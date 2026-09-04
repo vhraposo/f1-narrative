@@ -1,0 +1,780 @@
+// F1 Narrative Universe — Prisma Schema
+// Revisão conceitual do modelo de domínio.
+//
+// Princípios desta revisão:
+// - Character é o ator central do universo (controlado por USER ou AI).
+// - DriverProfile é o perfil esportivo opcional de um Character (1:0..1).
+// - WorldState mantém apenas referências escalares ao estado ativo, sem
+//   circularidade com Season/Race/Conversation.
+// - Relationship é única por par de personagens (simétrica, sem A→B e B→A).
+// - Memory pode envolver múltiplos personagens (N:N) e um evento (N:1).
+// - Event pode envolver múltiplos personagens participantes (N:N).
+// - Sem pgvector/embeddings inicial — adicionado na Fase 13 STEP 7 (ExternalChunk
+//   ganhou coluna vector(1024) + embeddedContentHash; provider Cohere, cosine).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Papel do usuário na aplicação.
+enum Role {
+  USER
+  ADMIN
+}
+
+/// Quem controla o comportamento de um Character dentro do universo.
+enum CharacterController {
+  USER
+  AI
+}
+
+enum SeasonStatus {
+  PRE_SEASON
+  ACTIVE
+  FINISHED
+}
+
+enum RaceStatus {
+  UPCOMING
+  QUALIFYING
+  RACE
+  FINISHED
+}
+
+/// Sessão ativa do fim de semana de corrida.
+enum RaceSession {
+  PRACTICE
+  QUALIFYING
+  RACE
+}
+
+enum ConversationType {
+  GROUP
+  DM
+}
+
+/// Origem (quem efetivamente enviou) de uma Message.
+enum MessageSenderType {
+  USER_CHARACTER
+  AI_CHARACTER
+  SYSTEM
+}
+
+enum MemoryImportance {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CanonSource {
+  CANON
+  USER_DEFINED
+  GENERATED_EVENT
+  EXTERNAL_INFORMATION
+}
+
+/// Categoria de uma origem externa (fonte pesquisada/ingestada).
+enum ExternalSourceType {
+  ARTICLE
+  WEBSITE
+  DOCUMENT
+  DATABASE
+  API
+  SEARCH_RESULT
+}
+
+/// Escopo de acesso a uma fonte externa.
+enum ExternalSourceVisibility {
+  PRIVATE
+  SHARED
+  PUBLIC
+}
+
+/// Estado de processamento de um documento externo.
+enum ExternalDocumentStatus {
+  NEW
+  READY
+  STALE
+  FAILED
+}
+
+enum EventType {
+  RACE
+  RACE_INCIDENT
+  RELATIONSHIP
+  SOCIAL
+  PERSONAL
+  NEWS
+  WORLD
+}
+
+enum EventImportance {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  TRAINING
+  TRAVELING
+  SLEEPING
+  RACE_WEEKEND
+  OFFLINE
+}
+
+/// Conta de acesso da aplicação.
+model User {
+  id            String  @id @default(uuid()) @db.Uuid
+  email         String  @unique
+  name          String
+  password      String?
+  role          Role    @default(USER)
+  emailVerified Boolean @default(false)
+  image         String?
+
+  characters      Character[]
+  sessions        Session[]
+  accounts        Account[]
+  teams           Team[]
+  externalSources ExternalSource[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Sessão de autenticação gerenciada pelo Better-Auth.
+model Session {
+  id        String   @id @default(uuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Conta de autenticação gerenciada pelo Better-Auth (email/password e,
+/// no futuro, provedores OAuth).
+model Account {
+  id                    String    @id @default(uuid())
+  accountId             String
+  providerId            String
+  issuer                String?
+  userId                String    @db.Uuid
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+/// Verificação de e-mail / códigos de validação (Better-Auth).
+model Verification {
+  id         String   @id @default(uuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+/// Atores do universo. Podem ser controlados pelo usuário ou pela IA.
+model Character {
+  id           String              @id @default(uuid()) @db.Uuid
+  userId       String?             @db.Uuid
+  user         User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  controlledBy CharacterController @default(USER)
+
+  name        String
+  nationality String
+  gender      String?
+  birthDate   DateTime
+  imageUrl    String?
+
+  // Character DNA — fonte de verdade para características narrativas
+  // (personalidade, temperamento, maneira de falar, gostos, hábitos, etc.)
+  dna       Json    @default("{}")
+  biography String?
+
+  // Perfil esportivo opcional (caso seja piloto)
+  driverProfile DriverProfile?
+
+  relationshipsA           Relationship[]            @relation("characterA")
+  relationshipsB           Relationship[]            @relation("characterB")
+  availability             CharacterAvailability?
+  schedules                CharacterSchedule[]
+  conversationParticipants ConversationParticipant[]
+  messages                 Message[]
+  memoryMemberships        MemoryCharacter[]
+  eventMemberships         EventCharacter[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Perfil esportivo de um Character que é piloto (0..1 por personagem).
+model DriverProfile {
+  id          String    @id @default(uuid()) @db.Uuid
+  characterId String    @unique @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  teamId String? @db.Uuid
+  team   Team?   @relation(fields: [teamId], references: [id])
+  number Int?
+
+  results               RaceResult[]
+  championshipStandings ChampionshipStanding[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([teamId])
+}
+
+/// Equipe esportiva (vínculo feito via perfil de piloto).
+/// As equipes são por usuário: `name` é único dentro do mesmo usuário,
+/// não globalmente.
+model Team {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  shortName      String?
+  color          String?
+  driverProfiles DriverProfile[]
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+/// Temporada do campeonato.
+model Season {
+  id     String       @id @default(uuid()) @db.Uuid
+  year   Int
+  name   String?
+  status SeasonStatus @default(PRE_SEASON)
+
+  races                 Race[]
+  championshipStandings ChampionshipStanding[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Não há @@unique([year]) global: múltiplos universos/linhas temporais
+  // podem coexistir no futuro, portanto o ano não é globalmente único.
+}
+
+/// Corrida do calendário de uma temporada.
+model Race {
+  id       String @id @default(uuid()) @db.Uuid
+  seasonId String @db.Uuid
+  season   Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  name    String
+  circuit String?
+  country String?
+  date    DateTime?
+  round   Int?
+  status  RaceStatus @default(UPCOMING)
+
+  results RaceResult[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([seasonId])
+  @@index([status])
+}
+
+/// Resultado esportivo determinístico de um piloto em uma corrida.
+/// Incidentes narrativos pertencem ao sistema de Events, não a este modelo.
+model RaceResult {
+  id              String        @id @default(uuid()) @db.Uuid
+  raceId          String        @db.Uuid
+  race            Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  driverProfileId String        @db.Uuid
+  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id])
+
+  position   Int?
+  points     Float   @default(0)
+  grid       Int?
+  fastestLap Boolean @default(false)
+  status     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([raceId, driverProfileId])
+  @@index([raceId])
+  @@index([driverProfileId])
+}
+
+/// Pontos acumulados de um piloto em uma temporada.
+model ChampionshipStanding {
+  id              String        @id @default(uuid()) @db.Uuid
+  seasonId        String        @db.Uuid
+  season          Season        @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  driverProfileId String        @db.Uuid
+  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id])
+
+  points   Float @default(0)
+  position Int?
+  wins     Int   @default(0)
+  podiums  Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([seasonId, driverProfileId])
+  @@index([seasonId])
+  @@index([driverProfileId])
+}
+
+// ---------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------
+
+/// Grupo ou conversa direta composta por Characters.
+model Conversation {
+  id    String           @id @default(uuid()) @db.Uuid
+  title String?
+  type  ConversationType @default(GROUP)
+
+  participants ConversationParticipant[]
+  messages     Message[]
+  ragFrames    ConversationRagFrame[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Participação de um Character em uma Conversation (N:N).
+model ConversationParticipant {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  characterId    String       @db.Uuid
+  character      Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
+
+  @@unique([conversationId, characterId])
+}
+
+/// Mensagem de chat. O remetente é identificado por senderType + characterId.
+/// - USER_CHARACTER / AI_CHARACTER: characterId obrigatório
+/// - SYSTEM: characterId deve ser null
+model Message {
+  id             String            @id @default(uuid()) @db.Uuid
+  conversationId String            @db.Uuid
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType     MessageSenderType
+  characterId    String?           @db.Uuid
+  character      Character?        @relation(fields: [characterId], references: [id])
+  content        String
+  createdAt      DateTime          @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// ---------------------------------------------------------------
+// Memória
+// ---------------------------------------------------------------
+
+/// Memória persistente do universo. Pode envolver múltiplos personagens
+/// (via MemoryCharacter) e pode ser originada por um Event.
+model Memory {
+  id      String  @id @default(uuid()) @db.Uuid
+  eventId String? @db.Uuid
+  event   Event?  @relation(fields: [eventId], references: [id])
+
+  importance      MemoryImportance  @default(LOW)
+  source          CanonSource       @default(USER_DEFINED)
+  content         String
+  summary         String?
+  context         Json?
+  participants    MemoryCharacter[]
+  emotionalImpact Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([importance])
+  @@index([eventId])
+}
+
+/// Associação N:N entre Memory e Character (personagens aos quais a memória é relevante).
+model MemoryCharacter {
+  id          String    @id @default(uuid()) @db.Uuid
+  memoryId    String    @db.Uuid
+  memory      Memory    @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  characterId String    @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([memoryId, characterId])
+}
+
+// ---------------------------------------------------------------
+// Relacionamentos
+// ---------------------------------------------------------------
+
+/// Relação simétrica única entre dois Characters (A↔B, nunca A→B e B→A).
+/// As dimensões narrativas evoluem no JSON `dimensions`.
+model Relationship {
+  id           String    @id @default(uuid()) @db.Uuid
+  characterAId String    @db.Uuid
+  characterA   Character @relation("characterA", fields: [characterAId], references: [id], onDelete: Cascade)
+  characterBId String    @db.Uuid
+  characterB   Character @relation("characterB", fields: [characterBId], references: [id], onDelete: Cascade)
+
+  // Dimensões multidimensionais (amizade, confiança, respeito, rivalidade, ...)
+  dimensions Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([characterAId, characterBId])
+  @@index([characterAId])
+}
+
+// ---------------------------------------------------------------
+// Eventos
+// ---------------------------------------------------------------
+
+/// Acontecimento do universo. Tipos bem definidos; o payload JSON carrega
+/// dados específicos do tipo. Pode envolver múltiplos Characters e gerar
+/// memórias e notícias.
+model Event {
+  id          String          @id @default(uuid()) @db.Uuid
+  type        EventType
+  importance  EventImportance @default(MEDIUM)
+  source      CanonSource     @default(GENERATED_EVENT)
+  title       String
+  description String?
+  worldDate   DateTime?
+  payload     Json?
+
+  participants EventCharacter[]
+  memories     Memory[]
+  newsItems    NewsItem[]
+
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([worldDate])
+}
+
+/// Associação N:N entre Event e Character (personagens participantes).
+model EventCharacter {
+  id          String    @id @default(uuid()) @db.Uuid
+  eventId     String    @db.Uuid
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  characterId String    @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, characterId])
+}
+
+// ---------------------------------------------------------------
+// Notícias e fontes externas
+// ---------------------------------------------------------------
+
+/// Notícia do universo, derivada de um Event.
+model NewsItem {
+  id        String      @id @default(uuid()) @db.Uuid
+  eventId   String?     @db.Uuid
+  event     Event?      @relation(fields: [eventId], references: [id])
+  title     String
+  body      String?
+  source    CanonSource @default(GENERATED_EVENT)
+  worldDate DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([worldDate])
+}
+
+/// Fonte pesquisada na web (feature futura — apenas modelo preparado).
+/// Representa a ORIGEM auditável de informação externa. Não é um documento:
+/// documentos (ExternalDocument) e chunks (ExternalChunk) derivam dela.
+model ExternalSource {
+  id          String                   @id @default(uuid()) @db.Uuid
+  url         String
+  title       String?
+  snippet     String?
+  reliability Int?
+  sourceType  ExternalSourceType?
+  visibility  ExternalSourceVisibility @default(PRIVATE)
+
+  // Proprietário opcional. Concede escopo de acesso (PRIVADO por padrão);
+  // PUBLIC/SHARED não exigem dono. Usuário deletado => SetNull (fonte pública
+  // sobrevive).
+  ownerId String? @db.Uuid
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  fetchedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  documents ExternalDocument[]
+
+  @@index([fetchedAt])
+  @@index([ownerId])
+  @@index([sourceType])
+}
+
+/// Documento externo obtido de uma ExternalSource. Conteúdo íntegro +
+/// contentHash para provenance e detecção de alterações (freshness).
+model ExternalDocument {
+  id          String                 @id @default(uuid()) @db.Uuid
+  sourceId    String                 @db.Uuid
+  source      ExternalSource         @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title       String
+  content     String
+  contentHash String
+  status      ExternalDocumentStatus @default(NEW)
+  publishedAt DateTime?
+  fetchedAt   DateTime               @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chunks ExternalChunk[]
+
+  // Mesma fonte + mesmo conteúdo => mesmo documento (evita duplicatas).
+  @@unique([sourceId, contentHash])
+  @@index([sourceId])
+  @@index([status])
+}
+
+/// Chunk textual de um ExternalDocument. Ordem original preservada via
+/// `orderOriginal`; contentHash para versionamento. O vetor de embedding é
+/// representado por um tipo customizado pgvector `vector(1024)` (Cohere
+/// `embed-multilingual-v3.0`, cosine) e é NULLABLE: um chunk pode existir sem
+/// embedding (ausência de vector NÃO é erro de storage). `embeddedContentHash`
+/// vincula o vetor ao contentHash exato que foi embeddado.
+model ExternalChunk {
+  id            String           @id @default(uuid()) @db.Uuid
+  documentId    String           @db.Uuid
+  document      ExternalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  text          String
+  orderOriginal Int
+  contentHash   String
+
+  // Metadata de provenance/versionamento do embedding (preenchida SOMENTE após
+  // um embedding real ser gerado e validado).
+  embeddingProvider   String?
+  embeddingModel      String?
+  embeddingVersion    String?
+  embeddingDimensions Int?
+
+  // Vetor pgvector (1024 dims) + contentHash embeddado. Unsupported porque o
+  // Prisma não tem tipo nativo para vector; leitura/escrita via SQL raw.
+  embedding           Unsupported("vector(1024)")?
+  embeddedContentHash String?
+
+  ragSnapshotItems ConversationRagSnapshotItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([documentId, orderOriginal])
+  @@index([documentId])
+}
+
+// ---------------------------------------------------------------
+// RAG materializado por Conversation (Fase 13 STEP 17)
+// ---------------------------------------------------------------
+
+/// Estado de uma definição de frame de pesquisa de uma Conversation.
+enum ConversationRagFrameStatus {
+  READY
+  FAILED
+}
+
+/// Estado de uma materialização de um frame.
+enum ConversationRagSnapshotStatus {
+  NEW
+  MATERIALIZING
+  READY
+  STALE
+  FAILED
+}
+
+/// Definição do que uma Conversation pesquisa em um determinado frame/tópico.
+/// O vínculo semântico entre Conversation e uma consulta de retrieval:
+///   Conversation → ConversationRagFrame (1:N).
+/// O `frameKey` é a identidade determinística do frame (hash de query +
+/// scope + config); `scopeSourceIds` usa `Json?` (lista de IDs de
+/// ExternalSource), seguindo a convenção de JSON do projeto. Ownership é
+/// herdado da Conversation — NÃO há ownerId redundante.
+model ConversationRagFrame {
+  id             String                     @id @default(uuid()) @db.Uuid
+  conversationId String                     @db.Uuid
+  conversation   Conversation               @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  queryText String
+  queryHash String
+
+  // Lista opcional de source IDs que restringem a retrieval (JSON array de
+  // UUIDs, canonicalizado+ordenado na escrita). Json não pode entrar em
+  // @@unique, então a identidade determinística vive em `frameKey`.
+  scopeSourceIds Json?
+
+  topK          Int
+  threshold     Float
+  provider      String
+  model         String
+  version       String
+  dimensions    Int
+  ruleApplied   String
+
+  // Identidade determinística do frame (queryHash + scopeSourceIds + config).
+  frameKey String
+
+  status    ConversationRagFrameStatus @default(READY)
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
+
+  snapshots ConversationRagSnapshot[]
+
+  @@unique([conversationId, frameKey])
+  @@index([conversationId, createdAt])
+}
+
+/// Uma materialização de um frame num determinado estado/freshness.
+/// "Qual materialização foi produzida" para o frame. `snapshotKey` é a
+/// identidade determinística da materialização (frameKey + freshnessAnchor).
+model ConversationRagSnapshot {
+  id      String                @id @default(uuid()) @db.Uuid
+  frameId String                @db.Uuid
+  frame   ConversationRagFrame  @relation(fields: [frameId], references: [id], onDelete: Cascade)
+
+  snapshotKey String
+
+  status    ConversationRagSnapshotStatus @default(NEW)
+  retrievedAt DateTime
+  // Hash determinístico das dependências que invalidam o resultado (chunk
+  // contentHash/embeddedContentHash + provider/model/version/dimensions/
+  // scope/config). CURRENT = READY cujo freshnessAnchor coincide com o estado
+  // de referência atual.
+  freshnessAnchor String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items ConversationRagSnapshotItem[]
+
+  @@unique([frameId, snapshotKey])
+  @@index([frameId, status])
+  @@index([status, retrievedAt])
+}
+
+/// Linha por item de um snapshot: quais chunks foram recuperados e com qual
+/// ranking. Apenas REFERÊNCIA a ExternalChunk (chunkId) + score/distance/
+/// order/citation. NÃO duplica content/embedding/vector — ExternalChunk
+/// continua dono do conteúdo e do vetor.
+model ConversationRagSnapshotItem {
+  id         String                 @id @default(uuid()) @db.Uuid
+  snapshotId String                 @db.Uuid
+  snapshot   ConversationRagSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  chunkId String @db.Uuid
+  chunk   ExternalChunk @relation(fields: [chunkId], references: [id], onDelete: Restrict)
+
+  score    Float
+  distance Float
+  order    Int
+  citation String
+
+  @@unique([snapshotId, chunkId])
+  @@index([chunkId])
+}
+
+// ---------------------------------------------------------------
+// Estado do mundo
+// ---------------------------------------------------------------
+
+/// Estado temporal atual do universo. Mantém apenas referências escalares
+/// (sem @relation) para o Season/Race/Conversation ativos, evitando
+/// circularidade. O mundo existe independentemente do chat.
+model WorldState {
+  id  String @id @default(uuid()) @db.Uuid
+  key String @unique @default("default")
+
+  currentDate     DateTime     @default(now())
+  currentSeasonId String?      @db.Uuid // referência escalar a Season (sem @relation)
+  currentRaceId   String?      @db.Uuid // referência escalar a Race (sem @relation)
+  currentSession  RaceSession?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------
+// Comportamento e disponibilidade
+// ---------------------------------------------------------------
+
+/// Estado atual de disponibilidade de um Character.
+model CharacterAvailability {
+  id          String    @id @default(uuid()) @db.Uuid
+  characterId String    @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  status AvailabilityStatus @default(AVAILABLE)
+  reason String?
+  since  DateTime           @default(now())
+  until  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([characterId])
+  @@index([status])
+}
+
+/// Rotina/agenda de um Character (eventos futuros programados).
+model CharacterSchedule {
+  id          String    @id @default(uuid()) @db.Uuid
+  characterId String    @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  activity String
+  startsAt DateTime
+  endsAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([characterId, startsAt])
+}

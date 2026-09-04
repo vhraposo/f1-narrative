@@ -1,0 +1,32 @@
+{
+  "name": "f1-narrative-universe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "F1 Narrative Universe — monorepo",
+  "scripts": {
+    "dev": "pnpm --parallel -r run dev",
+    "dev:web": "pnpm --filter @f1nw/web run dev",
+    "dev:api": "pnpm --filter @f1nw/api run dev",
+    "build": "pnpm --parallel -r run build",
+    "build:web": "pnpm --filter @f1nw/web run build",
+    "build:api": "pnpm --filter @f1nw/api run build",
+    "lint": "pnpm --parallel -r run lint",
+    "test": "pnpm --parallel -r run test",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
+  },
+  "devDependencies": {
+    "@prisma/client": "^6.19.0",
+    "prisma": "^6.19.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}
