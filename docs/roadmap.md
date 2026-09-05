@@ -278,8 +278,8 @@ Cada fase futura, ao ser executada, deve registrar:
 | Fase 10 | **ACCEPTED** |
 | Fase 11 | **ACCEPTED** |
 | Fase 12 | **ACCEPTED** |
-| Fase 13 | **PLANNED** |
+| Fase 13 | **ACCEPTED** |
 
-Nenhuma fase futura está marcada como iniciada ou concluída. As fases futuras
-planejadas são exatamente: **10 (Memory), 11 (Conversation/Chat), 12 (IA/Context
-Assembly), 13 (External Research/RAG)**. Não há outras fases planejadas além destas.
+Todas as fases planejadas — **10 (Memory), 11 (Conversation/Chat), 12 (IA/Context
+Assembly), 13 (External Research/RAG)** — foram concluídas e aceitas. Não há
+outras fases planejadas além destas.
