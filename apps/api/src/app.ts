@@ -25,6 +25,11 @@ import conversationRagMaterializeRoutes, {
   type ConversationRagMaterializeRoutesOptions,
 } from "./modules/context/conversation-rag-materialize.routes.js";
 import generationRoutes from "./modules/generation/generation.routes.js";
+import generationGenerateRoutes from "./modules/generation/generation-generate.routes.js";
+import {
+  nullProvider,
+  type GenerationProvider,
+} from "./modules/generation/generation.assembly.js";
 import type { EmbeddingProviderWithInputType } from "./modules/external-research/external-embedding-store.js";
 import {
   COHERE_MODEL,
@@ -52,6 +57,7 @@ function defaultRagProvider(): EmbeddingProviderWithInputType {
 
 export function buildApp(
   ragProvider?: EmbeddingProviderWithInputType,
+  generationProvider?: GenerationProvider,
 ): FastifyInstance {
   const app = Fastify({
     logger: {
@@ -102,6 +108,9 @@ export function buildApp(
   };
   void app.register(conversationRagMaterializeRoutes, materializeOptions);
   void app.register(generationRoutes);
+  void app.register(generationGenerateRoutes, {
+    provider: generationProvider ?? nullProvider,
+  });
 
   return app;
 }
