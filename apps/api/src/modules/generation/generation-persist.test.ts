@@ -11,7 +11,6 @@ import {
   GenerationSpeakerTargetError,
   type GenerationProvider,
   type GenerationResult,
-  type ProviderInput,
 } from "./generation.assembly.js";
 import { persistGeneratedMessage } from "./generation-persist.js";
 
@@ -39,8 +38,6 @@ let ownerCharId: string;
 let aiAId: string;
 let aiBId: string;
 let conversationId: string;
-
-type Capture = { input?: ProviderInput; calls: number };
 
 function spyGeneratedProvider(text = "resposta spy"): GenerationProvider {
   return {
@@ -237,6 +234,7 @@ it("D) generated sem text → 0 Message", async () => {
   const result = syntheticResult({ mode: "generated", conversationId, speakerCharacterId: aiAId, text: "  " });
   const decision = await persistGeneratedMessage(prisma, result, owner.userId);
   expect(decision.persisted).toBe(false);
+  if (decision.persisted) throw new Error("esperava não persistir");
   expect(decision.reason).toBe("missing-or-empty-text");
   expect(await messageCountFor(conversationId)).toBe(1); // inalterado
 });
@@ -306,6 +304,7 @@ it("H) conversation sem ownership → 0 Message", async () => {
   const result = syntheticResult({ mode: "generated", conversationId: foreignConvId, speakerCharacterId: aiAId });
   const decision = await persistGeneratedMessage(prisma, result, owner.userId);
   expect(decision.persisted).toBe(false);
+  if (decision.persisted) throw new Error("esperava não persistir");
   expect(decision.reason).toBe("no-conversation-access");
   expect(await prisma.message.count({ where: { conversationId: foreignConvId } })).toBe(0);
 });
@@ -370,6 +369,7 @@ it("K) NullProvider assembly-only → não persiste Message", async () => {
   expect(base.meta.mode).toBe("assembly-only");
   const decision = await persistGeneratedMessage(prisma, base, owner.userId);
   expect(decision.persisted).toBe(false);
+  if (decision.persisted) throw new Error("esperava não persistir");
   expect(decision.reason).toBe("mode-not-generated");
 });
 
