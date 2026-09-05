@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { assembleContext } from "./context.assembly.js";
+import { canonicalizeRelationshipPair } from "../relationships/relationship.pair.js";
 
 // Testes do Context Assembly (Fase 12, determinístico, SEM LLM).
 // Todos os artefatos criados são rastreados e removidos em afterAll, devolvendo
@@ -864,7 +865,7 @@ describe("Context - determinismo", () => {
     });
     // Relationship USER+AI (via prisma, pois a API exige ownership dos dois lados).
     await prisma.relationship.create({
-      data: { characterAId: charA.id, characterBId: aiB.id },
+      data: canonicalizeRelationshipPair(charA.id, aiB.id),
     }).then((r) => createdRelationshipIds.push(r.id));
 
     await prisma.message.createMany({

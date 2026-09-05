@@ -10,6 +10,7 @@ import {
   GENERATION_VERSION,
   GENERATION_RULE,
 } from "./generation.assembly.js";
+import { canonicalizeRelationshipPair } from "../relationships/relationship.pair.js";
 
 // Testes da orquestração de Generation (Fase 12 STEP 3, determinístico, SEM LLM).
 // Fixtures criadas principalmente via Prisma direto (evita o rate-limit da API);
@@ -159,7 +160,9 @@ async function createRelationshipDirect(
 ): Promise<{ id: string }> {
   return track(
     createdRelationshipIds,
-    await prisma.relationship.create({ data: { characterAId, characterBId } }),
+    await prisma.relationship.create({
+      data: canonicalizeRelationshipPair(characterAId, characterBId),
+    }),
   );
 }
 
@@ -493,7 +496,9 @@ describe("Generation - composição e sections", () => {
     const mems = gen.context.memories.map((m) => m.content);
     expect(mems).toContain("Carlos venceu em Interlagos");
     expect(mems).toContain("Ana treinou grid de inicio");
-    expect(gen.context.relationships.map((r) => r.characterAName)).toEqual(["Carlos"]);
+    expect(
+      gen.context.relationships.map((r) => [r.characterAName, r.characterBName].sort()),
+    ).toContainEqual(["Ana (AI)", "Carlos"].sort());
     expect(gen.context.events.map((e) => e.title)).toContain("Anuncio de temporada");
     expect(gen.context.news.map((n) => n.title)).toContain("Corrida historica em Interlagos");
     expect(gen.context.motorsport).toBeNull();

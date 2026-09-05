@@ -142,6 +142,9 @@ describe("POST /api/relationships", () => {
     });
     expect(statusCode).toBe(201);
     expect(involves(json.relationship as Relationship, a.id, b.id)).toBe(true);
+    const [minId, maxId] = [a.id, b.id].sort();
+    expect((json.relationship as Relationship).characterAId).toBe(minId);
+    expect((json.relationship as Relationship).characterBId).toBe(maxId);
     expect((json.relationship as Relationship).dimensions).toEqual({});
   });
 
@@ -240,6 +243,32 @@ describe("POST /api/relationships", () => {
     expect(first.statusCode).toBe(201);
     const reversed = await createRelationship(u, { characterAId: g.id, characterBId: f.id });
     expect(reversed.statusCode).toBe(409);
+  });
+
+  it("ordem reversa (B,A) → 201 com par canônico persistido e leitura preservando o par", async () => {
+    const j = await createCharacter(u, { name: "J", nationality: "Sul-africana", birthDate: "1987-01-01" });
+    const k = await createCharacter(u, { name: "K", nationality: "Canadense", birthDate: "1986-01-01" });
+    const { statusCode, json } = await createRelationship(u, {
+      characterAId: k.id,
+      characterBId: j.id,
+    });
+    expect(statusCode).toBe(201);
+    const created = json.relationship as Relationship;
+    const [minId, maxId] = [j.id, k.id].sort();
+    expect(created.characterAId).toBe(minId);
+    expect(created.characterBId).toBe(maxId);
+
+    const read = await app.inject({
+      method: "GET",
+      url: `/api/relationships/${created.id}`,
+      headers: { cookie: u.cookie },
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.json().relationship.characterAId).toBe(minId);
+    expect(read.json().relationship.characterBId).toBe(maxId);
+
+    const dup = await createRelationship(u, { characterAId: j.id, characterBId: k.id });
+    expect(dup.statusCode).toBe(409);
   });
 
   it("concorrência (A,B) e (B,A) — apenas uma vence, a outra 409", async () => {

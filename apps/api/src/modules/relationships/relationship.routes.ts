@@ -6,6 +6,7 @@ import {
   relationshipIdParamsSchema,
   updateRelationshipSchema,
 } from "./relationship.schema.js";
+import { canonicalizeRelationshipPair } from "./relationship.pair.js";
 
 const characterSelect = {
   id: true,
@@ -13,14 +14,6 @@ const characterSelect = {
   nationality: true,
   imageUrl: true,
 } as const;
-
-// A ordem canônica (LEAST/GREATEST) resolve a duplicidade simétrica na
-// camada de aplicação, sem alterar schema/migration: (A,B) e (B,A) passam a
-// colidir no mesmo par normalizado.
-function normalizePair(a: string, b: string): { a: string; b: string } {
-  const [min, max] = a < b ? [a, b] : [b, a];
-  return { a: min, b: max };
-}
 
 // Detecta erros conhecidos do Prisma (violação de unique) e os converte em
 // resposta previsível de conflito (409).
@@ -95,7 +88,7 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Ordem canônica para persistência (A = menor, B = maior).
-      const { a: characterAId, b: characterBId } = normalizePair(
+      const { characterAId, characterBId } = canonicalizeRelationshipPair(
         originalA,
         originalB,
       );
