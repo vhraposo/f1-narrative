@@ -142,3 +142,39 @@ export function createMessage(
 ): Promise<Message> {
   return post<Message>(`/api/conversations/${conversationId}/messages`, input);
 }
+
+export type GenerateMessageInput = {
+  userPrompt: string;
+  targetCharacterId: string;
+};
+
+// Resposta real de geração (201): o backend já persistiu a Message AI.
+export type GeneratedMessageResponse = {
+  message: Message;
+  generationKey: string;
+  provider: string;
+  mode: string;
+};
+
+// Resposta assembly-only (200, default NullProvider): o backend NÃO persiste.
+// Nunca tratar responseSkeleton como Message.
+export type AssemblyOnlyResponse = {
+  generation: {
+    generationKey: string;
+    provider: string;
+    mode: string;
+  };
+  responseSkeleton: unknown;
+};
+
+export type GenerateResponse = GeneratedMessageResponse | AssemblyOnlyResponse;
+
+export function generateMessage(
+  conversationId: string,
+  input: GenerateMessageInput,
+): Promise<GenerateResponse> {
+  return post<GenerateResponse>(
+    `/api/conversations/${conversationId}/generate`,
+    input,
+  );
+}
