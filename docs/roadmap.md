@@ -283,3 +283,19 @@ Cada fase futura, ao ser executada, deve registrar:
 Todas as fases planejadas — **10 (Memory), 11 (Conversation/Chat), 12 (IA/Context
 Assembly), 13 (External Research/RAG)** — foram concluídas e aceitas. Não há
 outras fases planejadas além destas.
+
+**Entregas pós-F13:** após a aceitação da Fase 13, foram realizadas entregas de
+implementação — sem constituir novas fases formais — que completam e
+operacionalizam o escopo já previsto na Fase 12 (IA/Context Assembly) e integram
+o RAG ao runtime de geração:
+
+- catálogo oficial de AI Characters + seed;
+- runtime real de geração via Ollama sobre o Context Assembly;
+- rota `/generate`;
+- persistência de mensagens produzidas por IA;
+- fluxo USER → IA no frontend (turno completo);
+- integração do `ragFrameId` ao fluxo de geração (RAG ao vivo: Cohere + pgvector).
+
+Essas entregas foram implementadas, testadas e validadas ao vivo (geração real
+com Ollama e RAG real com Cohere + pgvector) e devem ser tratadas como evolução
+pós-F13.
