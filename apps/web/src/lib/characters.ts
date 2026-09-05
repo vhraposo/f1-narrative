@@ -14,6 +14,17 @@ export type Character = {
   updatedAt: string;
 };
 
+// AI Character oficial do catálogo de sistema (dados controlados por IA,
+// sempre userId = null).
+export type AiCharacter = {
+  id: string;
+  name: string;
+  nationality: string;
+  imageUrl: string | null;
+  controlledBy: "AI";
+  userId: null;
+};
+
 export type CreateCharacterInput = {
   name: string;
   nationality: string;
@@ -30,6 +41,12 @@ type ItemResponse = { character: Character };
 
 export function listCharacters(): Promise<Character[]> {
   return get<ListResponse>("/api/characters").then((r) => r.characters);
+}
+
+export function listAiCharacters(): Promise<AiCharacter[]> {
+  return get<{ characters: AiCharacter[] }>("/api/characters/ai").then(
+    (r) => r.characters,
+  );
 }
 
 export function getCharacter(id: string): Promise<Character> {

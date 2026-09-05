@@ -22,6 +22,17 @@ const characterSelect = {
   updatedAt: true,
 } as const;
 
+// Catálogo oficial de AI Characters (dados de sistema: controlledBy = AI,
+// userId = null). GET-only; expõe somente o mínimo necessário à seleção.
+const aiCharacterSelect = {
+  id: true,
+  name: true,
+  nationality: true,
+  imageUrl: true,
+  controlledBy: true,
+  userId: true,
+} as const;
+
 export const charactersRoutes: FastifyPluginAsync = async (fastify) => {
   // Listar os personagens do usuário autenticado.
   fastify.get("/api/characters", { preHandler: [fastify.authenticate] }, async (request) => {
@@ -33,6 +44,21 @@ export const charactersRoutes: FastifyPluginAsync = async (fastify) => {
     });
     return { characters };
   });
+
+  // Catálogo oficial de AI Characters (dados de sistema, userId = null).
+  // Autenticado como os demais endpoints de Character; não depende do caller.
+  fastify.get(
+    "/api/characters/ai",
+    { preHandler: [fastify.authenticate] },
+    async (_request, reply) => {
+      const characters = await prisma.character.findMany({
+        where: { controlledBy: "AI", userId: null },
+        select: aiCharacterSelect,
+        orderBy: { name: "asc" },
+      });
+      return reply.send({ characters });
+    },
+  );
 
   // Criar personagem. userId e controlledBy são definidos pelo servidor.
   fastify.post("/api/characters", { preHandler: [fastify.authenticate] }, async (request, reply) => {

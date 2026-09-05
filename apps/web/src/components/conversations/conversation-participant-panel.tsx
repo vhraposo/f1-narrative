@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useCharacters } from "@/hooks/use-characters";
+import { useAiCharacters, useCharacters } from "@/hooks/use-characters";
 import {
   useAddConversationParticipant,
   useConversationParticipants,
@@ -36,6 +36,7 @@ export function ConversationParticipantPanel({
 }: ConversationParticipantPanelProps) {
   const participantsQuery = useConversationParticipants(conversationId);
   const charactersQuery = useCharacters();
+  const aiCharactersQuery = useAiCharacters();
   const addMutation = useAddConversationParticipant(conversationId);
   const removeMutation = useRemoveConversationParticipant(conversationId);
 
@@ -54,14 +55,17 @@ export function ConversationParticipantPanel({
 
   const participants = participantsQuery.data ?? [];
   const characters = charactersQuery.data ?? [];
+  const aiCharacters = aiCharactersQuery.data ?? [];
   const participatingIds = new Set(participants.map((p) => p.id));
-  const availableCharacters = characters.filter(
+  const availableCharacters = [...characters, ...aiCharacters].filter(
     (c) => !participatingIds.has(c.id),
   );
 
   const characterOptions = availableCharacters.map((c) => ({
     id: c.id,
-    label: `${c.name}${c.nationality ? ` (${c.nationality})` : ""}`,
+    label: `${c.name}${c.nationality ? ` (${c.nationality})` : ""}${
+      c.controlledBy === "AI" ? " — IA" : ""
+    }`,
   }));
 
   function handleAdd(values: AddParticipantValues) {
@@ -154,7 +158,7 @@ export function ConversationParticipantPanel({
             </p>
           )}
 
-        {charactersQuery.isLoading ? (
+        {charactersQuery.isLoading || aiCharactersQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">
             Carregando personagens...
           </p>
@@ -162,11 +166,15 @@ export function ConversationParticipantPanel({
           <p className="text-sm text-destructive">
             Não foi possível carregar seus personagens.
           </p>
+        ) : aiCharactersQuery.isError ? (
+          <p className="text-sm text-destructive">
+            Não foi possível carregar os personagens de IA.
+          </p>
         ) : characterOptions.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {characters.length === 0
+            {characters.length === 0 && aiCharacters.length === 0
               ? "Você ainda não tem personagens para adicionar."
-              : "Todos os seus personagens já participam desta conversa."}
+              : "Todos os personagens disponíveis já participam desta conversa."}
           </p>
         ) : (
           <form
@@ -197,8 +205,7 @@ export function ConversationParticipantPanel({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Personagens de IA não listados aqui ainda podem participar da
-                conversa.
+                Personagens de IA oficiais também podem participar da conversa.
               </p>
               {errors.characterId && (
                 <p className="text-sm text-destructive">

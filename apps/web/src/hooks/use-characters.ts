@@ -5,6 +5,7 @@ import {
   createCharacter,
   deleteCharacter,
   getCharacter,
+  listAiCharacters,
   listCharacters,
   updateCharacter,
   type Character,
@@ -14,6 +15,8 @@ import {
 
 export const charactersKey = ["characters"] as const;
 
+export const aiCharactersKey = ["characters", "ai"] as const;
+
 function characterKey(id: string) {
   return ["characters", id] as const;
 }
@@ -22,6 +25,13 @@ export function useCharacters() {
   return useQuery({
     queryKey: charactersKey,
     queryFn: listCharacters,
+  });
+}
+
+export function useAiCharacters() {
+  return useQuery({
+    queryKey: aiCharactersKey,
+    queryFn: listAiCharacters,
   });
 }
 
