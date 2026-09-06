@@ -1,12 +1,11 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
-import { SignOutButton } from "@/components/auth/sign-out-button";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { useSession } from "@/providers/session-provider";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -38,69 +37,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  const userName = data.user?.name ?? "Piloto";
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/app" className="text-sm font-semibold text-muted-foreground">
-              F1 Narrative Universe
-            </Link>
-            <nav className="flex items-center gap-4 text-sm">
-              <Link
-                href="/app/characters"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Personagens
-              </Link>
-              <Link
-                href="/app/drivers"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Pilotos
-              </Link>
-              <Link
-                href="/app/teams"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Equipes
-              </Link>
-              <Link
-                href="/app/relationships"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Relacionamentos
-              </Link>
-              <Link
-                href="/app/championship"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Campeonato
-              </Link>
-              <Link
-                href="/app/events"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Eventos
-              </Link>
-              <Link
-                href="/app/conversations"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Conversas
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <span className="text-sm text-muted-foreground">
-              {data.user?.name}
-            </span>
-            <SignOutButton />
-          </div>
-        </div>
-      </header>
-      <main className="container flex-1 py-8">{children}</main>
+    <div className="min-h-screen bg-background">
+      <AppSidebar userName={userName} />
+      <MobileNav userName={userName} />
+      <div className="lg:pl-64">
+        <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
