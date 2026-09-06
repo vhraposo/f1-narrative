@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useSession } from "@/providers/session-provider";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -91,6 +92,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">
               {data.user?.name}
             </span>
