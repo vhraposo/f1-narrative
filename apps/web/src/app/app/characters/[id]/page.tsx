@@ -10,6 +10,8 @@ import { DriverProfileForm } from "@/components/drivers/driver-profile-form";
 import { MemorySection } from "@/components/memory/memory-section";
 import { ScheduleCard } from "@/components/schedule/schedule-card";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { useCharacter } from "@/hooks/use-characters";
 import {
   useDeleteDriver,
@@ -81,22 +83,23 @@ export default function CharacterDetailPage() {
 
   if (isError || !character) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Personagem não encontrado
-        </h1>
-        <p className="text-muted-foreground">
-          {error instanceof Error
+      <ErrorState
+        heading="h1"
+        title="Personagem não encontrado"
+        description={
+          error instanceof Error
             ? error.message
-            : "Não foi possível carregar o personagem."}
-        </p>
-        <Button
-          variant="outline"
-          onClick={() => router.push("/app/characters")}
-        >
-          Voltar para personagens
-        </Button>
-      </div>
+            : "Não foi possível carregar o personagem."
+        }
+        action={
+          <Button
+            variant="outline"
+            onClick={() => router.push("/app/characters")}
+          >
+            Voltar para personagens
+          </Button>
+        }
+      />
     );
   }
 
@@ -107,25 +110,22 @@ export default function CharacterDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {character.name}
-          </h1>
-          <p className="text-muted-foreground">
-            {character.nationality}
-            {character.gender ? ` · ${character.gender}` : ""}
-            {character.birthDate ? ` · Nascido(a): ${birthLabel}` : ""}
-          </p>
-        </div>
-        <Link
-          href={`/app/characters/${character.id}/edit`}
-          className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <Pencil className="mr-2 h-4 w-4" />
-          Editar personagem
-        </Link>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / PERSONAGENS"
+        title={character.name}
+        description={`${character.nationality}${
+          character.gender ? ` · ${character.gender}` : ""
+        }${character.birthDate ? ` · Nascido(a): ${birthLabel}` : ""}`}
+        action={
+          <Link
+            href={`/app/characters/${character.id}/edit`}
+            className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Editar personagem
+          </Link>
+        }
+      />
 
       {character.biography && (
         <p className="text-muted-foreground">{character.biography}</p>

@@ -6,6 +6,9 @@ import { useState } from "react";
 
 import { CharacterCard } from "@/components/characters/character-card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { useCharacters, useDeleteCharacter } from "@/hooks/use-characters";
 import type { Character } from "@/lib/characters";
 
@@ -13,7 +16,8 @@ const primaryLinkStyles =
   "inline-flex items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 export default function CharactersPage() {
-  const { data, isLoading, isError, error, refetch } = useCharacters();
+  const { data, isLoading, isError, isRefetching, error, refetch } =
+    useCharacters();
   const deleteMutation = useDeleteCharacter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -26,18 +30,17 @@ export default function CharactersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Personagens</h1>
-          <p className="text-muted-foreground">
-            Seus personagens do universo narrativo.
-          </p>
-        </div>
-        <Link href="/app/characters/new" className={primaryLinkStyles}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo personagem
-        </Link>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / PERSONAGENS"
+        title="Personagens"
+        description="Seus personagens do universo narrativo."
+        action={
+          <Link href="/app/characters/new" className={primaryLinkStyles}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo personagem
+          </Link>
+        }
+      />
 
       {isLoading && (
         <div className="flex justify-center py-16">
@@ -46,37 +49,36 @@ export default function CharactersPage() {
       )}
 
       {isError && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-destructive">
-            Não foi possível carregar os personagens.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "Erro desconhecido"}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => void refetch()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
+        <ErrorState
+          title="Dados indisponíveis"
+          description="Não foi possível carregar os personagens."
+          detail={error instanceof Error ? error.message : "Erro desconhecido"}
+          action={
+            <Button
+              variant="outline"
+              onClick={() => void refetch()}
+              disabled={isRefetching}
+            >
+              {isRefetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Tentar novamente
+            </Button>
+          }
+        />
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-muted-foreground">
-            Você ainda não tem personagens.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Crie seu primeiro personagem para começar a narrativa.
-          </p>
-          <Link href="/app/characters/new" className={primaryLinkStyles}>
-            <Plus className="mr-2 h-4 w-4" />
-            Criar personagem
-          </Link>
-        </div>
+        <EmptyState
+          title="Você ainda não tem personagens."
+          description="Crie seu primeiro personagem para começar a narrativa."
+          action={
+            <Link href="/app/characters/new" className={primaryLinkStyles}>
+              <Plus className="mr-2 h-4 w-4" />
+              Criar personagem
+            </Link>
+          }
+        />
       )}
 
       {data && data.length > 0 && (

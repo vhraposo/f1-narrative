@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EventForm } from "@/components/events/event-form";
+import { PageHeader } from "@/components/ui/page-header";
 import { useCreateEvent } from "@/hooks/use-events";
 import type { CreateEventInput } from "@/lib/events";
 
@@ -27,12 +28,11 @@ export default function NewEventPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Novo evento</h1>
-        <p className="text-muted-foreground">
-          Registre um evento na sua narrativa.
-        </p>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / EVENTOS"
+        title="Novo evento"
+        description="Registre um evento na sua narrativa."
+      />
       <EventForm
         isSubmitting={createMutation.isPending}
         error={error}

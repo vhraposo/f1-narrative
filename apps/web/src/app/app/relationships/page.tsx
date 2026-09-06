@@ -6,6 +6,9 @@ import { useState } from "react";
 import { RelationshipCard } from "@/components/relationships/relationship-card";
 import { RelationshipForm } from "@/components/relationships/relationship-form";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { useCharacters } from "@/hooks/use-characters";
 import {
   useCreateRelationship,
@@ -26,6 +29,7 @@ export default function RelationshipsPage() {
     data: relationships,
     isLoading,
     isError,
+    isRefetching,
     error,
     refetch,
   } = useRelationships();
@@ -115,20 +119,19 @@ export default function RelationshipsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Relacionamentos</h1>
-          <p className="text-muted-foreground">
-            As relações entre personagens do seu universo.
-          </p>
-        </div>
-        {form.mode === "hidden" && !isLoading && !isError && needsCharacters && (
-          <Button onClick={() => setForm({ mode: "create" })}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova relação
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / RELACIONAMENTOS"
+        title="Relacionamentos"
+        description="As relações entre personagens do seu universo."
+        action={
+          form.mode === "hidden" && !isLoading && !isError && needsCharacters ? (
+            <Button onClick={() => setForm({ mode: "create" })}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova relação
+            </Button>
+          ) : undefined
+        }
+      />
 
       {form.mode !== "hidden" && (
         <RelationshipForm
@@ -153,41 +156,37 @@ export default function RelationshipsPage() {
       )}
 
       {isError && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-destructive">
-            Não foi possível carregar os relacionamentos.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "Erro desconhecido"}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => void refetch()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
+        <ErrorState
+          title="Dados indisponíveis"
+          description="Não foi possível carregar os relacionamentos."
+          detail={error instanceof Error ? error.message : "Erro desconhecido"}
+          action={
+            <Button
+              variant="outline"
+              onClick={() => void refetch()}
+              disabled={isRefetching}
+            >
+              {isRefetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Tentar novamente
+            </Button>
+          }
+        />
       )}
 
       {!isLoading && !isError && relationships && relationships.length === 0 && (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-muted-foreground">
-            Você ainda não tem relacionamentos.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Crie pelo menos dois personagens e vincule-os entre si.
-          </p>
-          {characters.length >= 2 && form.mode === "hidden" && (
-            <Button
-              className="mt-4"
-              onClick={() => setForm({ mode: "create" })}
-            >
-              Criar relação
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          title="Você ainda não tem relacionamentos."
+          description="Crie pelo menos dois personagens e vincule-os entre si."
+          action={
+            characters.length >= 2 && form.mode === "hidden" ? (
+              <Button onClick={() => setForm({ mode: "create" })}>
+                Criar relação
+              </Button>
+            ) : undefined
+          }
+        />
       )}
 
       {relationships && relationships.length > 0 && (

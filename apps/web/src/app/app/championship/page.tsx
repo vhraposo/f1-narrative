@@ -10,6 +10,9 @@ import { SeasonCard } from "@/components/championship/season-card";
 import { SeasonForm } from "@/components/championship/season-form";
 import { StandingsPanel } from "@/components/championship/standings-panel";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   useCreateRace,
   useCreateSeason,
@@ -34,7 +37,13 @@ type RaceFormState =
   | { mode: "edit"; race: Race };
 
 export default function ChampionshipPage() {
-  const { data: seasons, isLoading, isError } = useSeasons();
+  const {
+    data: seasons,
+    isLoading,
+    isError,
+    isRefetching: seasonsRefetching,
+    refetch: refetchSeasons,
+  } = useSeasons();
   const createSeasonMutation = useCreateSeason();
   const updateSeasonMutation = useUpdateSeason();
   const deleteSeasonMutation = useDeleteSeason();
@@ -59,6 +68,8 @@ export default function ChampionshipPage() {
     data: races,
     isLoading: racesLoading,
     isError: racesError,
+    isRefetching: racesRefetching,
+    refetch: refetchRaces,
   } = useRaces(selectedSeasonId ?? "");
 
   const createRaceMutation = useCreateRace(selectedSeasonId ?? "");
@@ -188,20 +199,24 @@ export default function ChampionshipPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Campeonato</h1>
-          <p className="text-muted-foreground">
-            Temporadas, corridas, resultados e classificação do seu universo.
-          </p>
-        </div>
-        {seasonForm.mode === "hidden" && !isLoading && !isError && (
-          <Button onClick={() => setSeasonForm({ mode: "create" })}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova temporada
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / CAMPEONATO"
+        title="Campeonato"
+        description="Temporadas, corridas, resultados e classificação do seu universo."
+        meta={
+          seasons && seasons.length > 0
+            ? `${seasons.length} temporada${seasons.length === 1 ? "" : "s"}`
+            : undefined
+        }
+        action={
+          seasonForm.mode === "hidden" && !isLoading && !isError ? (
+            <Button onClick={() => setSeasonForm({ mode: "create" })}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova temporada
+            </Button>
+          ) : undefined
+        }
+      />
 
       {seasonForm.mode !== "hidden" && (
         <SeasonForm
@@ -231,12 +246,22 @@ export default function ChampionshipPage() {
       )}
 
       {isError && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-destructive">
-            Não foi possível carregar as temporadas.
-          </p>
-          <p className="text-sm text-muted-foreground">Tente novamente.</p>
-        </div>
+        <ErrorState
+          title="Dados indisponíveis"
+          description="Não foi possível carregar as temporadas."
+          action={
+            <Button
+              variant="outline"
+              onClick={() => void refetchSeasons()}
+              disabled={seasonsRefetching}
+            >
+              {seasonsRefetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Tentar novamente
+            </Button>
+          }
+        />
       )}
 
       {!isLoading && !isError && seasons && seasons.length > 0 && (
@@ -260,22 +285,17 @@ export default function ChampionshipPage() {
       )}
 
       {!isLoading && !isError && seasons && seasons.length === 0 && (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-muted-foreground">
-            Você ainda não tem temporadas.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Crie uma temporada para começar o campeonato.
-          </p>
-          {seasonForm.mode === "hidden" && (
-            <Button
-              className="mt-4"
-              onClick={() => setSeasonForm({ mode: "create" })}
-            >
-              Criar temporada
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          title="Você ainda não tem temporadas."
+          description="Crie uma temporada para começar o campeonato."
+          action={
+            seasonForm.mode === "hidden" ? (
+              <Button onClick={() => setSeasonForm({ mode: "create" })}>
+                Criar temporada
+              </Button>
+            ) : undefined
+          }
+        />
       )}
 
       {selectedSeason && (
@@ -329,9 +349,24 @@ export default function ChampionshipPage() {
           )}
 
           {racesError && (
-            <p className="text-sm text-destructive">
-              Não foi possível carregar as corridas.
-            </p>
+            <ErrorState
+              className="py-6 sm:py-8"
+              title="Dados indisponíveis"
+              description="Não foi possível carregar as corridas."
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void refetchRaces()}
+                  disabled={racesRefetching}
+                >
+                  {racesRefetching ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Tentar novamente
+                </Button>
+              }
+            />
           )}
 
           {!racesLoading && !racesError && races && races.length > 0 && (
@@ -354,11 +389,10 @@ export default function ChampionshipPage() {
           )}
 
           {!racesLoading && !racesError && races && races.length === 0 && (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="text-muted-foreground">
-                Nenhuma corrida nesta temporada ainda.
-              </p>
-            </div>
+            <EmptyState
+              className="py-6 sm:py-8"
+              title="Nenhuma corrida nesta temporada ainda."
+            />
           )}
 
           {openRaceResults && (

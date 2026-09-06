@@ -6,6 +6,9 @@ import { useState } from "react";
 import { TeamCard } from "@/components/teams/team-card";
 import { TeamForm } from "@/components/teams/team-form";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   useCreateTeam,
   useDeleteTeam,
@@ -20,7 +23,8 @@ type FormState =
   | { mode: "edit"; team: Team };
 
 export default function TeamsPage() {
-  const { data, isLoading, isError, error, refetch } = useTeams();
+  const { data, isLoading, isError, isRefetching, error, refetch } =
+    useTeams();
   const createMutation = useCreateTeam();
   const updateMutation = useUpdateTeam();
   const deleteMutation = useDeleteTeam();
@@ -89,20 +93,19 @@ export default function TeamsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Equipes</h1>
-          <p className="text-muted-foreground">
-            As equipes do seu universo narrativo.
-          </p>
-        </div>
-        {form.mode === "hidden" && !isLoading && !isError && (
-          <Button onClick={() => setForm({ mode: "create" })}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova equipe
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / EQUIPES"
+        title="Equipes"
+        description="As equipes do seu universo narrativo."
+        action={
+          form.mode === "hidden" && !isLoading && !isError ? (
+            <Button onClick={() => setForm({ mode: "create" })}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova equipe
+            </Button>
+          ) : undefined
+        }
+      />
 
       {form.mode !== "hidden" && (
         <TeamForm
@@ -132,41 +135,37 @@ export default function TeamsPage() {
       )}
 
       {isError && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-destructive">
-            Não foi possível carregar as equipes.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "Erro desconhecido"}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => void refetch()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
+        <ErrorState
+          title="Dados indisponíveis"
+          description="Não foi possível carregar as equipes."
+          detail={error instanceof Error ? error.message : "Erro desconhecido"}
+          action={
+            <Button
+              variant="outline"
+              onClick={() => void refetch()}
+              disabled={isRefetching}
+            >
+              {isRefetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Tentar novamente
+            </Button>
+          }
+        />
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-muted-foreground">
-            Você ainda não tem equipes.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Crie uma equipe para começar e depois vincule seus pilotos a ela.
-          </p>
-          {form.mode === "hidden" && (
-            <Button
-              className="mt-4"
-              onClick={() => setForm({ mode: "create" })}
-            >
-              Criar equipe
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          title="Você ainda não tem equipes."
+          description="Crie uma equipe para começar e depois vincule seus pilotos a ela."
+          action={
+            form.mode === "hidden" ? (
+              <Button onClick={() => setForm({ mode: "create" })}>
+                Criar equipe
+              </Button>
+            ) : undefined
+          }
+        />
       )}
 
       {data && data.length > 0 && (

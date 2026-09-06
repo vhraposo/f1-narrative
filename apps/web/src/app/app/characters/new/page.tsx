@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { CharacterForm } from "@/components/characters/character-form";
+import { PageHeader } from "@/components/ui/page-header";
 import { useCreateCharacter } from "@/hooks/use-characters";
 import type { CreateCharacterInput } from "@/lib/characters";
 
@@ -27,14 +28,11 @@ export default function NewCharacterPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Novo personagem
-        </h1>
-        <p className="text-muted-foreground">
-          Defina a identidade básica do seu personagem.
-        </p>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / PERSONAGENS"
+        title="Novo personagem"
+        description="Defina a identidade básica do seu personagem."
+      />
       <CharacterForm
         isSubmitting={createMutation.isPending}
         error={error}

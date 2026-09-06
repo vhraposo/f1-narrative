@@ -10,6 +10,8 @@ import { ConversationParticipantPanel } from "@/components/conversations/convers
 import { MessageComposer } from "@/components/conversations/message-composer";
 import { MessageList } from "@/components/conversations/message-list";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   useConversation,
   useConversationParticipants,
@@ -52,22 +54,23 @@ export default function ConversationDetailPage() {
 
   if (isError || !conversation) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Conversa não encontrada
-        </h1>
-        <p className="text-muted-foreground">
-          {error instanceof Error
+      <ErrorState
+        heading="h1"
+        title="Conversa não encontrada"
+        description={
+          error instanceof Error
             ? error.message
-            : "Não foi possível carregar a conversa."}
-        </p>
-        <Button
-          variant="outline"
-          onClick={() => router.push("/app/conversations")}
-        >
-          Voltar para conversas
-        </Button>
-      </div>
+            : "Não foi possível carregar a conversa."
+        }
+        action={
+          <Button
+            variant="outline"
+            onClick={() => router.push("/app/conversations")}
+          >
+            Voltar para conversas
+          </Button>
+        }
+      />
     );
   }
 
@@ -83,25 +86,22 @@ export default function ConversationDetailPage() {
         Conversas
       </Link>
 
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {conversation.title || "Conversa sem título"}
-          </h1>
-          <p className="text-muted-foreground">
-            {CONVERSATION_TYPE_LABELS[conversation.type]} ·{" "}
-            {participants.length} participante
-            {participants.length === 1 ? "" : "s"}
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => setShowEdit((v) => !v)}
-        >
-          <Pencil className="mr-2 h-4 w-4" />
-          Editar
-        </Button>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / CONVERSAS"
+        title={conversation.title || "Conversa sem título"}
+        description={`${CONVERSATION_TYPE_LABELS[conversation.type]} · ${
+          participants.length
+        } participante${participants.length === 1 ? "" : "s"}`}
+        action={
+          <Button
+            variant="outline"
+            onClick={() => setShowEdit((v) => !v)}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Editar
+          </Button>
+        }
+      />
 
       {showEdit && (
         <ConversationForm

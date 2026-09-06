@@ -6,11 +6,15 @@ import { useState } from "react";
 
 import { DriverCard } from "@/components/drivers/driver-card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { useDeleteDriver, useDrivers } from "@/hooks/use-driver-profiles";
 import type { Driver } from "@/lib/driver-profiles";
 
 export default function DriversPage() {
-  const { data, isLoading, isError, error, refetch } = useDrivers();
+  const { data, isLoading, isError, isRefetching, error, refetch } =
+    useDrivers();
   const deleteMutation = useDeleteDriver();
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -23,12 +27,16 @@ export default function DriversPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Pilotos</h1>
-        <p className="text-muted-foreground">
-          Os pilotos do seu universo narrativo.
-        </p>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / PILOTOS"
+        title="Pilotos"
+        description="Os pilotos do seu universo narrativo."
+        meta={
+          data && data.length > 0
+            ? `${data.length} piloto${data.length === 1 ? "" : "s"} na grid`
+            : undefined
+        }
+      />
 
       {isLoading && (
         <div className="flex justify-center py-16">
@@ -37,37 +45,40 @@ export default function DriversPage() {
       )}
 
       {isError && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-destructive">Não foi possível carregar os pilotos.</p>
-          <p className="text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "Erro desconhecido"}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => void refetch()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
+        <ErrorState
+          title="Dados indisponíveis"
+          description="Não foi possível carregar os pilotos."
+          detail={error instanceof Error ? error.message : "Erro desconhecido"}
+          action={
+            <Button
+              variant="outline"
+              onClick={() => void refetch()}
+              disabled={isRefetching}
+            >
+              {isRefetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Tentar novamente
+            </Button>
+          }
+        />
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-muted-foreground">Você ainda não tem pilotos.</p>
-          <p className="text-sm text-muted-foreground">
-            Abra um personagem e torne-o piloto para começar.
-          </p>
-          <Button className="mt-4">
-            <Link
-              href="/app/characters"
-              className="inline-flex items-center gap-2"
-            >
-              Ir para personagens
-            </Link>
-          </Button>
-        </div>
+        <EmptyState
+          title="Você ainda não tem pilotos."
+          description="Abra um personagem e torne-o piloto para começar."
+          action={
+            <Button>
+              <Link
+                href="/app/characters"
+                className="inline-flex items-center gap-2"
+              >
+                Ir para personagens
+              </Link>
+            </Button>
+          }
+        />
       )}
 
       {data && data.length > 0 && (

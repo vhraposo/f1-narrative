@@ -6,6 +6,9 @@ import { useState } from "react";
 
 import { EventCard } from "@/components/events/event-card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Select,
   SelectContent,
@@ -31,10 +34,8 @@ export default function EventsPage() {
     undefined,
   );
 
-  const { data, isLoading, isError, error, refetch } = useEvents({
-    type,
-    importance,
-  });
+  const { data, isLoading, isError, isRefetching, error, refetch } =
+    useEvents({ type, importance });
   const deleteMutation = useDeleteEvent();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -47,18 +48,17 @@ export default function EventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Eventos</h1>
-          <p className="text-muted-foreground">
-            Os eventos da sua narrativa e a notícia derivada de cada um.
-          </p>
-        </div>
-        <Link href="/app/events/new" className={primaryLinkStyles}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo evento
-        </Link>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / EVENTOS"
+        title="Eventos"
+        description="Os eventos da sua narrativa e a notícia derivada de cada um."
+        action={
+          <Link href="/app/events/new" className={primaryLinkStyles}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo evento
+          </Link>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <label
@@ -106,43 +106,46 @@ export default function EventsPage() {
       )}
 
       {isError && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-destructive">
-            Não foi possível carregar os eventos.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "Erro desconhecido"}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => void refetch()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
+        <ErrorState
+          title="Dados indisponíveis"
+          description="Não foi possível carregar os eventos."
+          detail={error instanceof Error ? error.message : "Erro desconhecido"}
+          action={
+            <Button
+              variant="outline"
+              onClick={() => void refetch()}
+              disabled={isRefetching}
+            >
+              {isRefetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Tentar novamente
+            </Button>
+          }
+        />
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-muted-foreground">
-            {type || importance
-              ? "Nenhum evento corresponde aos filtros."
-              : "Você ainda não tem eventos."}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {type || importance
+        <EmptyState
+          title={
+            type || importance
+              ? "Nenhum evento encontrado"
+              : "Você ainda não tem eventos."
+          }
+          description={
+            type || importance
               ? "Ajuste os filtros para ver mais resultados."
-              : "Crie seu primeiro evento para começar a narrativa."}
-          </p>
-          {!type && !importance && (
-            <Link href="/app/events/new" className={primaryLinkStyles}>
-              <Plus className="mr-2 h-4 w-4" />
-              Criar evento
-            </Link>
-          )}
-        </div>
+              : "Crie seu primeiro evento para começar a narrativa."
+          }
+          action={
+            !type && !importance ? (
+              <Link href="/app/events/new" className={primaryLinkStyles}>
+                <Plus className="mr-2 h-4 w-4" />
+                Criar evento
+              </Link>
+            ) : undefined
+          }
+        />
       )}
 
       {data && data.length > 0 && (

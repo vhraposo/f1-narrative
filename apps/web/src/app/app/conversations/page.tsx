@@ -7,6 +7,9 @@ import { useState } from "react";
 import { ConversationCard } from "@/components/conversations/conversation-card";
 import { ConversationForm } from "@/components/conversations/conversation-form";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   useConversations,
   useCreateConversation,
@@ -16,7 +19,14 @@ import type { Conversation } from "@/lib/conversations";
 
 export default function ConversationsPage() {
   const router = useRouter();
-  const { data, isLoading, isError, error, refetch } = useConversations();
+  const {
+    data,
+    isLoading,
+    isError,
+    isRefetching,
+    error,
+    refetch,
+  } = useConversations();
   const createMutation = useCreateConversation();
   const deleteMutation = useDeleteConversation();
 
@@ -46,18 +56,17 @@ export default function ConversationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Conversas</h1>
-          <p className="text-muted-foreground">
-            Comunicação persistente entre personagens do universo.
-          </p>
-        </div>
-        <Button onClick={() => setShowCreate((v) => !v)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova conversa
-        </Button>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / CONVERSAS"
+        title="Conversas"
+        description="Comunicação persistente entre personagens do universo."
+        action={
+          <Button onClick={() => setShowCreate((v) => !v)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova conversa
+          </Button>
+        }
+      />
 
       {showCreate && (
         <ConversationForm
@@ -76,34 +85,31 @@ export default function ConversationsPage() {
       )}
 
       {isError && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-destructive">
-            Não foi possível carregar as conversas.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "Erro desconhecido"}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => void refetch()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
+        <ErrorState
+          title="Dados indisponíveis"
+          description="Não foi possível carregar as conversas."
+          detail={error instanceof Error ? error.message : "Erro desconhecido"}
+          action={
+            <Button
+              variant="outline"
+              onClick={() => void refetch()}
+              disabled={isRefetching}
+            >
+              {isRefetching ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Tentar novamente
+            </Button>
+          }
+        />
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <MessagesSquare className="mx-auto h-8 w-8 text-muted-foreground" />
-          <p className="mt-2 text-muted-foreground">
-            Você ainda não tem conversas.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Crie uma conversa para começar a comunicação entre personagens.
-          </p>
-        </div>
+        <EmptyState
+          icon={<MessagesSquare className="h-6 w-6" />}
+          title="Você ainda não tem conversas."
+          description="Crie uma conversa para começar a comunicação entre personagens."
+        />
       )}
 
       {data && data.length > 0 && (

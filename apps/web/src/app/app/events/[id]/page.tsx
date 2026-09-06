@@ -8,6 +8,8 @@ import { useState } from "react";
 import { ParticipantPanel } from "@/components/events/participant-panel";
 import { NewsCard } from "@/components/news/news-card";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   useDeleteEvent,
   useEvent,
@@ -62,19 +64,20 @@ export default function EventDetailPage() {
 
   if (isError || !event) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Evento não encontrado
-        </h1>
-        <p className="text-muted-foreground">
-          {error instanceof Error
+      <ErrorState
+        heading="h1"
+        title="Evento não encontrado"
+        description={
+          error instanceof Error
             ? error.message
-            : "Não foi possível carregar o evento."}
-        </p>
-        <Button variant="outline" onClick={() => router.push("/app/events")}>
-          Voltar para eventos
-        </Button>
-      </div>
+            : "Não foi possível carregar o evento."
+        }
+        action={
+          <Button variant="outline" onClick={() => router.push("/app/events")}>
+            Voltar para eventos
+          </Button>
+        }
+      />
     );
   }
 
@@ -82,70 +85,75 @@ export default function EventDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{event.title}</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-              {EVENT_TYPE_LABELS[event.type]}
-            </span>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-              {EVENT_IMPORTANCE_LABELS[event.importance]}
-            </span>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-              {EVENT_SOURCE_LABELS[event.source]}
-            </span>
-          </div>
-          {worldDate && (
-            <p className="mt-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              {worldDate}
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Link
-            href={`/app/events/${event.id}/edit`}
-            className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Editar
-          </Link>
-          {confirmingDelete ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Excluir?</span>
+      <PageHeader
+        kicker="UNIVERSO / EVENTOS"
+        title={event.title}
+        meta={
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                {EVENT_TYPE_LABELS[event.type]}
+              </span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                {EVENT_IMPORTANCE_LABELS[event.importance]}
+              </span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                {EVENT_SOURCE_LABELS[event.source]}
+              </span>
+            </div>
+            {worldDate && (
+              <span className="inline-flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                {worldDate}
+              </span>
+            )}
+          </>
+        }
+        action={
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/app/events/${event.id}/edit`}
+              className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Link>
+            {confirmingDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Excluir?</span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={deleteMutation.isPending}
+                  onClick={handleDelete}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Confirmar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => setConfirmingDelete(false)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
               <Button
                 variant="destructive"
                 size="sm"
-                disabled={deleteMutation.isPending}
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
               >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Confirmar
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={deleteMutation.isPending}
-                onClick={() => setConfirmingDelete(false)}
-              >
-                Cancelar
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setConfirmingDelete(true)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Excluir
-            </Button>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        }
+      />
 
       {deleteError && (
         <p className="text-sm text-destructive" role="alert">

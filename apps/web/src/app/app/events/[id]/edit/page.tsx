@@ -6,6 +6,8 @@ import { useState } from "react";
 
 import { EventForm } from "@/components/events/event-form";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { useEvent, useUpdateEvent } from "@/hooks/use-events";
 import type { CreateEventInput } from "@/lib/events";
 
@@ -44,30 +46,33 @@ export default function EditEventPage() {
 
   if (isError || !event) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Evento não encontrado
-        </h1>
-        <p className="text-muted-foreground">
-          {error instanceof Error
+      <ErrorState
+        heading="h1"
+        title="Evento não encontrado"
+        description={
+          error instanceof Error
             ? error.message
-            : "Não foi possível carregar o evento."}
-        </p>
-        <Button variant="outline" onClick={() => router.push("/app/events")}>
-          Voltar para eventos
-        </Button>
-      </div>
+            : "Não foi possível carregar o evento."
+        }
+        action={
+          <Button
+            variant="outline"
+            onClick={() => router.push("/app/events")}
+          >
+            Voltar para eventos
+          </Button>
+        }
+      />
     );
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Editar evento</h1>
-        <p className="text-muted-foreground">
-          Atualize os dados de {event.title}.
-        </p>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / EVENTOS"
+        title="Editar evento"
+        description={`Atualize os dados de ${event.title}.`}
+      />
       <EventForm
         event={event}
         isSubmitting={updateMutation.isPending}

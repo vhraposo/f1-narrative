@@ -6,6 +6,8 @@ import { useState } from "react";
 
 import { CharacterForm } from "@/components/characters/character-form";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   useCharacter,
   useUpdateCharacter,
@@ -47,30 +49,33 @@ export default function EditCharacterPage() {
 
   if (isError || !character) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Personagem não encontrado
-        </h1>
-        <p className="text-muted-foreground">
-          {error instanceof Error ? error.message : "Não foi possível carregar o personagem."}
-        </p>
-        <Button variant="outline" onClick={() => router.push("/app/characters")}>
-          Voltar para personagens
-        </Button>
-      </div>
+      <ErrorState
+        heading="h1"
+        title="Personagem não encontrado"
+        description={
+          error instanceof Error
+            ? error.message
+            : "Não foi possível carregar o personagem."
+        }
+        action={
+          <Button
+            variant="outline"
+            onClick={() => router.push("/app/characters")}
+          >
+            Voltar para personagens
+          </Button>
+        }
+      />
     );
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Editar personagem
-        </h1>
-        <p className="text-muted-foreground">
-          Atualize os dados de {character.name}.
-        </p>
-      </div>
+      <PageHeader
+        kicker="UNIVERSO / PERSONAGENS"
+        title="Editar personagem"
+        description={`Atualize os dados de ${character.name}.`}
+      />
       <CharacterForm
         character={character}
         isSubmitting={updateMutation.isPending}
