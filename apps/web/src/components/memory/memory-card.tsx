@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Loader2, Trash2, Users } from "lucide-react";
+import { Calendar, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   MEMORY_IMPORTANCE_LABELS,
   MEMORY_SOURCE_LABELS,
@@ -73,40 +74,23 @@ export function MemoryCard({
         <Button variant="outline" size="sm" onClick={() => onOpen(memory)}>
           Abrir
         </Button>
-        {confirming ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Excluir?</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={isDeleting}
-              onClick={() => onDelete(memory)}
-            >
-              {isDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Confirmar
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isDeleting}
-              onClick={() => setConfirming(false)}
-            >
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Excluir
-          </Button>
-        )}
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setConfirming(true)}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Excluir
+        </Button>
       </CardFooter>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title="Excluir memória"
+        description="Deseja excluir esta memória? Esta ação não pode ser desfeita."
+        onConfirm={() => onDelete(memory)}
+        isPending={isDeleting}
+      />
     </Card>
   );
 }

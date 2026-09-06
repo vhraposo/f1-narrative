@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Driver } from "@/lib/driver-profiles";
 
 type DriverCardProps = {
@@ -68,40 +69,23 @@ export function DriverCard({ driver, onRemove, isRemoving }: DriverCardProps) {
           <Pencil className="mr-2 h-4 w-4" />
           Editar
         </Link>
-        {confirming ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Remover?</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={isRemoving}
-              onClick={() => onRemove(driver)}
-            >
-              {isRemoving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Confirmar
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isRemoving}
-              onClick={() => setConfirming(false)}
-            >
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Remover
-          </Button>
-        )}
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setConfirming(true)}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Remover
+        </Button>
       </CardFooter>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title="Remover piloto"
+        description={`Deseja remover ${driver.character.name} da lista de pilotos? Essa alteração pode ser feita novamente pela ficha do personagem.`}
+        onConfirm={() => onRemove(driver)}
+        isPending={isRemoving}
+      />
     </Card>
   );
 }

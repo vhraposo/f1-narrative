@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Loader2, Trash2 } from "lucide-react";
+import { CalendarDays, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Season } from "@/lib/championship";
 
 type SeasonCardProps = {
@@ -75,40 +76,24 @@ export function SeasonCard({
         >
           Editar
         </Button>
-        {confirming ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Remover?</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={isRemoving}
-              onClick={() => onRemove(season)}
-            >
-              {isRemoving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Confirmar
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isRemoving}
-              onClick={() => setConfirming(false)}
-            >
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Remover
-          </Button>
-        )}
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setConfirming(true)}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Remover
+        </Button>
       </CardFooter>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title="Remover temporada"
+        description={`Deseja remover a temporada ${season.year}? Esta ação não pode ser desfeita.`}
+        onConfirm={() => onRemove(season)}
+        isPending={isRemoving}
+        error={removeError}
+      />
       {removeError && (
         <p className="px-6 pb-4 text-sm text-destructive" role="alert">
           {removeError}

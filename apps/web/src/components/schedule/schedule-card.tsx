@@ -20,6 +20,7 @@ import {
   useUpdateSchedule,
   type Schedule,
 } from "@/hooks/use-schedule";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -215,6 +216,9 @@ export function ScheduleCard({ characterId }: { characterId: string }) {
   );
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const confirmingItem =
+    data?.find((item) => item.id === confirmingDeleteId) ?? null;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -297,45 +301,7 @@ export function ScheduleCard({ characterId }: { characterId: string }) {
                       <Pencil className="mr-2 h-4 w-4" />
                       Editar
                     </Button>
-                    {confirmingDeleteId === item.id ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          Remover?
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={deleteMutation.isPending}
-                          onClick={() => {
-                            setDeleteError(null);
-                            deleteMutation.mutate(item.id, {
-                              onSuccess: () => setConfirmingDeleteId(null),
-                              onError: (err) => {
-                                setConfirmingDeleteId(null);
-                                setDeleteError(
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Não foi possível remover.",
-                                );
-                              },
-                            });
-                          }}
-                        >
-                          {deleteMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : null}
-                          Confirmar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={deleteMutation.isPending}
-                          onClick={() => setConfirmingDeleteId(null)}
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    ) : (
+                    {confirmingDeleteId === item.id ? null : (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -355,6 +321,29 @@ export function ScheduleCard({ characterId }: { characterId: string }) {
           </ul>
         ) : null}
       </CardContent>
+
+      {confirmingItem && (
+        <ConfirmDialog
+          open
+          onClose={() => setConfirmingDeleteId(null)}
+          title="Remover agendamento"
+          description={`Deseja remover "${confirmingItem.activity}"? Esta ação não pode ser desfeita.`}
+          onConfirm={() => {
+            setDeleteError(null);
+            deleteMutation.mutate(confirmingItem.id, {
+              onError: (err) => {
+                setDeleteError(
+                  err instanceof Error
+                    ? err.message
+                    : "Não foi possível remover.",
+                );
+              },
+            });
+          }}
+          isPending={deleteMutation.isPending}
+          error={deleteError}
+        />
+      )}
 
       {deleteError && (
         <CardFooter className="pt-0">

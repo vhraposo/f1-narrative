@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Calendar, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   EVENT_IMPORTANCE_LABELS,
   EVENT_SOURCE_LABELS,
@@ -73,40 +74,23 @@ export function EventCard({ event, isDeleting, onDelete }: EventCardProps) {
           <Pencil className="mr-2 h-4 w-4" />
           Editar
         </Link>
-        {confirming ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Excluir?</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={isDeleting}
-              onClick={() => onDelete(event)}
-            >
-              {isDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Confirmar
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isDeleting}
-              onClick={() => setConfirming(false)}
-            >
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Excluir
-          </Button>
-        )}
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setConfirming(true)}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Excluir
+        </Button>
       </CardFooter>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title="Excluir evento"
+        description={`Deseja excluir "${event.title}"? Esta ação não pode ser desfeita.`}
+        onConfirm={() => onDelete(event)}
+        isPending={isDeleting}
+      />
     </Card>
   );
 }

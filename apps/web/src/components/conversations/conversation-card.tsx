@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, MessagesSquare, Trash2 } from "lucide-react";
+import { MessagesSquare, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CONVERSATION_TYPE_LABELS, type Conversation } from "@/lib/conversations";
 
 type ConversationCardProps = {
@@ -57,40 +58,23 @@ export function ConversationCard({
           <MessagesSquare className="mr-2 h-4 w-4" />
           Abrir
         </Link>
-        {confirming ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Excluir?</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={isDeleting}
-              onClick={() => onDelete(conversation)}
-            >
-              {isDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Confirmar
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isDeleting}
-              onClick={() => setConfirming(false)}
-            >
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Excluir
-          </Button>
-        )}
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setConfirming(true)}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Excluir
+        </Button>
       </CardFooter>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title="Excluir conversa"
+        description={`Deseja excluir "${conversation.title || "conversa sem título"}"? Esta ação não pode ser desfeita.`}
+        onConfirm={() => onDelete(conversation)}
+        isPending={isDeleting}
+      />
     </Card>
   );
 }
