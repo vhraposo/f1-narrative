@@ -14,6 +14,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
+import {
   AVAILABILITY_STATUSES,
   type AvailabilityStatus,
 } from "@/lib/availability";
@@ -128,18 +133,19 @@ export function AvailabilityCard({ characterId }: { characterId: string }) {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="availability-status">Status</Label>
-              <select
-                id="availability-status"
+              <Select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as AvailabilityStatus)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onValueChange={(value) =>
+                  setStatus(value as AvailabilityStatus)
+                }
+                options={AVAILABILITY_STATUSES.map((s) => ({
+                  value: s,
+                  label: s,
+                }))}
               >
-                {AVAILABILITY_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="availability-status" />
+                <SelectContent />
+              </Select>
             </div>
 
             <div className="space-y-2">

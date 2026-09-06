@@ -5,6 +5,12 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   useConversationParticipants,
   useCreateMessage,
   useGenerateMessage,
@@ -192,19 +198,17 @@ export function MessageComposer({ conversationId, onError }: MessageComposerProp
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
       {ownCharacters.length > 1 && (
-        <select
+        <Select
           value={effectiveSender}
-          onChange={(e) => setSenderCharacterId(e.target.value)}
-          aria-label="Quem envia a mensagem"
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+          onValueChange={(value) => setSenderCharacterId(value)}
+          options={[
+            { value: "", label: "Selecione o remetente" },
+            ...ownCharacters.map((c) => ({ value: c.id, label: c.name })),
+          ]}
         >
-          <option value="">Selecione o remetente</option>
-          {ownCharacters.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger aria-label="Quem envia a mensagem" />
+          <SelectContent />
+        </Select>
       )}
 
       {aiParticipants.length === 0 ? (
@@ -217,25 +221,36 @@ export function MessageComposer({ conversationId, onError }: MessageComposerProp
           <span className="text-xs text-muted-foreground">
             Quem deve responder?
           </span>
-          <div className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 text-sm shadow-sm">
-            <Bot className="mr-2 h-3 w-3 text-muted-foreground" />
-            <select
-              value={speakerCharacterId}
-              onChange={(e) => setSpeakerCharacterId(e.target.value)}
-              disabled={aiParticipants.length === 1 || isBusy}
+          <Select
+            value={speakerCharacterId}
+            onValueChange={(value) => setSpeakerCharacterId(value)}
+            options={
+              aiParticipants.length > 1
+                ? [
+                    {
+                      value: "",
+                      label: "Selecione quem deve responder",
+                    },
+                    ...aiParticipants.map((ai) => ({
+                      value: ai.id,
+                      label: ai.name,
+                    })),
+                  ]
+                : aiParticipants.map((ai) => ({
+                    value: ai.id,
+                    label: ai.name,
+                  }))
+            }
+          >
+            <SelectTrigger
               aria-label="Quem deve responder"
-              className="h-full w-full bg-transparent outline-none"
+              disabled={aiParticipants.length === 1 || isBusy}
             >
-              {aiParticipants.length > 1 && (
-                <option value="">Selecione quem deve responder</option>
-              )}
-              {aiParticipants.map((ai) => (
-                <option key={ai.id} value={ai.id}>
-                  {ai.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <Bot className="mr-2 h-3 w-3 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent />
+          </Select>
         </label>
       )}
 

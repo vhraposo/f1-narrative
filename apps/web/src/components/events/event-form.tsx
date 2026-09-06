@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 import {
   EVENT_IMPORTANCE_OPTIONS,
   EVENT_SOURCE_OPTIONS,
@@ -105,6 +110,7 @@ export function EventForm({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
@@ -146,17 +152,20 @@ export function EventForm({
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="event-type">Tipo</Label>
-            <select
-              id="event-type"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              {...register("type")}
-            >
-              {EVENT_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="type"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={EVENT_TYPE_OPTIONS}
+                >
+                  <SelectTrigger id="event-type" onBlur={field.onBlur} />
+                  <SelectContent />
+                </Select>
+              )}
+            />
             {errors.type && (
               <p className="text-sm text-destructive">{errors.type.message}</p>
             )}
@@ -193,17 +202,23 @@ export function EventForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="event-importance">Importância</Label>
-              <select
-                id="event-importance"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                {...register("importance")}
-              >
-                {EVENT_IMPORTANCE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="importance"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={EVENT_IMPORTANCE_OPTIONS}
+                  >
+                    <SelectTrigger
+                      id="event-importance"
+                      onBlur={field.onBlur}
+                    />
+                    <SelectContent />
+                  </Select>
+                )}
+              />
               {errors.importance && (
                 <p className="text-sm text-destructive">
                   {errors.importance.message}
@@ -213,17 +228,20 @@ export function EventForm({
 
             <div className="space-y-2">
               <Label htmlFor="event-source">Origem</Label>
-              <select
-                id="event-source"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                {...register("source")}
-              >
-                {EVENT_SOURCE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="source"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={EVENT_SOURCE_OPTIONS}
+                  >
+                    <SelectTrigger id="event-source" onBlur={field.onBlur} />
+                    <SelectContent />
+                  </Select>
+                )}
+              />
               {errors.source && (
                 <p className="text-sm text-destructive">
                   {errors.source.message}

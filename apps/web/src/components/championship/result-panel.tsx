@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 import {
   useCreateResult,
   useDeleteResult,
@@ -50,6 +55,7 @@ export function ResultPanel({ race, drivers, onClose }: ResultPanelProps) {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<ResultFormValues>({
     resolver: zodResolver(resultFormSchema),
@@ -63,6 +69,16 @@ export function ResultPanel({ race, drivers, onClose }: ResultPanelProps) {
   const resultsByDriver = new Map(
     (results ?? []).map((r) => [r.driverProfileId, r]),
   );
+
+  const driverOptions = [
+    { value: "", label: "Selecione um piloto" },
+    ...drivers.map((d) => ({
+      value: d.id,
+      label: `${d.character.name}${
+        resultsByDriver.has(d.id) ? " (já adicionado)" : ""
+      }`,
+    })),
+  ];
 
   function toNumber(value: string | undefined): number | null {
     if (!value) return null;
@@ -178,19 +194,20 @@ export function ResultPanel({ race, drivers, onClose }: ResultPanelProps) {
         >
           <div className="space-y-2">
             <Label htmlFor="result-driver">Piloto</Label>
-            <select
-              id="result-driver"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              {...register("driverProfileId")}
-            >
-              <option value="">Selecione um piloto</option>
-              {drivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.character.name}
-                  {resultsByDriver.has(d.id) ? " (já adicionado)" : ""}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="driverProfileId"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={driverOptions}
+                >
+                  <SelectTrigger id="result-driver" onBlur={field.onBlur} />
+                  <SelectContent />
+                </Select>
+              )}
+            />
             {errors.driverProfileId && (
               <p className="text-sm text-destructive">
                 {errors.driverProfileId.message}

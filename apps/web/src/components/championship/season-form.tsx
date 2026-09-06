@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 
 const SEASON_STATUSES = ["PRE_SEASON", "ACTIVE", "FINISHED"] as const;
 
@@ -60,6 +65,7 @@ export function SeasonForm({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<SeasonFormValues>({
     resolver: zodResolver(seasonFormSchema),
@@ -115,17 +121,23 @@ export function SeasonForm({
 
           <div className="space-y-2">
             <Label htmlFor="season-status">Status</Label>
-            <select
-              id="season-status"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              {...register("status")}
-            >
-              {SEASON_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={SEASON_STATUSES.map((s) => ({
+                    value: s,
+                    label: s,
+                  }))}
+                >
+                  <SelectTrigger id="season-status" onBlur={field.onBlur} />
+                  <SelectContent />
+                </Select>
+              )}
+            />
             {errors.status && (
               <p className="text-sm text-destructive">{errors.status.message}</p>
             )}

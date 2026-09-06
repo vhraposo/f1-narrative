@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 
 const RACE_STATUSES = ["UPCOMING", "QUALIFYING", "RACE", "FINISHED"] as const;
 
@@ -84,6 +89,7 @@ export function RaceForm({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<RaceFormValues>({
     resolver: zodResolver(raceFormSchema),
@@ -190,17 +196,23 @@ export function RaceForm({
 
           <div className="space-y-2">
             <Label htmlFor="race-status">Status</Label>
-            <select
-              id="race-status"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              {...register("status")}
-            >
-              {RACE_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={RACE_STATUSES.map((s) => ({
+                    value: s,
+                    label: s,
+                  }))}
+                >
+                  <SelectTrigger id="race-status" onBlur={field.onBlur} />
+                  <SelectContent />
+                </Select>
+              )}
+            />
             {errors.status && (
               <p className="text-sm text-destructive">{errors.status.message}</p>
             )}

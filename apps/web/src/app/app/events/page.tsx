@@ -7,6 +7,11 @@ import { useState } from "react";
 import { EventCard } from "@/components/events/event-card";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
+import {
   useDeleteEvent,
   useEvents,
 } from "@/hooks/use-events";
@@ -56,40 +61,42 @@ export default function EventsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm text-muted-foreground">Tipo</label>
-        <select
-          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-          value={type ?? ""}
-          onChange={(e) =>
-            setType(e.target.value === "" ? undefined : (e.target.value as EventFilters["type"]))
-          }
+        <label
+          htmlFor="event-type-filter"
+          className="text-sm text-muted-foreground"
         >
-          <option value="">Todos</option>
-          {EVENT_TYPE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <label className="text-sm text-muted-foreground">Importância</label>
-        <select
-          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+          Tipo
+        </label>
+        <Select
+          value={type ?? ""}
+          onValueChange={(value) =>
+            setType(value === "" ? undefined : (value as EventFilters["type"]))
+          }
+          options={[{ value: "", label: "Todos" }, ...EVENT_TYPE_OPTIONS]}
+        >
+          <SelectTrigger id="event-type-filter" className="w-44" />
+          <SelectContent />
+        </Select>
+        <label
+          htmlFor="event-importance-filter"
+          className="text-sm text-muted-foreground"
+        >
+          Importância
+        </label>
+        <Select
           value={importance ?? ""}
-          onChange={(e) =>
+          onValueChange={(value) =>
             setImportance(
-              e.target.value === ""
+              value === ""
                 ? undefined
-                : (e.target.value as EventFilters["importance"]),
+                : (value as EventFilters["importance"]),
             )
           }
+          options={[{ value: "", label: "Todas" }, ...EVENT_IMPORTANCE_OPTIONS]}
         >
-          <option value="">Todas</option>
-          {EVENT_IMPORTANCE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id="event-importance-filter" className="w-44" />
+          <SelectContent />
+        </Select>
       </div>
 
       {isLoading && (

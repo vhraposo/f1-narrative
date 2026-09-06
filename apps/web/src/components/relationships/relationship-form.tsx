@@ -11,6 +11,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 import type { Character } from "@/lib/characters";
 import type { Relationship } from "@/lib/relationships";
 
@@ -132,20 +137,20 @@ export function RelationshipForm({
                 {initial?.characterA.name}
               </p>
             ) : (
-              <select
-                id="characterA"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              <Select
                 value={characterAId}
-                disabled={isSubmitting}
-                onChange={(e) => setCharacterAId(e.target.value)}
+                onValueChange={(value) => setCharacterAId(value)}
+                options={[
+                  { value: "", label: "Selecione..." },
+                  ...characters.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                  })),
+                ]}
               >
-                <option value="">Selecione...</option>
-                {characters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="characterA" disabled={isSubmitting} />
+                <SelectContent />
+              </Select>
             )}
           </div>
 
@@ -162,20 +167,20 @@ export function RelationshipForm({
                 {initial?.characterB.name}
               </p>
             ) : (
-              <select
-                id="characterB"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              <Select
                 value={characterBId}
-                disabled={isSubmitting}
-                onChange={(e) => setCharacterBId(e.target.value)}
+                onValueChange={(value) => setCharacterBId(value)}
+                options={[
+                  { value: "", label: "Selecione..." },
+                  ...options.map((o) => ({
+                    value: o.id,
+                    label: o.label,
+                  })),
+                ]}
               >
-                <option value="">Selecione...</option>
-                {options.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="characterB" disabled={isSubmitting} />
+                <SelectContent />
+              </Select>
             )}
           </div>
         </div>

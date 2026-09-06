@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { useEvents } from "@/hooks/use-events";
 import { useCharacters } from "@/hooks/use-characters";
 import {
@@ -153,6 +158,7 @@ export function MemoryForm({
     setValue,
     getValues,
     watch,
+    control,
     formState: { errors },
   } = useForm<MemoryFormValues>({
     resolver: zodResolver(memoryFormSchema),
@@ -292,50 +298,64 @@ export function MemoryForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="memory-importance">Importância</Label>
-              <select
-                id="memory-importance"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                {...register("importance")}
-              >
-                {MEMORY_IMPORTANCE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="importance"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={MEMORY_IMPORTANCE_OPTIONS}
+                  >
+                    <SelectTrigger id="memory-importance" onBlur={field.onBlur} />
+                    <SelectContent />
+                  </Select>
+                )}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="memory-source">Origem</Label>
-              <select
-                id="memory-source"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                {...register("source")}
-              >
-                {MEMORY_SOURCE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="source"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={MEMORY_SOURCE_OPTIONS}
+                  >
+                    <SelectTrigger id="memory-source" onBlur={field.onBlur} />
+                    <SelectContent />
+                  </Select>
+                )}
+              />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="memory-event">Evento de origem (opcional)</Label>
-              <select
-                id="memory-event"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                {...register("eventId")}
-              >
-                <option value="">Nenhum evento</option>
-                {events.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.title}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="eventId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? ""}
+                    onValueChange={field.onChange}
+                    options={[
+                      { value: "", label: "Nenhum evento" },
+                      ...events.map((event) => ({
+                        value: event.id,
+                        label: event.title,
+                      })),
+                    ]}
+                  >
+                    <SelectTrigger id="memory-event" onBlur={field.onBlur} />
+                    <SelectContent />
+                  </Select>
+                )}
+              />
             </div>
 
             <div className="space-y-2">

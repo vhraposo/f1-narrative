@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 import type { Team } from "@/lib/teams";
 
 const driverFormSchema = z.object({
@@ -72,6 +77,7 @@ export function DriverProfileForm({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<DriverFormValues>({
     resolver: zodResolver(driverFormSchema),
@@ -132,18 +138,26 @@ export function DriverProfileForm({
               </p>
             ) : (
               <>
-                <select
-                  id="teamId"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  {...register("teamId")}
-                >
-                  <option value="">Sem equipe</option>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  control={control}
+                  name="teamId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={[
+                        { value: "", label: "Sem equipe" },
+                        ...teams.map((team) => ({
+                          value: team.id,
+                          label: team.name,
+                        })),
+                      ]}
+                    >
+                      <SelectTrigger id="teamId" onBlur={field.onBlur} />
+                      <SelectContent />
+                    </Select>
+                  )}
+                />
                 <p className="text-xs text-muted-foreground">
                   Escolha &ldquo;Sem equipe&rdquo; para desvincular este piloto.
                 </p>

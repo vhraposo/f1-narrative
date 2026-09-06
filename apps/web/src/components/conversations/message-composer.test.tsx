@@ -95,7 +95,20 @@ const gerarBtn = () =>
 const enviarBtn = () =>
   screen.getByRole("button", { name: "Enviar" }) as HTMLButtonElement;
 const speakerSelect = () =>
-  screen.getByLabelText("Quem deve responder") as HTMLSelectElement;
+  screen.getByLabelText("Quem deve responder") as HTMLButtonElement;
+
+async function chooseSpeaker(h: ReturnType<typeof setup>, value: string) {
+  const trigger = speakerSelect();
+  await h.user.click(trigger);
+  const listbox = screen.getByRole("listbox");
+  const option = Array.from(
+    listbox.querySelectorAll<HTMLElement>('[role="option"]'),
+  ).find((el) => el.getAttribute("data-value") === value);
+  if (!option) {
+    throw new Error(`Option not found for value ${value}`);
+  }
+  await h.user.click(option);
+}
 
 function setup(
   participants: ConversationParticipant[],
@@ -278,7 +291,7 @@ describe("MessageComposer — turno sequenciado (STEP 43)", () => {
 
     const select = speakerSelect();
     expect(select.disabled).toBe(true);
-    expect(select.value).toBe("ai-1");
+    expect(select.textContent).toContain("IA ai-1");
 
     await h.user.type(textInput(), "Olá");
     await h.user.click(gerarBtn());
@@ -299,10 +312,10 @@ describe("MessageComposer — turno sequenciado (STEP 43)", () => {
 
     const select = speakerSelect();
     expect(select.disabled).toBe(false);
-    expect(select.value).toBe("");
+    expect(select.textContent).toContain("Selecione quem deve responder");
     expect(gerarBtn().disabled).toBe(true);
 
-    await h.user.selectOptions(select, "ai-b");
+    await chooseSpeaker(h, "ai-b");
 
     await h.user.type(textInput(), "Olá");
     expect(gerarBtn().disabled).toBe(false);

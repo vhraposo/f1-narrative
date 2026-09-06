@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Bot, Loader2, Trash2, User, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { useCharacters } from "@/hooks/use-characters";
 import {
   useAddMemoryParticipant,
@@ -43,9 +48,9 @@ export function MemoryParticipantPanel({
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const {
-    register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<AddParticipantValues>({
     resolver: zodResolver(addParticipantSchema),
@@ -176,17 +181,26 @@ export function MemoryParticipantPanel({
           >
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                  {...register("characterId")}
-                >
-                  <option value="">Selecione um personagem</option>
-                  {characterOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  control={control}
+                  name="characterId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={[
+                        { value: "", label: "Selecione um personagem" },
+                        ...characterOptions.map((option) => ({
+                          value: option.id,
+                          label: option.label,
+                        })),
+                      ]}
+                    >
+                      <SelectTrigger onBlur={field.onBlur} />
+                      <SelectContent />
+                    </Select>
+                  )}
+                />
                 <Button
                   type="submit"
                   size="sm"

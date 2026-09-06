@@ -121,19 +121,45 @@ function setup(opts?: {
   };
 }
 
+async function openSelect(h: {
+  user: Awaited<ReturnType<typeof userEvent.setup>>;
+}) {
+  const trigger = screen.getByRole("button", {
+    name: /Selecione um personagem/,
+  });
+  await h.user.click(trigger);
+  return screen.getByRole("listbox");
+}
+
+async function chooseCharacter(
+  h: {
+    user: Awaited<ReturnType<typeof userEvent.setup>>;
+  },
+  value: string,
+) {
+  const listbox = await openSelect(h);
+  const option = within(listbox)
+    .getAllByRole("option")
+    .find((el) => el.getAttribute("data-value") === String(value));
+  if (!option) {
+    throw new Error(`Option not found for value ${value}`);
+  }
+  await h.user.click(option);
+}
+
 describe("ConversationParticipantPanel — catálogo AI (STEP 49)", () => {
-  it("J - lista AI Characters oficiais no combo de adicionar", () => {
-    setup({
+  it("J - lista AI Characters oficiais no combo de adicionar", async () => {
+    const h = setup({
       own: [userCharacter("u-1", "Usuario")],
       ai: [aiCatalogItem("ai-1", "Mia Sorensen")],
     });
 
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-    const option = within(select).getByRole("option", {
+    const listbox = await openSelect(h);
+    const option = within(listbox).getByRole("option", {
       name: /Mia Sorensen/,
-    }) as HTMLOptionElement;
-    expect(option.value).toBe("ai-1");
-    expect(option.text).toContain("IA");
+    });
+    expect(option.getAttribute("data-value")).toBe("ai-1");
+    expect(option.textContent).toContain("IA");
   });
 
   it("K - adicionar AI chama POST /participants com characterId correto", async () => {
@@ -142,7 +168,7 @@ describe("ConversationParticipantPanel — catálogo AI (STEP 49)", () => {
       ai: [aiCatalogItem("ai-1", "Mia Sorensen")],
     });
 
-    await h.user.selectOptions(screen.getByRole("combobox"), "ai-1");
+    await chooseCharacter(h, "ai-1");
     await h.user.click(screen.getByRole("button", { name: "Adicionar" }));
 
     expect(h.addSpy).toHaveBeenCalledWith("ai-1", expect.anything());
@@ -154,7 +180,7 @@ describe("ConversationParticipantPanel — catálogo AI (STEP 49)", () => {
       ai: [aiCatalogItem("ai-1", "Mia Sorensen")],
     });
 
-    await h.user.selectOptions(screen.getByRole("combobox"), "ai-1");
+    await chooseCharacter(h, "ai-1");
     await h.user.click(screen.getByRole("button", { name: "Adicionar" }));
     h.fireAddSuccess();
 
@@ -167,11 +193,11 @@ describe("ConversationParticipantPanel — catálogo AI (STEP 49)", () => {
 
   it("L2 - erro 409 mostra mensagem de duplicidade existente", async () => {
     const h = setup({
-      own: [userCharacter("u-1", "Usuario")],
+      own: [userCharacter("u-1", "Usuario"), userCharacter("u-2", "Outro")],
       ai: [aiCatalogItem("ai-1", "Mia Sorensen")],
     });
 
-    await h.user.selectOptions(screen.getByRole("combobox"), "u-1");
+    await chooseCharacter(h, "u-1");
     await h.user.click(screen.getByRole("button", { name: "Adicionar" }));
 
     h.fireAddError(new ApiError("Duplicado", 409));
@@ -199,8 +225,7 @@ describe("ConversationParticipantPanel — catálogo AI (STEP 49)", () => {
     h.rerender(<ConversationParticipantPanel conversationId={CONV_ID} />);
 
     expect(screen.getByText("Nenhum participante ainda.")).toBeTruthy();
-    // O AI volta a ficar disponível no combo após a remoção.
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-    expect(within(select).getByText(/Mia Sorensen/)).toBeTruthy();
+    const listbox = await openSelect(h);
+    expect(within(listbox).getByText(/Mia Sorensen/)).toBeTruthy();
   });
 });

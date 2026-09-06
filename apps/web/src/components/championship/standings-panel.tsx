@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+} from "@/components/ui/select";
 import {
   useCreateStanding,
   useDeleteStanding,
@@ -50,6 +55,7 @@ export function StandingsPanel({ season, drivers }: StandingsPanelProps) {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<StandingFormValues>({
     resolver: zodResolver(standingFormSchema),
@@ -59,6 +65,16 @@ export function StandingsPanel({ season, drivers }: StandingsPanelProps) {
   const standingByDriver = new Map(
     (standings ?? []).map((s) => [s.driverProfileId, s]),
   );
+
+  const driverOptions = [
+    { value: "", label: "Selecione um piloto" },
+    ...drivers.map((d) => ({
+      value: d.id,
+      label: `${d.character.name}${
+        standingByDriver.has(d.id) ? " (já na tabela)" : ""
+      }`,
+    })),
+  ];
 
   function toPoints(value: string | undefined): number {
     const parsed = Number(value);
@@ -159,19 +175,20 @@ export function StandingsPanel({ season, drivers }: StandingsPanelProps) {
         >
           <div className="space-y-2">
             <Label htmlFor="standing-driver">Piloto</Label>
-            <select
-              id="standing-driver"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              {...register("driverProfileId")}
-            >
-              <option value="">Selecione um piloto</option>
-              {drivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.character.name}
-                  {standingByDriver.has(d.id) ? " (já na tabela)" : ""}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="driverProfileId"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={driverOptions}
+                >
+                  <SelectTrigger id="standing-driver" onBlur={field.onBlur} />
+                  <SelectContent />
+                </Select>
+              )}
+            />
             {errors.driverProfileId && (
               <p className="text-sm text-destructive">
                 {errors.driverProfileId.message}
