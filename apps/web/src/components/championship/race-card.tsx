@@ -1,20 +1,16 @@
 "use client";
 
-import { Calendar, MapPin, Pencil, Timer, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Race } from "@/lib/championship";
 
 type RaceCardProps = {
   race: Race;
+  current?: boolean;
   onEdit: (race: Race) => void;
   onRemove: (race: Race) => void;
   onViewResults: (race: Race) => void;
@@ -33,6 +29,7 @@ function formatDate(value: string | null): string | null {
 
 export function RaceCard({
   race,
+  current = false,
   onEdit,
   onRemove,
   onViewResults,
@@ -43,57 +40,74 @@ export function RaceCard({
   const dateLabel = formatDate(race.date);
 
   return (
-    <Card>
-      <CardHeader className="gap-1.5">
-        <CardTitle className="text-lg">{race.name}</CardTitle>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-          {race.circuit && (
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5" />
-              {race.circuit}
-              {race.country ? `, ${race.country}` : ""}
-            </span>
-          )}
-          {race.round != null && (
-            <span className="inline-flex items-center gap-1">
-              <Timer className="h-3.5 w-3.5" />
-              Rodada {race.round}
-            </span>
-          )}
-          {dateLabel && (
-            <span className="inline-flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
-              {dateLabel}
-            </span>
-          )}
-          <span
-            className={
-              race.status === "FINISHED"
-                ? "rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                : "rounded-full bg-muted px-2 py-0.5 text-xs"
-            }
-          >
-            {race.status}
+    <Card
+      className={
+        current
+          ? "border-primary"
+          : "transition-colors hover:border-muted-foreground/40"
+      }
+    >
+      <div className="flex gap-4 p-4">
+        <span className="flex w-16 shrink-0 flex-col items-center justify-center rounded-md border border-border bg-muted/20 px-2 py-2 text-center">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Rodada
           </span>
-        </div>
-      </CardHeader>
-      <CardFooter className="gap-2">
-        <Button variant="outline" size="sm" onClick={() => onViewResults(race)}>
+          <span className="mt-0.5 text-2xl font-black tabular-nums leading-none tracking-tight text-foreground">
+            R{race.round ?? "—"}
+          </span>
+        </span>
+        <span className="min-w-0 flex-1">
+          <h3 className="truncate text-lg font-black leading-tight tracking-tight text-foreground">
+            {race.name}
+          </h3>
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
+            {(race.circuit || race.country) && (
+              <span>
+                {[race.circuit, race.country].filter(Boolean).join(", ")}
+              </span>
+            )}
+            {dateLabel && <span>{dateLabel}</span>}
+          </span>
+          <span className="mt-2 flex flex-wrap items-center gap-1.5">
+            {current && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                Atual
+              </span>
+            )}
+            <span
+              className={
+                race.status === "FINISHED"
+                  ? "rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+                  : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+              }
+            >
+              {race.status}
+            </span>
+          </span>
+        </span>
+      </div>
+      <div className="flex items-center justify-end gap-1.5 border-t border-border px-4 py-2.5">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onViewResults(race)}
+        >
           Resultados
         </Button>
         <Button variant="outline" size="sm" onClick={() => onEdit(race)}>
-          <Pencil className="mr-2 h-4 w-4" />
+          <Pencil className="mr-1.5 h-3.5 w-3.5" />
           Editar
         </Button>
         <Button
-          variant="destructive"
+          variant="ghost"
           size="sm"
+          className="text-muted-foreground hover:text-destructive"
           onClick={() => setConfirming(true)}
         >
-          <Trash2 className="mr-2 h-4 w-4" />
+          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
           Remover
         </Button>
-      </CardFooter>
+      </div>
       <ConfirmDialog
         open={confirming}
         onClose={() => setConfirming(false)}
@@ -104,7 +118,7 @@ export function RaceCard({
         error={removeError}
       />
       {removeError && (
-        <p className="px-6 pb-4 text-sm text-destructive" role="alert">
+        <p className="px-4 pb-4 text-sm text-destructive" role="alert">
           {removeError}
         </p>
       )}

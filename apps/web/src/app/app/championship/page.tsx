@@ -1,14 +1,16 @@
 "use client";
 
-import { Loader2, Plus, Trophy } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useState } from "react";
 
+import { ChampionshipContext } from "@/components/championship/championship-context";
 import { RaceCard } from "@/components/championship/race-card";
 import { RaceForm } from "@/components/championship/race-form";
 import { ResultPanel } from "@/components/championship/result-panel";
 import { SeasonCard } from "@/components/championship/season-card";
 import { SeasonForm } from "@/components/championship/season-form";
 import { StandingsPanel } from "@/components/championship/standings-panel";
+import { SectionHeading } from "@/components/home/section-heading";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -24,6 +26,7 @@ import {
   useUpdateSeason,
 } from "@/hooks/use-championship";
 import { useDrivers } from "@/hooks/use-driver-profiles";
+import { useWorld } from "@/hooks/use-world";
 import type { Race, Season } from "@/lib/championship";
 
 type SeasonFormState =
@@ -44,6 +47,7 @@ export default function ChampionshipPage() {
     isRefetching: seasonsRefetching,
     refetch: refetchSeasons,
   } = useSeasons();
+  const { data: world } = useWorld();
   const createSeasonMutation = useCreateSeason();
   const updateSeasonMutation = useUpdateSeason();
   const deleteSeasonMutation = useDeleteSeason();
@@ -60,21 +64,25 @@ export default function ChampionshipPage() {
     Record<string, string>
   >({});
 
+  const worldSeason = seasons?.find((s) => s.id === world?.currentSeasonId) ?? null;
   const selectedSeason =
-    seasons?.find((s) => s.id === selectedSeasonId) ?? null;
+    seasons?.find((s) => s.id === selectedSeasonId) ??
+    worldSeason ??
+    seasons?.[0] ??
+    null;
+  const activeSeasonId = selectedSeason?.id ?? "";
 
-  // Races do season selecionado
   const {
     data: races,
     isLoading: racesLoading,
     isError: racesError,
     isRefetching: racesRefetching,
     refetch: refetchRaces,
-  } = useRaces(selectedSeasonId ?? "");
+  } = useRaces(activeSeasonId);
 
-  const createRaceMutation = useCreateRace(selectedSeasonId ?? "");
-  const updateRaceMutation = useUpdateRace(selectedSeasonId ?? "");
-  const deleteRaceMutation = useDeleteRace(selectedSeasonId ?? "");
+  const createRaceMutation = useCreateRace(activeSeasonId);
+  const updateRaceMutation = useUpdateRace(activeSeasonId);
+  const deleteRaceMutation = useDeleteRace(activeSeasonId);
 
   const [raceForm, setRaceForm] = useState<RaceFormState>({ mode: "hidden" });
   const [raceFormError, setRaceFormError] = useState<string | null>(null);
@@ -200,8 +208,8 @@ export default function ChampionshipPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        kicker="UNIVERSO / CAMPEONATO"
-        title="Campeonato"
+        kicker="CAMPEONATO MUNDIAL"
+        title="World Championship"
         description="Temporadas, corridas, resultados e classificação do seu universo."
         meta={
           seasons && seasons.length > 0
@@ -210,7 +218,10 @@ export default function ChampionshipPage() {
         }
         action={
           seasonForm.mode === "hidden" && !isLoading && !isError ? (
-            <Button onClick={() => setSeasonForm({ mode: "create" })}>
+            <Button
+              variant="outline"
+              onClick={() => setSeasonForm({ mode: "create" })}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Nova temporada
             </Button>
@@ -264,26 +275,6 @@ export default function ChampionshipPage() {
         />
       )}
 
-      {!isLoading && !isError && seasons && seasons.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {seasons.map((season) => (
-            <SeasonCard
-              key={season.id}
-              season={season}
-              active={selectedSeasonId === season.id}
-              onSelect={handleSeasonSelect}
-              onEdit={(s) => {
-                setSeasonForm({ mode: "edit", season: s });
-                setSeasonFormError(null);
-              }}
-              onRemove={handleRemoveSeason}
-              isRemoving={removingSeasonId === season.id}
-              removeError={seasonDeleteErrors[season.id] ?? null}
-            />
-          ))}
-        </div>
-      )}
-
       {!isLoading && !isError && seasons && seasons.length === 0 && (
         <EmptyState
           title="Você ainda não tem temporadas."
@@ -298,119 +289,152 @@ export default function ChampionshipPage() {
         />
       )}
 
-      {selectedSeason && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between border-t pt-6">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight">
-                <Trophy className="mr-2 inline h-5 w-5" />
-                {selectedSeason.name ?? `Temporada ${selectedSeason.year}`}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Corridas e classificação desta temporada.
-              </p>
-            </div>
-            {raceForm.mode === "hidden" && (
-              <Button onClick={() => setRaceForm({ mode: "create" })}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nova corrida
-              </Button>
-            )}
+      {selectedSeason && world && (
+        <ChampionshipContext
+          season={selectedSeason}
+          race={races?.find((r) => r.id === world?.currentRaceId) ?? null}
+          session={world?.currentSession ?? null}
+          isCurrentSeason={selectedSeason.id === world?.currentSeasonId}
+        />
+      )}
+
+      {!isLoading && !isError && seasons && seasons.length > 0 && (
+        <section aria-label="Temporadas" className="space-y-4">
+          <SectionHeading kicker="Campeonato" title="Temporadas" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {seasons.map((season) => (
+              <SeasonCard
+                key={season.id}
+                season={season}
+                active={selectedSeason?.id === season.id}
+                current={season.id === world?.currentSeasonId}
+                onSelect={handleSeasonSelect}
+                onEdit={(s) => {
+                  setSeasonForm({ mode: "edit", season: s });
+                  setSeasonFormError(null);
+                }}
+                onRemove={handleRemoveSeason}
+                isRemoving={removingSeasonId === season.id}
+                removeError={seasonDeleteErrors[season.id] ?? null}
+              />
+            ))}
           </div>
-
-          {raceForm.mode !== "hidden" && (
-            <RaceForm
-              initial={
-                raceForm.mode === "edit"
-                  ? {
-                      name: raceForm.race.name,
-                      circuit: raceForm.race.circuit,
-                      country: raceForm.race.country,
-                      date: raceForm.race.date,
-                      round: raceForm.race.round,
-                      status: raceForm.race.status,
-                    }
-                  : undefined
-              }
-              isSubmitting={raceSubmitting}
-              error={raceFormError}
-              onSubmit={handleRaceSubmit}
-              onCancel={() => {
-                setRaceForm({ mode: "hidden" });
-                setRaceFormError(null);
-              }}
-            />
-          )}
-
-          {racesLoading && (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {racesError && (
-            <ErrorState
-              className="py-6 sm:py-8"
-              title="Dados indisponíveis"
-              description="Não foi possível carregar as corridas."
-              action={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void refetchRaces()}
-                  disabled={racesRefetching}
-                >
-                  {racesRefetching ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Tentar novamente
-                </Button>
-              }
-            />
-          )}
-
-          {!racesLoading && !racesError && races && races.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {races.map((race) => (
-                <RaceCard
-                  key={race.id}
-                  race={race}
-                  onEdit={(r) => {
-                    setRaceForm({ mode: "edit", race: r });
-                    setRaceFormError(null);
-                  }}
-                  onRemove={handleRemoveRace}
-                  onViewResults={handleViewResults}
-                  isRemoving={removingRaceId === race.id}
-                  removeError={raceDeleteErrors[race.id] ?? null}
-                />
-              ))}
-            </div>
-          )}
-
-          {!racesLoading && !racesError && races && races.length === 0 && (
-            <EmptyState
-              className="py-6 sm:py-8"
-              title="Nenhuma corrida nesta temporada ainda."
-            />
-          )}
-
-          {openRaceResults && (
-            (() => {
-              const openRace = races?.find((r) => r.id === openRaceResults);
-              if (!openRace) return null;
-              return (
-                <ResultPanel
-                  race={openRace}
-                  drivers={drivers ?? []}
-                  onClose={() => setOpenRaceResults(null)}
-                />
-              );
-            })()
-          )}
-
-          <StandingsPanel season={selectedSeason} drivers={drivers ?? []} />
         </section>
+      )}
+
+      {selectedSeason && (
+        <>
+          <StandingsPanel season={selectedSeason} drivers={drivers ?? []} />
+
+          <section aria-label="Calendário de corridas" className="space-y-4">
+            <SectionHeading
+              kicker="Rodadas"
+              title="Calendário de corridas"
+              action={
+                raceForm.mode === "hidden" ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setRaceForm({ mode: "create" })}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nova corrida
+                  </Button>
+                ) : undefined
+              }
+            />
+
+            {raceForm.mode !== "hidden" && (
+              <RaceForm
+                initial={
+                  raceForm.mode === "edit"
+                    ? {
+                        name: raceForm.race.name,
+                        circuit: raceForm.race.circuit,
+                        country: raceForm.race.country,
+                        date: raceForm.race.date,
+                        round: raceForm.race.round,
+                        status: raceForm.race.status,
+                      }
+                    : undefined
+                }
+                isSubmitting={raceSubmitting}
+                error={raceFormError}
+                onSubmit={handleRaceSubmit}
+                onCancel={() => {
+                  setRaceForm({ mode: "hidden" });
+                  setRaceFormError(null);
+                }}
+              />
+            )}
+
+            {racesLoading && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {racesError && (
+              <ErrorState
+                className="py-6 sm:py-8"
+                title="Dados indisponíveis"
+                description="Não foi possível carregar as corridas."
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void refetchRaces()}
+                    disabled={racesRefetching}
+                  >
+                    {racesRefetching ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Tentar novamente
+                  </Button>
+                }
+              />
+            )}
+
+            {!racesLoading && !racesError && races && races.length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {races.map((race) => (
+                  <RaceCard
+                    key={race.id}
+                    race={race}
+                    current={race.id === world?.currentRaceId}
+                    onEdit={(r) => {
+                      setRaceForm({ mode: "edit", race: r });
+                      setRaceFormError(null);
+                    }}
+                    onRemove={handleRemoveRace}
+                    onViewResults={handleViewResults}
+                    isRemoving={removingRaceId === race.id}
+                    removeError={raceDeleteErrors[race.id] ?? null}
+                  />
+                ))}
+              </div>
+            )}
+
+            {!racesLoading && !racesError && races && races.length === 0 && (
+              <EmptyState
+                className="py-6 sm:py-8"
+                title="Nenhuma corrida nesta temporada ainda."
+              />
+            )}
+
+            {openRaceResults &&
+              (() => {
+                const openRace = races?.find((r) => r.id === openRaceResults);
+                if (!openRace) return null;
+                return (
+                  <ResultPanel
+                    race={openRace}
+                    drivers={drivers ?? []}
+                    onClose={() => setOpenRaceResults(null)}
+                  />
+                );
+              })()}
+          </section>
+        </>
       )}
     </div>
   );

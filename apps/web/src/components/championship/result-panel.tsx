@@ -70,6 +70,8 @@ export function ResultPanel({ race, drivers, onClose }: ResultPanelProps) {
     (results ?? []).map((r) => [r.driverProfileId, r]),
   );
 
+  const driverById = new Map(drivers.map((d) => [d.id, d]));
+
   const driverOptions = [
     { value: "", label: "Selecione um piloto" },
     ...drivers.map((d) => ({
@@ -145,46 +147,91 @@ export function ResultPanel({ race, drivers, onClose }: ResultPanelProps) {
           </p>
         )}
 
+        {!isLoading && !isError && results && results.length === 0 && (
+          <p className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+            Nenhum resultado registrado ainda.
+          </p>
+        )}
+
         {!isLoading && !isError && results && results.length > 0 && (
-          <ul className="divide-y rounded-md border">
-            {results.map((result) => (
-              <li
-                key={result.id}
-                className="flex items-center justify-between gap-3 px-3 py-2"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-6 text-center text-sm font-semibold">
-                    {result.position ?? "—"}
-                  </span>
-                  <span className="text-sm">
-                    {result.driverProfile.character.name}
-                  </span>
-                  {result.fastestLap && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                      VL
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    {result.points} pts
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={removingId === result.id}
-                    onClick={() => handleRemove(result)}
+          <div className="overflow-hidden rounded-md border">
+            <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="w-10 shrink-0 text-center">Pos</span>
+              <span className="h-4 w-1 shrink-0" aria-hidden="true" />
+              <span className="flex-1">Piloto</span>
+              <span className="text-right">Pontos</span>
+              <span className="w-9 shrink-0" aria-hidden="true" />
+            </div>
+            <ol className="divide-y divide-border">
+              {results.map((result) => {
+                const driver = driverById.get(result.driverProfileId);
+                const team = driver?.team ?? null;
+                const teamColor = team?.color ?? null;
+                const meta = [
+                  driver?.number != null
+                    ? `#${driver.number}`
+                    : null,
+                  team?.name ?? null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+
+                return (
+                  <li
+                    key={result.id}
+                    className="flex items-center gap-3 px-4 py-3"
                   >
-                    {removingId === result.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                    <span className="w-10 shrink-0 text-center text-sm font-black tabular-nums text-muted-foreground">
+                      {result.position == null
+                        ? "—"
+                        : String(result.position).padStart(2, "0")}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="h-4 w-1 shrink-0 rounded-full bg-foreground/10"
+                      style={teamColor ? { backgroundColor: teamColor } : undefined}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-semibold text-foreground">
+                          {result.driverProfile.character.name}
+                        </span>
+                        {result.fastestLap && (
+                          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            VL
+                          </span>
+                        )}
+                      </span>
+                      {meta && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {meta}
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-right text-sm font-black tabular-nums text-foreground">
+                      {result.points}{" "}
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        PTS
+                      </span>
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      disabled={removingId === result.id}
+                      onClick={() => handleRemove(result)}
+                    >
+                      {removingId === result.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
         )}
 
         <form
