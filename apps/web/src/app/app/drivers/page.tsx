@@ -9,14 +9,30 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { useSeasons, useStandings } from "@/hooks/use-championship";
 import { useDeleteDriver, useDrivers } from "@/hooks/use-driver-profiles";
+import { useWorld } from "@/hooks/use-world";
 import type { Driver } from "@/lib/driver-profiles";
 
 export default function DriversPage() {
   const { data, isLoading, isError, isRefetching, error, refetch } =
     useDrivers();
+  const { data: world } = useWorld();
+  const { data: seasons } = useSeasons();
   const deleteMutation = useDeleteDriver();
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const currentSeasonId = world?.currentSeasonId ?? null;
+  const standingsQuery = useStandings(currentSeasonId ?? "");
+
+  const seasonLabel = seasons?.find((s) => s.id === currentSeasonId) ?? null;
+
+  const standingByDriver = new Map(
+    (standingsQuery.data ?? []).map((standing) => [
+      standing.driverProfileId,
+      standing,
+    ]),
+  );
 
   function handleRemove(driver: Driver) {
     setRemovingId(driver.characterId);
@@ -28,9 +44,13 @@ export default function DriversPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="UNIVERSO / PILOTOS"
-        title="Pilotos"
-        description="Os pilotos do seu universo narrativo."
+        kicker={
+          seasonLabel
+            ? `UNIVERSO / GRID ${seasonLabel.year}`
+            : "UNIVERSO / GRID"
+        }
+        title="Drivers"
+        description="A grade esportiva do seu universo: número, piloto e equipe, na ordem do grid."
         meta={
           data && data.length > 0
             ? `${data.length} piloto${data.length === 1 ? "" : "s"} na grid`
@@ -82,11 +102,12 @@ export default function DriversPage() {
       )}
 
       {data && data.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-2">
           {data.map((driver) => (
             <DriverCard
               key={driver.characterId}
               driver={driver}
+              standing={standingByDriver.get(driver.id) ?? null}
               onRemove={handleRemove}
               isRemoving={removingId === driver.characterId}
             />

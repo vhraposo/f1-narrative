@@ -26,6 +26,10 @@ export type UpsertDriverInput = {
   teamId?: string | null;
 };
 
+export function formatDriverNumber(number: number | null): string {
+  return `#${number ?? "—"}`;
+}
+
 type ListResponse = { drivers: Driver[] };
 type ItemResponse = { driver: Driver };
 
