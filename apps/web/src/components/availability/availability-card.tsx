@@ -20,21 +20,12 @@ import {
 } from "@/components/ui/select";
 import {
   AVAILABILITY_STATUSES,
+  AVAILABILITY_STATUS_LABELS,
+  formatAvailabilityDateTime,
   type AvailabilityStatus,
 } from "@/lib/availability";
 import { useAvailability, useUpdateAvailability } from "@/hooks/use-availability";
 
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pt-BR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-// Converter um datetime ISO de volta para o valor aceito pelo input datetime-local.
 function toLocalInputValue(value: string | null): string {
   if (!value) return "";
   const date = new Date(value);
@@ -54,7 +45,6 @@ export function AvailabilityCard({ characterId }: { characterId: string }) {
   const [hasUntil, setHasUntil] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Preenche o formulário quando entra em edição ou o dado muda.
   useEffect(() => {
     if (editing && data) {
       setStatus(data.status);
@@ -74,7 +64,6 @@ export function AvailabilityCard({ characterId }: { characterId: string }) {
         : { until: null }),
     };
 
-    // ApiError (404/400) já tem mensagem amigável; qualquer outro erro genérico.
     updateMutation.mutate(payload, {
       onSuccess: () => {
         setEditing(false);
@@ -87,10 +76,18 @@ export function AvailabilityCard({ characterId }: { characterId: string }) {
     });
   }
 
+  const sinceText = data ? formatAvailabilityDateTime(data.since) : null;
+  const untilText = data ? formatAvailabilityDateTime(data.until) : null;
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-xl">Disponibilidade</CardTitle>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
+            Status
+          </p>
+          <CardTitle className="mt-1 text-xl">Disponibilidade</CardTitle>
+        </div>
         {!isLoading && !isError && data && !editing && (
           <Button
             size="sm"
@@ -140,7 +137,7 @@ export function AvailabilityCard({ characterId }: { characterId: string }) {
                 }
                 options={AVAILABILITY_STATUSES.map((s) => ({
                   value: s,
-                  label: s,
+                  label: AVAILABILITY_STATUS_LABELS[s],
                 }))}
               >
                 <SelectTrigger id="availability-status" />
@@ -204,26 +201,50 @@ export function AvailabilityCard({ characterId }: { characterId: string }) {
             )}
           </div>
         ) : (
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Status</dt>
-              <dd className="text-right">{data.status}</dd>
+          <div className="rounded-lg border border-border bg-background/40 p-4 sm:p-5">
+            <div className="flex items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 shrink-0 rounded-full bg-foreground"
+              />
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Status atual
+                </p>
+                <p className="mt-0.5 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+                  {AVAILABILITY_STATUS_LABELS[data.status]}
+                </p>
+              </div>
             </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Desde</dt>
-              <dd className="text-right">{formatDate(data.since)}</dd>
-            </div>
+
+            <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="shrink-0 text-muted-foreground">Disponível desde</dt>
+                <dd className="text-right font-medium tabular-nums text-foreground">
+                  {sinceText ?? "—"}
+                </dd>
+              </div>
+              {untilText && (
+                <div className="flex items-baseline justify-between gap-4">
+                  <dt className="shrink-0 text-muted-foreground">Válido até</dt>
+                  <dd className="text-right font-medium tabular-nums text-foreground">
+                    {untilText}
+                  </dd>
+                </div>
+              )}
+            </dl>
+
             {data.reason && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Motivo</dt>
-                <dd className="text-right">{data.reason}</dd>
+              <div className="mt-4 border-t border-border pt-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Motivo
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-foreground">
+                  {data.reason}
+                </p>
               </div>
             )}
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Até</dt>
-              <dd className="text-right">{formatDate(data.until)}</dd>
-            </div>
-          </dl>
+          </div>
         )}
       </CardContent>
 

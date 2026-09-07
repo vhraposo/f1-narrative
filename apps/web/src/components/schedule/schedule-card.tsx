@@ -21,16 +21,10 @@ import {
   type Schedule,
 } from "@/hooks/use-schedule";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pt-BR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
+import {
+  formatScheduleDay,
+  formatScheduleTime,
+} from "@/lib/schedule";
 
 function toLocalInputValue(value: string): string {
   const date = new Date(value);
@@ -39,7 +33,6 @@ function toLocalInputValue(value: string): string {
   return local.toISOString().slice(0, 16);
 }
 
-// Formulário pequeno reutilizado para criar e editar um agendamento.
 function ScheduleForm({
   characterId,
   editing,
@@ -221,8 +214,13 @@ export function ScheduleCard({ characterId }: { characterId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-xl">Agenda</CardTitle>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
+            Timeline
+          </p>
+          <CardTitle className="mt-1 text-xl">Agenda</CardTitle>
+        </div>
         {!isLoading && !isError && !editing && (
           <Button
             size="sm"
@@ -264,61 +262,87 @@ export function ScheduleCard({ characterId }: { characterId: string }) {
             Nenhuma atividade agendada.
           </p>
         ) : data ? (
-          <ul className="space-y-2">
-            {data.map((item) =>
-              editing && editing.id === item.id ? (
-                <li key={item.id}>
-                  <ScheduleForm
-                    characterId={characterId}
-                    editing={editing}
-                    onDone={() => setEditing(null)}
-                  />
-                </li>
-              ) : (
-                <li
-                  key={item.id}
-                  className="flex items-center justify-between gap-3 rounded-md border p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium">{item.activity}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(item.startsAt)}
-                      {item.endsAt
-                        ? ` → ${formatDate(item.endsAt)}`
-                        : ""}
+          <ol className="space-y-0">
+            {data.map((item, index) => {
+              const isLast = index === data.length - 1;
+              const isEditingThis = editing && editing.id === item.id;
+
+              if (isEditingThis) {
+                return (
+                  <li key={item.id} className="py-2">
+                    <ScheduleForm
+                      characterId={characterId}
+                      editing={editing}
+                      onDone={() => setEditing(null)}
+                    />
+                  </li>
+                );
+              }
+
+              return (
+                <li key={item.id} className="relative flex gap-4 pb-5 last:pb-0">
+                  <div className="w-16 shrink-0 text-right sm:w-20">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {formatScheduleDay(item.startsAt)}
+                    </p>
+                    <p className="mt-0.5 text-2xl font-black leading-none tabular-nums text-foreground">
+                      {formatScheduleTime(item.startsAt)}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setEditing(item);
-                        setShowForm(false);
-                        setDeleteError(null);
-                      }}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Editar
-                    </Button>
-                    {confirmingDeleteId === item.id ? null : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label="Remover agendamento"
-                        onClick={() => {
-                          setConfirmingDeleteId(item.id);
-                          setDeleteError(null);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  <div className="relative min-w-0 flex-1 pl-4 sm:pl-5">
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-1.5 h-2 w-2 rounded-full bg-foreground"
+                    />
+                    {!isLast && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-[3px] top-5 bottom-[-1.25rem] w-px bg-border"
+                      />
                     )}
+                    <div className="rounded-lg border border-border bg-background/40 px-4 py-3">
+                      <h4 className="text-sm font-semibold text-foreground">
+                        {item.activity}
+                      </h4>
+                      {item.endsAt && (
+                        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                          até {formatScheduleTime(item.endsAt)}
+                        </p>
+                      )}
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditing(item);
+                            setShowForm(false);
+                            setDeleteError(null);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
+                        </Button>
+                        {confirmingDeleteId === item.id ? null : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-muted-foreground hover:text-destructive"
+                            aria-label="Remover agendamento"
+                            onClick={() => {
+                              setConfirmingDeleteId(item.id);
+                              setDeleteError(null);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </li>
-              ),
-            )}
-          </ul>
+              );
+            })}
+          </ol>
         ) : null}
       </CardContent>
 

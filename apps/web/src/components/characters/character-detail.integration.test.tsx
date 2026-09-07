@@ -175,6 +175,8 @@ describe("Character Detail - identidade e seções", () => {
 
     expect(screen.getByText("Disponibilidade")).toBeDefined();
     expect(screen.getByText("Agenda")).toBeDefined();
+    expect(await screen.findByText("Disponível")).toBeDefined();
+    expect(screen.queryByText("AVAILABLE")).toBeNull();
 
     // O contexto estruturado NUNCA é exposto como JSON nesta interface.
     expect(container.querySelector("pre")).toBeNull();

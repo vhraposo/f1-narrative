@@ -17,6 +17,27 @@ export type CreateScheduleInput = {
 
 export type UpdateScheduleInput = Partial<CreateScheduleInput>;
 
+export function formatScheduleTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+export function formatScheduleDay(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const day = date.toLocaleDateString("pt-BR", { day: "2-digit" });
+  const month = date
+    .toLocaleDateString("pt-BR", { month: "short" })
+    .replace(".", "")
+    .toUpperCase();
+  return `${day} ${month}`;
+}
+
 type ListResponse = { schedules: Schedule[] };
 type ItemResponse = { schedule: Schedule };
 
