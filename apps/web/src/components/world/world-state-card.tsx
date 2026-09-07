@@ -35,7 +35,7 @@ export function WorldStateCard() {
   }
 
   const rows = [
-    { label: "Data atual", value: formatDate(world.currentDate) },
+    { label: "Data do mundo", value: formatDate(world.currentDate) },
     {
       label: "Temporada",
       value: season ? (season.name ?? `Temporada ${season.year}`) : "—",

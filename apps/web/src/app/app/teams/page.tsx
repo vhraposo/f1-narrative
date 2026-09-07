@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { useDrivers } from "@/hooks/use-driver-profiles";
 import {
   useCreateTeam,
   useDeleteTeam,
   useTeams,
   useUpdateTeam,
 } from "@/hooks/use-teams";
+import type { Driver } from "@/lib/driver-profiles";
 import type { Team } from "@/lib/teams";
 
 type FormState =
@@ -25,9 +27,21 @@ type FormState =
 export default function TeamsPage() {
   const { data, isLoading, isError, isRefetching, error, refetch } =
     useTeams();
+  const { data: drivers } = useDrivers();
   const createMutation = useCreateTeam();
   const updateMutation = useUpdateTeam();
   const deleteMutation = useDeleteTeam();
+
+  const driversByTeam = new Map<string, Driver[]>();
+  for (const driver of drivers ?? []) {
+    if (!driver.teamId) continue;
+    const list = driversByTeam.get(driver.teamId);
+    if (list) {
+      list.push(driver);
+    } else {
+      driversByTeam.set(driver.teamId, [driver]);
+    }
+  }
 
   const [form, setForm] = useState<FormState>({ mode: "hidden" });
   const [formError, setFormError] = useState<string | null>(null);
@@ -170,19 +184,22 @@ export default function TeamsPage() {
 
       {data && data.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.map((team) => (
-            <TeamCard
-              key={team.id}
-              team={team}
-              onEdit={(t) => {
-                setForm({ mode: "edit", team: t });
-                setFormError(null);
-              }}
-              onRemove={handleRemove}
-              isRemoving={removingId === team.id}
-              removeError={deleteErrors[team.id] ?? null}
-            />
-          ))}
+          {[...data]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((team) => (
+              <TeamCard
+                key={team.id}
+                team={team}
+                drivers={driversByTeam.get(team.id) ?? []}
+                onEdit={(t) => {
+                  setForm({ mode: "edit", team: t });
+                  setFormError(null);
+                }}
+                onRemove={handleRemove}
+                isRemoving={removingId === team.id}
+                removeError={deleteErrors[team.id] ?? null}
+              />
+            ))}
         </div>
       )}
     </div>
