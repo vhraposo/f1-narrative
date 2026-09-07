@@ -1,36 +1,33 @@
 "use client";
 
-import { Calendar, Loader2, Pencil, Trash2 } from "lucide-react";
+import { CalendarDays, Loader2, Newspaper, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
+import {
+  IMPORTANCE_SIGNAL_CLASS,
+  ImportanceDot,
+} from "@/components/events/event-display";
 import { ParticipantPanel } from "@/components/events/participant-panel";
+import { SectionHeading } from "@/components/home/section-heading";
 import { NewsCard } from "@/components/news/news-card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
-import {
-  useDeleteEvent,
-  useEvent,
-  useEventNews,
-} from "@/hooks/use-events";
+import { formatWorldDate, formatWorldDateLong } from "@/lib/event-format";
 import {
   EVENT_IMPORTANCE_LABELS,
   EVENT_SOURCE_LABELS,
   EVENT_TYPE_LABELS,
 } from "@/lib/events";
-
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  return new Date(value).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { cn } from "@/lib/utils";
+import {
+  useDeleteEvent,
+  useEvent,
+  useEventNews,
+} from "@/hooks/use-events";
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -81,7 +78,8 @@ export default function EventDetailPage() {
     );
   }
 
-  const worldDate = formatDate(event.worldDate);
+  const worldDate = formatWorldDate(event.worldDate);
+  const worldDateLong = formatWorldDateLong(event.worldDate);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -89,25 +87,31 @@ export default function EventDetailPage() {
         kicker="UNIVERSO / EVENTOS"
         title={event.title}
         meta={
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                {EVENT_TYPE_LABELS[event.type]}
-              </span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                {EVENT_IMPORTANCE_LABELS[event.importance]}
-              </span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                {EVENT_SOURCE_LABELS[event.source]}
-              </span>
-            </div>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-2 font-medium text-foreground">
+              <ImportanceDot importance={event.importance} className="h-2.5 w-2.5" />
+              {EVENT_IMPORTANCE_LABELS[event.importance]}
+            </span>
+            <span aria-hidden="true" className="text-muted-foreground/50">
+              ·
+            </span>
+            <span>{EVENT_TYPE_LABELS[event.type]}</span>
+            <span aria-hidden="true" className="text-muted-foreground/50">
+              ·
+            </span>
+            <span>{EVENT_SOURCE_LABELS[event.source]}</span>
             {worldDate && (
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                {worldDate}
-              </span>
+              <>
+                <span aria-hidden="true" className="text-muted-foreground/50">
+                  ·
+                </span>
+                <span className="inline-flex items-center gap-1.5 tabular-nums font-medium text-foreground">
+                  <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                  {worldDate}
+                </span>
+              </>
             )}
-          </>
+          </span>
         }
         action={
           <div className="flex items-center gap-2">
@@ -161,35 +165,63 @@ export default function EventDetailPage() {
         </p>
       )}
 
-      {event.description && (
-        <p className="whitespace-pre-line text-muted-foreground">
-          {event.description}
-        </p>
-      )}
-
-      <section className="space-y-6">
-        <ParticipantPanel eventId={event.id} />
-
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold tracking-tight">Notícia</h2>
-          <p className="text-sm text-muted-foreground">
-            Notícia derivada automaticamente a partir do evento e de seus
-            participantes (somente leitura).
-          </p>
-          {newsQuery.isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : newsQuery.isError ? (
-            <div className="rounded-lg border border-dashed p-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Este evento ainda não possui uma notícia derivada.
-              </p>
-            </div>
-          ) : newsQuery.data ? (
-            <NewsCard news={newsQuery.data} />
-          ) : null}
+      <section aria-label="Registro do evento">
+        <div className="relative overflow-hidden rounded-lg border border-border bg-card p-6">
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute inset-y-0 left-0 w-[3px]",
+              IMPORTANCE_SIGNAL_CLASS[event.importance],
+            )}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <ImportanceDot importance={event.importance} />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              {EVENT_TYPE_LABELS[event.type]}
+            </p>
+            <span aria-hidden="true" className="text-muted-foreground/50">
+              ·
+            </span>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              {EVENT_IMPORTANCE_LABELS[event.importance]}
+            </p>
+          </div>
+          {worldDateLong && (
+            <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <CalendarDays className="h-4 w-4" aria-hidden="true" />
+              {worldDateLong}
+            </p>
+          )}
+          {event.description && (
+            <p className="mt-4 whitespace-pre-line text-muted-foreground">
+              {event.description}
+            </p>
+          )}
         </div>
+      </section>
+
+      <section aria-label="Participantes" className="space-y-4">
+        <ParticipantPanel eventId={event.id} />
+      </section>
+
+      <section aria-label="Notícia derivada" className="space-y-4">
+        {newsQuery.isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : newsQuery.isError || newsQuery.data == null ? (
+          <EmptyState
+            icon={<Newspaper className="h-6 w-6" />}
+            kicker="Cobertura"
+            title="Sem notícia derivada."
+            description="A notícia surge automaticamente quando o evento e seus participantes tiverem informações suficientes."
+          />
+        ) : (
+          <>
+            <SectionHeading kicker="Cobertura" title="Notícia" />
+            <NewsCard news={newsQuery.data} />
+          </>
+        )}
       </section>
     </div>
   );

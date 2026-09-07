@@ -1,24 +1,26 @@
 "use client";
 
-import { Calendar, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { ImportanceDot } from "@/components/events/event-display";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
-  CardDescription,
+  CardContent,
   CardFooter,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { formatWorldDate } from "@/lib/event-format";
 import {
   EVENT_IMPORTANCE_LABELS,
   EVENT_SOURCE_LABELS,
   EVENT_TYPE_LABELS,
 } from "@/lib/events";
 import type { Event } from "@/lib/events";
+import { cn } from "@/lib/utils";
 
 type EventCardProps = {
   event: Event;
@@ -26,50 +28,57 @@ type EventCardProps = {
   onDelete: (event: Event) => void;
 };
 
-function formatDate(value: string | null): string | null {
-  if (!value) return null;
-  return new Date(value).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
 export function EventCard({ event, isDeleting, onDelete }: EventCardProps) {
   const [confirming, setConfirming] = useState(false);
-  const dateLabel = formatDate(event.worldDate);
+  const dateLabel = formatWorldDate(event.worldDate);
 
   return (
-    <Card>
-      <CardHeader className="gap-1.5">
+    <Card className="relative flex h-full flex-col overflow-hidden group">
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-[3px] bg-muted-foreground/10 transition-colors group-hover:bg-brand"
+      />
+      <CardContent className="flex flex-1 flex-col pt-5">
         <Link
           href={`/app/events/${event.id}`}
-          className="font-semibold text-foreground transition-colors hover:text-primary"
+          className="flex h-full flex-col focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <CardTitle className="text-lg">{event.title}</CardTitle>
-        </Link>
-        <CardDescription>
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
-            {EVENT_TYPE_LABELS[event.type]}
-          </span>{" "}
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
-            {EVENT_IMPORTANCE_LABELS[event.importance]}
-          </span>{" "}
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
-            {EVENT_SOURCE_LABELS[event.source]}
+          <span className="flex items-center gap-2">
+            <ImportanceDot importance={event.importance} />
+            <span className="truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              {EVENT_TYPE_LABELS[event.type]}
+            </span>
+            <span aria-hidden="true" className="text-muted-foreground/50">
+              ·
+            </span>
+            <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              {EVENT_IMPORTANCE_LABELS[event.importance]}
+            </span>
+            <ArrowUpRight
+              className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-brand"
+              aria-hidden="true"
+            />
           </span>
-        </CardDescription>
-        {dateLabel && (
-          <p className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-            <Calendar className="h-3.5 w-3.5" />
-            {dateLabel}
-          </p>
-        )}
-      </CardHeader>
-      <CardFooter className="justify-end gap-2">
+          <CardTitle className="mt-3 text-lg leading-snug tracking-tight text-foreground transition-colors group-hover:text-brand">
+            {event.title}
+          </CardTitle>
+          <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            {dateLabel && (
+              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                {dateLabel}
+              </span>
+            )}
+            <span className="truncate">
+              {EVENT_SOURCE_LABELS[event.source]}
+            </span>
+          </span>
+        </Link>
+      </CardContent>
+      <CardFooter className="gap-2 pt-2">
         <Link
           href={`/app/events/${event.id}/edit`}
-          className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >
           <Pencil className="mr-2 h-4 w-4" />
           Editar

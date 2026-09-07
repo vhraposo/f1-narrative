@@ -60,43 +60,52 @@ export default function EventsPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <label
-          htmlFor="event-type-filter"
-          className="text-sm text-muted-foreground"
-        >
-          Tipo
-        </label>
-        <Select
-          value={type ?? ""}
-          onValueChange={(value) =>
-            setType(value === "" ? undefined : (value as EventFilters["type"]))
-          }
-          options={[{ value: "", label: "Todos" }, ...EVENT_TYPE_OPTIONS]}
-        >
-          <SelectTrigger id="event-type-filter" className="w-44" />
-          <SelectContent />
-        </Select>
-        <label
-          htmlFor="event-importance-filter"
-          className="text-sm text-muted-foreground"
-        >
-          Importância
-        </label>
-        <Select
-          value={importance ?? ""}
-          onValueChange={(value) =>
-            setImportance(
-              value === ""
-                ? undefined
-                : (value as EventFilters["importance"]),
-            )
-          }
-          options={[{ value: "", label: "Todas" }, ...EVENT_IMPORTANCE_OPTIONS]}
-        >
-          <SelectTrigger id="event-importance-filter" className="w-44" />
-          <SelectContent />
-        </Select>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <label
+            htmlFor="event-type-filter"
+            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground"
+          >
+            Tipo
+          </label>
+          <Select
+            value={type ?? ""}
+            onValueChange={(value) =>
+              setType(
+                value === "" ? undefined : (value as EventFilters["type"]),
+              )
+            }
+            options={[{ value: "", label: "Todos" }, ...EVENT_TYPE_OPTIONS]}
+          >
+            <SelectTrigger id="event-type-filter" className="w-full" />
+            <SelectContent />
+          </Select>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <label
+            htmlFor="event-importance-filter"
+            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground"
+          >
+            Importância
+          </label>
+          <Select
+            value={importance ?? ""}
+            onValueChange={(value) =>
+              setImportance(
+                value === ""
+                  ? undefined
+                  : (value as EventFilters["importance"]),
+              )
+            }
+            options={[
+              { value: "", label: "Todas" },
+              ...EVENT_IMPORTANCE_OPTIONS,
+            ]}
+          >
+            <SelectTrigger id="event-importance-filter" className="w-full" />
+            <SelectContent />
+          </Select>
+        </div>
       </div>
 
       {isLoading && (

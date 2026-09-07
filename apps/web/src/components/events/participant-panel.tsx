@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -130,12 +131,30 @@ export function ParticipantPanel({ eventId }: ParticipantPanelProps) {
                 key={participant.id}
                 className="flex items-center justify-between gap-3 px-3 py-2"
               >
-                <div>
-                  <p className="text-sm font-medium">{participant.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {participant.nationality}
-                  </p>
-                </div>
+                <Link
+                  href={`/app/characters/${participant.id}`}
+                  className="group flex min-w-0 flex-1 items-center gap-3 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {participant.imageUrl ? (
+                    <img
+                      src={participant.imageUrl}
+                      alt=""
+                      className="h-9 w-9 shrink-0 rounded-full bg-muted object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground">
+                      {participant.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-foreground transition-colors group-hover:text-brand">
+                      {participant.name}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {participant.nationality}
+                    </span>
+                  </span>
+                </Link>
                 <Button
                   variant="ghost"
                   size="sm"
