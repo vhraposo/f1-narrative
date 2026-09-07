@@ -4,7 +4,7 @@ import { ArrowUpRight, CalendarDays, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { ImportanceDot } from "@/components/events/event-display";
+import { ImportanceDot, IMPORTANCE_SIGNAL_CLASS } from "@/components/events/event-display";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -36,7 +36,10 @@ export function EventCard({ event, isDeleting, onDelete }: EventCardProps) {
     <Card className="relative flex h-full flex-col overflow-hidden group">
       <span
         aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-[3px] bg-muted-foreground/10 transition-colors group-hover:bg-brand"
+        className={cn(
+          "absolute inset-y-0 left-0 w-[3px] transition-colors group-hover:brightness-110",
+          IMPORTANCE_SIGNAL_CLASS[event.importance],
+        )}
       />
       <CardContent className="flex flex-1 flex-col pt-5">
         <Link

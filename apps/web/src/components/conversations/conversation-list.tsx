@@ -95,7 +95,7 @@ function ConversationRow({
         onClick={() => onSelect(conversation.id)}
         aria-current={selected ? "true" : undefined}
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-3 rounded-md px-2.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md px-2.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           selected ? "bg-accent" : "hover:bg-accent/60",
         )}
       >
@@ -174,9 +174,9 @@ export function ConversationList({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Conversas
-        </p>
+        </h2>
         <Button variant="outline" size="sm" onClick={onNew}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Nova conversa

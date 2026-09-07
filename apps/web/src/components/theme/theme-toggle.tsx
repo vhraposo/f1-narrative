@@ -29,7 +29,7 @@ export function ThemeToggle() {
             aria-label={label}
             aria-pressed={active}
             className={
-              "inline-flex h-7 w-7 items-center justify-center rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 " +
+              "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 " +
               (active
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:text-foreground")

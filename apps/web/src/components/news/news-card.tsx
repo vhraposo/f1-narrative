@@ -14,7 +14,6 @@ type NewsCardProps = {
 // NewsItem é derivada e SOMENTE LEITURA: não há ações de editar/criar/excluir.
 export function NewsCard({ news }: NewsCardProps) {
   const dateLabel = formatWorldDate(news.worldDate);
-  const createdAt = new Date(news.createdAt).toLocaleString("pt-BR");
 
   return (
     <Card>
@@ -26,7 +25,7 @@ export function NewsCard({ news }: NewsCardProps) {
         <h3 className="text-2xl font-black tracking-tight text-foreground">
           {news.title}
         </h3>
-        <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+        <p className="whitespace-pre-line break-words text-sm leading-relaxed text-muted-foreground">
           {news.body}
         </p>
       </CardContent>
@@ -37,7 +36,6 @@ export function NewsCard({ news }: NewsCardProps) {
             {dateLabel}
           </span>
         )}
-        <span>Gerada em: {createdAt}</span>
       </CardFooter>
     </Card>
   );

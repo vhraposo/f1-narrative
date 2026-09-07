@@ -223,7 +223,7 @@ export function MemoryDetail({ memoryId, onDone }: MemoryDetailProps) {
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Memória
               </p>
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
+              <p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed text-foreground">
                 {memory.content}
               </p>
             </div>

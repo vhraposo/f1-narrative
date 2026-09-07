@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AppBrand } from "@/components/layout/app-brand";
@@ -12,14 +12,22 @@ import { cn } from "@/lib/utils";
 
 export function MobileNav({ userName }: { userName: string }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = "";
+      previouslyFocused?.focus();
+    };
   }, [open]);
 
   return (
@@ -33,7 +41,7 @@ export function MobileNav({ userName }: { userName: string }) {
             onClick={() => setOpen(true)}
             aria-label="Abrir menu de navegação"
             aria-expanded={open}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-input text-muted-foreground transition-colors motion-safe:transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-sm border border-input text-muted-foreground transition-colors motion-safe:transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -50,11 +58,13 @@ export function MobileNav({ userName }: { userName: string }) {
       />
 
       <div
+        ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Menu de navegação"
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full max-w-xs flex-col border-l border-border bg-background transition-[transform,visibility] motion-safe:transition-[transform,visibility] lg:hidden",
+          "fixed inset-y-0 right-0 z-50 flex w-full max-w-xs flex-col border-l border-border bg-background outline-none transition-[transform,visibility] motion-safe:transition-[transform,visibility] lg:hidden",
           open ? "visible translate-x-0" : "invisible translate-x-full",
         )}
       >
@@ -64,7 +74,7 @@ export function MobileNav({ userName }: { userName: string }) {
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Fechar menu de navegação"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-input text-muted-foreground transition-colors motion-safe:transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-sm border border-input text-muted-foreground transition-colors motion-safe:transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>

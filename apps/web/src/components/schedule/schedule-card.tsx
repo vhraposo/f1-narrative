@@ -301,7 +301,7 @@ export function ScheduleCard({ characterId }: { characterId: string }) {
                       />
                     )}
                     <div className="rounded-lg border border-border bg-background/40 px-4 py-3">
-                      <h4 className="text-sm font-semibold text-foreground">
+                      <h4 className="break-words text-sm font-semibold text-foreground">
                         {item.activity}
                       </h4>
                       {item.endsAt && (

@@ -101,7 +101,7 @@ export function MemoryCard({
           {memory.summary || "Memória"}
         </h3>
 
-        <p className="line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+        <p className="line-clamp-3 whitespace-pre-line break-words text-sm leading-relaxed text-muted-foreground">
           {memory.content}
         </p>
 

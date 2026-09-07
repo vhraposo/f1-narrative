@@ -143,9 +143,9 @@ export function ConversationThread({
           />
         ) : null}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold leading-tight text-foreground">
+          <h2 className="truncate text-sm font-bold leading-tight text-foreground">
             {threadTitle(conversation.title, participants)}
-          </p>
+          </h2>
           <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
         </div>
         {rightAction}

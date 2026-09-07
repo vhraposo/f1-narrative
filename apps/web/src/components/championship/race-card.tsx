@@ -86,7 +86,7 @@ export function RaceCard({
           </span>
         </span>
       </div>
-      <div className="flex items-center justify-end gap-1.5 border-t border-border px-4 py-2.5">
+      <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-border px-4 py-2.5">
         <Button
           variant="outline"
           size="sm"

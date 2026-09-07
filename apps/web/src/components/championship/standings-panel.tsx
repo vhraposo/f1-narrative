@@ -140,12 +140,12 @@ export function StandingsPanel({ season, drivers }: StandingsPanelProps) {
           )}
 
           {!isLoading && !isError && standings && standings.length > 0 && (
-            <div className="overflow-hidden rounded-md border">
+<div className="overflow-x-auto rounded-md border">
               <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 <span className="w-10 shrink-0 text-center">Pos</span>
                 <span className="h-4 w-1 shrink-0" aria-hidden="true" />
                 <span className="flex-1">Piloto</span>
-                <span className="text-right">Pontos</span>
+                <span className="shrink-0 text-right">Pontos</span>
                 <span className="w-9 shrink-0" aria-hidden="true" />
               </div>
               <ol className="divide-y divide-border">

@@ -190,7 +190,7 @@ export function ConversationForm({
                           type="button"
                           key={character.id}
                           onClick={() => toggleCharacter(character.id)}
-                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm transition-colors ${
+                          className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                             selected
                               ? "border-primary bg-primary text-primary-foreground"
                               : "hover:bg-accent"

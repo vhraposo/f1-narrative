@@ -24,7 +24,7 @@ export function MessageBubble({ message, author }: MessageBubbleProps) {
       <li className="flex justify-center px-4 py-1.5">
         <div className="flex max-w-[85%] items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-xs text-muted-foreground">
           <UserRoundCog className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span className="whitespace-pre-wrap text-center">
+          <span className="whitespace-pre-wrap break-words text-center">
             {message.content}
           </span>
         </div>
@@ -39,7 +39,7 @@ export function MessageBubble({ message, author }: MessageBubbleProps) {
     return (
       <li className="flex justify-end px-4 py-1.5">
         <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground shadow-sm">
-          <span className="block whitespace-pre-wrap">{message.content}</span>
+          <span className="block whitespace-pre-wrap break-words">{message.content}</span>
           {time && (
             <span className="mt-0.5 block text-right text-[10px] font-medium text-primary-foreground/70">
               {time}
@@ -65,7 +65,7 @@ export function MessageBubble({ message, author }: MessageBubbleProps) {
             {name}
           </span>
         )}
-        <span className="block whitespace-pre-wrap text-foreground">
+        <span className="block whitespace-pre-wrap break-words text-foreground">
           {message.content}
         </span>
         {time && (

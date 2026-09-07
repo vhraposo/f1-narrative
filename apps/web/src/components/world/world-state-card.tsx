@@ -59,7 +59,7 @@ export function WorldStateCard() {
           <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             {row.label}
           </dt>
-          <dd className="text-right text-sm font-semibold text-foreground">
+          <dd className="min-w-0 truncate text-right text-sm font-semibold text-foreground">
             {row.value}
           </dd>
         </div>

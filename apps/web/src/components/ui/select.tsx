@@ -305,7 +305,7 @@ export function SelectContent({ className }: { className?: string }) {
       aria-labelledby={triggerId}
       onKeyDown={handleKeyDown}
       className={cn(
-        "absolute left-0 top-full z-50 mt-1 flex w-max min-w-full max-w-[calc(100vw-1rem)] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95",
+        "absolute left-0 top-full z-50 mt-1 flex w-max min-w-full max-w-[calc(100vw-1rem)] max-h-[50dvh] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95",
         className,
       )}
     >

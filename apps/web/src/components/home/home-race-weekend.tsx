@@ -132,7 +132,7 @@ export function HomeRaceWeekend() {
                   >
                     <p
                       className={cn(
-                        "text-[10px] font-semibold uppercase tracking-[0.2em]",
+                        "truncate text-[10px] font-semibold uppercase tracking-[0.2em]",
                         active ? "opacity-80" : "opacity-60",
                       )}
                     >

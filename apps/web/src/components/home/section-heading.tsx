@@ -10,7 +10,7 @@ export function SectionHeading({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-end justify-between gap-4">
+    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
           {kicker}

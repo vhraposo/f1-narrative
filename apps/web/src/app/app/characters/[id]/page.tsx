@@ -219,7 +219,7 @@ export default function CharacterDetailPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 sm:ml-auto">
+              <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
                 <Button
                   size="sm"
                   onClick={() => {

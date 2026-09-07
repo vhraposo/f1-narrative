@@ -114,7 +114,7 @@ export default function EventDetailPage() {
           </span>
         }
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/app/events/${event.id}/edit`}
               className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -193,7 +193,7 @@ export default function EventDetailPage() {
             </p>
           )}
           {event.description && (
-            <p className="mt-4 whitespace-pre-line text-muted-foreground">
+            <p className="mt-4 whitespace-pre-line break-words text-muted-foreground">
               {event.description}
             </p>
           )}
