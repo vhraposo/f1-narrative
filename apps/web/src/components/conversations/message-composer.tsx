@@ -196,118 +196,133 @@ export function MessageComposer({ conversationId, onError }: MessageComposerProp
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-2">
-      {ownCharacters.length > 1 && (
-        <Select
-          value={effectiveSender}
-          onValueChange={(value) => setSenderCharacterId(value)}
-          options={[
-            { value: "", label: "Selecione o remetente" },
-            ...ownCharacters.map((c) => ({ value: c.id, label: c.name })),
-          ]}
-        >
-          <SelectTrigger aria-label="Quem envia a mensagem" />
-          <SelectContent />
-        </Select>
-      )}
+    <form onSubmit={handleSubmit} className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        {ownCharacters.length > 1 && (
+          <label className="flex min-w-0 flex-1 basis-44 items-center gap-2">
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Remetente
+            </span>
+            <Select
+              value={effectiveSender}
+              onValueChange={(value) => setSenderCharacterId(value)}
+              options={[
+                { value: "", label: "Selecione o remetente" },
+                ...ownCharacters.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            >
+              <SelectTrigger aria-label="Quem envia a mensagem" className="h-8" />
+              <SelectContent />
+            </Select>
+          </label>
+        )}
 
-      {aiParticipants.length === 0 ? (
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <Bot className="h-3 w-3" />
-          Nenhum personagem de IA participa desta conversa.
-        </p>
-      ) : (
-        <label className="block space-y-1">
-          <span className="text-xs text-muted-foreground">
-            Quem deve responder?
-          </span>
-          <Select
-            value={speakerCharacterId}
-            onValueChange={(value) => setSpeakerCharacterId(value)}
-            options={
-              aiParticipants.length > 1
-                ? [
-                    {
-                      value: "",
-                      label: "Selecione quem deve responder",
-                    },
-                    ...aiParticipants.map((ai) => ({
+        {aiParticipants.length > 0 && (
+          <label className="flex min-w-0 flex-1 basis-44 items-center gap-2">
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Resposta de
+            </span>
+            <Select
+              value={speakerCharacterId}
+              onValueChange={(value) => setSpeakerCharacterId(value)}
+              options={
+                aiParticipants.length > 1
+                  ? [
+                      {
+                        value: "",
+                        label: "Selecione quem deve responder",
+                      },
+                      ...aiParticipants.map((ai) => ({
+                        value: ai.id,
+                        label: ai.name,
+                      })),
+                    ]
+                  : aiParticipants.map((ai) => ({
                       value: ai.id,
                       label: ai.name,
-                    })),
-                  ]
-                : aiParticipants.map((ai) => ({
-                    value: ai.id,
-                    label: ai.name,
-                  }))
-            }
-          >
-            <SelectTrigger
-              aria-label="Quem deve responder"
-              disabled={aiParticipants.length === 1 || isBusy}
+                    }))
+              }
             >
-              <Bot className="mr-2 h-3 w-3 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent />
-          </Select>
-        </label>
-      )}
+              <SelectTrigger
+                aria-label="Quem deve responder"
+                className="h-8"
+                disabled={aiParticipants.length === 1 || isBusy}
+              >
+                <Bot className="mr-2 h-3 w-3 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent />
+            </Select>
+          </label>
+        )}
 
-      <div className="flex items-start gap-2">
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Escreva sua mensagem como personagem..."
-          rows={2}
-          disabled={!effectiveSender && !speakerCharacterId}
-          className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-        />
-        <Button
-          type="submit"
-          disabled={!effectiveSender || !content.trim() || isBusy}
-        >
-          {createMutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="mr-2 h-4 w-4" />
-          )}
-          Enviar
-        </Button>
         <Button
           type="button"
           variant="outline"
+          size="sm"
+          className="h-8"
           disabled={
             !speakerCharacterId || !effectiveSender || !content.trim() || isBusy
           }
           onClick={handleGenerate}
         >
           {isBusy ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Sparkles className="mr-2 h-4 w-4" />
+            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
           )}
           Gerar resposta IA
         </Button>
       </div>
+
+      <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm">
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Escreva sua mensagem..."
+          rows={2}
+          disabled={!effectiveSender && !speakerCharacterId}
+          className="min-h-[40px] max-h-[160px] w-full resize-none rounded-md bg-transparent py-1.5 px-1 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+        />
+        <Button
+          type="submit"
+          size="icon"
+          className="h-10 w-10 shrink-0 rounded-full"
+          aria-label="Enviar"
+          disabled={!effectiveSender || !content.trim() || isBusy}
+        >
+          {createMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
       {ownCharacters.length === 0 && (
-        <p className="text-xs text-muted-foreground">
+        <p className="px-1 text-[11px] text-muted-foreground">
           Nenhum dos seus personagens participa desta conversa.
         </p>
       )}
+      {aiParticipants.length === 0 && (
+        <p className="flex items-center gap-1 px-1 text-[11px] text-muted-foreground">
+          <Bot className="h-3 w-3" />
+          Nenhum personagem de IA participa desta conversa.
+        </p>
+      )}
       {aiParticipants.length > 0 && !effectiveSender && (
-        <p className="text-xs text-muted-foreground">
+        <p className="px-1 text-[11px] text-muted-foreground">
           Escolha um remetente do seu personagem para gerar uma resposta de IA
           (o turno inclui a sua mensagem no histórico).
         </p>
       )}
       {aiParticipants.length > 1 && !speakerCharacterId && (
-        <p className="text-xs text-muted-foreground">
+        <p className="px-1 text-[11px] text-muted-foreground">
           Selecione quem deve responder para gerar uma resposta de IA.
         </p>
       )}
       {notice && (
-        <p className="text-xs text-muted-foreground" role="status">
+        <p className="px-1 text-[11px] text-muted-foreground" role="status">
           {notice}
         </p>
       )}

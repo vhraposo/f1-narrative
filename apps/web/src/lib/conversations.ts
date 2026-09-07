@@ -148,7 +148,6 @@ export type GenerateMessageInput = {
   targetCharacterId: string;
 };
 
-// Resposta real de geração (201): o backend já persistiu a Message AI.
 export type GeneratedMessageResponse = {
   message: Message;
   generationKey: string;
@@ -156,8 +155,6 @@ export type GeneratedMessageResponse = {
   mode: string;
 };
 
-// Resposta assembly-only (200, default NullProvider): o backend NÃO persiste.
-// Nunca tratar responseSkeleton como Message.
 export type AssemblyOnlyResponse = {
   generation: {
     generationKey: string;
@@ -177,4 +174,102 @@ export function generateMessage(
     `/api/conversations/${conversationId}/generate`,
     input,
   );
+}
+
+export const DEFAULT_GROUP_NAME = "Grupo dos Pilotos";
+
+export function isDefaultGroupTitle(title: string | null): boolean {
+  if (!title) return false;
+  const normalized = title.replace(/\s+/g, " ").trim();
+  return (
+    normalized === DEFAULT_GROUP_NAME ||
+    normalized.startsWith(`${DEFAULT_GROUP_NAME} ·`)
+  );
+}
+
+export function isDefaultGroup(conversation: Conversation): boolean {
+  return conversation.type === "GROUP" && isDefaultGroupTitle(conversation.title);
+}
+
+export function defaultGroupSeasonYear(title: string | null): number | null {
+  if (!title) return null;
+  const normalized = title.replace(/\s+/g, " ").trim();
+  if (!normalized.startsWith(`${DEFAULT_GROUP_NAME} ·`)) return null;
+  const segment = normalized.split("·")[1]?.trim();
+  if (!segment) return null;
+  const year = Number.parseInt(segment, 10);
+  return Number.isFinite(year) ? year : null;
+}
+
+export function findDefaultGroup(
+  conversations: Conversation[],
+  currentSeasonYear?: number,
+): Conversation | null {
+  const groups = conversations.filter(isDefaultGroup);
+  if (groups.length === 0) return null;
+  if (currentSeasonYear != null) {
+    const preferred = groups.find(
+      (g) => defaultGroupSeasonYear(g.title) === currentSeasonYear,
+    );
+    if (preferred) return preferred;
+  }
+  return groups[0];
+}
+
+function startOfDay(date: Date): number {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ).getTime();
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return startOfDay(a) === startOfDay(b);
+}
+
+export function formatChatTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  if (sameDay(date, now)) {
+    return date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  const daysDiff = Math.round(
+    (startOfDay(now) - startOfDay(date)) / 86_400_000,
+  );
+  if (daysDiff === 1) return "Ontem";
+  if (date.getFullYear() === now.getFullYear()) {
+    const day = date.toLocaleDateString("pt-BR", { day: "2-digit" });
+    const month = date
+      .toLocaleDateString("pt-BR", { month: "short" })
+      .replace(".", "")
+      .toUpperCase();
+    return `${day} ${month}`;
+  }
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+export function formatListTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  if (sameDay(date, now)) {
+    return date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
 }
