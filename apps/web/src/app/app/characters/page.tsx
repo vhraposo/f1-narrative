@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { useCharacters, useDeleteCharacter } from "@/hooks/use-characters";
+import { useDrivers } from "@/hooks/use-driver-profiles";
 import type { Character } from "@/lib/characters";
 
 const primaryLinkStyles =
@@ -18,8 +19,13 @@ const primaryLinkStyles =
 export default function CharactersPage() {
   const { data, isLoading, isError, isRefetching, error, refetch } =
     useCharacters();
+  const driversQuery = useDrivers();
   const deleteMutation = useDeleteCharacter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const driversById = new Map(
+    (driversQuery.data ?? []).map((driver) => [driver.characterId, driver]),
+  );
 
   function handleDelete(character: Character) {
     setDeletingId(character.id);
@@ -87,6 +93,7 @@ export default function CharactersPage() {
             <CharacterCard
               key={character.id}
               character={character}
+              driver={driversById.get(character.id) ?? null}
               onDelete={handleDelete}
               isDeleting={deletingId === character.id}
             />

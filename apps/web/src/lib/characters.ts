@@ -36,6 +36,19 @@ export type CreateCharacterInput = {
 
 export type UpdateCharacterInput = Partial<CreateCharacterInput>;
 
+// Linguagem consistente de controle (aplicação inteira): quem "usa" o
+// personagem. NUNCA usada como único indicador visual (cor não informa).
+export const CONTROLLED_BY_LABELS: Record<Character["controlledBy"], string> = {
+  USER: "Você",
+  AI: "IA",
+};
+
+export function formatBirthDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("pt-BR");
+}
+
 type ListResponse = { characters: Character[] };
 type ItemResponse = { character: Character };
 
