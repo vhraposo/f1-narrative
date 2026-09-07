@@ -122,7 +122,7 @@ export default function RelationshipsPage() {
       <PageHeader
         kicker="UNIVERSO / RELACIONAMENTOS"
         title="Relacionamentos"
-        description="As relações entre personagens do seu universo."
+        description="As conexões sociais entre os personagens do seu universo."
         action={
           form.mode === "hidden" && !isLoading && !isError && needsCharacters ? (
             <Button onClick={() => setForm({ mode: "create" })}>

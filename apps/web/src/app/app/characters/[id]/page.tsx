@@ -7,9 +7,9 @@ import { useState } from "react";
 
 import { AvailabilityCard } from "@/components/availability/availability-card";
 import { CharacterIdentity } from "@/components/characters/character-identity";
-import { CharacterAvatar } from "@/components/conversations/character-avatar";
 import { DriverProfileForm } from "@/components/drivers/driver-profile-form";
 import { MemorySection } from "@/components/memory/memory-section";
+import { RelationshipConnection } from "@/components/relationships/relationship-connection";
 import { SectionHeading } from "@/components/home/section-heading";
 import { ScheduleCard } from "@/components/schedule/schedule-card";
 import { Button } from "@/components/ui/button";
@@ -313,41 +313,13 @@ export default function CharacterDetailPage() {
           <ul className="divide-y divide-border border-y border-border">
             {related.map((r) => {
               const other = fight(r);
-              const dimensions = Object.entries(r.dimensions ?? {});
               return (
-                <li key={r.id} className="flex items-center gap-3 py-3">
-                  <CharacterAvatar
-                    name={other.name}
-                    imageUrl={other.imageUrl}
+                <li key={r.id} className="py-4">
+                  <RelationshipConnection
+                    a={character}
+                    b={other}
+                    dimensions={r.dimensions ?? undefined}
                   />
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/app/characters/${other.id}`}
-                      className="font-semibold text-foreground transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                    >
-                      {other.name}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">
-                      {other.nationality}
-                    </p>
-                    {dimensions.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {dimensions.map(([key, value]) => (
-                          <span
-                            key={key}
-                            className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-xs"
-                          >
-                            <span className="font-medium text-foreground">
-                              {key}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {String(value)}
-                            </span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 </li>
               );
             })}

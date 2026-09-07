@@ -3,14 +3,8 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { RelationshipConnection } from "@/components/relationships/relationship-connection";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Relationship } from "@/lib/relationships";
 
@@ -22,15 +16,6 @@ type RelationshipCardProps = {
   removeError: string | null;
 };
 
-function DimensionItem({ label, value }: { label: string; value: unknown }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs">
-      <span className="font-medium">{String(label)}:</span>
-      <span className="text-muted-foreground">{String(value)}</span>
-    </span>
-  );
-}
-
 export function RelationshipCard({
   relationship,
   onEdit,
@@ -41,47 +26,36 @@ export function RelationshipCard({
   const [confirming, setConfirming] = useState(false);
   const { characterA, characterB, dimensions } = relationship;
 
-  const dimensionEntries = Object.entries(dimensions ?? {});
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">
-          <span>{characterA.name}</span>
-          <span className="mx-2 text-muted-foreground">↔</span>
-          <span>{characterB.name}</span>
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          {characterA.nationality} e {characterB.nationality}
-        </p>
-      </CardHeader>
-      <CardContent>
-        {dimensionEntries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Sem dimensões definidas.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {dimensionEntries.map(([key, value]) => (
-              <DimensionItem key={key} label={key} value={value} />
-            ))}
-          </div>
-        )}
-      </CardContent>
-      <CardFooter className="gap-2">
-        <Button variant="outline" size="sm" onClick={() => onEdit(relationship)}>
-          <Pencil className="mr-2 h-4 w-4" />
+    <article className="flex flex-col rounded-xl border border-border bg-card transition-colors hover:border-brand/50">
+      <div className="flex flex-col gap-4 p-5">
+        <RelationshipConnection
+          a={characterA}
+          b={characterB}
+          dimensions={dimensions ?? undefined}
+        />
+      </div>
+
+      <div className="mt-auto flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-2.5">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onEdit(relationship)}
+        >
+          <Pencil className="mr-1.5 h-3.5 w-3.5" />
           Editar
         </Button>
         <Button
-          variant="destructive"
+          variant="ghost"
           size="sm"
+          className="text-muted-foreground hover:text-destructive"
           onClick={() => setConfirming(true)}
         >
-          <Trash2 className="mr-2 h-4 w-4" />
+          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
           Remover
         </Button>
-      </CardFooter>
+      </div>
+
       <ConfirmDialog
         open={confirming}
         onClose={() => setConfirming(false)}
@@ -91,11 +65,6 @@ export function RelationshipCard({
         isPending={isRemoving}
         error={removeError}
       />
-      {removeError && (
-        <p className="px-6 pb-4 text-sm text-destructive" role="alert">
-          {removeError}
-        </p>
-      )}
-    </Card>
+    </article>
   );
 }
