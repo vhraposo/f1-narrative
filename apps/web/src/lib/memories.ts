@@ -73,6 +73,14 @@ export const MEMORY_SOURCE_OPTIONS = Object.entries(MEMORY_SOURCE_LABELS).map(
   ([value, label]) => ({ value: value as MemorySource, label }),
 );
 
+export function formatMemoryDate(value: string): string {
+  return new Date(value).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 type MemoriesResponse = { memories: Memory[] };
 type MemoryResponse = { memory: Memory };
 type ParticipantResponse = { participant: { character: MemoryParticipant } };

@@ -3,10 +3,12 @@
 import { Brain, Loader2, Plus } from "lucide-react";
 import { useState } from "react";
 
+import { SectionHeading } from "@/components/home/section-heading";
 import { MemoryCard } from "@/components/memory/memory-card";
 import { MemoryDetail } from "@/components/memory/memory-detail";
 import { MemoryForm } from "@/components/memory/memory-form";
 import { Button } from "@/components/ui/button";
+import { useEvents } from "@/hooks/use-events";
 import {
   useCharacterMemories,
   useCreateMemory,
@@ -24,12 +26,17 @@ export function MemorySection({
   characterName,
 }: MemorySectionProps) {
   const memoriesQuery = useCharacterMemories(characterId);
+  const eventsQuery = useEvents();
   const createMutation = useCreateMemory(characterId);
   const deleteMutation = useDeleteMemory(characterId);
 
   const [showCreate, setShowCreate] = useState(false);
   const [openMemoryId, setOpenMemoryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const eventTitleById = new Map(
+    (eventsQuery.data ?? []).map((event) => [event.id, event.title]),
+  );
 
   function handleCreate(payload: {
     content: string;
@@ -61,22 +68,20 @@ export function MemorySection({
   }
 
   return (
-    <section className="rounded-lg border p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Memórias</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Lembranças relevantes para {characterName}.
-          </p>
-        </div>
-        <Button size="sm" onClick={() => setShowCreate((v) => !v)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova memória
-        </Button>
-      </div>
+    <section aria-label="Memórias" className="rounded-xl border border-border p-6">
+      <SectionHeading
+        kicker="Narrativa"
+        title="Memórias"
+        action={
+          <Button size="sm" onClick={() => setShowCreate((v) => !v)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova memória
+          </Button>
+        }
+      />
 
       {error && (
-        <p className="mt-2 text-sm text-destructive" role="alert">
+        <p className="mt-4 text-sm text-destructive" role="alert">
           {error}
         </p>
       )}
@@ -93,7 +98,7 @@ export function MemorySection({
         </div>
       )}
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-5 space-y-3">
         {memoriesQuery.isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -108,7 +113,7 @@ export function MemorySection({
             <p className="mt-2 text-sm text-muted-foreground">
               {showCreate
                 ? "Preencha o formulário acima para registrar a primeira memória."
-                : "Este personagem ainda não possui memórias. Crie a primeira para começar."}
+                : `${characterName} ainda não possui memórias. Crie a primeira para começar.`}
             </p>
           </div>
         ) : openMemoryId ? (
@@ -121,6 +126,11 @@ export function MemorySection({
             <MemoryCard
               key={memory.id}
               memory={memory}
+              eventTitle={
+                memory.eventId != null
+                  ? eventTitleById.get(memory.eventId)
+                  : undefined
+              }
               isDeleting={deleteMutation.isPending}
               onDelete={handleDelete}
               onOpen={() => setOpenMemoryId(memory.id)}

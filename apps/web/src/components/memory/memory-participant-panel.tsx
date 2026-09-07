@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Bot, Loader2, Trash2, User, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -119,8 +120,27 @@ export function MemoryParticipantPanel({
                 className="flex items-center justify-between gap-3 px-3 py-2"
               >
                 <div className="flex items-center gap-2">
+                  {participant.imageUrl ? (
+                    <img
+                      src={participant.imageUrl}
+                      alt=""
+                      className="h-8 w-8 rounded-full bg-muted object-cover"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold uppercase text-muted-foreground"
+                    >
+                      {participant.name.trim().charAt(0).toUpperCase() || "?"}
+                    </span>
+                  )}
                   <div>
-                    <p className="text-sm font-medium">{participant.name}</p>
+                    <Link
+                      href={`/app/characters/${participant.id}`}
+                      className="text-sm font-medium transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                    >
+                      {participant.name}
+                    </Link>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       {participant.controlledBy === "AI" ? (
                         <>

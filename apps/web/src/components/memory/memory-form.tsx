@@ -216,146 +216,161 @@ export function MemoryForm({
         })}
         noValidate
       >
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="memory-content">Conteúdo</Label>
-            <textarea
-              id="memory-content"
-              rows={4}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="O que essa memória registra?"
-              {...register("content")}
-            />
-            {errors.content && (
-              <p className="text-sm text-destructive">
-                {errors.content.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="memory-summary">Resumo (opcional)</Label>
-            <Input
-              id="memory-summary"
-              placeholder="Um título curto para a memória"
-              {...register("summary")}
-            />
-            {errors.summary && (
-              <p className="text-sm text-destructive">
-                {errors.summary.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label>Participantes (ao menos um)</Label>
-            {charactersQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">
-                Carregando personagens...
-              </p>
-            ) : charactersQuery.isError ? (
-              <p className="text-sm text-destructive">
-                Não foi possível carregar seus personagens.
-              </p>
-            ) : characters.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Você ainda não tem personagens para associar à memória.
-              </p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {characters.map((c) => (
-                  <label
-                    key={c.id}
-                    className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={participantIds.includes(c.id)}
-                      onChange={() => toggleCharacter(c.id)}
-                    />
-                    <span>
-                      {c.name}
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        {c.nationality}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Ao menos um participante precisa ser seu personagem (ownership).
-              Personagens de IA podem ser associados depois, via painel de
-              participantes.
+        <CardContent className="space-y-6">
+          <section className="space-y-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
+              Registro
             </p>
-            {errors.participantIds && (
-              <p className="text-sm text-destructive">
-                {errors.participantIds.message}
+            <div className="space-y-2">
+              <Label htmlFor="memory-content">Conteúdo</Label>
+              <textarea
+                id="memory-content"
+                rows={4}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="O que essa memória registra?"
+                {...register("content")}
+              />
+              {errors.content && (
+                <p className="text-sm text-destructive">
+                  {errors.content.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="memory-summary">Resumo (opcional)</Label>
+              <Input
+                id="memory-summary"
+                placeholder="Um título curto para a memória"
+                {...register("summary")}
+              />
+              {errors.summary && (
+                <p className="text-sm text-destructive">
+                  {errors.summary.message}
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
+              Vínculos
+            </p>
+            <div className="space-y-2">
+              <Label>Participantes (ao menos um)</Label>
+              {charactersQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">
+                  Carregando personagens...
+                </p>
+              ) : charactersQuery.isError ? (
+                <p className="text-sm text-destructive">
+                  Não foi possível carregar seus personagens.
+                </p>
+              ) : characters.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Você ainda não tem personagens para associar à memória.
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {characters.map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={participantIds.includes(c.id)}
+                        onChange={() => toggleCharacter(c.id)}
+                      />
+                      <span>
+                        {c.name}
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          {c.nationality}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Ao menos um participante precisa ser seu personagem (ownership).
+                Personagens de IA podem ser associados depois, via painel de
+                participantes.
               </p>
-            )}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="memory-importance">Importância</Label>
-              <Controller
-                control={control}
-                name="importance"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    options={MEMORY_IMPORTANCE_OPTIONS}
-                  >
-                    <SelectTrigger id="memory-importance" onBlur={field.onBlur} />
-                    <SelectContent />
-                  </Select>
-                )}
-              />
+              {errors.participantIds && (
+                <p className="text-sm text-destructive">
+                  {errors.participantIds.message}
+                </p>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="memory-source">Origem</Label>
-              <Controller
-                control={control}
-                name="source"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    options={MEMORY_SOURCE_OPTIONS}
-                  >
-                    <SelectTrigger id="memory-source" onBlur={field.onBlur} />
-                    <SelectContent />
-                  </Select>
-                )}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="memory-event">Evento de origem (opcional)</Label>
+                <Controller
+                  control={control}
+                  name="eventId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={field.onChange}
+                      options={[
+                        { value: "", label: "Nenhum evento" },
+                        ...events.map((event) => ({
+                          value: event.id,
+                          label: event.title,
+                        })),
+                      ]}
+                    >
+                      <SelectTrigger id="memory-event" onBlur={field.onBlur} />
+                      <SelectContent />
+                    </Select>
+                  )}
+                />
+              </div>
             </div>
-          </div>
+          </section>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="memory-event">Evento de origem (opcional)</Label>
-              <Controller
-                control={control}
-                name="eventId"
-                render={({ field }) => (
-                  <Select
-                    value={field.value ?? ""}
-                    onValueChange={field.onChange}
-                    options={[
-                      { value: "", label: "Nenhum evento" },
-                      ...events.map((event) => ({
-                        value: event.id,
-                        label: event.title,
-                      })),
-                    ]}
-                  >
-                    <SelectTrigger id="memory-event" onBlur={field.onBlur} />
-                    <SelectContent />
-                  </Select>
-                )}
-              />
+          <section className="space-y-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
+              Classificação
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="memory-importance">Importância</Label>
+                <Controller
+                  control={control}
+                  name="importance"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={MEMORY_IMPORTANCE_OPTIONS}
+                    >
+                      <SelectTrigger id="memory-importance" onBlur={field.onBlur} />
+                      <SelectContent />
+                    </Select>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="memory-source">Origem</Label>
+                <Controller
+                  control={control}
+                  name="source"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={MEMORY_SOURCE_OPTIONS}
+                    >
+                      <SelectTrigger id="memory-source" onBlur={field.onBlur} />
+                      <SelectContent />
+                    </Select>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -371,23 +386,28 @@ export function MemoryForm({
                 {...register("emotionalImpact")}
               />
             </div>
-          </div>
+          </section>
 
-          <div className="space-y-2">
-            <Label htmlFor="memory-context">Contexto (JSON, opcional)</Label>
-            <textarea
-              id="memory-context"
-              rows={4}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder='Ex.: { "local": "Interlagos", "disputa": "última volta" }'
-              {...register("context")}
-            />
-            {errors.context && (
-              <p className="text-sm text-destructive">
-                {errors.context.message}
-              </p>
-            )}
-          </div>
+          <section className="space-y-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand">
+              Avançado
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="memory-context">Contexto (JSON, opcional)</Label>
+              <textarea
+                id="memory-context"
+                rows={4}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder='Ex.: { "local": "Interlagos", "disputa": "última volta" }'
+                {...register("context")}
+              />
+              {errors.context && (
+                <p className="text-sm text-destructive">
+                  {errors.context.message}
+                </p>
+              )}
+            </div>
+          </section>
 
           {error && (
             <p className="text-sm text-destructive" role="alert">
