@@ -23,7 +23,6 @@ export type Driver = {
 
 export type UpsertDriverInput = {
   number?: number | null;
-  teamId?: string | null;
 };
 
 export function formatDriverNumber(number: number | null): string {

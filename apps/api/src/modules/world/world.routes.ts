@@ -1,9 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { rosterService } from "../roster/roster.service.js";
 import { updateWorldSchema } from "./world.schema.js";
 
-// Chave fixa do WorldState global: correspondente ao @unique default("default")
-// do modelo. Garante um único registro de estado do mundo em toda a aplicação.
 const WORLD_KEY = "default";
 
 const worldSelect = {
@@ -17,12 +16,6 @@ const worldSelect = {
   updatedAt: true,
 } as const;
 
-// Resolve o WorldState único, criando-o se ainda não existir.
-//
-// Concorrência: Prisma `upsert` sobre a chave única `key` é atômico no banco —
-// duas chamadas simultâneas terminam com EXATAMENTE uma linha com
-// `key='default'`. Isso resolve a corrida "GET + GET -> dois WorldStates" sem
-// exigir migration (a constraint @unique já existe no schema).
 async function resolveWorld() {
   return prisma.worldState.upsert({
     where: { key: WORLD_KEY },
@@ -32,10 +25,6 @@ async function resolveWorld() {
   });
 }
 
-// Valida referências a Season/Race. Como currentSeasonId/currentRaceId são
-// referências escalares SEM FK no banco, a existência é verificada
-// explicitamente aqui — nunca permitimos uma referência silenciosa a um
-// registro inexistente. Retorna a mensagem de erro ou null quando tudo ok.
 async function findInvalidReference(
   seasonId: string | null | undefined,
   raceId: string | null | undefined,
@@ -58,7 +47,6 @@ async function findInvalidReference(
 }
 
 export const worldRoutes: FastifyPluginAsync = async (fastify) => {
-  // Estado global do universo (singleton). Leitura autenticada.
   fastify.get(
     "/api/world",
     { preHandler: [fastify.authenticate] },
@@ -68,8 +56,6 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Atualização do estado global (singleton). Nenhum POST/DELETE nem endpoint
-  // por usuário: existe sempre um, e apenas um.
   fastify.patch(
     "/api/world",
     { preHandler: [fastify.authenticate] },
@@ -127,6 +113,10 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
         },
         select: worldSelect,
       });
+
+      if (parsed.data.currentSeasonId !== undefined) {
+        await rosterService.resyncAllDriverTeamCaches();
+      }
 
       return reply.send({ world });
     },

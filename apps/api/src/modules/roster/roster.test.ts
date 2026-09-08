@@ -444,7 +444,7 @@ describe("RosterService — histórico e independência", () => {
 });
 
 describe("RosterService — cache teamId e atomicidade", () => {
-  it("sincroniza o cache DriverProfile.teamId apenas na temporada corrente", async () => {
+  it("sincroniza o cache DriverProfile.teamId a partir da temporada corrente", async () => {
     const season = await createSeason(2026);
     const other = await createSeason(2027);
     const driver = await createDriver(owner.id, "Cacheado");
@@ -471,11 +471,12 @@ describe("RosterService — cache teamId e atomicidade", () => {
       driverProfileId: driver.driverProfileId,
     });
 
+    // O cache deriva da temporada CORRENTE (2027): sem entrada em 2027, null.
     cached = await prisma.driverProfile.findUnique({
       where: { id: driver.driverProfileId },
       select: { teamId: true },
     });
-    expect(cached?.teamId).toBe(teamA.id);
+    expect(cached?.teamId).toBeNull();
 
     await setCurrentSeason(originalSeason);
   });
@@ -534,6 +535,118 @@ describe("RosterService — cache teamId e atomicidade", () => {
     });
     expect(cached?.teamId).toBe(winnerTeamId);
     expect(loserIsConflict).toBe(true);
+
+    await setCurrentSeason(originalSeason);
+  });
+});
+
+describe("RosterService — regressões (fontes únicas de verdade)", () => {
+  it("transferência entre temporadas: cache reflete a equipe da temporada corrente", async () => {
+    const season2026 = await createSeason(2026);
+    const season2027 = await createSeason(2027);
+    const lando = await createDriver(owner.id, "Lando Transfere");
+    const originalSeason = await readCurrentSeason();
+
+    await setCurrentSeason(season2026.id);
+    await rosterService.assignDriverToSeat(owner.id, {
+      seasonId: season2026.id,
+      teamId: teamA.id,
+      driverProfileId: lando.driverProfileId,
+      seat: 1,
+    });
+
+    let cached = await prisma.driverProfile.findUnique({
+      where: { id: lando.driverProfileId },
+      select: { teamId: true },
+    });
+    expect(cached?.teamId).toBe(teamA.id);
+
+    // Designa em 2027 (Ferrari/teamB) mesmo com a corrente ainda sendo 2026,
+    // e depois troca o WorldState para 2027 via API (dispara resync).
+    await rosterService.assignDriverToSeat(owner.id, {
+      seasonId: season2027.id,
+      teamId: teamB.id,
+      driverProfileId: lando.driverProfileId,
+      seat: 1,
+    });
+
+    const patch = await app.inject({
+      method: "PATCH",
+      url: "/api/world",
+      headers: { cookie: owner.cookie },
+      payload: { currentSeasonId: season2027.id },
+    });
+    expect(patch.statusCode).toBe(200);
+
+    cached = await prisma.driverProfile.findUnique({
+      where: { id: lando.driverProfileId },
+      select: { teamId: true },
+    });
+    expect(cached?.teamId).toBe(teamB.id);
+
+    const e2026 = await getEntry(lando.driverProfileId, season2026.id);
+    const e2027 = await getEntry(lando.driverProfileId, season2027.id);
+    expect(e2026?.teamId).toBe(teamA.id);
+    expect(e2027?.teamId).toBe(teamB.id);
+
+    await setCurrentSeason(originalSeason);
+  });
+
+  it("substituição de assento: deslocado vira AVAILABLE com teamId null e histórico preservado", async () => {
+    const season = await createSeason(2026);
+    const oscar = await createDriver(owner.id, "Oscar Desloc");
+    const alicya = await createDriver(owner.id, "Alicya Entra");
+    const originalSeason = await readCurrentSeason();
+
+    await setCurrentSeason(season.id);
+    const oscarEntry = await rosterService.assignDriverToSeat(owner.id, {
+      seasonId: season.id,
+      teamId: teamA.id,
+      driverProfileId: oscar.driverProfileId,
+      seat: 2,
+    });
+    await rosterService.assignDriverToSeat(owner.id, {
+      seasonId: season.id,
+      teamId: teamA.id,
+      driverProfileId: alicya.driverProfileId,
+      seat: 2,
+    });
+
+    const oscarNow = await getEntry(oscar.driverProfileId, season.id);
+    expect(oscarNow?.status).toBe("AVAILABLE");
+    expect(oscarNow?.teamId).toBeNull();
+    expect(oscarNow?.seat).toBeNull();
+
+    const cached = await prisma.driverProfile.findUnique({
+      where: { id: oscar.driverProfileId },
+      select: { teamId: true },
+    });
+    expect(cached?.teamId).toBeNull();
+
+    const oscarEvents = (await getEvents(oscarEntry.id)).map((e) => e.kind);
+    expect(oscarEvents).toEqual(["CREATED", "DISPLACED"]);
+
+    await setCurrentSeason(originalSeason);
+  });
+
+  it("reserva ACTIVE com equipe mantém teamId (cache)", async () => {
+    const season = await createSeason(2026);
+    const reserve = await createDriver(owner.id, "Reserva Cache");
+    const originalSeason = await readCurrentSeason();
+
+    await setCurrentSeason(season.id);
+    await rosterService.hireDriver(owner.id, {
+      seasonId: season.id,
+      teamId: teamA.id,
+      driverProfileId: reserve.driverProfileId,
+      role: "RESERVE",
+    });
+
+    const cached = await prisma.driverProfile.findUnique({
+      where: { id: reserve.driverProfileId },
+      select: { teamId: true },
+    });
+    expect(cached?.teamId).toBe(teamA.id);
 
     await setCurrentSeason(originalSeason);
   });

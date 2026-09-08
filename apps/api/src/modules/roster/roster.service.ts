@@ -130,25 +130,30 @@ async function assertValidSeat(seat: number): Promise<void> {
   }
 }
 
-// DriverProfile.teamId é um cache de conveniência do vínculo atual. A fonte de
-// verdade é a SeasonDriverEntry da temporada corrente (WorldState). O cache só
-// é sincronizado quando a temporada manipulada É a temporada corrente.
-async function syncTeamCache(
-  tx: Tx,
-  driverProfileId: string,
-  teamId: string | null,
-  seasonId: string,
-): Promise<void> {
+async function syncCurrentTeamCache(tx: Tx, driverProfileId: string): Promise<void> {
   const world = await tx.worldState.findUnique({
     where: { key: WORLD_KEY },
     select: { currentSeasonId: true },
   });
-  if (world?.currentSeasonId === seasonId) {
+  const seasonId = world?.currentSeasonId;
+  if (!seasonId) {
     await tx.driverProfile.update({
       where: { id: driverProfileId },
-      data: { teamId },
+      data: { teamId: null },
     });
+    return;
   }
+  const entry = await tx.seasonDriverEntry.findUnique({
+    where: {
+      seasonId_driverProfileId: { seasonId, driverProfileId },
+    },
+    select: { status: true, teamId: true },
+  });
+  const teamId = entry && entry.status === "ACTIVE" ? (entry.teamId ?? null) : null;
+  await tx.driverProfile.update({
+    where: { id: driverProfileId },
+    data: { teamId },
+  });
 }
 
 async function displaceOccupant(
@@ -162,14 +167,13 @@ async function displaceOccupant(
     number: number | null;
     status: DriverStatus;
   },
-  seasonId: string,
 ): Promise<void> {
   if (occupant.status !== "ACTIVE") return;
   const updated = await tx.seasonDriverEntry.update({
     where: { id: occupant.id },
     data: { teamId: null, role: null, seat: null, number: null, status: "AVAILABLE" },
   });
-  await syncTeamCache(tx, occupant.driverProfileId, null, seasonId);
+  await syncCurrentTeamCache(tx, occupant.driverProfileId);
   await logEvent(
     tx,
     occupant.id,
@@ -221,13 +225,13 @@ export const rosterService = {
           data: { number: input.number ?? occupant.number ?? null },
           include: entryInclude,
         });
-        await syncTeamCache(tx, input.driverProfileId, input.teamId, input.seasonId);
+        await syncCurrentTeamCache(tx, input.driverProfileId);
         await logEvent(tx, occupant.id, "SEATED", toState(occupant), toState(updated));
         return updated;
       }
 
       if (occupant) {
-        await displaceOccupant(tx, occupant, input.seasonId);
+        await displaceOccupant(tx, occupant);
       }
 
       const kind: DriverEntryEventKind = existing
@@ -262,7 +266,7 @@ export const rosterService = {
             include: entryInclude,
           });
 
-      await syncTeamCache(tx, input.driverProfileId, input.teamId, input.seasonId);
+      await syncCurrentTeamCache(tx, input.driverProfileId);
       await logEvent(tx, target.id, kind, existing ? toState(existing) : null, toState(target));
       return target;
     });
@@ -296,7 +300,7 @@ export const rosterService = {
         data: { teamId: null, role: null, seat: null, number: null, status: "AVAILABLE" },
         include: entryInclude,
       });
-      await syncTeamCache(tx, input.driverProfileId, null, input.seasonId);
+      await syncCurrentTeamCache(tx, input.driverProfileId);
       await logEvent(tx, existing.id, "RELEASED", toState(existing), toState(updated));
       return updated;
     });
@@ -398,7 +402,7 @@ export const rosterService = {
             include: entryInclude,
           });
 
-      await syncTeamCache(tx, input.driverProfileId, input.teamId, input.seasonId);
+      await syncCurrentTeamCache(tx, input.driverProfileId);
       await logEvent(tx, target.id, kind, existing ? toState(existing) : null, toState(target));
       return target;
     });
@@ -466,7 +470,7 @@ export const rosterService = {
         },
         include: entryInclude,
       });
-      await syncTeamCache(tx, input.driverProfileId, input.teamId, input.seasonId);
+      await syncCurrentTeamCache(tx, input.driverProfileId);
       await logEvent(tx, existing.id, "PROMOTED", toState(existing), toState(updated));
       return updated;
     });
@@ -509,5 +513,27 @@ export const rosterService = {
       },
       entry: driver.seasonDriverEntries[0] ?? null,
     }));
+  },
+
+  async resyncAllDriverTeamCaches() {
+    const world = await prisma.worldState.findUnique({
+      where: { key: WORLD_KEY },
+      select: { currentSeasonId: true },
+    });
+    const seasonId = world?.currentSeasonId ?? null;
+    const profiles = await prisma.driverProfile.findMany({
+      where: {
+        OR: [
+          { teamId: { not: null } },
+          ...(seasonId
+            ? [{ seasonDriverEntries: { some: { seasonId } } }]
+            : []),
+        ],
+      },
+      select: { id: true },
+    });
+    for (const profile of profiles) {
+      await syncCurrentTeamCache(prisma, profile.id);
+    }
   },
 };

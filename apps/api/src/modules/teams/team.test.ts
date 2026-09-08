@@ -353,8 +353,8 @@ describe("DELETE /api/teams/:id", () => {
     const created = await createTeam(u, { name: "Com Piloto" });
     const teamId = created.json.team!.id;
 
-    // A vinculação teamId ainda não é exposta pela API nesta fase; ligamos o
-    // piloto diretamente no banco para validar a restrição onDelete: Restrict.
+    // A vinculação de equipe (teamId) é do domínio de Roster; ligamos o
+// piloto diretamente no banco apenas para validar onDelete: Restrict.
     await prisma.driverProfile.update({
       where: { characterId: ch.id },
       data: { teamId },

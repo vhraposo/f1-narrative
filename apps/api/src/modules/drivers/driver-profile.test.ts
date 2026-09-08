@@ -2,6 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { rosterService } from "../roster/roster.service.js";
+
+const WORLD_KEY = "default";
 
 let app: FastifyInstance;
 
@@ -344,7 +347,25 @@ describe("DELETE /api/drivers/:characterId", () => {
   });
 });
 
-describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
+async function createSeason(year: number): Promise<string> {
+  const season = await prisma.season.create({ data: { year } });
+  return season.id;
+}
+
+async function setCurrentSeason(seasonId: string | null): Promise<void> {
+  await prisma.worldState.upsert({
+    where: { key: WORLD_KEY },
+    update: { currentSeasonId: seasonId },
+    create: { key: WORLD_KEY, currentSeasonId: seasonId },
+  });
+}
+
+async function readCurrentSeason(): Promise<string | null> {
+  const world = await prisma.worldState.findUnique({ where: { key: WORLD_KEY } });
+  return world?.currentSeasonId ?? null;
+}
+
+describe("PUT /api/drivers/:characterId — vinculação de Team é do roster", () => {
   it("cria piloto sem Team → teamId e team null", async () => {
     const u = await createUser(`vtsem-${Date.now()}@f1nw.test`, "Vsem");
     const ch = await createCharacter(u, {
@@ -358,7 +379,7 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
     expect(body!.team).toBeNull();
   });
 
-  it("cria piloto já com Team própria", async () => {
+  it("rejeita teamId no corpo (criar piloto já com Team) → 400 ROSTER_OPERATION_REQUIRED", async () => {
     const u = await createUser(`vtcom-${Date.now()}@f1nw.test`, "Vcom");
     const ch = await createCharacter(u, {
       name: "Com Time",
@@ -366,17 +387,18 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
       birthDate: "1993-03-03",
     });
     const team = await createTeam(u, { name: "Equipe do Piloto" });
-    const { statusCode, body } = await putDriver(u, ch.id, {
-      number: 10,
-      teamId: team.id,
+
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/drivers/${ch.id}`,
+      headers: { cookie: u.cookie },
+      payload: { number: 10, teamId: team.id },
     });
-    expect(statusCode).toBe(200);
-    expect(body!.teamId).toBe(team.id);
-    expect(body!.team!.id).toBe(team.id);
-    expect(body!.team!.name).toBe("Equipe do Piloto");
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("ROSTER_OPERATION_REQUIRED");
   });
 
-  it("adiciona Team a piloto existente", async () => {
+  it("rejeita teamId no corpo (adicionar Team a piloto existente) → 400 ROSTER_OPERATION_REQUIRED", async () => {
     const u = await createUser(`vtadd-${Date.now()}@f1nw.test`, "Vadd");
     const ch = await createCharacter(u, {
       name: "Adicionar Time",
@@ -386,16 +408,17 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
     await putDriver(u, ch.id, { number: 5 });
 
     const team = await createTeam(u, { name: "Time Adicionado" });
-    const { statusCode, body } = await putDriver(u, ch.id, {
-      number: 5,
-      teamId: team.id,
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/drivers/${ch.id}`,
+      headers: { cookie: u.cookie },
+      payload: { number: 5, teamId: team.id },
     });
-    expect(statusCode).toBe(200);
-    expect(body!.teamId).toBe(team.id);
-    expect(body!.team!.id).toBe(team.id);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("ROSTER_OPERATION_REQUIRED");
   });
 
-  it("troca Team", async () => {
+  it("rejeita teamId no corpo (trocar Team) → 400 ROSTER_OPERATION_REQUIRED", async () => {
     const u = await createUser(`vtswap-${Date.now()}@f1nw.test`, "Vswap");
     const ch = await createCharacter(u, {
       name: "Trocar Time",
@@ -405,36 +428,38 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
     const teamA = await createTeam(u, { name: "Time A" });
     const teamB = await createTeam(u, { name: "Time B" });
 
-    await putDriver(u, ch.id, { number: 7, teamId: teamA.id });
-    const { statusCode, body } = await putDriver(u, ch.id, {
-      number: 7,
-      teamId: teamB.id,
+    await putDriver(u, ch.id, { number: 7 });
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/drivers/${ch.id}`,
+      headers: { cookie: u.cookie },
+      payload: { number: 7, teamId: teamB.id },
     });
-    expect(statusCode).toBe(200);
-    expect(body!.teamId).toBe(teamB.id);
-    expect(body!.team!.id).toBe(teamB.id);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("ROSTER_OPERATION_REQUIRED");
+    expect(teamA.id).not.toBe(teamB.id);
   });
 
-  it("remove Team enviando teamId: null", async () => {
+  it("rejeita teamId: null no corpo (desvincular via profile) → 400 ROSTER_OPERATION_REQUIRED", async () => {
     const u = await createUser(`vtdel-${Date.now()}@f1nw.test`, "Vunlink");
     const ch = await createCharacter(u, {
       name: "Desvincular",
       nationality: "Britânica",
       birthDate: "1990-05-05",
     });
-    const team = await createTeam(u, { name: "Time Removível" });
-    await putDriver(u, ch.id, { number: 3, teamId: team.id });
+    await putDriver(u, ch.id, { number: 3 });
 
-    const { statusCode, body } = await putDriver(u, ch.id, {
-      number: 3,
-      teamId: null,
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/drivers/${ch.id}`,
+      headers: { cookie: u.cookie },
+      payload: { number: 3, teamId: null },
     });
-    expect(statusCode).toBe(200);
-    expect(body!.teamId).toBeNull();
-    expect(body!.team).toBeNull();
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("ROSTER_OPERATION_REQUIRED");
   });
 
-  it("PUT sem teamId preserva a Team existente", async () => {
+  it("PUT sem teamId preserva a Team vinda do roster", async () => {
     const u = await createUser(`vtkeep-${Date.now()}@f1nw.test`, "Vkeep");
     const ch = await createCharacter(u, {
       name: "Preservar Time",
@@ -442,30 +467,31 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
       birthDate: "1989-06-06",
     });
     const team = await createTeam(u, { name: "Time Preservado" });
-    await putDriver(u, ch.id, { number: 12, teamId: team.id });
+    const seasonId = await createSeason(2026);
+    const originalSeason = await readCurrentSeason();
 
-    // Envia apenas number, sem teamId: a Team deve ser preservada.
+    await putDriver(u, ch.id, { number: 12 });
+    const driverRow = await prisma.driverProfile.findUnique({
+      where: { characterId: ch.id },
+    });
+    await setCurrentSeason(seasonId);
+    await rosterService.assignDriverToSeat(u.userId, {
+      seasonId,
+      teamId: team.id,
+      driverProfileId: driverRow!.id,
+      seat: 1,
+    });
+
+    // Envia apenas number, sem teamId: a Team (cache via roster) deve permanecer.
     const { statusCode, body } = await putDriver(u, ch.id, { number: 13 });
     expect(statusCode).toBe(200);
     expect(body!.teamId).toBe(team.id);
     expect(body!.team!.id).toBe(team.id);
+
+    await setCurrentSeason(originalSeason);
   });
 
-  it("retorna 404 para Team inexistente", async () => {
-    const u = await createUser(`vtmiss-${Date.now()}@f1nw.test`, "Vmiss");
-    const ch = await createCharacter(u, {
-      name: "Time Sumido",
-      nationality: "Espanhola",
-      birthDate: "1988-07-07",
-    });
-    const { statusCode } = await putDriver(u, ch.id, {
-      number: 4,
-      teamId: "00000000-0000-4000-8000-000000000000",
-    });
-    expect(statusCode).toBe(404);
-  });
-
-  it("retorna 404 para Team de outro usuário", async () => {
+  it("rejeita teamId mesmo com equipe de outro usuário → 400 ROSTER_OPERATION_REQUIRED (não vaza 404)", async () => {
     const owner = await createUser(`vtotherowner-${Date.now()}@f1nw.test`, "VO");
     const intruder = await createUser(`vtother-${Date.now()}@f1nw.test`, "VI");
     const team = await createTeam(owner, { name: "Time Alheio" });
@@ -475,11 +501,14 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
       nationality: "Holandesa",
       birthDate: "1987-08-08",
     });
-    const { statusCode } = await putDriver(intruder, ch.id, {
-      number: 9,
-      teamId: team.id,
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/drivers/${ch.id}`,
+      headers: { cookie: intruder.cookie },
+      payload: { number: 9, teamId: team.id },
     });
-    expect(statusCode).toBe(404);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("ROSTER_OPERATION_REQUIRED");
   });
 
   it("não altera ownership quando userId/characterId são enviados no body", async () => {
@@ -490,16 +519,14 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
       nationality: "Argentina",
       birthDate: "1986-09-09",
     });
-    const team = await createTeam(u, { name: "Time Privacy" });
 
     const { statusCode, body } = await putDriver(u, ch.id, {
       number: 8,
-      teamId: team.id,
       userId: other.userId,
       characterId: "00000000-0000-4000-8000-000000000000",
     });
     expect(statusCode).toBe(200);
-    expect(body!.teamId).toBe(team.id);
+    expect(body!.teamId).toBeNull();
 
     const stored = await prisma.driverProfile.findFirst({
       where: { characterId: ch.id },
@@ -508,7 +535,7 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
     expect(stored!.character.userId).toBe(u.userId);
   });
 
-  it("valida teamId não-UUID → 400", async () => {
+  it("valida teamId não-UUID → 400 ROSTER_OPERATION_REQUIRED (antes da validação de payload)", async () => {
     const u = await createUser(`vtbadt-${Date.now()}@f1nw.test`, "VBadT");
     const ch = await createCharacter(u, {
       name: "Time Inválido",
@@ -522,11 +549,12 @@ describe("PUT /api/drivers/:characterId — vinculação de Team", () => {
       payload: { number: 6, teamId: "nao-e-uuid" },
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("ROSTER_OPERATION_REQUIRED");
   });
 });
 
 describe("GET /api/drivers — Team na resposta e pilotos sem Team", () => {
-  it("retorna teamId/team e mantém pilotos sem Team na listagem", async () => {
+  it("retorna teamId/team (cache via roster) e mantém pilotos sem Team na listagem", async () => {
     const u = await createUser(`vtget-${Date.now()}@f1nw.test`, "VG");
     const chCom = await createCharacter(u, {
       name: "Piloto Com Time",
@@ -539,9 +567,22 @@ describe("GET /api/drivers — Team na resposta e pilotos sem Team", () => {
       birthDate: "1983-02-02",
     });
     const team = await createTeam(u, { name: "Time do GET" });
+    const seasonId = await createSeason(2026);
+    const originalSeason = await readCurrentSeason();
 
-    await putDriver(u, chCom.id, { number: 20, teamId: team.id });
+    await putDriver(u, chCom.id, { number: 20 });
     await putDriver(u, chSem.id, { number: 21 });
+    const comDriver = await prisma.driverProfile.findUnique({
+      where: { characterId: chCom.id },
+    });
+
+    await setCurrentSeason(seasonId);
+    await rosterService.assignDriverToSeat(u.userId, {
+      seasonId,
+      teamId: team.id,
+      driverProfileId: comDriver!.id,
+      seat: 1,
+    });
 
     const res = await app.inject({
       method: "GET",
@@ -561,5 +602,7 @@ describe("GET /api/drivers — Team na resposta e pilotos sem Team", () => {
     expect(withTeam.team.name).toBe("Time do GET");
     expect(withoutTeam.teamId).toBeNull();
     expect(withoutTeam.team).toBeNull();
+
+    await setCurrentSeason(originalSeason);
   });
 });

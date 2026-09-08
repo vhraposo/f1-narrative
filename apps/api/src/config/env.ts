@@ -13,7 +13,7 @@ loadEnv({
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().default(3001),
-  API_HOST: z.string().default("0.0.0.0"),
+  API_HOST: z.string().default("::"),
   BETTER_AUTH_URL: z.string().url().default("http://localhost:3001"),
   BETTER_AUTH_SECRET: z.string().min(16, "BETTER_AUTH_SECRET muito curto"),
   CLIENT_ORIGIN: z.string().url().default("http://localhost:3000"),

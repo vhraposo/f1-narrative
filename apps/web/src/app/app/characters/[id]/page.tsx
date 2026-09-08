@@ -21,7 +21,6 @@ import {
   useUpsertDriver,
 } from "@/hooks/use-driver-profiles";
 import { useRelationships } from "@/hooks/use-relationships";
-import { useTeams } from "@/hooks/use-teams";
 import { CONTROLLED_BY_LABELS } from "@/lib/characters";
 import type { Relationship } from "@/lib/relationships";
 
@@ -36,7 +35,6 @@ export default function CharacterDetailPage() {
   } = useCharacter(id);
 
   const driversQuery = useDrivers();
-  const teamsQuery = useTeams();
   const relationshipsQuery = useRelationships();
   const upsertMutation = useUpsertDriver();
   const deleteMutation = useDeleteDriver();
@@ -47,7 +45,7 @@ export default function CharacterDetailPage() {
 
   const driver = driversQuery.data?.find((d) => d.characterId === id);
 
-  function handleSave(input: { number: number | null; teamId: string | null }) {
+  function handleSave(input: { number: number | null }) {
     setSubmitError(null);
     upsertMutation.mutate(
       { characterId: id, input },
@@ -174,16 +172,6 @@ export default function CharacterDetailPage() {
           <DriverProfileForm
             characterName={character.name}
             initialNumber={driver?.number ?? null}
-            initialTeamId={driver?.teamId ?? null}
-            teams={teamsQuery.data ?? []}
-            teamsLoading={teamsQuery.isLoading}
-            teamsError={
-              teamsQuery.isError
-                ? teamsQuery.error instanceof Error
-                  ? teamsQuery.error.message
-                  : "Falha ao carregar equipes"
-                : null
-            }
             isSubmitting={upsertMutation.isPending}
             error={submitError}
             onSubmit={handleSave}

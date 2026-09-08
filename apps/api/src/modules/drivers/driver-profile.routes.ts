@@ -26,7 +26,6 @@ const driverInclude = {
 } as const;
 
 export const driversRoutes: FastifyPluginAsync = async (fastify) => {
-  // Listar os pilotos (DriverProfiles) do usuário autenticado.
   fastify.get(
     "/api/drivers",
     { preHandler: [fastify.authenticate] },
@@ -41,13 +40,6 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Criar/atualizar (upsert idempotente) o perfil de piloto de um Character
-  // pertencente ao usuário autenticado. 404 para personagem de outro usuário.
-  //
-  // Semântica de teamId (PUT):
-  // - omitido  -> preserva a Team atual;
-  // - null     -> remove a vinculação;
-  // - "<uuid>" -> define/troca a vinculação (validada contra o usuário).
   fastify.put(
     "/api/drivers/:characterId",
     { preHandler: [fastify.authenticate] },
@@ -58,6 +50,18 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(400).send({
           error: "Identificador inválido",
           code: "VALIDATION_ERROR",
+        });
+      }
+
+      if (
+        typeof request.body === "object" &&
+        request.body !== null &&
+        "teamId" in request.body
+      ) {
+        return reply.code(400).send({
+          error:
+            "A vinculação de equipe é administrada pelas operações de roster (/api/roster/assign, /api/roster/hire, /api/roster/reserve, /api/roster/release). Edite apenas o número base neste endpoint.",
+          code: "ROSTER_OPERATION_REQUIRED",
         });
       }
 
@@ -76,43 +80,20 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!character) {
-        // 404 para não vazar a existência de personagens de outros usuários.
         return reply.code(404).send({
           error: "Personagem não encontrado",
           code: "NOT_FOUND",
         });
       }
 
-      // Quando teamId é informado (UUID), a Team deve pertencer ao usuário
-      // autenticado. Se não existir ou for de outro usuário, responde 404.
-      const teamId = parsed.data.teamId;
-      if (typeof teamId === "string") {
-        const team = await prisma.team.findFirst({
-          where: { id: teamId, userId },
-          select: { id: true },
-        });
-
-        if (!team) {
-          return reply.code(404).send({
-            error: "Equipe não encontrada",
-            code: "NOT_FOUND",
-          });
-        }
-      }
-
-      // No create, teamId omitido ou null vira null (sem vinculação).
-      // No update, teamId só é alterado quando de fato enviado (undefined é
-      // preservado; null remove; UUID define/troca).
       const driver = await prisma.driverProfile.upsert({
         where: { characterId: character.id },
         create: {
           characterId: character.id,
           number: parsed.data.number ?? null,
-          teamId: teamId ?? null,
         },
         update: {
           number: parsed.data.number ?? null,
-          ...(teamId !== undefined ? { teamId } : {}),
         },
         include: driverInclude,
       });
@@ -121,7 +102,6 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Remover o perfil de piloto de um Character pertencente ao usuário.
   fastify.delete(
     "/api/drivers/:characterId",
     { preHandler: [fastify.authenticate] },
