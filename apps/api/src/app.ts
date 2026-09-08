@@ -11,6 +11,7 @@ import healthRoutes from "./modules/health/health.routes.js";
 import charactersRoutes from "./modules/characters/characters.routes.js";
 import driversRoutes from "./modules/drivers/driver-profile.routes.js";
 import teamsRoutes from "./modules/teams/team.routes.js";
+import rosterRoutes from "./modules/roster/roster.routes.js";
 import relationshipsRoutes from "./modules/relationships/relationship.routes.js";
 import championshipRoutes from "./modules/championship/championship.routes.js";
 import eventsRoutes from "./modules/events/event.routes.js";
@@ -93,6 +94,7 @@ export function buildApp(
   void app.register(charactersRoutes);
   void app.register(driversRoutes);
   void app.register(teamsRoutes);
+  void app.register(rosterRoutes);
   void app.register(relationshipsRoutes);
   void app.register(championshipRoutes);
   void app.register(eventsRoutes);
