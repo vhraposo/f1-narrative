@@ -525,6 +525,8 @@ model ExternalSeason {
   year          Int
   name          String?
   status        String?
+  contentHash   String
+  sourceRecord  Json?
   firstSyncedAt DateTime @default(now())
   lastSyncedAt  DateTime @default(now())
 
@@ -543,6 +545,8 @@ model ExternalRace {
   circuitName   String?
   date          DateTime?
   status        String?
+  contentHash   String
+  sourceRecord  Json?
   firstSyncedAt DateTime  @default(now())
   lastSyncedAt  DateTime  @default(now())
 
@@ -567,6 +571,7 @@ model ExternalResult {
   fastestLap    Boolean?
   status        String?
   contentHash   String
+  sourceRecord  Json?
   firstSyncedAt DateTime @default(now())
   lastSyncedAt  DateTime @default(now())
 
@@ -589,6 +594,7 @@ model ExternalStanding {
   wins          Int?
   podiums       Int?
   contentHash   String
+  sourceRecord  Json?
   firstSyncedAt DateTime @default(now())
   lastSyncedAt  DateTime @default(now())
 

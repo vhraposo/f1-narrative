@@ -18,6 +18,13 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(16, "BETTER_AUTH_SECRET muito curto"),
   CLIENT_ORIGIN: z.string().url().default("http://localhost:3000"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL é obrigatório"),
+  JOLPICA_BASE_URL: z
+    .string()
+    .url("JOLPICA_BASE_URL inválida")
+    .default("https://api.jolpi.ca/ergast/f1/"),
+  JOLPICA_TIMEOUT_MS: z.coerce.number().int().min(1).default(30000),
+  JOLPICA_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
+  JOLPICA_REQUEST_DELAY_MS: z.coerce.number().int().min(0).default(0),
 });
 
 const parsed = envSchema.safeParse(process.env);

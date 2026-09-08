@@ -39,6 +39,11 @@ import {
   COHERE_DIMENSIONS,
   CohereEmbeddingProvider,
 } from "./modules/external-research/external-embedding-provider.js";
+import { JolpicaClient } from "./modules/external-sync/jolpica.client.js";
+import { JolpicaTransport } from "./modules/external-sync/jolpica.transport.js";
+import jolpicaSyncRoutes, {
+  type JolpicaSyncRoutesOptions,
+} from "./modules/external-sync/jolpica.routes.js";
 
 function defaultRagProvider(): EmbeddingProviderWithInputType {
   const apiKey = process.env.COHERE_API_KEY;
@@ -59,6 +64,7 @@ function defaultRagProvider(): EmbeddingProviderWithInputType {
 export function buildApp(
   ragProvider?: EmbeddingProviderWithInputType,
   generationProvider?: GenerationProvider,
+  jolpicaClient?: JolpicaClient,
 ): FastifyInstance {
   const app = Fastify({
     logger: {
@@ -113,6 +119,19 @@ export function buildApp(
   void app.register(generationGenerateRoutes, {
     provider: generationProvider ?? nullProvider,
   });
+  const jolpicaOptions: JolpicaSyncRoutesOptions = {
+    client:
+      jolpicaClient ??
+      new JolpicaClient({
+        transport: new JolpicaTransport({
+          baseUrl: env.JOLPICA_BASE_URL,
+          timeoutMs: env.JOLPICA_TIMEOUT_MS,
+          maxRetries: env.JOLPICA_MAX_RETRIES,
+        }),
+      }),
+    requestDelayMs: env.JOLPICA_REQUEST_DELAY_MS,
+  };
+  void app.register(jolpicaSyncRoutes, jolpicaOptions);
 
   return app;
 }

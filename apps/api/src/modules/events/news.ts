@@ -2,18 +2,6 @@ import type { Prisma } from "@prisma/client";
 import type { CanonSource, EventImportance, EventType } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
 
-// Geração determinística de NewsItem a partir de um Event.
-//
-// NewsItem é derived/read-only nesta fase: não há CRUD manual de notícia.
-// buildNewsFromEvent é pura e determinística — dado o mesmo Event + os mesmos
-// participantes, produz exatamente a mesma notícia. Não usa random, hora
-// atual, estado externo nem chamadas de rede.
-//
-// A unicidade "uma notícia por Event" não é garantida por constraint no banco
-// (NewsItem.eventId NÃO possui @unique). Para evitar duplicidade sem alterar o
-// schema, usamos um advisory lock do PostgreSQL por evento dentro de uma
-// transação: operações que sincronizam a notícia do MESMO evento ficam
-// serializadas, então a segunda sempre atualiza a notícia criada pela primeira.
 
 const eventTypeLabels: Record<EventType, string> = {
   RACE: "Corrida",
@@ -45,7 +33,6 @@ export type NewsDraft = {
   body: string;
 };
 
-// Contrato determinístico de conteúdo.
 export function buildNewsFromEvent(
   event: NewsSourceEvent,
   participantNames: string[],
@@ -65,8 +52,6 @@ export function buildNewsFromEvent(
     lines.push(`Descrição: ${event.description}`);
   }
 
-  // Participantes ordenados por nome, de forma determinística. Sem
-  // participantes, a linha simplesmente não existe.
   const names = [...participantNames].sort((a, b) => a.localeCompare(b));
   if (names.length > 0) {
     lines.push(`Participantes: ${names.join(", ")}`);
@@ -75,18 +60,10 @@ export function buildNewsFromEvent(
   return { title, body: lines.join("\n") };
 }
 
-// Sincroniza (cria ou regenera) a notícia de um Event de forma idempotente.
-// Atualização do Event regenera a MESMA notícia; nunca cria uma segunda.
-//
-// `client` é o cliente transacional onde a operação roda. Exigir um
-// transaction client permite que a notícia seja sincronizada DENTRO da mesma
-// transação da escrita do Event/participante, garantindo a consistência
-// "Event + News derivada" após create/update (sem schema alterado).
 export async function syncNewsForEvent(
   client: Prisma.TransactionClient,
   eventId: string,
 ): Promise<void> {
-  // Serializa operações sobre o mesmo evento (sem schema alterado).
   await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${eventId})::bigint)`;
 
   const event = await client.event.findUnique({

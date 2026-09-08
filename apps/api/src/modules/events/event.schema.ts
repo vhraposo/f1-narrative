@@ -1,20 +1,5 @@
 import { z } from "zod";
 
-// Esquemas de validação para o domínio de Events (Evento / EventCharacter /
-// NewsItem).
-//
-// Event e NewsItem são entidades globais compartilhadas (sem userId), no
-// mesmo padrão de Season/Race: qualquer usuário autenticado pode consultá-las
-// e gerenciá-las. O cliente nunca controla id/createdAt/ownership.
-//
-// NewsItem é derivado, determinístico e SOMENTE LEITURA nesta fase: não existe
-// schema de criação/edição manual de notícia; ele é gerado a partir do Event
-// pelo servidor. Daí termos apenas o schema de parâmetro para a leitura.
-//
-// EventCharacter não possui ownership próprio; ao associar um Character a um
-// Event, o servidor valida que o Character pertence ao usuário autenticado
-// (princípio de ownership já usado em Relationships). Aqui temos apenas os
-// schemas de entrada (characterId) e de parâmetros do vínculo.
 
 export const eventTypeSchema = z.enum([
   "RACE",

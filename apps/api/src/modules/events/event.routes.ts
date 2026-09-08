@@ -27,7 +27,7 @@ const eventSelect = {
   createdAt: true,
 } as const;
 
-// select mínimo da NewsItem derivada (leitura read-only).
+
 const newsItemSelect = {
   id: true,
   eventId: true,
@@ -38,7 +38,6 @@ const newsItemSelect = {
   createdAt: true,
 } as const;
 
-// select mínimo de Character reutilizado para os participantes do Event.
 const participantSelect = {
   id: true,
   name: true,
@@ -46,8 +45,6 @@ const participantSelect = {
   imageUrl: true,
 } as const;
 
-// query opcional de listagem. Filtros limitados aos enums/campos reais do
-// schema; nada de paginação ou abstrações novas.
 const eventQuerySchema = z.object({
   type: eventTypeSchema.optional(),
   importance: eventImportanceSchema.optional(),
@@ -67,7 +64,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
   // Events — entidade global compartilhada (sem userId), como Season/Race.
   // ------------------------------------------------------------------
 
-  // Listar eventos. Filtro opcional apenas por type/importance (enums reais).
   fastify.get(
     "/api/events",
     { preHandler: [fastify.authenticate] },
@@ -92,7 +88,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Criar evento. Entidade global: servidor não injeta userId.
   fastify.post(
     "/api/events",
     { preHandler: [fastify.authenticate] },
@@ -106,9 +101,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Criação do Event + geração da notícia derivada em UMA transação:
-      // se qualquer uma falhar, nada é persistido. Garante a invariante
-      // "Event persistido => NewsItem derivada consistente existe".
       const event = await prisma.$transaction(async (tx) => {
         const created = await tx.event.create({
           data: {
@@ -130,7 +122,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Ler um evento.
   fastify.get(
     "/api/events/:id",
     { preHandler: [fastify.authenticate] },
@@ -159,7 +150,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Editar um evento.
   fastify.patch(
     "/api/events/:id",
     { preHandler: [fastify.authenticate] },
@@ -193,8 +183,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Atualização do Event + regeneração da MESMA notícia derivada em UMA
-        // transação (idempotente, nunca duplica). Consistência garantida.
         const event = await prisma.$transaction(async (tx) => {
           const updated = await tx.event.update({
             where: { id: existing.id },
@@ -219,10 +207,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Excluir um evento. Participantes (EventCharacter) são removidos em
-  // cascata (onDelete: Cascade). Como NewsItem.event NÃO possui cascade, a
-  // notícia derivada é removida explicitamente antes do Event, evitando órfã e
-  // o bloqueio por FK (onDelete padrão NoAction). Tudo em uma transação.
   fastify.delete(
     "/api/events/:id",
     { preHandler: [fastify.authenticate] },
@@ -266,7 +250,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Ler a notícia derivada (read-only) de um evento.
   fastify.get(
     "/api/events/:id/news",
     { preHandler: [fastify.authenticate] },
@@ -297,8 +280,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!news) {
-        // Após criação normal sempre existe uma notícia; este caso indica
-        // inconsistência e é sinalizado como 404 (evento sem notícia).
         return reply.code(404).send({
           error: "Notícia não encontrada",
           code: "NOT_FOUND",
@@ -309,13 +290,8 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // ------------------------------------------------------------------
   // EventCharacter — vínculo N:N Event <-> Character.
-  // Event não possui ownership; o Character precisa pertencer ao usuário
-  // autenticado (ownership indireta, princípio de Relationships).
-  // ------------------------------------------------------------------
 
-  // Listar participantes (Characters) de um evento.
   fastify.get(
     "/api/events/:eventId/participants",
     { preHandler: [fastify.authenticate] },
@@ -341,9 +317,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Event é global, mas Characters têm ownership por userId: retornamos
-      // apenas EventCharacter cujo Character pertence ao usuário autenticado,
-      // sem expor participantes de outros usuários.
       const participants = await prisma.eventCharacter.findMany({
         where: { eventId: event.id, character: { userId } },
         select: { character: { select: participantSelect } },
@@ -354,7 +327,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Associar um Character (do usuário autenticado) a um evento.
   fastify.post(
     "/api/events/:eventId/participants",
     { preHandler: [fastify.authenticate] },
@@ -389,9 +361,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Valida que o Character existe E pertence ao usuário autenticado.
-      // 404 para não vazar a existência de characters de outros usuários
-      // (inclusive aqueles com userId = null, controlados por IA).
       const character = await prisma.character.findFirst({
         where: { id: parsed.data.characterId, userId },
         select: { id: true },
@@ -420,9 +389,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        // Associa o participante e regenera a notícia na MESMA transação:
-        // a notícia reflete imediatamente o novo participante, sem estado
-        // intermediário inconsistente.
         const participant = await prisma.$transaction(async (tx) => {
           const created = await tx.eventCharacter.create({
             data: { eventId: event.id, characterId: character.id },
@@ -436,8 +402,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
 
         return reply.code(201).send({ participant });
       } catch (error) {
-        // Race condition: outra requisição pode ter criado o vínculo no meio
-        // tempo (unique(eventId, characterId)).
         if (isConflict(error)) {
           return reply.code(409).send({
             error: "Este personagem já participa do evento",
@@ -449,7 +413,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Remover um participante de um evento.
   fastify.delete(
     "/api/events/:eventId/participants/:characterId",
     { preHandler: [fastify.authenticate] },
@@ -475,9 +438,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Valida que o Character existe E pertence ao usuário autenticado.
-      // 404 para não vazar a existência de characters de outros usuários
-      // (inclusive aqueles com userId = null, controlados por IA).
       const character = await prisma.character.findFirst({
         where: { id: params.data.characterId, userId },
         select: { id: true },
@@ -505,8 +465,6 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Remove o participante e regenera a notícia na MESMA transação: a
-        // notícia deixa de refletir o participante removido imediatamente.
         await prisma.$transaction(async (tx) => {
           await tx.eventCharacter.delete({ where: { id: participant.id } });
           await syncNewsForEvent(tx, event.id);
