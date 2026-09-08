@@ -131,6 +131,40 @@ enum AvailabilityStatus {
   OFFLINE
 }
 
+enum DriverRole {
+  RACE_SEAT
+  RESERVE
+}
+
+enum DriverStatus {
+  ACTIVE
+  AVAILABLE
+  LEFT
+  INACTIVE
+}
+
+enum Provenance {
+  CANONICAL
+  IMPORTED
+  HYBRID
+  SIMULATED
+}
+
+enum BindingConfidence {
+  SUGGESTED
+  CONFIRMED
+}
+
+enum DriverEntryEventKind {
+  CREATED
+  SEATED
+  DISPLACED
+  HIRED
+  RELEASED
+  PROMOTED
+  STATUS_CHANGED
+}
+
 /// Conta de acesso da aplicação.
 model User {
   id            String  @id @default(uuid()) @db.Uuid
@@ -225,6 +259,8 @@ model Character {
   // Perfil esportivo opcional (caso seja piloto)
   driverProfile DriverProfile?
 
+  externalDriverBindings ExternalBindingDriver[]
+
   relationshipsA           Relationship[]            @relation("characterA")
   relationshipsB           Relationship[]            @relation("characterB")
   availability             CharacterAvailability?
@@ -252,6 +288,7 @@ model DriverProfile {
 
   results               RaceResult[]
   championshipStandings ChampionshipStanding[]
+  seasonDriverEntries   SeasonDriverEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -268,6 +305,9 @@ model Team {
   shortName      String?
   color          String?
   driverProfiles DriverProfile[]
+
+  seasonDriverEntries  SeasonDriverEntry[]
+  externalTeamBindings ExternalBindingTeam[]
 
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -286,8 +326,13 @@ model Season {
   name   String?
   status SeasonStatus @default(PRE_SEASON)
 
+  provenance Provenance @default(CANONICAL)
+
   races                 Race[]
   championshipStandings ChampionshipStanding[]
+
+  seasonDriverEntries    SeasonDriverEntry[]
+  externalSeasonBindings ExternalBindingSeason[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -309,7 +354,10 @@ model Race {
   round   Int?
   status  RaceStatus @default(UPCOMING)
 
-  results RaceResult[]
+  provenance Provenance @default(CANONICAL)
+
+  results              RaceResult[]
+  externalRaceBindings ExternalBindingRace[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -328,10 +376,14 @@ model RaceResult {
   driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id])
 
   position   Int?
-  points     Float   @default(0)
+  points     Float      @default(0)
   grid       Int?
-  fastestLap Boolean @default(false)
+  fastestLap Boolean    @default(false)
   status     String?
+  provenance Provenance @default(CANONICAL)
+  sourceHash String?
+
+  externalBindings ExternalBindingResult[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -349,10 +401,14 @@ model ChampionshipStanding {
   driverProfileId String        @db.Uuid
   driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id])
 
-  points   Float @default(0)
-  position Int?
-  wins     Int   @default(0)
-  podiums  Int   @default(0)
+  points     Float      @default(0)
+  position   Int?
+  wins       Int        @default(0)
+  podiums    Int        @default(0)
+  provenance Provenance @default(CANONICAL)
+  sourceHash String?
+
+  externalBindings ExternalBindingStanding[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -360,6 +416,277 @@ model ChampionshipStanding {
   @@unique([seasonId, driverProfileId])
   @@index([seasonId])
   @@index([driverProfileId])
+}
+
+model SeasonDriverEntry {
+  id              String        @id @default(uuid()) @db.Uuid
+  driverProfileId String        @db.Uuid
+  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Restrict)
+  seasonId        String        @db.Uuid
+  season          Season        @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  teamId          String?       @db.Uuid
+  team            Team?         @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
+  role       DriverRole?
+  seat       Int?
+  number     Int?
+  status     DriverStatus @default(ACTIVE)
+  provenance Provenance   @default(CANONICAL)
+
+  events           DriverEntryEvent[]
+  externalBindings ExternalBindingDriverSeason[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([seasonId, driverProfileId])
+  @@unique([seasonId, teamId, seat])
+  @@index([seasonId])
+  @@index([driverProfileId])
+  @@index([teamId, status])
+}
+
+model DriverEntryEvent {
+  id        String               @id @default(uuid()) @db.Uuid
+  entryId   String               @db.Uuid
+  entry     SeasonDriverEntry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  kind      DriverEntryEventKind
+  from      Json?
+  to        Json?
+  reason    String?
+  createdAt DateTime             @default(now())
+
+  @@index([entryId, createdAt])
+}
+
+model ExternalDriver {
+  id            String   @id @default(uuid()) @db.Uuid
+  source        String
+  externalId    String
+  name          String
+  fullName      String?
+  nationality   String?
+  number        Int?
+  contentHash   String
+  firstSyncedAt DateTime @default(now())
+  lastSyncedAt  DateTime @default(now())
+  sourceRecord  Json?
+
+  driverSeasons     ExternalDriverSeason[]
+  externalResults   ExternalResult[]
+  externalStandings ExternalStanding[]
+  bindings          ExternalBindingDriver[]
+
+  @@unique([source, externalId])
+  @@index([source, name])
+}
+
+model ExternalTeam {
+  id            String   @id @default(uuid()) @db.Uuid
+  source        String
+  externalId    String
+  name          String
+  shortName     String?
+  color         String?
+  contentHash   String
+  firstSyncedAt DateTime @default(now())
+  lastSyncedAt  DateTime @default(now())
+  sourceRecord  Json?
+
+  bindings ExternalBindingTeam[]
+
+  @@unique([source, externalId])
+}
+
+model ExternalDriverSeason {
+  id               String         @id @default(uuid()) @db.Uuid
+  source           String
+  externalDriverId String         @db.Uuid
+  externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Restrict)
+  seasonYear       Int
+  teamExternalId   String?
+  teamNameSnapshot String?
+  number           Int?
+  role             String?
+  contentHash      String
+  firstSyncedAt    DateTime       @default(now())
+  lastSyncedAt     DateTime       @default(now())
+  sourceRecord     Json?
+
+  bindings ExternalBindingDriverSeason[]
+
+  @@unique([source, externalDriverId, seasonYear])
+  @@index([seasonYear])
+}
+
+model ExternalSeason {
+  id            String   @id @default(uuid()) @db.Uuid
+  source        String
+  year          Int
+  name          String?
+  status        String?
+  firstSyncedAt DateTime @default(now())
+  lastSyncedAt  DateTime @default(now())
+
+  bindings ExternalBindingSeason[]
+
+  @@unique([source, year])
+}
+
+model ExternalRace {
+  id            String    @id @default(uuid()) @db.Uuid
+  source        String
+  seasonYear    Int
+  round         Int
+  grandPrix     String?
+  name          String?
+  circuitName   String?
+  date          DateTime?
+  status        String?
+  firstSyncedAt DateTime  @default(now())
+  lastSyncedAt  DateTime  @default(now())
+
+  results  ExternalResult[]
+  bindings ExternalBindingRace[]
+
+  @@unique([source, seasonYear, round])
+  @@index([source, seasonYear])
+}
+
+model ExternalResult {
+  id               String         @id @default(uuid()) @db.Uuid
+  source           String
+  externalRaceId   String         @db.Uuid
+  externalRace     ExternalRace   @relation(fields: [externalRaceId], references: [id], onDelete: Restrict)
+  externalDriverId String         @db.Uuid
+  externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Restrict)
+
+  position      Int?
+  points        Float?
+  grid          Int?
+  fastestLap    Boolean?
+  status        String?
+  contentHash   String
+  firstSyncedAt DateTime @default(now())
+  lastSyncedAt  DateTime @default(now())
+
+  bindings ExternalBindingResult[]
+
+  @@unique([source, externalRaceId, externalDriverId])
+  @@index([externalRaceId])
+  @@index([externalDriverId])
+}
+
+model ExternalStanding {
+  id               String         @id @default(uuid()) @db.Uuid
+  source           String
+  seasonYear       Int
+  externalDriverId String         @db.Uuid
+  externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Restrict)
+
+  position      Int?
+  points        Float?
+  wins          Int?
+  podiums       Int?
+  contentHash   String
+  firstSyncedAt DateTime @default(now())
+  lastSyncedAt  DateTime @default(now())
+
+  bindings ExternalBindingStanding[]
+
+  @@unique([source, seasonYear, externalDriverId])
+  @@index([externalDriverId])
+}
+
+model ExternalBindingDriver {
+  id               String            @id @default(uuid()) @db.Uuid
+  externalDriverId String            @unique @db.Uuid
+  externalDriver   ExternalDriver    @relation(fields: [externalDriverId], references: [id], onDelete: Cascade)
+  characterId      String            @unique @db.Uuid
+  character        Character         @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  confidence       BindingConfidence @default(SUGGESTED)
+  boundAt          DateTime          @default(now())
+  boundBy          Role?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model ExternalBindingTeam {
+  id             String            @id @default(uuid()) @db.Uuid
+  externalTeamId String            @unique @db.Uuid
+  externalTeam   ExternalTeam      @relation(fields: [externalTeamId], references: [id], onDelete: Cascade)
+  teamId         String            @unique @db.Uuid
+  team           Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  confidence     BindingConfidence @default(SUGGESTED)
+  boundAt        DateTime          @default(now())
+  boundBy        Role?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model ExternalBindingSeason {
+  id               String            @id @default(uuid()) @db.Uuid
+  externalSeasonId String            @unique @db.Uuid
+  externalSeason   ExternalSeason    @relation(fields: [externalSeasonId], references: [id], onDelete: Cascade)
+  seasonId         String            @unique @db.Uuid
+  season           Season            @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  confidence       BindingConfidence @default(SUGGESTED)
+  boundAt          DateTime          @default(now())
+  boundBy          Role?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model ExternalBindingRace {
+  id             String            @id @default(uuid()) @db.Uuid
+  externalRaceId String            @unique @db.Uuid
+  externalRace   ExternalRace      @relation(fields: [externalRaceId], references: [id], onDelete: Cascade)
+  raceId         String            @unique @db.Uuid
+  race           Race              @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  confidence     BindingConfidence @default(SUGGESTED)
+  boundAt        DateTime          @default(now())
+  boundBy        Role?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model ExternalBindingDriverSeason {
+  id                     String               @id @default(uuid()) @db.Uuid
+  externalDriverSeasonId String               @unique @db.Uuid
+  externalDriverSeason   ExternalDriverSeason @relation(fields: [externalDriverSeasonId], references: [id], onDelete: Cascade)
+  seasonDriverEntryId    String               @unique @db.Uuid
+  seasonDriverEntry      SeasonDriverEntry    @relation(fields: [seasonDriverEntryId], references: [id], onDelete: Cascade)
+  confidence             BindingConfidence    @default(SUGGESTED)
+  boundAt                DateTime             @default(now())
+  boundBy                Role?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+}
+
+model ExternalBindingResult {
+  id               String            @id @default(uuid()) @db.Uuid
+  externalResultId String            @unique @db.Uuid
+  externalResult   ExternalResult    @relation(fields: [externalResultId], references: [id], onDelete: Cascade)
+  raceResultId     String            @unique @db.Uuid
+  raceResult       RaceResult        @relation(fields: [raceResultId], references: [id], onDelete: Cascade)
+  confidence       BindingConfidence @default(SUGGESTED)
+  boundAt          DateTime          @default(now())
+  boundBy          Role?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model ExternalBindingStanding {
+  id                     String               @id @default(uuid()) @db.Uuid
+  externalStandingId     String               @unique @db.Uuid
+  externalStanding       ExternalStanding     @relation(fields: [externalStandingId], references: [id], onDelete: Cascade)
+  championshipStandingId String               @unique @db.Uuid
+  championshipStanding   ChampionshipStanding @relation(fields: [championshipStandingId], references: [id], onDelete: Cascade)
+  confidence             BindingConfidence    @default(SUGGESTED)
+  boundAt                DateTime             @default(now())
+  boundBy                Role?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 }
 
 // ---------------------------------------------------------------
@@ -640,9 +967,9 @@ enum ConversationRagSnapshotStatus {
 /// ExternalSource), seguindo a convenção de JSON do projeto. Ownership é
 /// herdado da Conversation — NÃO há ownerId redundante.
 model ConversationRagFrame {
-  id             String                     @id @default(uuid()) @db.Uuid
-  conversationId String                     @db.Uuid
-  conversation   Conversation               @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   queryText String
   queryHash String
@@ -652,13 +979,13 @@ model ConversationRagFrame {
   // @@unique, então a identidade determinística vive em `frameKey`.
   scopeSourceIds Json?
 
-  topK          Int
-  threshold     Float
-  provider      String
-  model         String
-  version       String
-  dimensions    Int
-  ruleApplied   String
+  topK        Int
+  threshold   Float
+  provider    String
+  model       String
+  version     String
+  dimensions  Int
+  ruleApplied String
 
   // Identidade determinística do frame (queryHash + scopeSourceIds + config).
   frameKey String
@@ -677,14 +1004,14 @@ model ConversationRagFrame {
 /// "Qual materialização foi produzida" para o frame. `snapshotKey` é a
 /// identidade determinística da materialização (frameKey + freshnessAnchor).
 model ConversationRagSnapshot {
-  id      String                @id @default(uuid()) @db.Uuid
-  frameId String                @db.Uuid
-  frame   ConversationRagFrame  @relation(fields: [frameId], references: [id], onDelete: Cascade)
+  id      String               @id @default(uuid()) @db.Uuid
+  frameId String               @db.Uuid
+  frame   ConversationRagFrame @relation(fields: [frameId], references: [id], onDelete: Cascade)
 
   snapshotKey String
 
-  status    ConversationRagSnapshotStatus @default(NEW)
-  retrievedAt DateTime
+  status          ConversationRagSnapshotStatus @default(NEW)
+  retrievedAt     DateTime
   // Hash determinístico das dependências que invalidam o resultado (chunk
   // contentHash/embeddedContentHash + provider/model/version/dimensions/
   // scope/config). CURRENT = READY cujo freshnessAnchor coincide com o estado
@@ -706,11 +1033,11 @@ model ConversationRagSnapshot {
 /// order/citation. NÃO duplica content/embedding/vector — ExternalChunk
 /// continua dono do conteúdo e do vetor.
 model ConversationRagSnapshotItem {
-  id         String                 @id @default(uuid()) @db.Uuid
-  snapshotId String                 @db.Uuid
+  id         String                  @id @default(uuid()) @db.Uuid
+  snapshotId String                  @db.Uuid
   snapshot   ConversationRagSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
 
-  chunkId String @db.Uuid
+  chunkId String        @db.Uuid
   chunk   ExternalChunk @relation(fields: [chunkId], references: [id], onDelete: Restrict)
 
   score    Float
