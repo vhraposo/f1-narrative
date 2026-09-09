@@ -44,6 +44,7 @@ import { JolpicaTransport } from "./modules/external-sync/jolpica.transport.js";
 import jolpicaSyncRoutes, {
   type JolpicaSyncRoutesOptions,
 } from "./modules/external-sync/jolpica.routes.js";
+import reconciliationRoutes from "./modules/reconciliation/reconciliation.routes.js";
 
 function defaultRagProvider(): EmbeddingProviderWithInputType {
   const apiKey = process.env.COHERE_API_KEY;
@@ -132,6 +133,7 @@ export function buildApp(
     requestDelayMs: env.JOLPICA_REQUEST_DELAY_MS,
   };
   void app.register(jolpicaSyncRoutes, jolpicaOptions);
+  void app.register(reconciliationRoutes);
 
   return app;
 }
