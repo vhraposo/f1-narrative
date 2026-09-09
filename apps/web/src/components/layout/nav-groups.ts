@@ -1,4 +1,5 @@
 import {
+  Database,
   Flag,
   HeartHandshake,
   MessagesSquare,
@@ -48,6 +49,16 @@ export const NAV_GROUPS: NavGroupDef[] = [
         href: "/app/conversations",
         label: "Conversas",
         Icon: MessagesSquare,
+      },
+    ],
+  },
+  {
+    label: "Externo",
+    items: [
+      {
+        href: "/app/external",
+        label: "F1 World Data",
+        Icon: Database,
       },
     ],
   },
