@@ -1,9 +1,6 @@
 import { z } from "zod";
 
 // Esquemas de validação para o domínio de Roster (escalação por temporada).
-// Season/DriverProfile/Team são validados por UUID; a existência e a
-// propriedade são verificadas no serviço (Team e DriverProfile são do usuário
-// autenticado; Season é global).
 
 export const seasonIdParamSchema = z.object({
   seasonId: z.string().uuid("Identificador de temporada inválido"),

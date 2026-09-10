@@ -1,7 +1,3 @@
-// Regra única de canonicalização de pares de Relationship.
-// (A,B) e (B,A) representam o mesmo par lógico: A é SEMPRE o menor id e B o
-// maior. Aplicada em toda escrita antes do acesso ao Prisma; as leituras do
-// domínio são agnósticas à direção e dependem apenas do par canônico.
 
 export interface CanonicalRelationshipPair {
   characterAId: string;

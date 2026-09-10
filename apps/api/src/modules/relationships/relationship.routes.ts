@@ -15,8 +15,6 @@ const characterSelect = {
   imageUrl: true,
 } as const;
 
-// Detecta erros conhecidos do Prisma (violação de unique) e os converte em
-// resposta previsível de conflito (409).
 function isConflict(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -25,7 +23,6 @@ function isConflict(error: unknown): boolean {
 }
 
 export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
-  // Listar relacionamentos do usuário autenticado (ambos os Characters).
   fastify.get(
     "/api/relationships",
     { preHandler: [fastify.authenticate] },
@@ -46,7 +43,6 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Criar relacionamento entre dois Characters do usuário autenticado.
   fastify.post(
     "/api/relationships",
     { preHandler: [fastify.authenticate] },
@@ -64,7 +60,6 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
       const originalA = parsed.data.characterAId;
       const originalB = parsed.data.characterBId;
 
-      // Auto-relação: reforço na rota, além do refine do Zod.
       if (originalA === originalB) {
         return reply.code(400).send({
           error: "Os personagens A e B devem ser diferentes",
@@ -72,9 +67,6 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Ambos os Characters devem pertencer ao usuário autenticado.
-      // 404 para não vazar a existência de characters de outros usuários
-      // (inclusive aqueles com userId = null, controlados por IA).
       const characters = await prisma.character.findMany({
         where: { id: { in: [originalA, originalB] }, userId },
         select: { id: true },
@@ -87,7 +79,6 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Ordem canônica para persistência (A = menor, B = maior).
       const { characterAId, characterBId } = canonicalizeRelationshipPair(
         originalA,
         originalB,
@@ -120,7 +111,6 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
 
         return reply.code(201).send({ relationship });
       } catch (error) {
-        // Race condition: outra requisição pode ter criado o par no meio tempo.
         if (isConflict(error)) {
           return reply.code(409).send({
             error: "Já existe um relacionamento entre esses personagens",
@@ -132,7 +122,6 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Ler um relacionamento próprio.
   fastify.get(
     "/api/relationships/:id",
     { preHandler: [fastify.authenticate] },
@@ -169,7 +158,6 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Editar apenas `dimensions` de um relacionamento próprio.
   fastify.patch(
     "/api/relationships/:id",
     { preHandler: [fastify.authenticate] },
@@ -221,7 +209,7 @@ export const relationshipsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Excluir um relacionamento próprio.
+
   fastify.delete(
     "/api/relationships/:id",
     { preHandler: [fastify.authenticate] },
