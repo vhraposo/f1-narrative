@@ -151,6 +151,11 @@ export function formatExternalDate(value: string | null | undefined): string {
   return value.slice(0, 10);
 }
 
+export function formatExternalDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  return `${value.slice(0, 10)} · ${value.slice(11, 16)} UTC`;
+}
+
 export function positionSortKey(position: number | string | null): number {
   if (position == null) return Number.POSITIVE_INFINITY;
   const numeric = typeof position === "number" ? position : Number(position);

@@ -14,10 +14,12 @@ export function ExternalSectionLoading() {
 
 export function ExternalSectionError({
   description,
+  detail,
   refetching,
   onRetry,
 }: {
   description: string;
+  detail?: string;
   refetching: boolean;
   onRetry: () => void;
 }) {
@@ -26,6 +28,7 @@ export function ExternalSectionError({
       className="py-6 sm:py-8"
       title="Dados indisponíveis"
       description={description}
+      detail={detail}
       action={
         <Button variant="outline" size="sm" onClick={onRetry} disabled={refetching}>
           {refetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

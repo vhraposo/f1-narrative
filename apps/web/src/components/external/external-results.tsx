@@ -117,7 +117,9 @@ export function ExternalResults({
                 <div className="overflow-x-auto rounded-md border border-border">
                   <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     <span className="w-10 shrink-0 text-center">Pos</span>
-                    <span className="h-4 w-1 shrink-0" aria-hidden="true" />
+                    <span className="hidden w-10 shrink-0 text-center sm:block">
+                      Largada
+                    </span>
                     <span className="flex-1">Piloto</span>
                     <span className="shrink-0 text-right">Pontos</span>
                   </div>
@@ -136,6 +138,9 @@ export function ExternalResults({
                             {result.position == null
                               ? "—"
                               : String(result.position).padStart(2, "0")}
+                          </span>
+                          <span className="hidden w-10 shrink-0 text-center text-xs tabular-nums text-muted-foreground sm:block">
+                            {result.grid ?? "—"}
                           </span>
                           <span
                             aria-hidden

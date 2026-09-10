@@ -1,10 +1,11 @@
 "use client";
 
-import { Loader2, Link2 } from "lucide-react";
+import { Link2, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import { SectionHeading } from "@/components/home/section-heading";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +24,9 @@ import { useExternalCandidates } from "@/hooks/use-external-world";
 import { formatDriverNumber } from "@/lib/driver-profiles";
 import {
   driverRoleLabel,
+  EXTERNAL_SOURCE_NAME,
   EXTERNAL_SOURCE_REF,
-  formatExternalDate,
+  formatExternalDateTime,
   type ExternalDriver,
   type ExternalDriverSeason,
 } from "@/lib/external-world";
@@ -41,6 +43,7 @@ type ExternalDriversProps = {
 type SeasonDriver = {
   externalId: string;
   name: string;
+  fullName: string | null;
   nationality: string | null;
   number: number | null;
   teamName: string | null;
@@ -48,7 +51,7 @@ type SeasonDriver = {
   lastSyncedAt: string | null;
 };
 
-function DriverBindingDialog({
+function DriverDetailDialog({
   driver,
   open,
   onOpenChange,
@@ -59,60 +62,94 @@ function DriverBindingDialog({
 }) {
   const candidates = useExternalCandidates("DRIVER", open ? driver.externalId : null);
 
+  const identity = [
+    { label: "Nome completo", value: driver.fullName ?? driver.name },
+    { label: "Nacionalidade", value: driver.nationality ?? "—" },
+    { label: "Número", value: formatDriverNumber(driver.number) },
+    { label: "Equipe", value: driver.teamName ?? "Equipe não informada" },
+    ...(driver.role
+      ? [{ label: "Função", value: driverRoleLabel(driver.role) ?? driver.role }]
+      : []),
+    { label: "Identidade externa", value: driver.externalId },
+    {
+      label: "Fonte",
+      value: `${driver.externalId} @ ${EXTERNAL_SOURCE_NAME} · ${EXTERNAL_SOURCE_REF}`,
+    },
+    { label: "Atualizado em", value: formatExternalDateTime(driver.lastSyncedAt) },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Correspondência — {driver.name}</DialogTitle>
+          <DialogTitle>{driver.name}</DialogTitle>
           <DialogDescription>
-            Vínculo entre este piloto externo e o universo narrativo. Consulta
-            somente leitura, sem confirmação.
+            Dados do Mirror Externo · somente leitura.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 px-5 pb-5">
-          {candidates.isLoading && (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          )}
-          {candidates.isError && (
-            <p className="text-sm text-destructive">
-              Não foi possível consultar a correspondência na fonte.
-            </p>
-          )}
-          {candidates.data && (
-            <>
-              <div className="space-y-1.5 rounded-md border border-border p-3">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Vínculo atual
-                </span>
-                {candidates.data.currentBinding ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">
-                      {candidates.data.currentBinding.targetLabel ?? "Personagem"}
-                    </span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {candidates.data.currentBinding.confidence === "CONFIRMED"
-                        ? "Confirmado"
-                        : "Sugerido"}
-                    </span>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Este piloto externo ainda não tem vínculo no universo.
-                  </p>
-                )}
+        <div className="space-y-5 px-5 pb-5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-brand">
+              EXTERNAL DATA
+            </span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              {EXTERNAL_SOURCE_NAME}
+            </span>
+          </div>
+
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {identity.map((item) => (
+              <div
+                key={item.label}
+                className="space-y-0.5 rounded-md border border-border p-3"
+              >
+                <dt className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  {item.label}
+                </dt>
+                <dd className="truncate text-sm font-semibold text-foreground">
+                  {item.value}
+                </dd>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Identidade externa: {driver.externalId} · Fonte:{" "}
-                {candidates.data.external.source} ({EXTERNAL_SOURCE_REF})
+            ))}
+          </dl>
+
+          <div className="space-y-1.5 rounded-md border border-border p-3">
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              <Link2 className="h-3.5 w-3.5" />
+              Correspondência no universo
+            </span>
+            {candidates.isLoading && (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {candidates.isError && (
+              <p className="text-sm text-destructive">
+                Não foi possível consultar a correspondência na fonte.
               </p>
-              {candidates.data.candidates.length > 0 && (
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    Candidatos no universo
-                  </span>
-                  <ul className="space-y-1">
+            )}
+            {candidates.data && (
+              <>
+                <div className="space-y-1 pt-1">
+                  {candidates.data.currentBinding ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-foreground">
+                        {candidates.data.currentBinding.targetLabel ?? "Personagem"}
+                      </span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {candidates.data.currentBinding.confidence === "CONFIRMED"
+                          ? "Confirmado"
+                          : "Sugerido"}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Este piloto externo ainda não tem vínculo no universo.
+                    </p>
+                  )}
+                </div>
+                {candidates.data.candidates.length > 0 && (
+                  <ul className="space-y-1 pt-2">
                     {candidates.data.candidates.map((candidate) => (
                       <li
                         key={candidate.id}
@@ -127,10 +164,10 @@ function DriverBindingDialog({
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
-            </>
-          )}
+                )}
+              </>
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button
@@ -154,15 +191,14 @@ export function ExternalDrivers({
   refetching,
   onRetry,
 }: ExternalDriversProps) {
-  const [verifyingExternalId, setVerifyingExternalId] = useState<string | null>(
-    null,
-  );
+  const [detailExternalId, setDetailExternalId] = useState<string | null>(null);
 
   const seasonDrivers: SeasonDriver[] = driverSeasons.map((ds) => {
     const globalDriver = driversByExternalId[ds.externalDriver.externalId];
     return {
       externalId: ds.externalDriver.externalId,
       name: ds.externalDriver.name,
+      fullName: globalDriver?.fullName ?? null,
       nationality: globalDriver?.nationality ?? null,
       number: ds.number ?? globalDriver?.number ?? null,
       teamName: ds.teamNameSnapshot ?? null,
@@ -172,8 +208,8 @@ export function ExternalDrivers({
   });
   seasonDrivers.sort((a, b) => a.name.localeCompare(b.name));
 
-  const verifyingDriver =
-    seasonDrivers.find((d) => d.externalId === verifyingExternalId) ?? null;
+  const detailDriver =
+    seasonDrivers.find((d) => d.externalId === detailExternalId) ?? null;
 
   return (
     <section aria-label="Pilotos externos" className="space-y-4">
@@ -197,67 +233,57 @@ export function ExternalDrivers({
         />
       )}
       {!isLoading && !isError && seasonDrivers.length > 0 && (
-        <div className="overflow-hidden rounded-md border border-border">
-          <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            <span className="w-9 shrink-0 text-center">Nº</span>
-            <span className="flex-1">Piloto</span>
-            <span className="hidden w-40 shrink-0 sm:block">Nacionalidade</span>
-            <span className="hidden w-28 shrink-0 md:block">Sincronização</span>
-            <span className="w-8 shrink-0" aria-hidden="true" />
-          </div>
-          <ol className="divide-y divide-border">
-            {seasonDrivers.map((driver) => (
-              <li
-                key={driver.externalId}
-                className="flex items-center gap-3 px-4 py-3"
-              >
-                <span className="w-9 shrink-0 text-center text-xs font-bold tabular-nums text-muted-foreground">
-                  {driver.number != null ? formatDriverNumber(driver.number) : "—"}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold text-foreground">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {seasonDrivers.map((driver) => (
+            <Card key={driver.externalId} className="h-full">
+              <CardContent className="flex h-full flex-col gap-3 pt-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 space-y-0.5">
+                    <h3 className="truncate text-base font-bold tracking-tight text-foreground">
                       {driver.name}
+                    </h3>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {driver.nationality ?? "Nacionalidade não informada"}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-black tabular-nums text-foreground">
+                    {formatDriverNumber(driver.number)}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    {driver.teamName ?? "Equipe não informada"}
+                  </span>
+                  {driver.role ? (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {driverRoleLabel(driver.role)}
                     </span>
-                    {driver.role ? (
-                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {driverRoleLabel(driver.role)}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {driver.teamName ?? "Equipe não informada"} · ID:{" "}
-                    {driver.externalId}
-                  </span>
-                </span>
-                <span className="hidden w-40 shrink-0 truncate text-sm text-muted-foreground sm:block">
-                  {driver.nationality ?? "—"}
-                </span>
-                <span className="hidden w-28 shrink-0 text-xs text-muted-foreground md:block">
-                  {formatExternalDate(driver.lastSyncedAt)}
-                </span>
+                  ) : null}
+                </div>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  ID: {driver.externalId}
+                </p>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="shrink-0 text-muted-foreground"
-                  aria-label={`Verificar correspondência de ${driver.name}`}
-                  onClick={() => setVerifyingExternalId(driver.externalId)}
+                  className="mt-auto w-full"
+                  aria-label={`Ver detalhes de ${driver.name}`}
+                  onClick={() => setDetailExternalId(driver.externalId)}
                 >
-                  <Link2 className="h-4 w-4" />
-                  <span className="ml-2 hidden sm:inline">Verificar</span>
+                  Ver detalhes
                 </Button>
-              </li>
-            ))}
-          </ol>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
-      {verifyingDriver && (
-        <DriverBindingDialog
-          driver={verifyingDriver}
-          open={verifyingExternalId != null}
+      {detailDriver && (
+        <DriverDetailDialog
+          driver={detailDriver}
+          open={detailExternalId != null}
           onOpenChange={(next) =>
-            setVerifyingExternalId(next ? verifyingDriver.externalId : null)
+            setDetailExternalId(next ? detailDriver.externalId : null)
           }
         />
       )}

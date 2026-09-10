@@ -9,7 +9,7 @@ export function ExternalSourceBadge({ className }: { className?: string }) {
       )}
     >
       <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
-      FONTE: JOLPICA-F1 · EXTERNAL
+      SOURCE · REAL F1 DATA · JOLPICA-F1
     </span>
   );
 }

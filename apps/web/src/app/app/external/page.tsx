@@ -6,12 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalCalendar } from "@/components/external/external-calendar";
 import { ExternalDrivers } from "@/components/external/external-drivers";
 import { ExternalGrid } from "@/components/external/external-grid";
+import { ExternalOverview } from "@/components/external/external-overview";
 import { ExternalResults } from "@/components/external/external-results";
 import { ExternalStandings } from "@/components/external/external-standings";
 import { ExternalSourceBadge } from "@/components/external/external-source-badge";
 import { ExternalTeams } from "@/components/external/external-teams";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,8 @@ import {
 import {
   EXTERNAL_SOURCE_NAME,
   EXTERNAL_SOURCE_REF,
+  formatExternalDateTime,
+  positionSortKey,
   seasonStatusLabel,
   type ExternalDriver,
   type ExternalTeam,
@@ -88,23 +90,119 @@ export default function F1WorldDataPage() {
     return map;
   }, [driverSeasonsQuery.data, teamsByExternalId]);
 
+  const selectedSeason = useMemo(
+    () => seasons.find((season) => season.year === year) ?? null,
+    [seasons, year],
+  );
+
+  const lastSyncedAt = useMemo(() => {
+    const values = [
+      ...(teamsQuery.data ?? []).map((team) => team.lastSyncedAt),
+      ...(driversQuery.data ?? []).map((driver) => driver.lastSyncedAt),
+    ].filter((value): value is string => value != null);
+    return values.length > 0 ? values.reduce((a, b) => (a > b ? a : b)) : null;
+  }, [teamsQuery.data, driversQuery.data]);
+
+  const teamsCount = useMemo(
+    () =>
+      new Set(
+        (driverSeasonsQuery.data ?? [])
+          .map((ds) => ds.teamExternalId)
+          .filter((value): value is string => value != null),
+      ).size,
+    [driverSeasonsQuery.data],
+  );
+
+  const driversCount = useMemo(
+    () =>
+      new Set(
+        (driverSeasonsQuery.data ?? []).map(
+          (ds) => ds.externalDriver.externalId,
+        ),
+      ).size,
+    [driverSeasonsQuery.data],
+  );
+
+  const racesCount = racesQuery.data?.length ?? 0;
+  const resultsCount = resultsQuery.data?.length ?? 0;
+
+  const leader = useMemo(() => {
+    const sorted = [...(standingsQuery.data ?? [])].sort(
+      (a, b) => positionSortKey(a.position) - positionSortKey(b.position),
+    );
+    const top = sorted[0];
+    if (!top) return null;
+    return {
+      name: top.externalDriver.name,
+      points: top.points,
+      teamName:
+        driverTeamByExternalId[top.externalDriver.externalId]?.teamName ?? null,
+    };
+  }, [standingsQuery.data, driverTeamByExternalId]);
+
   const seasonOptions = seasons.map((season) => ({
     value: String(season.year),
     label: `${season.year} — ${seasonStatusLabel(season.status)}`,
   }));
+
+  const overviewLoading =
+    driverSeasonsQuery.isLoading ||
+    racesQuery.isLoading ||
+    resultsQuery.isLoading ||
+    standingsQuery.isLoading;
+  const overviewError =
+    driverSeasonsQuery.isError ||
+    racesQuery.isError ||
+    resultsQuery.isError ||
+    standingsQuery.isError;
 
   return (
     <div className="space-y-8">
       <PageHeader
         kicker="EXTERNAL WORLD DATA"
         title="F1 World Data"
-        description={`Dados do Mirror Externo (${EXTERNAL_SOURCE_NAME} · ${EXTERNAL_SOURCE_REF}), somente leitura. Exibidos como contavam na fonte, sem alterar o universo narrativo.`}
+        description={`Dados externos da Fórmula 1 · Mirror de ${EXTERNAL_SOURCE_NAME} (${EXTERNAL_SOURCE_REF}), somente leitura. Exibidos como contavam na fonte, sem alterar o universo narrativo.`}
         meta={
-          seasons.length > 0
-            ? `${seasons.length} temporada${seasons.length === 1 ? "" : "s"} na fonte`
-            : undefined
+          <>
+            <span>
+              {seasons.length} temporada{seasons.length === 1 ? "" : "s"} na
+              fonte
+            </span>
+            {selectedSeason && (
+              <span>
+                Temporada {selectedSeason.year} —{" "}
+                {seasonStatusLabel(selectedSeason.status)}
+              </span>
+            )}
+            <span>Sincronizado em {formatExternalDateTime(lastSyncedAt)}</span>
+          </>
         }
-        action={<ExternalSourceBadge />}
+        action={
+          <div className="flex flex-col items-stretch gap-3 sm:items-end">
+            <div>
+              <Select
+                value={year != null ? String(year) : ""}
+                onValueChange={(value) => setYear(Number(value))}
+                options={seasonOptions}
+                placeholder="Selecione a temporada"
+              >
+                <Label
+                  className="sr-only"
+                  htmlFor="external-season"
+                >
+                  Temporada da fonte
+                </Label>
+                <SelectTrigger
+                  id="external-season"
+                  aria-label="Temporada da fonte"
+                  className="min-w-44"
+                />
+                <SelectContent />
+              </Select>
+            </div>
+            <ExternalSourceBadge className="self-end" />
+          </div>
+        }
       />
 
       {seasonsQuery.isLoading && (
@@ -117,6 +215,7 @@ export default function F1WorldDataPage() {
         <ErrorState
           title="Dados indisponíveis"
           description="Não foi possível carregar as temporadas da fonte."
+          detail="Verifique se a API está acessível e se o Mirror Externo já foi sincronizado."
           action={
             <Button
               variant="outline"
@@ -146,36 +245,30 @@ export default function F1WorldDataPage() {
         seasons.length > 0 &&
         year != null && (
           <>
-            <Card>
-              <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">
-                    Temporada exibida
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Seleção baseada nas temporadas da fonte, não no estado do
-                    universo.
-                  </p>
-                </div>
-                <div className="w-full max-w-xs space-y-1.5">
-                  <Label htmlFor="external-season">Temporada</Label>
-                  <Select
-                    value={String(year)}
-                    onValueChange={(value) => setYear(Number(value))}
-                    options={seasonOptions}
-                    placeholder="Selecione a temporada"
-                  >
-                    <SelectTrigger
-                      id="external-season"
-                      aria-label="Temporada da fonte"
-                    />
-                    <SelectContent />
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+            <ExternalOverview
+              year={year}
+              teamsCount={teamsCount}
+              driversCount={driversCount}
+              racesCount={racesCount}
+              resultsCount={resultsCount}
+              leader={leader}
+              isLoading={overviewLoading}
+              isError={overviewError}
+              refetching={
+                driverSeasonsQuery.isRefetching ||
+                racesQuery.isRefetching ||
+                resultsQuery.isRefetching ||
+                standingsQuery.isRefetching
+              }
+              onRetry={() => {
+                void driverSeasonsQuery.refetch();
+                void racesQuery.refetch();
+                void resultsQuery.refetch();
+                void standingsQuery.refetch();
+              }}
+            />
 
-            <ExternalTeams
+            <ExternalGrid
               year={year}
               driverSeasons={driverSeasonsQuery.data ?? []}
               teamsByExternalId={teamsByExternalId}
@@ -194,7 +287,7 @@ export default function F1WorldDataPage() {
               onRetry={() => void driverSeasonsQuery.refetch()}
             />
 
-            <ExternalGrid
+            <ExternalTeams
               year={year}
               driverSeasons={driverSeasonsQuery.data ?? []}
               teamsByExternalId={teamsByExternalId}
