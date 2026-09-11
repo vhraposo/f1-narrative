@@ -29,9 +29,10 @@ function SeatStatusBadge({ status }: { status: UniverseSeat["status"] }) {
 
 type SeatRowProps = {
   seat: UniverseSeat;
+  onReconcile?: (seat: UniverseSeat) => void;
 };
 
-function SeatRow({ seat }: SeatRowProps) {
+function SeatRow({ seat, onReconcile }: SeatRowProps) {
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-lg border border-border bg-muted/30 px-3 py-3">
       <div className="min-w-0">
@@ -53,6 +54,17 @@ function SeatRow({ seat }: SeatRowProps) {
         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
           Assento {seat.seat}
         </span>
+        {seat.source && onReconcile ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-1 h-7 px-2.5 text-xs"
+            onClick={() => onReconcile(seat)}
+          >
+            {seat.status === "MATCH" ? "Ver vínculo" : "Vincular"}
+          </Button>
+        ) : null}
       </div>
 
       <div className="min-w-0 text-right">
@@ -80,6 +92,7 @@ type UniverseTeamCardProps = {
   error?: string | null;
   onKeep: () => void;
   onRequestRestore: () => void;
+  onReconcile?: (seat: UniverseSeat) => void;
 };
 
 export function UniverseTeamCard({
@@ -90,6 +103,7 @@ export function UniverseTeamCard({
   error,
   onKeep,
   onRequestRestore,
+  onReconcile,
 }: UniverseTeamCardProps) {
   const divergent = team.status === "DIVERGENT";
   const restoredCount = team.seats.filter((s) => s.canRestore).length;
@@ -132,7 +146,7 @@ export function UniverseTeamCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {team.seats.map((seat) => (
-          <SeatRow key={seat.seat} seat={seat} />
+          <SeatRow key={seat.seat} seat={seat} onReconcile={onReconcile} />
         ))}
         {error && (
           <p className="text-sm text-destructive" role="alert">

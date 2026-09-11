@@ -1,4 +1,6 @@
-import { get, post } from "./api";
+import { get, post, remove } from "./api";
+
+export const RECONCILIATION_SOURCE = "jolpica";
 
 export type UniverseSeatStatus =
   | "MATCH"
@@ -75,5 +77,79 @@ export function restoreSourceConfig(input: {
   return post<RestoreSourceResult>(
     `/api/universe/roster-comparison/${encodeURIComponent(input.seasonId)}/restore-source`,
     { teamId: input.teamId },
+  );
+}
+
+export type ReconciliationBinding = {
+  id: string;
+  confidence: "SUGGESTED" | "CONFIRMED";
+  targetLabel: string | null;
+};
+
+export type ReconciliationCandidate = {
+  id: string;
+  label: string;
+  score: number;
+};
+
+export type DriverReconciliationListing = {
+  external: { kind: string; source: string; label: string };
+  currentBinding: ReconciliationBinding | null;
+  candidates: ReconciliationCandidate[];
+};
+
+export type ReconciliationWriteResult = {
+  binding: {
+    id: string;
+    confidence: "SUGGESTED" | "CONFIRMED";
+    boundBy: string | null;
+  };
+};
+
+export type UnbindResult = {
+  ok: boolean;
+  kind: string;
+  id: string;
+};
+
+export function getDriverReconciliation(
+  externalDriverId: string,
+): Promise<DriverReconciliationListing> {
+  return get<{ listing: DriverReconciliationListing }>(
+    `/api/reconciliation/candidates/DRIVER/${encodeURIComponent(externalDriverId)}?source=${RECONCILIATION_SOURCE}`,
+  ).then((response) => response.listing);
+}
+
+export function confirmDriverBinding(
+  externalDriverId: string,
+): Promise<ReconciliationWriteResult> {
+  return post<ReconciliationWriteResult>(
+    "/api/reconciliation/bindings/confirm",
+    {
+      kind: "DRIVER",
+      source: RECONCILIATION_SOURCE,
+      externalId: externalDriverId,
+    },
+  );
+}
+
+export function suggestDriverBinding(
+  externalDriverId: string,
+  candidateId: string,
+): Promise<ReconciliationWriteResult> {
+  return post<ReconciliationWriteResult>(
+    "/api/reconciliation/bindings/suggest",
+    {
+      kind: "DRIVER",
+      source: RECONCILIATION_SOURCE,
+      externalId: externalDriverId,
+      candidateId,
+    },
+  );
+}
+
+export function unbindDriverBinding(bindingId: string): Promise<UnbindResult> {
+  return remove<UnbindResult>(
+    `/api/reconciliation/bindings/${encodeURIComponent(bindingId)}`,
   );
 }

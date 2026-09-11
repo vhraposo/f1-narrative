@@ -28,6 +28,19 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
+const sessionMock = vi.hoisted(() => ({
+  session: {
+    data: {
+      user: { role: "ADMIN" as string },
+    },
+    isPending: false,
+  },
+}));
+
+vi.mock("@/providers/session-provider", () => ({
+  useSession: () => sessionMock.session,
+}));
+
 const SEASONS: PlayerEntrySeason[] = [
   {
     id: "s1",
@@ -144,6 +157,7 @@ beforeEach(() => {
   failSetup = false;
   failComparison = false;
   comparisonPaths.length = 0;
+  sessionMock.session.data.user.role = "ADMIN";
   apiMock.get.mockClear();
   apiMock.post.mockClear();
 

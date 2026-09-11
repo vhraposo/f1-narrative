@@ -10,9 +10,11 @@ import {
 
 import { authClient } from "@/lib/auth-client";
 
+export type SessionUser = User & { role?: "USER" | "ADMIN" | string };
+
 type SessionData = {
   session: Session | null;
-  user: User | null;
+  user: SessionUser | null;
 };
 
 type SessionContextValue = {

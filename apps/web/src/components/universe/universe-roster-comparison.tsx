@@ -3,6 +3,7 @@
 import { Loader2, CircleCheck, TriangleAlert } from "lucide-react";
 import * as React from "react";
 
+import { UniverseReconcileDialog } from "@/components/universe/universe-reconcile-dialog";
 import { UniverseTeamCard } from "@/components/universe/universe-team-card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -12,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectTrigger } from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
 import type { PlayerEntrySeason } from "@/lib/player-entry";
-import type { UniverseTeam } from "@/lib/universe";
+import type { UniverseSeat, UniverseTeam } from "@/lib/universe";
+import { useSession } from "@/providers/session-provider";
 import {
   useKeepUniverseConfig,
   useRestoreSourceConfig,
@@ -42,13 +44,19 @@ export function UniverseEditorContent({
   const comparison = useRosterComparison(seasonId);
   const keep = useKeepUniverseConfig(seasonId);
   const restore = useRestoreSourceConfig(seasonId);
+  const { data: session } = useSession();
+  const isAdmin = session.user?.role === "ADMIN";
 
   const [dialog, setDialog] = React.useState<DialogState>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
+  const [reconcileSeat, setReconcileSeat] = React.useState<UniverseSeat | null>(
+    null,
+  );
 
   React.useEffect(() => {
     setActionError(null);
     setDialog(null);
+    setReconcileSeat(null);
   }, [seasonId]);
 
   const runKeep = React.useCallback(
@@ -191,6 +199,7 @@ export function UniverseEditorContent({
               onRequestRestore={() =>
                 setDialog({ team, mode: "restore" })
               }
+              onReconcile={(seat) => setReconcileSeat(seat)}
             />
           ))}
         </section>
@@ -209,6 +218,20 @@ export function UniverseEditorContent({
         isPending={restore.isPending}
         error={actionError}
       />
+
+      {reconcileSeat?.source ? (
+        <UniverseReconcileDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setReconcileSeat(null);
+          }}
+          seasonId={seasonId}
+          externalDriverId={reconcileSeat.source.externalDriverId}
+          externalDriverLabel={reconcileSeat.source.name}
+          externalDriverNumber={reconcileSeat.source.number}
+          isAdmin={isAdmin}
+        />
+      ) : null}
     </div>
   );
 }
