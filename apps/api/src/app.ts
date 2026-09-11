@@ -47,6 +47,7 @@ import jolpicaSyncRoutes, {
 import reconciliationRoutes from "./modules/reconciliation/reconciliation.routes.js";
 import universeInitRoutes from "./modules/universe-init/universe-init.routes.js";
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
+import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
 
 function defaultRagProvider(): EmbeddingProviderWithInputType {
   const apiKey = process.env.COHERE_API_KEY;
@@ -138,6 +139,7 @@ export function buildApp(
   void app.register(reconciliationRoutes);
   void app.register(universeInitRoutes);
   void app.register(playerEntryRoutes);
+  void app.register(universeEditorRoutes);
 
   return app;
 }

@@ -1,6 +1,7 @@
 import {
   Database,
   Flag,
+  Globe,
   HeartHandshake,
   MessagesSquare,
   Newspaper,
@@ -35,6 +36,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         Icon: HeartHandshake,
       },
       { href: "/app/player-entry", label: "Entrar na F1", Icon: Rocket },
+      { href: "/app/universe", label: "Editor de Universo", Icon: Globe },
     ],
   },
   {
