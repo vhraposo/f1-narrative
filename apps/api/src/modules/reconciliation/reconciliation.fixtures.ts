@@ -45,6 +45,33 @@ export async function seedReconciliationFixture(
   ids: ReconFixtureIds;
   cleanup: () => Promise<void>;
 }> {
+  const teamExternalId = `rec-mclaren-${year}`;
+  const driverExternalIds = ["lando-norris", "oscar-piastri", "reserve-x"];
+  await prisma.externalResult.deleteMany({ where: { source: JOLPICA_SOURCE, externalRace: { seasonYear: year } } });
+  await prisma.externalStanding.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: year } });
+  await prisma.externalDriverSeason.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: year } });
+  await prisma.externalRace.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: year } });
+  await prisma.externalDriver.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: driverExternalIds } } });
+  await prisma.externalTeam.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: teamExternalId } });
+  await prisma.externalSeason.deleteMany({ where: { source: JOLPICA_SOURCE, year } });
+
+  const orphanSeasonIds = await prisma.season.findMany({
+    where: {
+      year,
+      status: "PRE_SEASON",
+      provenance: "CANONICAL",
+      name: null,
+      seasonDriverEntries: { none: {} },
+      championshipStandings: { none: {} },
+      races: { none: {} },
+      externalSeasonBindings: { none: {} },
+    },
+    select: { id: true },
+  });
+  if (orphanSeasonIds.length > 0) {
+    await prisma.season.deleteMany({ where: { id: { in: orphanSeasonIds.map((s) => s.id) } } });
+  }
+
   const user = await prisma.user.create({
     data: { name: "Recon Admin", email: `recon-admin-${Date.now()}@f1nw.test`, password: "x" },
   });
@@ -147,7 +174,7 @@ export async function seedReconciliationFixture(
     data: { source: JOLPICA_SOURCE, year: year, name: String(year), status: "ACTIVE", contentHash: "seed-ext-season" },
   });
   const extTeam = await prisma.externalTeam.create({
-    data: { source: JOLPICA_SOURCE, externalId: "mclaren", name: "McLaren", shortName: "MCL", color: "#ff8000", contentHash: "seed-ext-team" },
+    data: { source: JOLPICA_SOURCE, externalId: teamExternalId, name: "McLaren", shortName: "MCL", color: "#ff8000", contentHash: "seed-ext-team" },
   });
   const extLando = await prisma.externalDriver.create({
     data: { source: JOLPICA_SOURCE, externalId: "lando-norris", name: "Lando Norris", fullName: "Lando Norris", nationality: "British", number: 2, contentHash: "seed-ext-lando" },
@@ -160,13 +187,13 @@ export async function seedReconciliationFixture(
   });
 
   const extDsLando = await prisma.externalDriverSeason.create({
-    data: { source: JOLPICA_SOURCE, externalDriverId: extLando.id, seasonYear: year, teamExternalId: "mclaren", teamNameSnapshot: "McLaren", number: 2, role: null, contentHash: "seed-ext-ds-lando" },
+    data: { source: JOLPICA_SOURCE, externalDriverId: extLando.id, seasonYear: year, teamExternalId: teamExternalId, teamNameSnapshot: "McLaren", number: 2, role: null, contentHash: "seed-ext-ds-lando" },
   });
   const extDsOscar = await prisma.externalDriverSeason.create({
-    data: { source: JOLPICA_SOURCE, externalDriverId: extOscar.id, seasonYear: year, teamExternalId: "mclaren", teamNameSnapshot: "McLaren", number: 4, role: null, contentHash: "seed-ext-ds-oscar" },
+    data: { source: JOLPICA_SOURCE, externalDriverId: extOscar.id, seasonYear: year, teamExternalId: teamExternalId, teamNameSnapshot: "McLaren", number: 4, role: null, contentHash: "seed-ext-ds-oscar" },
   });
   const extDsReserveX = await prisma.externalDriverSeason.create({
-    data: { source: JOLPICA_SOURCE, externalDriverId: extReserveX.id, seasonYear: year, teamExternalId: "mclaren", teamNameSnapshot: "McLaren", number: 88, role: "RESERVE", contentHash: "seed-ext-ds-reserve" },
+    data: { source: JOLPICA_SOURCE, externalDriverId: extReserveX.id, seasonYear: year, teamExternalId: teamExternalId, teamNameSnapshot: "McLaren", number: 88, role: "RESERVE", contentHash: "seed-ext-ds-reserve" },
   });
 
   const extRace = await prisma.externalRace.create({

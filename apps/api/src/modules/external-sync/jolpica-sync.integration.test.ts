@@ -513,6 +513,19 @@ describe("JolpicaSync routes — endpoint admin-only", () => {
   });
 
   afterAll(async () => {
+    const syncYears = [1975, 1978];
+    const syncDriverIds = ["lauda", "hunt", "donnelly"];
+    await prisma.externalResult.deleteMany({ where: { source: JOLPICA_SOURCE, externalDriver: { externalId: { in: syncDriverIds } } } });
+    await prisma.externalResult.deleteMany({ where: { source: JOLPICA_SOURCE, externalRace: { seasonYear: { in: syncYears } } } });
+    await prisma.externalStanding.deleteMany({ where: { source: JOLPICA_SOURCE, externalDriver: { externalId: { in: syncDriverIds } } } });
+    await prisma.externalStanding.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: { in: syncYears } } });
+    await prisma.externalDriverSeason.deleteMany({ where: { source: JOLPICA_SOURCE, externalDriver: { externalId: { in: syncDriverIds } } } });
+    await prisma.externalDriverSeason.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: { in: syncYears } } });
+    await prisma.externalRace.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: { in: syncYears } } });
+    await prisma.externalDriver.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: syncDriverIds } } });
+    await prisma.externalTeam.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: ["mclaren", "ferrari"] } } });
+    await prisma.externalSeason.deleteMany({ where: { source: JOLPICA_SOURCE, year: { in: syncYears } } });
+    await prisma.user.deleteMany({ where: { email: { startsWith: "sync-" } } });
     await app.close();
     await prisma.$disconnect();
   });

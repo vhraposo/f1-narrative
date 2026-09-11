@@ -209,7 +209,9 @@ describe("ReconciliationService — candidatos e ciclo de vida de vínculos (202
     expect(report.counts.created).toBe(0);
 
     expect(
-      await prisma.externalDriver.count({ where: { source: JOLPICA_SOURCE } }),
+      await prisma.externalDriver.count({
+        where: { source: JOLPICA_SOURCE, externalId: { in: ["lando-norris", "oscar-piastri", "reserve-x"] } },
+      }),
     ).toBe(3);
 
     const saved = await prisma.externalBindingDriver.findUniqueOrThrow({

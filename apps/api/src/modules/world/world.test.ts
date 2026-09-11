@@ -71,6 +71,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.race.deleteMany({ where: { id: race.id } });
+  await prisma.season.deleteMany({ where: { id: season.id } });
+  await prisma.user.deleteMany({ where: { email: { startsWith: "world-" } } });
   await prisma.$disconnect();
   await app.close();
 });

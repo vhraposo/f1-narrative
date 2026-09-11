@@ -46,6 +46,7 @@ import jolpicaSyncRoutes, {
 } from "./modules/external-sync/jolpica.routes.js";
 import reconciliationRoutes from "./modules/reconciliation/reconciliation.routes.js";
 import universeInitRoutes from "./modules/universe-init/universe-init.routes.js";
+import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 
 function defaultRagProvider(): EmbeddingProviderWithInputType {
   const apiKey = process.env.COHERE_API_KEY;
@@ -75,7 +76,7 @@ export function buildApp(
   });
 
   void app.register(helmet, {
-    contentSecurityPolicy: false, // API: CSP não se aplica a respostas JSON
+    contentSecurityPolicy: false,
   });
 
   void app.register(cors, {
@@ -136,6 +137,7 @@ export function buildApp(
   void app.register(jolpicaSyncRoutes, jolpicaOptions);
   void app.register(reconciliationRoutes);
   void app.register(universeInitRoutes);
+  void app.register(playerEntryRoutes);
 
   return app;
 }

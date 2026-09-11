@@ -4,6 +4,7 @@ import {
   HeartHandshake,
   MessagesSquare,
   Newspaper,
+  Rocket,
   Shield,
   Trophy,
   Users,
@@ -33,6 +34,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         label: "Relacionamentos",
         Icon: HeartHandshake,
       },
+      { href: "/app/player-entry", label: "Entrar na F1", Icon: Rocket },
     ],
   },
   {

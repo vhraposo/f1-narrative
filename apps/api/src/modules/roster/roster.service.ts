@@ -188,6 +188,12 @@ export const rosterService = {
   async assignDriverToSeat(userId: string, input: AssignInput) {
     await assertValidSeat(input.seat);
     return prisma.$transaction(async (tx) => {
+      return this.assignDriverToSeatInTx(tx, userId, input);
+    });
+  },
+
+  async assignDriverToSeatInTx(tx: Tx, userId: string, input: AssignInput) {
+      await assertValidSeat(input.seat);
       await assertSeasonExists(tx, input.seasonId);
       await assertTeamOwned(tx, input.teamId, userId);
       await assertDriverOwned(tx, input.driverProfileId, userId);
@@ -269,7 +275,6 @@ export const rosterService = {
       await syncCurrentTeamCache(tx, input.driverProfileId);
       await logEvent(tx, target.id, kind, existing ? toState(existing) : null, toState(target));
       return target;
-    });
   },
 
   async releaseDriver(userId: string, input: TeamInput) {

@@ -1,10 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { rosterService } from "../roster/roster.service.js";
 
 const WORLD_KEY = "default";
+
+const createdSeasonIds: string[] = [];
 
 let app: FastifyInstance;
 
@@ -115,6 +117,17 @@ async function putDriver(
 beforeAll(async () => {
   app = buildApp();
   await app.ready();
+});
+
+afterEach(async () => {
+  if (createdSeasonIds.length === 0) return;
+  await prisma.worldState.updateMany({
+    where: { currentSeasonId: { in: createdSeasonIds } },
+    data: { currentSeasonId: null },
+  });
+  await prisma.seasonDriverEntry.deleteMany({ where: { seasonId: { in: createdSeasonIds } } });
+  await prisma.season.deleteMany({ where: { id: { in: createdSeasonIds } } });
+  createdSeasonIds.length = 0;
 });
 
 afterAll(async () => {
@@ -349,6 +362,7 @@ describe("DELETE /api/drivers/:characterId", () => {
 
 async function createSeason(year: number): Promise<string> {
   const season = await prisma.season.create({ data: { year } });
+  createdSeasonIds.push(season.id);
   return season.id;
 }
 

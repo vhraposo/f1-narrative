@@ -85,7 +85,9 @@ async function createSeason(
     payload,
   });
   expect(res.statusCode).toBe(201);
-  return res.json().season as Season;
+  const season = res.json().season as Season;
+  createdSeasonIds.push(season.id);
+  return season;
 }
 
 async function createRace(
@@ -110,6 +112,8 @@ let season: Season;
 let race: Race;
 let driver: Driver;
 let intruderDriver: Driver;
+
+const createdSeasonIds: string[] = [];
 
 beforeAll(async () => {
   app = buildApp();
@@ -142,6 +146,17 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (createdSeasonIds.length > 0) {
+    await prisma.worldState.updateMany({
+      where: { currentSeasonId: { in: createdSeasonIds } },
+      data: { currentSeasonId: null },
+    });
+    await prisma.championshipStanding.deleteMany({ where: { seasonId: { in: createdSeasonIds } } });
+    await prisma.seasonDriverEntry.deleteMany({ where: { seasonId: { in: createdSeasonIds } } });
+    await prisma.raceResult.deleteMany({ where: { race: { seasonId: { in: createdSeasonIds } } } });
+    await prisma.race.deleteMany({ where: { seasonId: { in: createdSeasonIds } } });
+    await prisma.season.deleteMany({ where: { id: { in: createdSeasonIds } } });
+  }
   await prisma.$disconnect();
   await app.close();
 });

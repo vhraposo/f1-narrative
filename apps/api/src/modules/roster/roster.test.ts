@@ -1,10 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { rosterService, RosterError } from "./roster.service.js";
 
 const WORLD_KEY = "default";
+
+const createdSeasonIds: string[] = [];
 
 let app: FastifyInstance;
 
@@ -65,6 +67,7 @@ async function createSeason(year: number): Promise<Season> {
   const season = await prisma.season.create({
     data: { year },
   });
+  createdSeasonIds.push(season.id);
   return { id: season.id };
 }
 
@@ -110,6 +113,17 @@ beforeAll(async () => {
   intruder = await createUser(`roster-intr-${Date.now()}@f1nw.test`, "RIntr");
   teamA = await createTeam(owner.id, "Equipe Alfa");
   teamB = await createTeam(owner.id, "Equipe Beta");
+});
+
+afterEach(async () => {
+  if (createdSeasonIds.length === 0) return;
+  await prisma.worldState.updateMany({
+    where: { currentSeasonId: { in: createdSeasonIds } },
+    data: { currentSeasonId: null },
+  });
+  await prisma.seasonDriverEntry.deleteMany({ where: { seasonId: { in: createdSeasonIds } } });
+  await prisma.season.deleteMany({ where: { id: { in: createdSeasonIds } } });
+  createdSeasonIds.length = 0;
 });
 
 afterAll(async () => {

@@ -104,6 +104,7 @@ describe("UniverseInit — proteção do universo inicializado (2033)", () => {
         race: { seasonId: ids.seasonId },
         driverProfile: { characterId: universeLandoCharId },
       },
+      orderBy: { race: { round: "asc" } },
       select: { id: true },
     });
     await prisma.raceResult.update({
@@ -158,6 +159,7 @@ describe("UniverseInit — proteção do universo inicializado (2033)", () => {
         race: { seasonId: ids.seasonId },
         driverProfile: { characterId: universeLandoCharId },
       },
+      orderBy: { race: { round: "asc" } },
     });
     expect(landoResult.points).toBe(30);
     expect(landoResult.position).toBe(1);
@@ -209,6 +211,7 @@ describe("UniverseInit — proteção do universo inicializado (2033)", () => {
         race: { seasonId: ids.seasonId },
         driverProfile: { characterId: universeLandoCharId },
       },
+      orderBy: { race: { round: "asc" } },
     });
     expect(landoResult.points).toBe(30);
 
