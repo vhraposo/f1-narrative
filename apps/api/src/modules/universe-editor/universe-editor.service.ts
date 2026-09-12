@@ -38,6 +38,15 @@ type DriverBinding = {
   driverProfileId: string;
 };
 
+type Divergence = {
+  kind: string;
+  origin: string | null;
+  eventId: string;
+  occurredAt: string;
+  summary: string;
+  readOnly: true;
+};
+
 type SeatComparison = {
   seat: 1 | 2;
   status: SeatStatus;
@@ -50,6 +59,7 @@ type SeatComparison = {
     provenance: string;
   } | null;
   canRestore: boolean;
+  divergence: Divergence | null;
 };
 
 type TeamComparison = {
@@ -231,6 +241,43 @@ function buildSeatComparison(
         }
       : null,
     canRestore: source !== null && binding !== null && binding !== undefined,
+    divergence: null,
+  };
+}
+
+const DIVERGENCE_KINDS = new Set(["CREATED", "SEATED", "HIRED", "PROMOTED"]);
+
+const DIVERGENCE_SUMMARIES: Record<string, string> = {
+  CREATED: "Piloto foi inserido no grid do universo",
+  SEATED: "Piloto foi designado ao assento no universo",
+  HIRED: "Piloto foi contratado pelo time do universo",
+  PROMOTED: "Reserva foi promovida ao assento de corrida",
+  RELEASED: "Piloto foi liberado para outra equipe",
+  DISPLACED: "Piloto perdeu o assento para outro piloto",
+  STATUS_CHANGED: "Estado do piloto atualizado no universo",
+};
+
+function divergenceOriginFor(kind: string, provenance: string): string | null {
+  if (kind === "HIRED") return "ROSTER_HIRE";
+  if (kind === "PROMOTED") return "ROSTER_PROMOTION";
+  if (kind === "RELEASED") return "ROSTER_RELEASE";
+  if (kind === "CREATED" && provenance === "IMPORTED") return "INITIALIZATION";
+  return null;
+}
+
+function divergenceOf(
+  events: Array<{ id: string; kind: string; createdAt: Date }>,
+  provenance: string,
+): Divergence | null {
+  const event = events.find((e) => DIVERGENCE_KINDS.has(e.kind));
+  if (!event) return null;
+  return {
+    kind: event.kind,
+    origin: divergenceOriginFor(event.kind, provenance),
+    eventId: event.id,
+    occurredAt: event.createdAt.toISOString(),
+    summary: DIVERGENCE_SUMMARIES[event.kind] ?? "Registro histórico no universo",
+    readOnly: true,
   };
 }
 
@@ -246,6 +293,24 @@ async function buildTeamComparison(
     resolveUniverseSeats(seasonId, teamId),
   ]);
 
+  const entryIds = [...universeSeats.values()].map((u) => u.id);
+  const eventsByEntry = new Map<
+    string,
+    Array<{ id: string; kind: string; createdAt: Date }>
+  >();
+  if (entryIds.length > 0) {
+    const rows = await prisma.driverEntryEvent.findMany({
+      where: { entryId: { in: entryIds } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { id: true, entryId: true, kind: true, createdAt: true },
+    });
+    for (const row of rows) {
+      const list = eventsByEntry.get(row.entryId) ?? [];
+      list.push(row);
+      eventsByEntry.set(row.entryId, list);
+    }
+  }
+
   const sourceForSeat = (seat: 1 | 2): SourceSeat | null => {
     const idx = seat - 1;
     return sourceSeats[idx] ?? null;
@@ -256,7 +321,17 @@ async function buildTeamComparison(
     const sourceSeat = sourceForSeat(seat);
     const universeEntry = universeSeats.get(seat) ?? null;
     const binding = sourceSeat ? (driverBindingMap.get(sourceSeat.externalDriverSeasonId) ?? null) : undefined;
-    return buildSeatComparison(seat, sourceSeat, universeEntry, binding, seasonId);
+    const comparison = buildSeatComparison(seat, sourceSeat, universeEntry, binding, seasonId);
+    if (
+      (comparison.status === "DIVERGENCE" || comparison.status === "UNIVERSE_ONLY") &&
+      comparison.universe
+    ) {
+      comparison.divergence = divergenceOf(
+        eventsByEntry.get(comparison.universe.entryId) ?? [],
+        comparison.universe.provenance,
+      );
+    }
+    return comparison;
   });
 
   const status: TeamComparisonStatus = seats.some((s) => s.status !== "MATCH") ? "DIVERGENT" : "MATCH";

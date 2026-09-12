@@ -15,6 +15,15 @@ export type UniverseSourceSeat = {
   number: number | null;
 };
 
+export type UniverseDivergence = {
+  kind: string;
+  origin: string | null;
+  eventId: string;
+  occurredAt: string;
+  summary: string;
+  readOnly: boolean;
+};
+
 export type UniverseSeat = {
   seat: 1 | 2;
   status: UniverseSeatStatus;
@@ -27,6 +36,7 @@ export type UniverseSeat = {
     provenance: string;
   } | null;
   canRestore: boolean;
+  divergence?: UniverseDivergence | null;
 };
 
 export type UniverseTeam = {

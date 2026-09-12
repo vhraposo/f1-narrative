@@ -3,6 +3,7 @@
 import { Loader2, CircleCheck, TriangleAlert } from "lucide-react";
 import * as React from "react";
 
+import { UniverseEventDialog } from "@/components/universe/universe-event-dialog";
 import { UniverseReconcileDialog } from "@/components/universe/universe-reconcile-dialog";
 import { UniverseTeamCard } from "@/components/universe/universe-team-card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectTrigger } from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
 import type { PlayerEntrySeason } from "@/lib/player-entry";
-import type { UniverseSeat, UniverseTeam } from "@/lib/universe";
+import type { UniverseDivergence, UniverseSeat, UniverseTeam } from "@/lib/universe";
 import { useSession } from "@/providers/session-provider";
 import {
   useKeepUniverseConfig,
@@ -52,11 +53,14 @@ export function UniverseEditorContent({
   const [reconcileSeat, setReconcileSeat] = React.useState<UniverseSeat | null>(
     null,
   );
+  const [viewDivergence, setViewDivergence] =
+    React.useState<UniverseDivergence | null>(null);
 
   React.useEffect(() => {
     setActionError(null);
     setDialog(null);
     setReconcileSeat(null);
+    setViewDivergence(null);
   }, [seasonId]);
 
   const runKeep = React.useCallback(
@@ -200,6 +204,7 @@ export function UniverseEditorContent({
                 setDialog({ team, mode: "restore" })
               }
               onReconcile={(seat) => setReconcileSeat(seat)}
+              onViewEvent={(divergence) => setViewDivergence(divergence)}
             />
           ))}
         </section>
@@ -218,6 +223,16 @@ export function UniverseEditorContent({
         isPending={restore.isPending}
         error={actionError}
       />
+
+      {viewDivergence ? (
+        <UniverseEventDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setViewDivergence(null);
+          }}
+          divergence={viewDivergence}
+        />
+      ) : null}
 
       {reconcileSeat?.source ? (
         <UniverseReconcileDialog

@@ -105,6 +105,7 @@ export type {
   DriverReconciliationListing,
   RestoreSourceResult,
   RosterComparison,
+  UniverseDivergence,
   UniverseSeat,
   UniverseSeatStatus,
   UniverseTeam,
