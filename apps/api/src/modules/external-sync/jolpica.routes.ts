@@ -2,6 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import type { JolpicaClient } from "./jolpica.client.js";
+import type { AutoMaterializeResult } from "./jolpica.materialize.js";
+import { tryAutoMaterialize, MATERIALIZABLE_SCOPES } from "./jolpica.materialize.js";
 import {
   JOLPICA_SOURCE,
   JOLPICA_SYNC_SCOPES,
@@ -75,7 +77,14 @@ export const jolpicaSyncRoutes: FastifyPluginAsync<JolpicaSyncRoutesOptions> =
             bodyParsed.data.seasonYear,
             params.data.scope,
           );
-          return reply.send({ ok: true, report });
+          let materialization: AutoMaterializeResult | undefined;
+          if ((MATERIALIZABLE_SCOPES as readonly string[]).includes(params.data.scope)) {
+            materialization = await tryAutoMaterialize(
+              { id: userId, role: "ADMIN" },
+              bodyParsed.data.seasonYear,
+            );
+          }
+          return reply.send({ ok: true, report, materialization });
         } catch (error) {
           if (error instanceof JolpicaError) {
             if (error.code === "HTTP" && error.statusCode === 404) {

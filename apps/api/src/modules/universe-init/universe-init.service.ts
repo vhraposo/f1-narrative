@@ -1097,7 +1097,11 @@ export class UniverseInitService {
             name: driver.name,
             nationality: driver.nationality ?? "Unknown",
             gender: null,
-            birthDate: deterministicBirthDate(`${plan.season.source}:${driver.externalId}`),
+            birthDate: await this.resolveBirthDate(
+              tx,
+              plan.season.source,
+              driver.externalId,
+            ),
             dna: {},
           },
         });
@@ -1278,6 +1282,24 @@ export class UniverseInitService {
         },
       });
     }
+  }
+
+  private async resolveBirthDate(
+    tx: Prisma.TransactionClient,
+    source: string,
+    externalId: string,
+  ): Promise<Date> {
+    const extDriver = await tx.externalDriver.findUnique({
+      where: { source_externalId: { source, externalId } },
+      select: { sourceRecord: true },
+    });
+    const record = (extDriver?.sourceRecord ?? null) as Record<string, unknown> | null;
+    const dob = record?.dateOfBirth;
+    if (typeof dob === "string" && dob.length > 0) {
+      const parsed = new Date(dob);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return deterministicBirthDate(`${source}:${externalId}`);
   }
 
   private async externalTeamId(tx: Prisma.TransactionClient, source: string, externalId: string): Promise<string> {

@@ -174,6 +174,18 @@ describe("ConversationParticipantPanel — catálogo AI (STEP 49)", () => {
     expect(h.addSpy).toHaveBeenCalledWith("ai-1", expect.anything());
   });
 
+  it("K2 - piloto materializado do grid aparece como Character USER e é adicionado", async () => {
+    const h = setup({
+      own: [userCharacter("c-lando", "Lando Norris")],
+      ai: [],
+    });
+
+    await chooseCharacter(h, "c-lando");
+    await h.user.click(screen.getByRole("button", { name: "Adicionar" }));
+
+    expect(h.addSpy).toHaveBeenCalledWith("c-lando", expect.anything());
+  });
+
   it("L - AI adicionado passa a aparecer como participante (IA)", async () => {
     const h = setup({
       own: [],

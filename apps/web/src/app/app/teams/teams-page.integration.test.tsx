@@ -200,4 +200,42 @@ describe("Teams Page - constructors", () => {
       screen.getByRole("button", { name: /Tentar novamente/ }),
     ).toBeDefined();
   });
+
+  it("após a materialização automática, exibe as equipes e pilotos materializados do universo (sem fonte externa)", async () => {
+    teamsFixture = [
+      makeTeam({
+        id: "t-auto",
+        name: "Atlas Racing",
+        shortName: "ATL",
+        color: "#1e3a8a",
+      }),
+    ];
+    driversFixture = [
+      makeDriver({
+        id: "d-auto",
+        characterId: "c-auto",
+        number: 1,
+        teamId: "t-auto",
+        team: {
+          id: "t-auto",
+          name: "Atlas Racing",
+          shortName: "ATL",
+          color: "#1e3a8a",
+        },
+        character: {
+          id: "c-auto",
+          name: "Ada Lovelace",
+          nationality: "Britânica",
+          imageUrl: null,
+        },
+      }),
+    ];
+    renderWithClient(<TeamsPage />);
+
+    expect(await screen.findByText("Atlas Racing")).toBeDefined();
+    expect(screen.getByText("Ada Lovelace")).toBeDefined();
+    expect(screen.getByText("#1")).toBeDefined();
+    expect(screen.queryByText(/Fonte externa/i)).toBeNull();
+    expect(screen.queryByRole("tab")).toBeNull();
+  });
 });

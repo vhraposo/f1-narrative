@@ -192,7 +192,7 @@ describe("Drivers Page - grid", () => {
     ).toBeDefined();
   });
 
-  it("estado de erro: falha ao carregar os pilotos", async () => {
+it("estado de erro: falha ao carregar os pilotos", async () => {
     failDrivers = true;
     renderWithClient(<DriversPage />);
 
@@ -200,5 +200,17 @@ describe("Drivers Page - grid", () => {
     expect(
       screen.getByRole("button", { name: /Tentar novamente/ }),
     ).toBeDefined();
+  });
+
+  it("após a materialização automática, exibe apenas o grid do universo (sem aba de fonte externa)", async () => {
+    renderWithClient(<DriversPage />);
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Drivers" }),
+    ).toBeDefined();
+    expect(screen.queryByText(/Fonte externa/i)).toBeNull();
+    expect(screen.queryByRole("tab")).toBeNull();
+    expect(await screen.findByText("Alicya Kucharski")).toBeDefined();
+    expect(screen.getByText("Lewis Hamilton")).toBeDefined();
   });
 });
