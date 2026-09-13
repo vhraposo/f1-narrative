@@ -9,8 +9,16 @@ import {
   type InitializationScope,
   type UniverseInitializationInput,
 } from "./universe-init.schemas.js";
+import {
+  parseSourceClaim,
+  resolveOpeningGrid,
+  type OpeningGridResolution,
+} from "../opening-grid/opening-grid.resolver.js";
+import { OPENING_GRID_SOURCE } from "../opening-grid/opening-grid.source.js";
 
 type Db = Prisma.TransactionClient | PrismaClient;
+
+type GridClaim = { teamExternalId: string | null; role: string | null; number: number | null };
 
 const WORLD_DEFAULT_KEY = "default";
 
@@ -130,6 +138,7 @@ export interface InitStatus {
   summary: InitReport["summary"];
   conflicts: InitConflict[];
   openingRoster: OpeningRosterInfo;
+  openingGrid: OpeningGridResolution;
   worldState: { changed: boolean };
 }
 
@@ -160,6 +169,7 @@ export interface InitReport {
     bindingsCreated: number;
     conflicts: number;
     openingRosterUnresolved: number;
+    openingGridState: OpeningGridResolution["state"];
   };
   teams: PlannedTeam[];
   drivers: PlannedDriver[];
@@ -168,6 +178,7 @@ export interface InitReport {
   standings: PlannedStanding[];
   conflicts: InitConflict[];
   openingRoster: OpeningRosterInfo;
+  openingGrid: OpeningGridResolution;
   worldState: { changed: boolean };
 }
 
@@ -209,6 +220,7 @@ type DraftDriver = {
   role: DriverRole | null;
   number: number | null;
   seat: number | null;
+  sourceSeat: number | null;
   entryAction?: PlanAction;
   entryId?: string;
   entryBindingCreate?: boolean;
@@ -275,6 +287,7 @@ export class UniverseInitService {
       summary: plan.summary,
       conflicts: plan.conflicts,
       openingRoster: plan.openingRoster,
+      openingGrid: plan.openingGrid,
       worldState: plan.worldState,
     };
   }
@@ -461,6 +474,12 @@ export class UniverseInitService {
       conflicts,
     );
 
+    const openingGrid = await resolveOpeningGrid(db, {
+      source: extSeason.source,
+      year: extSeason.year,
+      seasonId: input.seasonId,
+    });
+
     let teams: PlannedTeam[] = [];
     let drivers: PlannedDriver[] = [];
     let races: PlannedRace[] = [];
@@ -477,6 +496,23 @@ export class UniverseInitService {
         include: { externalDriver: true },
         orderBy: [{ externalDriver: { name: "asc" } }],
       });
+      const claimRows = await db.externalDriverSeason.findMany({
+        where: { source: OPENING_GRID_SOURCE, seasonYear: extSeason.year },
+        select: {
+          externalDriver: { select: { externalId: true } },
+          role: true,
+          number: true,
+          teamExternalId: true,
+        },
+      });
+      const gridClaims = new Map<string, GridClaim>();
+      for (const row of claimRows) {
+        gridClaims.set(row.externalDriver.externalId, {
+          teamExternalId: row.teamExternalId,
+          role: row.role,
+          number: row.number,
+        });
+      }
       const teamExternalIds = [
         ...new Set(
           driverSeasons
@@ -490,6 +526,7 @@ export class UniverseInitService {
         input.seasonId,
         scopes,
         driverSeasons,
+        gridClaims,
         teams,
         conflicts,
       );
@@ -572,6 +609,7 @@ export class UniverseInitService {
         bindingsCreated,
         conflicts: conflicts.length,
         openingRosterUnresolved: openingRoster.unresolvedParticipants,
+        openingGridState: openingGrid.state,
       },
       teams,
       drivers,
@@ -580,6 +618,7 @@ export class UniverseInitService {
       standings,
       conflicts,
       openingRoster,
+      openingGrid,
       worldState: { changed: false },
     };
   }
@@ -688,6 +727,7 @@ export class UniverseInitService {
       role: string | null;
       externalDriver: { name: string; number: number | null; nationality: string | null; externalId: string };
     }>,
+    claims: Map<string, GridClaim>,
     teams: PlannedTeam[],
     conflicts: InitConflict[],
   ): Promise<{ drivers: PlannedDriver[]; resolvedProfiles: Map<string, string> }> {
@@ -706,6 +746,7 @@ export class UniverseInitService {
         role: null,
         number: null,
         seat: null,
+        sourceSeat: null,
       };
       const label = ds.externalDriver.name;
       const binding = await db.externalBindingDriver.findUnique({
@@ -760,8 +801,26 @@ export class UniverseInitService {
         const plannedTeam = ds.teamExternalId ? teamById.get(ds.teamExternalId) : undefined;
         if (plannedTeam && plannedTeam.universeTeamId) {
           draft.plannedTeam = plannedTeam;
-          draft.role = this.mapSourceRole(ds.role);
+          const claimRecord = claims.get(ds.externalDriver.externalId);
+          const claim = claimRecord
+            ? parseSourceClaim(claimRecord.role)
+            : parseSourceClaim(ds.role);
+          draft.role = claim?.kind ?? null;
+          draft.sourceSeat = claim?.seat ?? null;
           draft.number = ds.number ?? ds.externalDriver.number ?? null;
+          if (
+            claimRecord &&
+            claimRecord.teamExternalId != null &&
+            claimRecord.teamExternalId !== ds.teamExternalId
+          ) {
+            pushConflict(
+              conflicts,
+              "CLAIM_TEAM_MISMATCH",
+              ds.externalDriver.externalId,
+              ds.externalDriver.name,
+              "Claim de grid reivindica equipe diversa da lista de participantes",
+            );
+          }
         } else if (plannedTeam && plannedTeam.action === "CONFLICT" && grid) {
           draft.entryAction = "CONFLICT";
           draft.reason = plannedTeam.reason;
@@ -795,26 +854,48 @@ export class UniverseInitService {
     }
 
     for (const group of raceSeatGroups.values()) {
-      group.sort(
-        (a, b) =>
-          (a.number ?? 9999) - (b.number ?? 9999) ||
-          a.externalDriver.name.localeCompare(b.externalDriver.name),
-      );
-      group.forEach((draft, index) => {
-        if (index >= 2) {
+      const used = new Map<number, string>();
+      for (const draft of group) {
+        if (draft.sourceSeat == null) continue;
+        const previous = used.get(draft.sourceSeat);
+        if (previous && previous !== draft.externalDriver.externalId) {
           draft.entryAction = "CONFLICT";
-          draft.reason = "A equipe possui no máximo dois assentos de corrida";
+          draft.reason = "Assento declarado por dois pilotos na fonte";
           pushConflict(
             conflicts,
-            "SEAT_CAPACITY",
+            "SEAT_CLAIM_CONFLICT",
             draft.externalDriver.externalId,
             draft.externalDriver.name,
             draft.reason,
           );
-        } else {
-          draft.seat = index + 1;
         }
-      });
+        used.set(draft.sourceSeat, draft.externalDriver.externalId);
+        draft.seat = draft.sourceSeat;
+      }
+      group
+        .filter((draft) => draft.seat == null)
+        .sort(
+          (a, b) =>
+            (a.number ?? 9999) - (b.number ?? 9999) ||
+            a.externalDriver.name.localeCompare(b.externalDriver.name),
+        )
+        .forEach((draft) => {
+          const free = [1, 2].find((seat) => !used.has(seat));
+          if (free) {
+            used.set(free, draft.externalDriver.externalId);
+            draft.seat = free;
+          } else {
+            draft.entryAction = "CONFLICT";
+            draft.reason = "A equipe possui no máximo dois assentos de corrida";
+            pushConflict(
+              conflicts,
+              "SEAT_CAPACITY",
+              draft.externalDriver.externalId,
+              draft.externalDriver.name,
+              draft.reason,
+            );
+          }
+        });
     }
 
     for (const draft of drafts) {
@@ -902,13 +983,6 @@ export class UniverseInitService {
     }));
 
     return { drivers, resolvedProfiles };
-  }
-
-  private mapSourceRole(role: string | null): DriverRole | null {
-    const normalized = (role ?? "").toUpperCase().trim();
-    if (normalized === "RESERVE") return "RESERVE";
-    if (normalized === "RACE_SEAT") return "RACE_SEAT";
-    return null;
   }
 
   private async universeTeamExists(db: Db, teamId: string): Promise<boolean> {

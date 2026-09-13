@@ -48,6 +48,13 @@ import reconciliationRoutes from "./modules/reconciliation/reconciliation.routes
 import universeInitRoutes from "./modules/universe-init/universe-init.routes.js";
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
+import {
+  OpeningGridClient,
+} from "./modules/opening-grid/opening-grid.client.js";
+import { OpeningGridTransport } from "./modules/opening-grid/opening-grid.transport.js";
+import openingGridRoutes, {
+  type OpeningGridRoutesOptions,
+} from "./modules/opening-grid/opening-grid.routes.js";
 
 function defaultRagProvider(): EmbeddingProviderWithInputType {
   const apiKey = process.env.COHERE_API_KEY;
@@ -69,6 +76,7 @@ export function buildApp(
   ragProvider?: EmbeddingProviderWithInputType,
   generationProvider?: GenerationProvider,
   jolpicaClient?: JolpicaClient,
+  openingGridClient?: OpeningGridClient,
 ): FastifyInstance {
   const app = Fastify({
     logger: {
@@ -136,6 +144,18 @@ export function buildApp(
     requestDelayMs: env.JOLPICA_REQUEST_DELAY_MS,
   };
   void app.register(jolpicaSyncRoutes, jolpicaOptions);
+  const openingGridOptions: OpeningGridRoutesOptions = {
+    client:
+      openingGridClient ??
+      new OpeningGridClient({
+        transport: new OpeningGridTransport({
+          baseUrl: env.OPENING_GRID_BASE_URL,
+          timeoutMs: env.OPENING_GRID_TIMEOUT_MS,
+          maxRetries: env.OPENING_GRID_MAX_RETRIES,
+        }),
+      }),
+  };
+  void app.register(openingGridRoutes, openingGridOptions);
   void app.register(reconciliationRoutes);
   void app.register(universeInitRoutes);
   void app.register(playerEntryRoutes);

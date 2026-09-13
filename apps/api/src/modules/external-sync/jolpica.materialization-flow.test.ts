@@ -418,7 +418,7 @@ describe("External Sync -> Materialização automática (107.2)", () => {
     expect(ada.birthDate.toISOString().slice(0, 10)).toBe("1946-04-01");
   });
 
-  it("8) Player Entry após materialização: desloca piloto materializado -> AVAILABLE", async () => {
+  it("8) Player Entry bloqueado enquanto o grid de abertura está UNRESOLVED (fonte real sem roles)", async () => {
     const atlas = await prisma.team.findFirstOrThrow({
       where: { userId: admin.id, name: "Atlas Racing" },
       select: { id: true },
@@ -448,35 +448,14 @@ describe("External Sync -> Materialização automática (107.2)", () => {
         birthDate: "2002-06-14",
       },
     });
-    expect(res.statusCode).toBe(201);
-    const result = res.json() as {
-      character: { name: string; controlledBy: string };
-      displaced: {
-        entry: {
-          driverProfile: { character: { name: string } };
-          status: string;
-          teamId: string | null;
-          role: string | null;
-          seat: number | null;
-        };
-      } | null;
-    };
-    expect(result.displaced).toBeNull();
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("OPENING_GRID_UNRESOLVED");
 
-    const alicyaProfile = await prisma.driverProfile.findFirstOrThrow({
-      where: { character: { name: "Alicya Auto" } },
-    });
-    const alicyaEntry = await prisma.seasonDriverEntry.findUniqueOrThrow({
-      where: {
-        seasonId_driverProfileId: {
-          seasonId: fixture.seasonId,
-          driverProfileId: alicyaProfile.id,
-        },
-      },
-    });
-    expect(alicyaEntry.seat).toBe(1);
-    expect(alicyaEntry.role).toBe("RACE_SEAT");
-    expect(alicyaEntry.status).toBe("ACTIVE");
+    expect(
+      await prisma.character.count({
+        where: { userId: admin.id, name: "Alicya Auto" },
+      }),
+    ).toBe(0);
 
     const adaEntry = await prisma.seasonDriverEntry.findFirstOrThrow({
       where: { seasonId: fixture.seasonId, driverProfileId: adaProfileId },
@@ -609,7 +588,7 @@ describe("External Sync -> Materialização automática (107.2)", () => {
     expect(adaEntry.teamId).toBe(redBull.id);
     expect(adaEntry.provenance).toBe("HYBRID");
     expect(await prisma.team.count({ where: { userId: admin.id } })).toBe(3);
-    expect(await prisma.character.count({ where: { userId: admin.id } })).toBe(5);
+    expect(await prisma.character.count({ where: { userId: admin.id } })).toBe(4);
   });
 
   it("12) fonte externa permanece intacta após sync + materialização", async () => {

@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { JOLPICA_SOURCE } from "../external-sync/jolpica.service.js";
 import { entryInclude, rosterService } from "../roster/roster.service.js";
+import {
+  resolveOpeningGrid,
+  type OpeningGridState,
+  type OpeningGridHolder,
+} from "../opening-grid/opening-grid.resolver.js";
 
 type Tx = Prisma.TransactionClient;
 
@@ -51,11 +57,8 @@ type CreateInput = {
   birthDate: Date;
 };
 
-function raceSeatSortKey(
-  number: number | null,
-  name: string,
-): { key: number; name: string } {
-  return { key: number ?? 9999, name };
+function toStarterView(holder: OpeningGridHolder): { name: string; number: number | null } {
+  return { name: holder.name, number: holder.number ?? null };
 }
 
 export const playerEntryService = {
@@ -126,59 +129,42 @@ export const playerEntryService = {
     const externalYear = externalSeason?.year;
     const result = [];
 
+    const universeEntries = await prisma.seasonDriverEntry.findMany({
+      where: { seasonId: input.seasonId, teamId: { in: teams.map((team) => team.id) } },
+      include: entryInclude,
+    });
+
+    const grid = await resolveOpeningGrid(prisma, {
+      source: source ?? JOLPICA_SOURCE,
+      year: externalYear ?? 0,
+      seasonId: input.seasonId,
+    });
+    const gridByExternalTeam = new Map(
+      grid.teams.map((team) => [team.externalTeamId, team]),
+    );
+
     for (const team of teams) {
       const binding = team.externalTeamBindings[0];
-      const externalDs = source
-        ? await prisma.externalDriverSeason.findMany({
-            where: {
-              source,
-              seasonYear: externalYear ?? 0,
-              teamExternalId: binding.externalTeam.externalId,
-            },
-            include: { externalDriver: { select: { name: true, number: true } } },
-          })
-        : [];
-
-      const riders = externalDs
-        .filter((item) => (item.role ?? "").toUpperCase() !== "RESERVE")
-        .sort(
-          (a, b) =>
-            raceSeatSortKey(a.number ?? a.externalDriver.number, a.externalDriver.name).key -
-              raceSeatSortKey(
-                b.number ?? b.externalDriver.number,
-                b.externalDriver.name,
-              ).key ||
-            a.externalDriver.name.localeCompare(b.externalDriver.name),
-        )
-        .slice(0, 2);
-
-      const reserves = externalDs
-        .filter((item) => (item.role ?? "").toUpperCase() === "RESERVE")
-        .map((item) => ({
-          name: item.externalDriver.name,
-          number: item.number ?? item.externalDriver.number ?? null,
-          teamName: item.teamNameSnapshot ?? binding.externalTeam.name,
-        }));
-
-      const universeEntries = await prisma.seasonDriverEntry.findMany({
-        where: { seasonId: input.seasonId, teamId: team.id },
-        include: entryInclude,
-      });
+      const entryGrid = gridByExternalTeam.get(binding.externalTeam.externalId);
+      const state: OpeningGridState = entryGrid?.state ?? "RESOLVED";
+      const entries = universeEntries.filter((entry) => entry.teamId === team.id);
 
       const seats: Array<{
         seat: number;
+        state: OpeningGridState;
         source: { name: string; number: number | null; teamName: string | null } | null;
         universe: { characterName: string; provenance: string } | null;
       }> = [1, 2].map((seat) => {
-        const rider = riders[seat - 1];
-        const univ = universeEntries.find((entry) => entry.seat === seat);
+        const holder = entryGrid?.seats.find((item) => item.seat === seat)?.holder ?? null;
+        const univ = entries.find((entry) => entry.seat === seat);
         return {
           seat,
-          source: rider
+          state,
+          source: holder
             ? {
-                name: rider.externalDriver.name,
-                number: rider.number ?? rider.externalDriver.number ?? null,
-                teamName: rider.teamNameSnapshot ?? null,
+                name: holder.name,
+                number: holder.number ?? null,
+                teamName: binding.externalTeam.name,
               }
             : null,
           universe: univ
@@ -190,12 +176,26 @@ export const playerEntryService = {
         };
       });
 
+      const reserves = (entryGrid?.reserves ?? []).map((item) => ({
+        name: item.name,
+        number: item.number ?? null,
+        teamName: binding.externalTeam.name,
+      }));
+
       result.push({
         id: team.id,
         name: team.name,
         shortName: team.shortName,
         color: team.color,
         externalTeamId: binding.externalTeam.externalId,
+        openingGrid: {
+          state,
+          reasons: entryGrid?.reasons ?? [],
+          starters: (entryGrid?.starters ?? []).map(toStarterView),
+          reserves: (entryGrid?.reserves ?? []).map(toStarterView),
+          participants: (entryGrid?.participants ?? []).map(toStarterView),
+          seats,
+        },
         seats,
         reserve: reserves,
       });
@@ -205,6 +205,7 @@ export const playerEntryService = {
       seasons: mappedSeasons,
       selection: {
         seasonId: input.seasonId,
+        openingGridState: grid.state,
         teams: result,
       },
     };
@@ -226,7 +227,7 @@ export const playerEntryService = {
 
       const seasonBinding = await tx.externalBindingSeason.findUnique({
         where: { seasonId: input.seasonId },
-        select: { confidence: true },
+        select: { confidence: true, externalSeasonId: true },
       });
       if (!seasonBinding || seasonBinding.confidence !== "CONFIRMED") {
         throw new PlayerEntryError(
@@ -246,12 +247,51 @@ export const playerEntryService = {
 
       const teamBinding = await tx.externalBindingTeam.findUnique({
         where: { teamId: input.teamId },
-        select: { confidence: true },
+        select: {
+          confidence: true,
+          externalTeam: { select: { externalId: true } },
+        },
       });
       if (!teamBinding || teamBinding.confidence !== "CONFIRMED") {
         throw new PlayerEntryError(
           "TEAM_NOT_MIRRORED",
           "A equipe ainda não está espelhada de uma equipe externa confirmada",
+          409,
+        );
+      }
+
+      const extSeason = await tx.externalSeason.findUnique({
+        where: { id: seasonBinding.externalSeasonId },
+        select: { source: true, year: true },
+      });
+      if (!extSeason) {
+        throw new PlayerEntryError(
+          "EXTERNAL_SEASON_NOT_FOUND",
+          "Temporada externa não encontrada",
+          409,
+        );
+      }
+
+      const openingGrid = await resolveOpeningGrid(tx, {
+        source: extSeason.source,
+        year: extSeason.year,
+        seasonId: input.seasonId,
+        teamIds: [input.teamId],
+      });
+      const teamGrid = openingGrid.teams.find(
+        (gridTeam) => gridTeam.externalTeamId === teamBinding.externalTeam.externalId,
+      );
+      if (teamGrid?.state === "UNRESOLVED") {
+        throw new PlayerEntryError(
+          "OPENING_GRID_UNRESOLVED",
+          "Os titulares do grid de abertura desta equipe ainda não foram determinados pela fonte",
+          409,
+        );
+      }
+      if (teamGrid?.state === "CONFLICTED") {
+        throw new PlayerEntryError(
+          "OPENING_GRID_CONFLICTED",
+          "O grid de abertura desta equipe possui claims incompatíveis na fonte",
           409,
         );
       }

@@ -25,6 +25,12 @@ const envSchema = z.object({
   JOLPICA_TIMEOUT_MS: z.coerce.number().int().min(1).default(30000),
   JOLPICA_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
   JOLPICA_REQUEST_DELAY_MS: z.coerce.number().int().min(0).default(0),
+  OPENING_GRID_BASE_URL: z
+    .string()
+    .url("OPENING_GRID_BASE_URL inválida")
+    .default("https://f1nw.invalid/opening-grid/"),
+  OPENING_GRID_TIMEOUT_MS: z.coerce.number().int().min(1).default(30000),
+  OPENING_GRID_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
 });
 
 const parsed = envSchema.safeParse(process.env);

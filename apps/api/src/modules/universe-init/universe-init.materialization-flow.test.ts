@@ -327,7 +327,7 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     expect(await prisma.seasonDriverEntry.count({ where: { seasonId: fixture.ids.seasonId } })).toBe(3);
   });
 
-  it("11) Player Entry no grid materializado ocupa assento aberto, sem deslocar participante", async () => {
+  it("11) Player Entry bloqueado quando o grid de abertura está UNRESOLVED (participante e assento aberto)", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/universe/player-entry",
@@ -341,37 +341,17 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
         birthDate: "2002-06-14",
       },
     });
-    expect(res.statusCode).toBe(201);
-    const result = res.json() as {
-      character: { name: string; controlledBy: string; userId: string };
-      displaced: {
-        entry: {
-          driverProfile: { character: { name: string } };
-          status: string;
-          teamId: string | null;
-          role: string | null;
-          seat: number | null;
-        };
-      } | null;
-    };
-    expect(result.character.controlledBy).toBe("USER");
-    expect(result.character.userId).toBe(admin.id);
-    expect(result.displaced).toBeNull();
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("OPENING_GRID_UNRESOLVED");
 
-    const alicyaProfile = await prisma.driverProfile.findFirstOrThrow({
-      where: { character: { name: "Alicya Materializada" } },
-    });
-    const alicyaEntry = await prisma.seasonDriverEntry.findUniqueOrThrow({
-      where: {
-        seasonId_driverProfileId: {
-          seasonId: fixture.ids.seasonId,
-          driverProfileId: alicyaProfile.id,
-        },
-      },
-    });
-    expect(alicyaEntry.seat).toBe(2);
-    expect(alicyaEntry.role).toBe("RACE_SEAT");
-    expect(alicyaEntry.status).toBe("ACTIVE");
+    expect(
+      await prisma.character.count({ where: { userId: admin.id, name: "Alicya Materializada" } }),
+    ).toBe(0);
+    expect(
+      await prisma.seasonDriverEntry.count({
+        where: { seasonId: fixture.ids.seasonId, teamId: mclarenTeamId, seat: 2 },
+      }),
+    ).toBe(0);
 
     const oscarEntry = await prisma.seasonDriverEntry.findFirstOrThrow({
       where: { seasonId: fixture.ids.seasonId, driverProfileId: oscarProfileId },
