@@ -365,19 +365,6 @@ export const rosterService = {
         }
       }
 
-      if (input.role === "RESERVE") {
-        const reserveCount = await tx.seasonDriverEntry.count({
-          where: { seasonId: input.seasonId, teamId: input.teamId, role: "RESERVE", status: "ACTIVE" },
-        });
-        if (reserveCount > 0) {
-          throw new RosterError(
-            "RESERVE_LIMIT",
-            "A equipe já possui um piloto reserva nesta temporada",
-            409,
-          );
-        }
-      }
-
       const seat = input.role === "RESERVE" ? null : (input.seat ?? null);
       const kind: DriverEntryEventKind = existing ? "HIRED" : "CREATED";
 

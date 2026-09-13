@@ -4,6 +4,7 @@ import { prisma } from "../../infrastructure/database/prisma.js";
 import {
   initializationScopeSchema,
   type InitializationScope,
+  universeBootstrapBodySchema,
   universeInitializationBodySchema,
   universeInitializationStatusQuerySchema,
   type UniverseInitializationInput,
@@ -124,6 +125,32 @@ export const universeInitRoutes: FastifyPluginAsync = async (fastify) => {
           inputFrom(parsed.data),
         );
         return reply.send({ report });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/universe/initialization/bootstrap",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const adminRole = await requireAdmin(request, reply);
+      if (adminRole === null) return;
+      const parsed = universeBootstrapBodySchema.safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: "Dados inválidos",
+          code: "VALIDATION_ERROR",
+          issues: parsed.error.issues,
+        });
+      }
+      try {
+        const report = await universeInitService.bootstrapSeason(
+          { id: request.user!.id, role: adminRole },
+          parsed.data.externalSeasonId,
+        );
+        return reply.send({ bootstrap: report });
       } catch (error) {
         return sendError(reply, error);
       }

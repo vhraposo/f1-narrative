@@ -315,7 +315,7 @@ describe("RosterService — reserva e promoção", () => {
     expect(entry.teamId).toBe(teamA.id);
   });
 
-  it("rejeita um segundo reserva para a mesma equipe", async () => {
+  it("permite múltiplos reservas para a mesma equipe (pool 0..N)", async () => {
     const season = await createSeason(2026);
     const r1 = await createDriver(owner.id, "Reserva Um");
     const r2 = await createDriver(owner.id, "Reserva Dois");
@@ -326,19 +326,20 @@ describe("RosterService — reserva e promoção", () => {
       driverProfileId: r1.driverProfileId,
     });
 
-    await expectRosterError(
-      rosterService.assignReserve(owner.id, {
-        seasonId: season.id,
-        teamId: teamA.id,
-        driverProfileId: r2.driverProfileId,
-      }),
-      "RESERVE_LIMIT",
-    );
+    const entry = await rosterService.assignReserve(owner.id, {
+      seasonId: season.id,
+      teamId: teamA.id,
+      driverProfileId: r2.driverProfileId,
+    });
+
+    expect(entry.status).toBe("ACTIVE");
+    expect(entry.role).toBe("RESERVE");
+    expect(entry.seat).toBeNull();
 
     const count = await prisma.seasonDriverEntry.count({
       where: { seasonId: season.id, teamId: teamA.id, role: "RESERVE", status: "ACTIVE" },
     });
-    expect(count).toBe(1);
+    expect(count).toBe(2);
   });
 
   it("promove reserva para assento vago", async () => {

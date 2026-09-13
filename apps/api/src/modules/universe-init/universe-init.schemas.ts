@@ -21,6 +21,12 @@ export const universeInitializationBodySchema = z.object({
 
 export type UniverseInitializationInput = z.infer<typeof universeInitializationBodySchema>;
 
+export const universeBootstrapBodySchema = z.object({
+  externalSeasonId: z.string().uuid("Identificador da temporada externa inválido"),
+});
+
+export type UniverseBootstrapInput = z.infer<typeof universeBootstrapBodySchema>;
+
 export const universeInitializationStatusQuerySchema = z.object({
   seasonId: z.string().uuid("Identificador de temporada inválido"),
   externalSeasonId: z.string().uuid("Identificador da temporada externa inválido"),

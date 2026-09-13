@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "admin:promote": "tsx src/scripts/admin-promote.ts",
     "test": "vitest run"
   },
   "dependencies": {

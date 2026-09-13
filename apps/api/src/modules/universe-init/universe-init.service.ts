@@ -3,6 +3,7 @@ import { Prisma, type Role } from "@prisma/client";
 import type { PrismaClient, DriverRole } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { computeContentHash } from "../external-sync/jolpica.hash.js";
+import { JOLPICA_SOURCE } from "../external-sync/jolpica.service.js";
 import {
   INITIALIZATION_SCOPE_VALUES,
   type InitializationScope,
@@ -10,6 +11,8 @@ import {
 } from "./universe-init.schemas.js";
 
 type Db = Prisma.TransactionClient | PrismaClient;
+
+const WORLD_DEFAULT_KEY = "default";
 
 export class UniverseInitError extends Error {
   constructor(
@@ -113,6 +116,12 @@ export interface InitConflict {
   reason: string;
 }
 
+export interface OpeningRosterInfo {
+  resolved: boolean;
+  unresolvedParticipants: number;
+  teams: string[];
+}
+
 export interface InitStatus {
   initialized: boolean;
   season: InitReport["season"];
@@ -120,6 +129,7 @@ export interface InitStatus {
   seasonBindingCreated: boolean;
   summary: InitReport["summary"];
   conflicts: InitConflict[];
+  openingRoster: OpeningRosterInfo;
   worldState: { changed: boolean };
 }
 
@@ -149,6 +159,7 @@ export interface InitReport {
     standingsReused: number;
     bindingsCreated: number;
     conflicts: number;
+    openingRosterUnresolved: number;
   };
   teams: PlannedTeam[];
   drivers: PlannedDriver[];
@@ -156,7 +167,28 @@ export interface InitReport {
   results: PlannedResult[];
   standings: PlannedStanding[];
   conflicts: InitConflict[];
+  openingRoster: OpeningRosterInfo;
   worldState: { changed: boolean };
+}
+
+export interface BootstrapReport {
+  season: {
+    universeSeasonId: string;
+    externalSeasonId: string;
+    year: number;
+    source: string;
+    action: "CREATED" | "REUSED";
+  };
+  binding: {
+    created: boolean;
+    reused: boolean;
+    confidence: "CONFIRMED";
+  };
+  worldState: {
+    previousSeasonId: string | null;
+    currentSeasonId: string | null;
+    changed: boolean;
+  };
 }
 
 type DraftDriver = {
@@ -242,8 +274,161 @@ export class UniverseInitService {
       seasonBindingCreated: plan.seasonBindingCreated,
       summary: plan.summary,
       conflicts: plan.conflicts,
+      openingRoster: plan.openingRoster,
       worldState: plan.worldState,
     };
+  }
+
+  async bootstrapSeason(actor: Actor, externalSeasonId: string): Promise<BootstrapReport> {
+    return prisma.$transaction(async (tx) => {
+      const extSeason = await tx.externalSeason.findUnique({
+        where: { id: externalSeasonId },
+        select: { id: true, source: true, year: true },
+      });
+      if (!extSeason) {
+        throw new UniverseInitError("NOT_FOUND", "Temporada externa não encontrada", 404);
+      }
+      if (extSeason.source !== JOLPICA_SOURCE) {
+        throw new UniverseInitError(
+          "SOURCE_INCOMPATIBLE",
+          "Temporada externa incompatível com a inicialização do universo",
+          409,
+        );
+      }
+
+      const world = await this.resolveWorldForBootstrap(tx);
+
+      const existingBinding = await tx.externalBindingSeason.findUnique({
+        where: { externalSeasonId },
+        select: { id: true, seasonId: true, confidence: true },
+      });
+
+      let universeSeasonId: string;
+      let seasonAction: "CREATED" | "REUSED" = "REUSED";
+      let bindingCreated = false;
+
+      if (existingBinding) {
+        if (existingBinding.confidence !== "CONFIRMED") {
+          throw new UniverseInitError(
+            "SEASON_BINDING_SUGGESTED",
+            "O vínculo da temporada está sugerido: confirme-o antes de executar o bootstrap",
+            409,
+          );
+        }
+        const season = await tx.season.findUnique({
+          where: { id: existingBinding.seasonId },
+          select: { id: true },
+        });
+        if (!season) {
+          throw new UniverseInitError(
+            "SEASON_BINDING_BROKEN",
+            "O vínculo da temporada referencia uma temporada inexistente",
+            409,
+          );
+        }
+        universeSeasonId = existingBinding.seasonId;
+      } else {
+        const candidates = await tx.season.findMany({
+          where: { year: extSeason.year },
+          select: { id: true },
+        });
+        if (candidates.length > 1) {
+          throw new UniverseInitError(
+            "MULTIPLE_SEASONS_SAME_YEAR",
+            `Existem múltiplas temporadas do universo para o ano ${extSeason.year}`,
+            409,
+          );
+        }
+        if (candidates.length === 1) {
+          const otherBinding = await tx.externalBindingSeason.findUnique({
+            where: { seasonId: candidates[0].id },
+            select: { id: true },
+          });
+          if (otherBinding) {
+            throw new UniverseInitError(
+              "SEASON_ALREADY_BOUND",
+              "A temporada do universo já está vinculada a outra temporada externa",
+              409,
+            );
+          }
+          universeSeasonId = candidates[0].id;
+        } else {
+          const season = await tx.season.create({
+            data: {
+              year: extSeason.year,
+              name: String(extSeason.year),
+              status: "PRE_SEASON",
+            },
+            select: { id: true },
+          });
+          universeSeasonId = season.id;
+          seasonAction = "CREATED";
+        }
+        bindingCreated = true;
+        await tx.externalBindingSeason.create({
+          data: {
+            externalSeasonId: extSeason.id,
+            seasonId: universeSeasonId,
+            confidence: "CONFIRMED",
+            boundBy: actor.role ?? null,
+          },
+        });
+      }
+
+      const previousSeasonId = world.currentSeasonId;
+      let worldChanged = false;
+      if (previousSeasonId === null) {
+        await tx.worldState.upsert({
+          where: { key: WORLD_DEFAULT_KEY },
+          update: { currentSeasonId: universeSeasonId },
+          create: { key: WORLD_DEFAULT_KEY, currentSeasonId: universeSeasonId },
+        });
+        worldChanged = true;
+      }
+
+      return {
+        season: {
+          universeSeasonId,
+          externalSeasonId: extSeason.id,
+          year: extSeason.year,
+          source: extSeason.source,
+          action: seasonAction,
+        },
+        binding: {
+          created: bindingCreated,
+          reused: !bindingCreated,
+          confidence: "CONFIRMED",
+        },
+        worldState: {
+          previousSeasonId,
+          currentSeasonId: previousSeasonId ?? universeSeasonId,
+          changed: worldChanged,
+        },
+      };
+    });
+  }
+
+  private async resolveWorldForBootstrap(
+    db: Db,
+  ): Promise<{ currentSeasonId: string | null }> {
+    const world = await db.worldState.findUnique({
+      where: { key: WORLD_DEFAULT_KEY },
+      select: { currentSeasonId: true },
+    });
+    if (world?.currentSeasonId) {
+      const season = await db.season.findUnique({
+        where: { id: world.currentSeasonId },
+        select: { id: true },
+      });
+      if (!season) {
+        throw new UniverseInitError(
+          "WORLD_SEASON_MISSING",
+          "O estado do mundo referencia uma temporada inexistente",
+          409,
+        );
+      }
+    }
+    return { currentSeasonId: world?.currentSeasonId ?? null };
   }
 
   private async buildPlan(
@@ -346,6 +531,20 @@ export class UniverseInitService {
       action: PlanAction,
     ) => items.filter((item) => item[field] === action).length;
 
+    const gridDrivers = drivers.filter(
+      (driver) => driver.teamId != null && driver.entryAction !== "SKIPPED",
+    );
+    const unresolved = gridDrivers.filter((driver) => driver.role === null);
+    const openingRoster: OpeningRosterInfo = {
+      resolved: unresolved.length === 0,
+      unresolvedParticipants: unresolved.length,
+      teams: [
+        ...new Set(
+          unresolved.map((driver) => driver.teamName ?? "").filter((name) => name.length > 0),
+        ),
+      ].sort(),
+    };
+
     return {
       season: {
         universeSeasonId: input.seasonId,
@@ -372,6 +571,7 @@ export class UniverseInitService {
         standingsReused: countBy(standings, "REUSED"),
         bindingsCreated,
         conflicts: conflicts.length,
+        openingRosterUnresolved: openingRoster.unresolvedParticipants,
       },
       teams,
       drivers,
@@ -379,6 +579,7 @@ export class UniverseInitService {
       results,
       standings,
       conflicts,
+      openingRoster,
       worldState: { changed: false },
     };
   }
@@ -559,7 +760,7 @@ export class UniverseInitService {
         const plannedTeam = ds.teamExternalId ? teamById.get(ds.teamExternalId) : undefined;
         if (plannedTeam && plannedTeam.universeTeamId) {
           draft.plannedTeam = plannedTeam;
-          draft.role = (ds.role ?? "").toUpperCase() === "RESERVE" ? "RESERVE" : "RACE_SEAT";
+          draft.role = this.mapSourceRole(ds.role);
           draft.number = ds.number ?? ds.externalDriver.number ?? null;
         } else if (plannedTeam && plannedTeam.action === "CONFLICT" && grid) {
           draft.entryAction = "CONFLICT";
@@ -586,7 +787,7 @@ export class UniverseInitService {
         const group = reserveGroups.get(key) ?? [];
         group.push(draft);
         reserveGroups.set(key, group);
-      } else if (draft.entryAction === undefined) {
+      } else if (draft.entryAction === undefined && draft.role === "RACE_SEAT") {
         const group = raceSeatGroups.get(key) ?? [];
         group.push(draft);
         raceSeatGroups.set(key, group);
@@ -616,20 +817,6 @@ export class UniverseInitService {
       });
     }
 
-    for (const group of reserveGroups.values()) {
-      group.slice(1).forEach((draft) => {
-        draft.entryAction = "CONFLICT";
-        draft.reason = "A equipe já possui um piloto reserva nesta temporada";
-        pushConflict(
-          conflicts,
-          "RESERVE_LIMIT",
-          draft.externalDriver.externalId,
-          draft.externalDriver.name,
-          draft.reason,
-        );
-      });
-    }
-
     for (const draft of drafts) {
       if (draft.entryAction !== undefined) continue;
       const team = draft.plannedTeam;
@@ -637,31 +824,17 @@ export class UniverseInitService {
         draft.entryAction = "SKIPPED";
         continue;
       }
-      if (draft.role === "RESERVE") {
-        if (await this.universeTeamExists(db, team.universeTeamId)) {
-          const reserveCount = await db.seasonDriverEntry.count({
-            where: {
-              seasonId,
-              teamId: team.universeTeamId,
-              role: "RESERVE",
-              status: "ACTIVE",
-              driverProfileId: { not: draft.driverProfileId },
-            },
-          });
-          if (reserveCount > 0) {
-            draft.entryAction = "CONFLICT";
-            draft.reason = "A equipe já possui um piloto reserva nesta temporada";
-            pushConflict(conflicts, "RESERVE_LIMIT", draft.externalDriver.externalId, draft.externalDriver.name, draft.reason);
-            continue;
-          }
-        }
-      } else if (await this.universeTeamExists(db, team.universeTeamId)) {
+      if (
+        draft.role === "RACE_SEAT" &&
+        draft.seat != null &&
+        (await this.universeTeamExists(db, team.universeTeamId))
+      ) {
         const occupant = await db.seasonDriverEntry.findUnique({
           where: {
             seasonId_teamId_seat: {
               seasonId,
               teamId: team.universeTeamId,
-              seat: draft.seat ?? 0,
+              seat: draft.seat,
             },
           },
           select: { driverProfileId: true },
@@ -679,9 +852,9 @@ export class UniverseInitService {
         const same =
           existingEntry.status === "ACTIVE" &&
           existingEntry.teamId === team.universeTeamId &&
-          existingEntry.role === draft.role &&
-          (existingEntry.seat ?? null) === draft.seat &&
-          (existingEntry.number ?? null) === draft.number;
+          (draft.role == null || existingEntry.role === draft.role) &&
+          (draft.role !== "RACE_SEAT" || (existingEntry.seat ?? null) === draft.seat) &&
+          !(draft.number != null && existingEntry.number != null && existingEntry.number !== draft.number);
         if (same) {
           const entryBinding = await db.externalBindingDriverSeason.findUnique({
             where: { externalDriverSeasonId: draft.ds.id },
@@ -729,6 +902,13 @@ export class UniverseInitService {
     }));
 
     return { drivers, resolvedProfiles };
+  }
+
+  private mapSourceRole(role: string | null): DriverRole | null {
+    const normalized = (role ?? "").toUpperCase().trim();
+    if (normalized === "RESERVE") return "RESERVE";
+    if (normalized === "RACE_SEAT") return "RACE_SEAT";
+    return null;
   }
 
   private async universeTeamExists(db: Db, teamId: string): Promise<boolean> {

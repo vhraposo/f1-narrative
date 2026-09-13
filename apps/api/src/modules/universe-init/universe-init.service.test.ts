@@ -100,18 +100,24 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
         include: { driverProfile: { include: { character: { select: { name: true } } } } },
       });
       expect(entries).toHaveLength(3);
-      const seat1 = entries.find((entry) => entry.seat === 1);
-      expect(seat1?.driverProfile.character.name).toBe("Lando Norris");
-      expect(seat1?.role).toBe("RACE_SEAT");
-      expect(seat1?.number).toBe(2);
-      const seat2 = entries.find((entry) => entry.seat === 2);
-      expect(seat2?.driverProfile.character.name).toBe("Oscar Piastri");
-      expect(seat2?.role).toBe("RACE_SEAT");
-      expect(seat2?.number).toBe(4);
+      const landoEntry = entries.find((entry) => entry.number === 2);
+      expect(landoEntry?.driverProfile.character.name).toBe("Lando Norris");
+      expect(landoEntry?.role).toBeNull();
+      expect(landoEntry?.seat).toBeNull();
+      const oscarEntry = entries.find((entry) => entry.number === 4);
+      expect(oscarEntry?.driverProfile.character.name).toBe("Oscar Piastri");
+      expect(oscarEntry?.role).toBeNull();
+      expect(oscarEntry?.seat).toBeNull();
       const reserve = entries.find((entry) => entry.role === "RESERVE");
       expect(reserve?.driverProfile.character.name).toBe("Reserve X");
       expect(reserve?.seat).toBeNull();
       expect(reserve?.number).toBe(88);
+      expect(report.summary).toMatchObject({ openingRosterUnresolved: 2 });
+      expect(report.openingRoster).toMatchObject({
+        resolved: false,
+        unresolvedParticipants: 2,
+        teams: ["McLaren"],
+      });
 
       expect(await prisma.race.count({ where: { seasonId: ids.seasonId } })).toBe(2);
       const races = await prisma.race.findMany({ where: { seasonId: ids.seasonId } });
@@ -128,8 +134,12 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       expect(await prisma.externalBindingSeason.count()).toBe(1);
 
       const worldAfter = await snapshotWorldState();
-      expect(worldAfter?.currentSeasonId).toBe(worldBefore?.currentSeasonId ?? null);
-      expect(String(worldAfter?.currentDate)).toBe(String(worldBefore?.currentDate));
+      if (worldBefore) {
+        expect(worldAfter?.currentSeasonId).toBe(worldBefore.currentSeasonId ?? null);
+        expect(String(worldAfter?.currentDate)).toBe(String(worldBefore.currentDate));
+      } else {
+        expect(worldAfter).toBeNull();
+      }
     } finally {
       await cleanup();
     }
@@ -298,7 +308,8 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
       expect(entry).not.toBeNull();
       expect(entry!.teamId).not.toBeNull();
-      expect(entry!.seat).toBe(1);
+      expect(entry!.role).toBeNull();
+      expect(entry!.seat).toBeNull();
       expect(entry!.number).toBe(2);
     } finally {
       await cleanup();
@@ -348,21 +359,13 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
     }
   });
 
-  it("G) entrada divergente/assento ocupado → conflitos de grid sem materialização", async () => {
+  it("G) entrada divergente (equipe diferente do universo) → conflito de grid sem materialização", async () => {
     const fixture = await seedUniverseInitFixture(2031);
     const { ids, cleanup } = fixture;
     actor.id = ids.userId;
     try {
-      const team = await prisma.team.create({
-        data: { name: "McLaren", shortName: "MCL", color: "#ff8000", userId: ids.userId },
-      });
-      await prisma.externalBindingTeam.create({
-        data: {
-          externalTeamId: ids.extTeamId,
-          teamId: team.id,
-          confidence: "CONFIRMED",
-          boundBy: "ADMIN",
-        },
+      const redBull = await prisma.team.create({
+        data: { name: "Red Bull", shortName: "RBR", color: "#1e41ff", userId: ids.userId },
       });
       const oscar = await prisma.character.create({
         data: {
@@ -387,7 +390,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
         data: {
           seasonId: ids.seasonId,
           driverProfileId: oscarProfile.id,
-          teamId: team.id,
+          teamId: redBull.id,
           role: "RACE_SEAT",
           seat: 1,
           number: 4,
@@ -397,8 +400,8 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
 
       const preview = await universeInitService.preview(actor, input(ids));
       const kinds = conflictKinds(preview.conflicts);
-      expect(kinds).toContain("SEAT_OCCUPIED");
       expect(kinds).toContain("ROSTER_CONFLICT");
+      expect(kinds).not.toContain("SEAT_OCCUPIED");
 
       await expect(universeInitService.execute(actor, input(ids))).rejects.toMatchObject({
         code: "CONFLICT",
@@ -548,16 +551,8 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
     actor.id = ids.userId;
     const worldBefore = await snapshotWorldState();
     try {
-      const team = await prisma.team.create({
-        data: { name: "McLaren", shortName: "MCL", color: "#ff8000", userId: ids.userId },
-      });
-      await prisma.externalBindingTeam.create({
-        data: {
-          externalTeamId: ids.extTeamId,
-          teamId: team.id,
-          confidence: "CONFIRMED",
-          boundBy: "ADMIN",
-        },
+      const redBull = await prisma.team.create({
+        data: { name: "Red Bull", shortName: "RBR", color: "#1e41ff", userId: ids.userId },
       });
       const oscar = await prisma.character.create({
         data: {
@@ -582,7 +577,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
         data: {
           seasonId: ids.seasonId,
           driverProfileId: oscarProfile.id,
-          teamId: team.id,
+          teamId: redBull.id,
           role: "RACE_SEAT",
           seat: 1,
           number: 4,
@@ -602,8 +597,12 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
         expect(after[model]).toBe(before[model]);
       }
       const worldAfter = await snapshotWorldState();
-      expect(worldAfter?.currentSeasonId).toBe(worldBefore?.currentSeasonId ?? null);
-      expect(String(worldAfter?.currentDate)).toBe(String(worldBefore?.currentDate));
+      if (worldBefore) {
+        expect(worldAfter?.currentSeasonId).toBe(worldBefore.currentSeasonId ?? null);
+        expect(String(worldAfter?.currentDate)).toBe(String(worldBefore.currentDate));
+      } else {
+        expect(worldAfter).toBeNull();
+      }
     } finally {
       await cleanup();
     }

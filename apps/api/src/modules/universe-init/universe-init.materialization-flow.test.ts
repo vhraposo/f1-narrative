@@ -156,14 +156,16 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
       where: { seasonId: fixture.ids.seasonId },
     });
     expect(entries).toHaveLength(3);
-    const seat1 = entries.find((entry) => entry.seat === 1)!;
-    const seat2 = entries.find((entry) => entry.seat === 2)!;
+    const landoEntry = entries.find((entry) => entry.number === 2)!;
+    const oscarEntry = entries.find((entry) => entry.number === 4)!;
     const reserve = entries.find((entry) => entry.role === "RESERVE")!;
-    expect(seat1.role).toBe("RACE_SEAT");
-    expect(seat1.number).toBe(2);
-    expect(seat1.driverProfileId).not.toBeNull();
-    expect(seat2.role).toBe("RACE_SEAT");
-    expect(seat2.number).toBe(4);
+    expect(landoEntry.role).toBeNull();
+    expect(landoEntry.seat).toBeNull();
+    expect(landoEntry.teamId).not.toBeNull();
+    expect(oscarEntry.role).toBeNull();
+    expect(oscarEntry.seat).toBeNull();
+    expect(oscarEntry.teamId).not.toBeNull();
+    expect(reserve.role).toBe("RESERVE");
     expect(reserve.number).toBe(88);
     expect(reserve.seat).toBeNull();
     expect(entries.every((entry) => entry.status === "ACTIVE")).toBe(true);
@@ -325,7 +327,7 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     expect(await prisma.seasonDriverEntry.count({ where: { seasonId: fixture.ids.seasonId } })).toBe(3);
   });
 
-  it("11) Player Entry no grid materializado desloca piloto materializado → AVAILABLE", async () => {
+  it("11) Player Entry no grid materializado ocupa assento aberto, sem deslocar participante", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/universe/player-entry",
@@ -354,21 +356,32 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     };
     expect(result.character.controlledBy).toBe("USER");
     expect(result.character.userId).toBe(admin.id);
-    expect(result.displaced).toBeTruthy();
-    expect(result.displaced!.entry.driverProfile.character.name).toBe("Oscar Piastri");
-    expect(result.displaced!.entry.status).toBe("AVAILABLE");
-    expect(result.displaced!.entry.teamId).toBeNull();
-    expect(result.displaced!.entry.role).toBeNull();
-    expect(result.displaced!.entry.seat).toBeNull();
+    expect(result.displaced).toBeNull();
+
+    const alicyaProfile = await prisma.driverProfile.findFirstOrThrow({
+      where: { character: { name: "Alicya Materializada" } },
+    });
+    const alicyaEntry = await prisma.seasonDriverEntry.findUniqueOrThrow({
+      where: {
+        seasonId_driverProfileId: {
+          seasonId: fixture.ids.seasonId,
+          driverProfileId: alicyaProfile.id,
+        },
+      },
+    });
+    expect(alicyaEntry.seat).toBe(2);
+    expect(alicyaEntry.role).toBe("RACE_SEAT");
+    expect(alicyaEntry.status).toBe("ACTIVE");
 
     const oscarEntry = await prisma.seasonDriverEntry.findFirstOrThrow({
       where: { seasonId: fixture.ids.seasonId, driverProfileId: oscarProfileId },
     });
-    expect(oscarEntry.status).toBe("AVAILABLE");
-    expect(oscarEntry.number).toBeNull();
+    expect(oscarEntry.status).toBe("ACTIVE");
+    expect(oscarEntry.role).toBeNull();
+    expect(oscarEntry.seat).toBeNull();
     const displacedEvent = await prisma.driverEntryEvent.findFirst({
       where: { entryId: oscarEntry.id, kind: "DISPLACED" },
     });
-    expect(displacedEvent).toBeTruthy();
+    expect(displacedEvent).toBeNull();
   });
 });

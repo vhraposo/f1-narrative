@@ -381,7 +381,8 @@ describe("External Sync -> Materialização automática (107.2)", () => {
     expect(entries.every((entry) => entry.status === "ACTIVE")).toBe(true);
     expect(entries.every((entry) => entry.provenance === "IMPORTED")).toBe(true);
     const ada = entries.find((entry) => entry.driverProfile.character.name === "Ada Lovelace")!;
-    expect(ada.role).toBe("RACE_SEAT");
+    expect(ada.role).toBeNull();
+    expect(ada.seat).toBeNull();
     expect(ada.number).toBe(1);
   });
 
@@ -460,22 +461,33 @@ describe("External Sync -> Materialização automática (107.2)", () => {
         };
       } | null;
     };
-    expect(result.displaced).toBeTruthy();
-    expect(result.displaced!.entry.driverProfile.character.name).toBe("Ada Lovelace");
-    expect(result.displaced!.entry.status).toBe("AVAILABLE");
-    expect(result.displaced!.entry.teamId).toBeNull();
-    expect(result.displaced!.entry.role).toBeNull();
-    expect(result.displaced!.entry.seat).toBeNull();
+    expect(result.displaced).toBeNull();
+
+    const alicyaProfile = await prisma.driverProfile.findFirstOrThrow({
+      where: { character: { name: "Alicya Auto" } },
+    });
+    const alicyaEntry = await prisma.seasonDriverEntry.findUniqueOrThrow({
+      where: {
+        seasonId_driverProfileId: {
+          seasonId: fixture.seasonId,
+          driverProfileId: alicyaProfile.id,
+        },
+      },
+    });
+    expect(alicyaEntry.seat).toBe(1);
+    expect(alicyaEntry.role).toBe("RACE_SEAT");
+    expect(alicyaEntry.status).toBe("ACTIVE");
 
     const adaEntry = await prisma.seasonDriverEntry.findFirstOrThrow({
       where: { seasonId: fixture.seasonId, driverProfileId: adaProfileId },
     });
-    expect(adaEntry.status).toBe("AVAILABLE");
-    expect(adaEntry.number).toBeNull();
+    expect(adaEntry.status).toBe("ACTIVE");
+    expect(adaEntry.role).toBeNull();
+    expect(adaEntry.seat).toBeNull();
     const displacedEvent = await prisma.driverEntryEvent.findFirst({
       where: { entryId: adaEntry.id, kind: "DISPLACED" },
     });
-    expect(displacedEvent).toBeTruthy();
+    expect(displacedEvent).toBeNull();
   });
 
   it("9) piloto materializado é elegível ao chat: Character USER, sem tipo externo", async () => {

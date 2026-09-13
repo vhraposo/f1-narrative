@@ -18,6 +18,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "admin:promote": "pnpm --filter @f1nw/api run admin:promote",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
     "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
