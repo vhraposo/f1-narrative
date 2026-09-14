@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { DriverCard } from "@/components/drivers/driver-card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useSeasons, useStandings } from "@/hooks/use-championship";
 import { useDeleteDriver, useDrivers } from "@/hooks/use-driver-profiles";
 import { useWorld } from "@/hooks/use-world";
-import type { Driver } from "@/lib/driver-profiles";
+import { compareDrivers, type Driver } from "@/lib/driver-profiles";
 
 export default function DriversPage() {
   const { data, isLoading, isError, isRefetching, error, refetch } =
@@ -21,6 +21,11 @@ export default function DriversPage() {
   const { data: seasons } = useSeasons();
   const deleteMutation = useDeleteDriver();
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const sortedDrivers = useMemo(
+    () => [...(data ?? [])].sort(compareDrivers),
+    [data],
+  );
 
   const currentSeasonId = world?.currentSeasonId ?? null;
   const standingsQuery = useStandings(currentSeasonId ?? "");
@@ -103,7 +108,7 @@ export default function DriversPage() {
 
       {data && data.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-2">
-          {data.map((driver) => (
+          {sortedDrivers.map((driver) => (
             <DriverCard
               key={driver.characterId}
               driver={driver}

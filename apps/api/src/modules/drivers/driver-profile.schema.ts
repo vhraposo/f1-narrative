@@ -24,3 +24,7 @@ export type UpsertDriverInput = z.infer<typeof upsertDriverSchema>;
 export const driverCharacterIdParamSchema = z.object({
   characterId: z.string().uuid("Identificador de personagem inválido"),
 });
+
+export const driverListQuerySchema = z.object({
+  seasonId: z.string().uuid("Identificador de temporada inválido").optional(),
+});

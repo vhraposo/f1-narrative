@@ -936,3 +936,44 @@ describe("Conversation - DELETE com vínculos (cascade)", () => {
     expect(convAfter).toBe(0);
   });
 });
+
+describe("DriverProfile e elegibilidade em conversas (STEP 107.14)", () => {
+  let owner: TestUser;
+  let driverChar: Character;
+  let aiParticipant: Character;
+
+  beforeAll(async () => {
+    owner = await createUser(`conv-driver-${Date.now()}@f1nw.test`, "Conv Driver");
+    driverChar = await createCharacter(owner, {
+      name: "Yuki Tsunoda",
+      nationality: "Japonesa",
+      birthDate: "2000-05-11",
+    });
+    // Materializa o personagem como piloto (equivalente ao PUT /api/drivers,
+    // criado direto no banco para evitar o rate-limit da API).
+    await prisma.driverProfile.create({
+      data: { characterId: driverChar.id, number: 22 },
+    });
+    aiParticipant = await createAICharacter({ name: "AI Narrador", nationality: "Global" });
+  });
+
+  it("personagem materializado como piloto continua elegível como participante de conversa", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/conversations",
+      headers: { cookie: owner.cookie },
+      remoteAddress: "10.14.2.1",
+      payload: {
+        type: "GROUP",
+        participantIds: [driverChar.id, aiParticipant.id],
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const conv = (res.json() as { conversation: Conversation & { participants: Character[] } })
+      .conversation;
+    track(createdConversationIds, conv);
+    const names = conv.participants.map((p) => p.name);
+    expect(names).toContain("Yuki Tsunoda");
+    expect(names).toContain("AI Narrador");
+  });
+});

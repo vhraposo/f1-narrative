@@ -29,6 +29,17 @@ export function formatDriverNumber(number: number | null): string {
   return `#${number ?? "—"}`;
 }
 
+export function compareDrivers(a: Driver, b: Driver): number {
+  if (a.number !== b.number) {
+    if (a.number === null) return 1;
+    if (b.number === null) return -1;
+    return a.number - b.number;
+  }
+  const byName = a.character.name.localeCompare(b.character.name);
+  if (byName !== 0) return byName;
+  return a.characterId.localeCompare(b.characterId);
+}
+
 type ListResponse = { drivers: Driver[] };
 type ItemResponse = { driver: Driver };
 

@@ -214,3 +214,99 @@ it("estado de erro: falha ao carregar os pilotos", async () => {
     expect(screen.getByText("Lewis Hamilton")).toBeDefined();
   });
 });
+
+describe("Drivers Page — ordenação e cards (STEP 107.14)", () => {
+  it("card expõe o formato [NÚMERO] Piloto — Equipe", async () => {
+    renderWithClient(<DriversPage />);
+    await screen.findByText("Alicya Kucharski");
+    const card = screen
+      .getByText("Alicya Kucharski")
+      .closest("article")!;
+    expect(card.textContent).toMatch(
+      /#81[\s\S]*Alicya Kucharski[\s\S]*McLaren/,
+    );
+  });
+
+  it("lista está ordenada numericamente", async () => {
+    driversFixture = [
+      { ...DRIVERS[1] },
+      { ...DRIVERS[0] },
+      {
+        id: "d3",
+        characterId: "c3",
+        number: 1,
+        teamId: null,
+        team: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        character: {
+          id: "c3",
+          name: "Zak Primeiro",
+          nationality: "Canadense",
+          imageUrl: null,
+        },
+      },
+    ];
+    renderWithClient(<DriversPage />);
+    await screen.findByText("Zak Primeiro");
+    const articles = screen.getAllByRole("article");
+    expect(articles[0].textContent).toContain("#1");
+    expect(articles[1].textContent).toContain("#44");
+    expect(articles[2].textContent).toContain("#81");
+  });
+
+  it("participante sem vaga (sem seat) continua listado com a equipe", async () => {
+    driversFixture = [
+      {
+        id: "d-tsu",
+        characterId: "c-tsu",
+        number: 22,
+        teamId: "t-rb",
+        team: {
+          id: "t-rb",
+          name: "Racing Bulls",
+          shortName: "RB",
+          color: "#6692ff",
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        character: {
+          id: "c-tsu",
+          name: "Yuki Tsunoda",
+          nationality: "Japonesa",
+          imageUrl: null,
+        },
+      },
+    ];
+    renderWithClient(<DriversPage />);
+    expect(await screen.findByText("Yuki Tsunoda")).toBeDefined();
+    expect(screen.getByText("#22")).toBeDefined();
+    expect(screen.getByText("Racing Bulls")).toBeDefined();
+    expect(screen.queryByText(/seat|assento/i)).toBeNull();
+  });
+
+  it("piloto sem número continua na grade sem inventar número", async () => {
+    driversFixture = [{ ...DRIVERS[0], number: null }];
+    renderWithClient(<DriversPage />);
+    expect(await screen.findByText("#—")).toBeDefined();
+    expect(screen.getByText("Alicya Kucharski")).toBeDefined();
+  });
+
+  it("estado de carregamento: exibe spinner enquanto busca", async () => {
+    const pending = new Promise<never>(() => {});
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/drivers") return pending;
+      if (path === "/api/world") return { world: worldFixture };
+      if (path === "/api/seasons") return { seasons: SEASONS };
+      if (path === "/api/seasons/s1/standings")
+        return { standings: standingsFixture };
+      return { drivers: driversFixture };
+    });
+    renderWithClient(<DriversPage />);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Drivers" }),
+    ).toBeDefined();
+    expect(document.querySelector(".animate-spin")).not.toBeNull();
+    expect(screen.queryByText("Alicya Kucharski")).toBeNull();
+  });
+});

@@ -1,5 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
+import type { DriverRole, DriverStatus } from "@prisma/client";
+import { createHmac, randomBytes } from "node:crypto";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { rosterService } from "../roster/roster.service.js";
@@ -618,5 +620,297 @@ describe("GET /api/drivers — Team na resposta e pilotos sem Team", () => {
     expect(withoutTeam.team).toBeNull();
 
     await setCurrentSeason(originalSeason);
+  });
+});
+
+type MaterializedEntryInput = {
+  seasonId: string;
+  teamId: string;
+  driverProfileId: string;
+  role?: DriverRole | null;
+  seat?: number | null;
+  number?: number | null;
+  status?: DriverStatus;
+};
+
+async function createMaterializedEntry(
+  input: MaterializedEntryInput,
+): Promise<void> {
+  await prisma.seasonDriverEntry.create({
+    data: {
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      driverProfileId: input.driverProfileId,
+      role: input.role ?? "RACE_SEAT",
+      seat: input.seat ?? null,
+      number: input.number ?? null,
+      status: input.status ?? "ACTIVE",
+    },
+  });
+}
+
+async function getDrivers(
+  user: TestUser,
+  query = "",
+  remoteAddress?: string,
+): Promise<{ status: number; drivers: Driver[] }> {
+  const res = await app.inject({
+    method: "GET",
+    url: `/api/drivers${query}`,
+    headers: { cookie: user.cookie },
+    remoteAddress: remoteAddress ?? "127.0.0.1",
+  });
+  return { status: res.statusCode, drivers: (res.json() as { drivers: Driver[] }).drivers };
+}
+
+async function createDbUser(name: string, email: string): Promise<TestUser> {
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (!secret) throw new Error("BETTER_AUTH_SECRET not set");
+  const user = await prisma.user.create({
+    data: { email, name, password: null, emailVerified: false },
+  });
+  const token = randomBytes(32).toString("hex");
+  await prisma.session.create({
+    data: {
+      token,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      userId: user.id,
+    },
+  });
+  const sig = Buffer.from(createHmac("sha256", secret).update(token).digest()).toString(
+    "base64",
+  );
+  const cookie = `f1nw.session_token=${token}.${sig}`;
+  return { cookie, userId: user.id };
+}
+
+async function createDbCharacter(
+  userId: string,
+  name: string,
+  nationality = "Brasileira",
+): Promise<{ id: string }> {
+  const character = await prisma.character.create({
+    data: { userId, name, nationality, birthDate: new Date("1990-01-01") },
+    select: { id: true },
+  });
+  return character;
+}
+
+async function createDbDriver(characterId: string, number: number | null): Promise<string> {
+  const profile = await prisma.driverProfile.create({
+    data: { characterId, number },
+    select: { id: true },
+  });
+  return profile.id;
+}
+
+async function createDbTeam(userId: string, name: string): Promise<Team> {
+  return prisma.team.create({
+    data: { userId, name },
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+      color: true,
+    },
+  });
+}
+
+async function makeDriverUser(
+  suffix: string,
+  name: string,
+): Promise<{ user: TestUser; characterId: string; profileId: string }> {
+  const user = await createDbUser(
+    suffix,
+    `${suffix}-${Date.now()}@f1nw.test`,
+  );
+  const ch = await createDbCharacter(user.userId, name);
+  const profileId = await createDbDriver(ch.id, 44);
+  return { user, characterId: ch.id, profileId };
+}
+
+describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14)", () => {
+  it("participante materializado (cache nulo) retorna a equipe da SeasonDriverEntry", async () => {
+    const { user, profileId } = await makeDriverUser("step14a", "Cache Nulo");
+    const team = await createDbTeam(user.userId, "Time da Entrada");
+    const seasonId = await createSeason(2027);
+    await createMaterializedEntry({ seasonId, teamId: team.id, driverProfileId: profileId, seat: 1 });
+
+    const cached = await prisma.driverProfile.findUnique({ where: { id: profileId } });
+    expect(cached!.teamId).toBeNull();
+
+    await setCurrentSeason(seasonId);
+    const { status, drivers } = await getDrivers(user, "", "10.14.1.1");
+    const found = drivers.find((d) => d.id === profileId)!;
+    expect(status).toBe(200);
+    expect(found.teamId).toBe(team.id);
+    expect(found.team!.id).toBe(team.id);
+    expect(found.team!.name).toBe("Time da Entrada");
+    expect(found.number).toBe(44);
+  });
+
+  it("retorna o número da SeasonDriverEntry (fonte de verdade) sobre o número base", async () => {
+    const { user, profileId } = await makeDriverUser("step14b", "Número da Entrada");
+    const team = await createDbTeam(user.userId, "Time do Número");
+    const seasonId = await createSeason(2027);
+    await createMaterializedEntry({ seasonId, teamId: team.id, driverProfileId: profileId, number: 88, seat: 1 });
+
+    await setCurrentSeason(seasonId);
+    const { drivers } = await getDrivers(user, "", "10.14.1.2");
+    expect(drivers.find((d) => d.id === profileId)!.number).toBe(88);
+  });
+
+  it("participante sem seat (role/seat nulos) continua com a equipe", async () => {
+    const { user, profileId } = await makeDriverUser("step14c", "Sem Seat");
+    const team = await createDbTeam(user.userId, "Time Sem Seat");
+    const seasonId = await createSeason(2027);
+    await createMaterializedEntry({
+      seasonId,
+      teamId: team.id,
+      driverProfileId: profileId,
+      role: null,
+      seat: null,
+      number: 22,
+      status: "ACTIVE",
+    });
+
+    await setCurrentSeason(seasonId);
+    const { drivers } = await getDrivers(user, "", "10.14.1.3");
+    const driver = drivers.find((d) => d.id === profileId)!;
+    expect(driver.teamId).toBe(team.id);
+    expect(driver.team!.name).toBe("Time Sem Seat");
+    expect(driver.number).toBe(22);
+  });
+
+  it("piloto sem equipe na temporada não gera equipe fictícia", async () => {
+    const { user, profileId } = await makeDriverUser("step14d", "Sem Equipe");
+    const team = await createDbTeam(user.userId, "Time de Referência");
+    const seasonId = await createSeason(2027);
+    const otherSeasonId = await createSeason(2028);
+
+    const chOutra = await createDbCharacter(user.userId, "Em Outra Temporada", "Italiana");
+    const outId = await createDbDriver(chOutra.id, 30);
+    await createMaterializedEntry({ seasonId: otherSeasonId, teamId: team.id, driverProfileId: outId, seat: 1 });
+
+    await setCurrentSeason(seasonId);
+    const { drivers } = await getDrivers(user, "", "10.14.1.4");
+    expect(drivers.find((d) => d.id === profileId)!.teamId).toBeNull();
+    expect(drivers.find((d) => d.id === profileId)!.team).toBeNull();
+    expect(drivers.find((d) => d.id === outId)!.teamId).toBeNull();
+  });
+
+  it("ordena a listagem por número ASC", async () => {
+    const { user } = await makeDriverUser("step14e", "Fora de Ordem");
+    const seasonId = await createSeason(2027);
+
+    const names = ["Cinquenta", "Dezena", "Primeiro"];
+    const numbers = [50, 10, 1];
+    const created: { id: string; number: number }[] = [];
+    for (let i = 0; i < names.length; i++) {
+      const ch = await createDbCharacter(user.userId, names[i]);
+      const profileId = await createDbDriver(ch.id, numbers[i]);
+      created.push({ id: profileId, number: numbers[i] });
+    }
+
+    await setCurrentSeason(seasonId);
+    const { drivers } = await getDrivers(user, "", "10.14.1.5");
+    const ids = drivers.filter((d) => created.some((c) => c.id === d.id));
+    expect(ids.map((d) => d.number)).toEqual([1, 10, 50]);
+  });
+
+  it("sem número fica por último; empate desempata por nome", async () => {
+    const user = await createDbUser(
+      "step14f",
+      `step14f-${Date.now()}@f1nw.test`,
+    );
+    const seasonId = await createSeason(2027);
+
+    const rows: { name: string; number: number | null }[] = [
+      { name: "Zed Sem Número", number: null },
+      { name: "Zolo Já Numerado", number: 10 },
+      { name: "Adam Já Numerado", number: 10 },
+      { name: "Alpha Sem Número", number: null },
+    ];
+    const ids: string[] = [];
+    for (const row of rows) {
+      const ch = await createDbCharacter(user.userId, row.name);
+      const profileId = await createDbDriver(ch.id, row.number);
+      ids.push(profileId);
+    }
+
+    await setCurrentSeason(seasonId);
+    const { drivers } = await getDrivers(user, "", "10.14.1.6");
+    const ordered = drivers.filter((d) => ids.includes(d.id));
+    expect(ordered.map((d) => d.character.name)).toEqual([
+      "Adam Já Numerado",
+      "Zolo Já Numerado",
+      "Alpha Sem Número",
+      "Zed Sem Número",
+    ]);
+  });
+
+  it("seasonId na query retorna a equipe daquela temporada", async () => {
+    const { user, profileId } = await makeDriverUser("step14g", "Duas Temporadas");
+    const teamA = await createDbTeam(user.userId, "Time 2027");
+    const teamB = await createDbTeam(user.userId, "Time 2028");
+    const season27 = await createSeason(2027);
+    const season28 = await createSeason(2028);
+    await createMaterializedEntry({ seasonId: season27, teamId: teamA.id, driverProfileId: profileId, seat: 1 });
+    await createMaterializedEntry({ seasonId: season28, teamId: teamB.id, driverProfileId: profileId, seat: 1 });
+
+    await setCurrentSeason(season27);
+    const s27 = await getDrivers(user, "", "10.14.1.7");
+    const s28 = await getDrivers(user, `?seasonId=${season28}`, "10.14.1.8");
+    const d27 = s27.drivers.find((d) => d.id === profileId)!;
+    const d28 = s28.drivers.find((d) => d.id === profileId)!;
+    expect(d27.team!.name).toBe("Time 2027");
+    expect(d28.team!.name).toBe("Time 2028");
+  });
+
+  it("player-created driver (PUT + roster) mantém equipe e número corretos", async () => {
+    const { user, profileId } = await makeDriverUser("step14h", "Player Criado");
+    const team = await createDbTeam(user.userId, "Time Player");
+    const seasonId = await createSeason(2027);
+    await setCurrentSeason(seasonId);
+    await rosterService.assignDriverToSeat(user.userId, {
+      seasonId,
+      teamId: team.id,
+      driverProfileId: profileId,
+      seat: 1,
+      number: 28,
+    });
+
+    const { drivers } = await getDrivers(user, "", "10.14.1.9");
+    const driver = drivers.find((d) => d.id === profileId)!;
+    expect(driver.teamId).toBe(team.id);
+    expect(driver.team!.name).toBe("Time Player");
+    expect(driver.number).toBe(28);
+  });
+
+  it("DriverProfile.teamId (cache stale) não sobrescreve a SeasonDriverEntry", async () => {
+    const { user, profileId } = await makeDriverUser("step14i", "Cache Stale");
+    const teamReal = await createDbTeam(user.userId, "Time Real da Entrada");
+    const teamStale = await createDbTeam(user.userId, "Time Stale do Cache");
+    const seasonId = await createSeason(2027);
+    await createMaterializedEntry({ seasonId, teamId: teamReal.id, driverProfileId: profileId, seat: 1 });
+    await prisma.driverProfile.update({ where: { id: profileId }, data: { teamId: teamStale.id } });
+
+    await setCurrentSeason(seasonId);
+    const { drivers } = await getDrivers(user, "", "10.14.1.10");
+    const driver = drivers.find((d) => d.id === profileId)!;
+    expect(driver.teamId).toBe(teamReal.id);
+    expect(driver.team!.name).toBe("Time Real da Entrada");
+  });
+
+  it("valida seasonId na query (UUID inválido → 400)", async () => {
+    const { user } = await makeDriverUser("step14j", "UUID Inválido");
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/drivers?seasonId=nao-e-uuid",
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.14.1.11",
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
   });
 });

@@ -239,3 +239,59 @@ describe("Teams Page - constructors", () => {
     expect(screen.queryByRole("tab")).toBeNull();
   });
 });
+
+describe("Teams Page — composição via SeasonDriverEntry (STEP 107.14)", () => {
+  it("piloto sem equipe na temporada não é exibido em nenhuma equipe", async () => {
+    driversFixture = [
+      DRIVERS[0],
+      makeDriver({
+        id: "d-free",
+        characterId: "c-free",
+        number: null,
+        teamId: null,
+        team: null,
+        character: {
+          id: "c-free",
+          name: "Piloto Livre",
+          nationality: "Brasileira",
+          imageUrl: null,
+        },
+      }),
+    ];
+    renderWithClient(<TeamsPage />);
+    await screen.findByText("Ferrari");
+    expect(screen.queryByText("Piloto Livre")).toBeNull();
+  });
+
+  it("equipe com dois pilotos na composição da temporada mostra a contagem correta", async () => {
+    driversFixture = [
+      makeDriver(),
+      makeDriver({
+        id: "d2b",
+        characterId: "c2b",
+        number: 44,
+        teamId: "t1",
+        team: {
+          id: "t1",
+          name: "Ferrari",
+          shortName: "FER",
+          color: "#e80020",
+        },
+        character: {
+          id: "c2b",
+          name: "Lewis Hamilton",
+          nationality: "Britânico",
+          imageUrl: null,
+        },
+      }),
+    ];
+    renderWithClient(<TeamsPage />);
+    await screen.findByText("Ferrari");
+    const ferrariCard = screen
+      .getByText("Ferrari")
+      .closest("article") as HTMLElement;
+    expect(ferrariCard.textContent).toContain("2 PILOTOS");
+    expect(ferrariCard.textContent).toContain("Charles Leclerc");
+    expect(ferrariCard.textContent).toContain("Lewis Hamilton");
+  });
+});
