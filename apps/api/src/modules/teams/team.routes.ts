@@ -6,8 +6,13 @@ import {
   teamIdParamSchema,
   updateTeamSchema,
 } from "./team.schema.js";
+import {
+  buildTeamCreateInput,
+  buildTeamUpdateInput,
+  teamSelectWithIdentity,
+} from "./team-identity.js";
 
-const teamSelect = {
+const baseTeamSelect = {
   id: true,
   name: true,
   shortName: true,
@@ -17,8 +22,6 @@ const teamSelect = {
   updatedAt: true,
 } as const;
 
-// Detecta erros conhecidos do Prisma (nome duplicado / FK restrita) e os
-// converte em respostas previsíveis de conflito (409).
 function isConflict(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -27,7 +30,8 @@ function isConflict(error: unknown): boolean {
 }
 
 export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
-  // Listar as equipes do usuário autenticado.
+  const teamSelect = await teamSelectWithIdentity(baseTeamSelect);
+
   fastify.get(
     "/api/teams",
     { preHandler: [fastify.authenticate] },
@@ -42,7 +46,6 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Criar equipe. userId é definido pelo servidor.
   fastify.post(
     "/api/teams",
     { preHandler: [fastify.authenticate] },
@@ -58,8 +61,9 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
+        const data = await buildTeamCreateInput(userId, parsed.data);
         const team = await prisma.team.create({
-          data: { userId, ...parsed.data },
+          data,
           select: teamSelect,
         });
         return reply.code(201).send({ team });
@@ -75,7 +79,6 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Ler uma equipe própria.
   fastify.get(
     "/api/teams/:id",
     { preHandler: [fastify.authenticate] },
@@ -95,7 +98,6 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (!team) {
-        // 404 para não vazar a existência de equipes de outros usuários.
         return reply.code(404).send({
           error: "Equipe não encontrada",
           code: "NOT_FOUND",
@@ -106,7 +108,6 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Editar uma equipe própria.
   fastify.patch(
     "/api/teams/:id",
     { preHandler: [fastify.authenticate] },
@@ -142,9 +143,10 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
+        const data = await buildTeamUpdateInput(parsed.data);
         const team = await prisma.team.update({
           where: { id: existing.id },
-          data: parsed.data,
+          data,
           select: teamSelect,
         });
         return reply.send({ team });
@@ -160,8 +162,6 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Excluir uma equipe própria. Respeita a relação DriverProfile.teamId
-  // (onDelete: Restrict): se existirem pilotos vinculados, retorna 409.
   fastify.delete(
     "/api/teams/:id",
     { preHandler: [fastify.authenticate] },

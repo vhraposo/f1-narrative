@@ -4,6 +4,7 @@ import { ArrowUpRight, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { CountryFlag } from "@/components/country-flag";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { ChampionshipStanding } from "@/lib/championship";
@@ -11,6 +12,8 @@ import {
   formatDriverNumber,
   type Driver,
 } from "@/lib/driver-profiles";
+import { resolveNationality } from "@/lib/nationalities";
+import { cn } from "@/lib/utils";
 
 type DriverCardProps = {
   driver: Driver;
@@ -32,6 +35,7 @@ export function DriverCard({
 
   const team = driver.team;
   const teamColor = team?.color ?? null;
+  const nationalityInfo = resolveNationality(driver.character.nationality);
   const initial =
     driver.character.name.trim().charAt(0).toUpperCase() || "?";
 
@@ -48,14 +52,38 @@ export function DriverCard({
     : null;
 
   return (
-    <article className="group flex overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-brand/50">
+    <article
+      className={cn(
+        "group relative isolate flex overflow-hidden rounded-xl border border-border bg-card transition-colors duration-200",
+        nationalityInfo.palette
+          ? cn(
+              "hover:border-[color:var(--national-border)] hover:shadow-[0_8px_24px_var(--national-glow)]",
+              "before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:bg-[image:var(--national-gradient)] before:opacity-0 before:transition-opacity before:duration-200 before:content-['']",
+              "hover:before:opacity-100",
+            )
+          : "hover:border-brand/50",
+      )}
+      style={
+        nationalityInfo.palette
+          ? ({
+              "--national-primary": nationalityInfo.palette.primary,
+              "--national-secondary": nationalityInfo.palette.secondary,
+              "--national-accent": nationalityInfo.palette.accent,
+              "--national-border": `${nationalityInfo.palette.accent}59`,
+              "--national-glow": `${nationalityInfo.palette.accent}1f`,
+              "--national-gradient": `linear-gradient(135deg, ${nationalityInfo.palette.primary}1f, ${nationalityInfo.palette.accent}1f)`,
+            } as React.CSSProperties)
+          : undefined
+      }
+    >
+
       <span
         aria-hidden="true"
         className="w-1 shrink-0 self-stretch bg-foreground/10"
         style={teamColor ? { backgroundColor: teamColor } : undefined}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative z-[1] flex min-w-0 flex-1 flex-col">
         <Link
           href={`/app/characters/${driver.characterId}`}
           className="relative flex flex-1 items-center gap-4 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:gap-5 sm:p-5"
@@ -74,7 +102,15 @@ export function DriverCard({
               {driver.character.name}
             </h3>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground sm:text-sm">
-              <span>{driver.character.nationality}</span>
+              <span className="inline-flex items-center gap-1">
+                {nationalityInfo.flag && (
+                  <CountryFlag
+                    iso={nationalityInfo.iso!}
+                    label={driver.character.nationality}
+                  />
+                )}
+                {driver.character.nationality}
+              </span>
               {team && (
                 <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-foreground">
                   {teamColor && (

@@ -5,6 +5,12 @@ export type Team = {
   name: string;
   shortName: string | null;
   color: string | null;
+  visualIdentity?: {
+    primary: string;
+    secondary?: string | null;
+    accent?: string | null;
+    foreground?: string | null;
+  } | null;
   userId: string;
   createdAt: string;
   updatedAt: string;
@@ -14,6 +20,7 @@ export type CreateTeamInput = {
   name: string;
   shortName?: string | null;
   color?: string | null;
+  visualIdentity?: Team["visualIdentity"];
 };
 
 export type UpdateTeamInput = Partial<CreateTeamInput>;

@@ -1,8 +1,15 @@
 import { z } from "zod";
 
-// Esquemas de validação para o CRUD de Team.
-// userId é definido exclusivamente no servidor (request.user.id) e nunca é
-// aceito como campo controlável pelo cliente.
+
+export const teamVisualIdentitySchema = z.object({
+  primary: z.string().min(1, "Informe a cor primária"),
+  secondary: z.string().optional().nullable(),
+  accent: z.string().optional().nullable(),
+  foreground: z.string().optional().nullable(),
+});
+
+export const teamVisualIdentityFieldSchema =
+  teamVisualIdentitySchema.optional().nullable();
 
 export const createTeamSchema = z.object({
   name: z
@@ -24,11 +31,11 @@ export const createTeamSchema = z.object({
     .optional()
     .nullable()
     .transform((value) => (value ? value : null)),
+  visualIdentity: teamVisualIdentityFieldSchema,
 });
 
 export type CreateTeamInput = z.infer<typeof createTeamSchema>;
 
-// PATCH: campos parciais opcionais. userId não está presente.
 export const updateTeamSchema = createTeamSchema.partial();
 
 export type UpdateTeamInput = z.infer<typeof updateTeamSchema>;

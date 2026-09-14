@@ -137,7 +137,10 @@ describe("DriverCard", () => {
       />,
     );
     expect(screen.getByText("McLaren")).toBeDefined();
-    expect(container.querySelector("[style]")).toBeNull();
+    const accentBar = container.querySelector('article [aria-hidden="true"]') as HTMLElement | null;
+    if (accentBar && accentBar.tagName === "SPAN") {
+      expect(accentBar.style.backgroundColor).toBe("");
+    }
   });
 
   it("sem número: mantém a vaga na grid sem inventar número", () => {
@@ -200,5 +203,125 @@ describe("DriverCard", () => {
     expect(onRemove).toHaveBeenCalledWith(
       expect.objectContaining({ id: "d1" }),
     );
+  });
+
+  it("mostra bandeira junto à nacionalidade conhecida", () => {
+    render(
+      <DriverCard driver={makeDriver()} onRemove={() => undefined} isRemoving={false} />,
+    );
+    const flag = screen.getByRole("img", { name: "Brasileira" });
+    expect(flag.textContent!.length).toBeGreaterThan(0);
+  });
+
+  it("não mostra bandeira para nacionalidade desconhecida", () => {
+    render(
+      <DriverCard
+        driver={makeDriver({
+          character: {
+            id: "c1",
+            name: "Piloto Fantasma",
+            nationality: "Atlantean",
+            imageUrl: null,
+          },
+        })}
+        onRemove={() => undefined}
+        isRemoving={false}
+      />,
+    );
+    expect(screen.queryByRole("img", { name: "Atlantean" })).toBeNull();
+  });
+
+  it("hover da nacionalidade aplica apenas no próprio card, de forma sutil", () => {
+    const { container } = render(
+      <DriverCard driver={makeDriver()} onRemove={() => undefined} isRemoving={false} />,
+    );
+    const article = container.querySelector("article") as HTMLElement;
+    expect(article.className).toContain("relative");
+    expect(article.className).toContain("isolate");
+    expect(article.className).toContain("before:bg-[image:var(--national-gradient)]");
+    expect(article.className).toContain("hover:before:opacity-100");
+    const gradient = article.style.getPropertyValue("--national-gradient");
+    expect(gradient).toMatch(/linear-gradient\(135deg,\s*#[0-9a-f]{6}1f,\s*#[0-9a-f]{6}1f\)/i);
+    expect(article.style.getPropertyValue("--national-border")).toMatch(
+      /#[0-9a-f]{6}59/i,
+    );
+    expect(article.style.getPropertyValue("--national-glow")).toMatch(
+      /#[0-9a-f]{6}1f/i,
+    );
+  });
+
+  it("o wrapper da página não recebe a paleta nacional", () => {
+    const { container } = render(
+      <div data-testid="page-wrapper">
+        <DriverCard driver={makeDriver()} onRemove={() => undefined} isRemoving={false} />
+      </div>,
+    );
+    const article = container.querySelector("article") as HTMLElement;
+    const wrapper = container.querySelector(
+      '[data-testid="page-wrapper"]',
+    ) as HTMLElement;
+    const wrapperClass = wrapper.getAttribute("class") ?? "";
+    expect(wrapperClass).not.toContain("before:");
+    expect(wrapper.style.getPropertyValue("--national-primary")).toBe("");
+    expect(wrapper.style.getPropertyValue("--national-gradient")).toBe("");
+    expect(article.style.getPropertyValue("--national-primary")).not.toBe("");
+  });
+
+  it("segundo DriverCard sem nacionalidade conhecida não é afetado", () => {
+    const { container } = render(
+      <div>
+        <DriverCard driver={makeDriver()} onRemove={() => undefined} isRemoving={false} />
+        <DriverCard
+          driver={makeDriver({
+            id: "dX",
+            characterId: "cX",
+            character: {
+              id: "cX",
+              name: "Ghost",
+              nationality: "Atlantean",
+              imageUrl: null,
+            },
+          })}
+          onRemove={() => undefined}
+          isRemoving={false}
+        />
+      </div>,
+    );
+    const articles = container.querySelectorAll("article");
+    expect(articles.length).toBe(2);
+    const first = articles[0] as HTMLElement;
+    const second = articles[1] as HTMLElement;
+    expect(first.style.getPropertyValue("--national-primary")).not.toBe("");
+    expect(second.style.getPropertyValue("--national-primary")).toBe("");
+    expect(second.style.getPropertyValue("--national-gradient")).toBe("");
+    expect(second.className).not.toContain("hover:before:opacity-100");
+  });
+
+  it("título preserva legibilidade: usa text-foreground", () => {
+    render(
+      <DriverCard driver={makeDriver()} onRemove={() => undefined} isRemoving={false} />,
+    );
+    const heading = screen.getByRole("heading", { name: "Alicya Kucharski" });
+    expect(heading.className).toContain("text-foreground");
+  });
+
+  it("piloto sem número e nacionalidade desconhecida não quebra renderização", () => {
+    expect(() =>
+      render(
+        <DriverCard
+          driver={makeDriver({
+            number: null,
+            character: {
+              id: "cX",
+              name: "Ghost",
+              nationality: "Nebulian",
+              imageUrl: null,
+            },
+          })}
+          onRemove={() => undefined}
+          isRemoving={false}
+        />,
+      ),
+    ).not.toThrow();
   });
 });

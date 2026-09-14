@@ -1,72 +1,26 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { formatDriverNumber, type Driver } from "@/lib/driver-profiles";
+import type { Driver } from "@/lib/driver-profiles";
+import { resolveTeamIdentity } from "@/lib/team-identity";
 import type { Team } from "@/lib/teams";
+import { cn } from "@/lib/utils";
 
-type TeamCardProps = {
+type Props = {
   team: Team;
   drivers: Driver[];
-  onEdit: (team: Team) => void;
-  onRemove: (team: Team) => void;
-  isRemoving: boolean;
-  removeError: string | null;
+  onEdit?: (team: Team) => void;
+  onRemove?: (team: Team) => void;
+  isRemoving?: boolean;
+  removeError?: string | null;
 };
 
-const driverRowStyles =
-  "flex items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-muted/60";
-
-function DriverRow({ driver }: { driver: Driver }) {
-  const initial = driver.character.name.trim().charAt(0).toUpperCase() || "?";
-  const row = (
-    <>
-      <span className="shrink-0">
-        {driver.character.imageUrl ? (
-          <img
-            src={driver.character.imageUrl}
-            alt=""
-            className="h-8 w-8 rounded-full object-cover"
-          />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-black uppercase text-muted-foreground/60"
-          >
-            {initial}
-          </span>
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold leading-tight text-foreground">
-          {driver.character.name}
-        </span>
-        <span className="block truncate text-xs text-muted-foreground">
-          {driver.character.nationality}
-        </span>
-      </span>
-      <span className="shrink-0 text-sm font-black tabular-nums text-muted-foreground">
-        {formatDriverNumber(driver.number)}
-      </span>
-    </>
-  );
-
-  return (
-    <li className="min-w-0">
-      <Link
-        href={`/app/characters/${driver.characterId}`}
-        aria-label={`Abrir ficha de ${driver.character.name}`}
-        className="outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-      >
-        <span className={driverRowStyles}>{row}</span>
-      </Link>
-    </li>
-  );
-}
+const editLinkStyles =
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 h-8 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 export function TeamCard({
   team,
@@ -75,85 +29,165 @@ export function TeamCard({
   onRemove,
   isRemoving,
   removeError,
-}: TeamCardProps) {
+}: Props) {
   const [confirming, setConfirming] = useState(false);
-
-  const hasColor = Boolean(team.color);
-  const driverLabel = drivers.length === 1 ? "1 PILOTO" : `${drivers.length} PILOTOS`;
+  const identity = resolveTeamIdentity(team);
+  const accentColor = identity?.primary ?? team.color;
 
   return (
-    <article className="flex overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-brand/50">
+    <article
+      className={cn(
+        "relative isolate flex overflow-hidden rounded-xl border border-border bg-card transition-colors duration-200",
+        identity
+          ? cn(
+              "group hover:border-[color:var(--team-border)] hover:shadow-[0_8px_30px_var(--team-border)]",
+              "before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:bg-[image:var(--team-gradient)] before:opacity-0 before:transition-opacity before:duration-200 before:content-['']",
+              "hover:before:opacity-100",
+            )
+          : "hover:border-brand/50",
+      )}
+      style={
+        identity
+          ? ({
+              "--team-primary": identity.primary,
+              "--team-secondary": identity.secondary,
+              "--team-accent": identity.accent,
+              "--team-fg": identity.foreground,
+              "--team-muted": identity.muted,
+              "--team-border": identity.border,
+              "--team-gradient": identity.gradient,
+            } as React.CSSProperties)
+          : undefined
+      }
+    >
+
       <span
         aria-hidden="true"
-        className="w-1 shrink-0 self-stretch bg-foreground/10"
-        style={hasColor ? { backgroundColor: team.color as string } : undefined}
+        className={cn(
+          "w-1 shrink-0 self-stretch transition-colors duration-200",
+          identity
+            ? "bg-[var(--team-fg)]/10 group-hover:bg-[var(--team-fg)]/25"
+            : "bg-foreground/10",
+        )}
+        style={accentColor ? { backgroundColor: accentColor } : undefined}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
-              <h3 className="truncate text-lg font-black leading-tight tracking-tight text-foreground sm:text-xl">
-                {team.name}
-              </h3>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                {team.shortName && (
-                  <span className="font-semibold uppercase tracking-widest">
-                    {team.shortName}
+      <div className="relative z-[1] flex min-w-0 flex-1 flex-col p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3
+            className={cn(
+              "truncate font-semibold leading-none text-foreground transition-colors duration-200",
+              identity && "group-hover:text-[color:var(--team-fg)]",
+            )}
+          >
+            {team.name}
+          </h3>
+          {team.shortName && (
+            <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-xs font-bold text-foreground/70">
+              {team.shortName}
+            </span>
+          )}
+        </div>
+
+        <p
+          className={cn(
+            "mt-1 text-xs text-muted-foreground transition-colors duration-200",
+            identity && "group-hover:text-[color:var(--team-muted)]",
+          )}
+        >
+          {drivers.length} {drivers.length === 1 ? "PILOTO" : "PILOTOS"}
+        </p>
+
+        <div className="-mx-1 mt-3 flex flex-wrap gap-1.5">
+          {drivers.length === 0 ? (
+            <span
+              className={cn(
+                "text-sm italic text-muted-foreground transition-colors duration-200",
+                identity && "group-hover:text-[color:var(--team-muted)]",
+              )}
+            >
+              Nenhum piloto vinculado
+            </span>
+          ) : (
+            drivers.map((driver) => (
+              <Link
+                key={driver.id}
+                href={`/app/characters/${driver.characterId}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-1 text-xs transition-colors hover:border-brand/50 hover:bg-accent"
+              >
+                {driver.character.imageUrl ? (
+                  <img
+                    src={driver.character.imageUrl}
+                    alt={driver.character.name}
+                    className="h-5 w-5 rounded-full object-cover"
+                  />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground/60"
+                  >
+                    {driver.character.name.trim().charAt(0).toUpperCase() || "?"}
                   </span>
                 )}
-                <span className="font-semibold tabular-nums tracking-wide">
-                  {driverLabel}
+                <span className="tabular-nums text-foreground">
+                  {driver.number !== null ? `#${driver.number}` : "—"}
                 </span>
-              </div>
+                <span className="truncate text-muted-foreground">
+                  {driver.character.name}
+                </span>
+                {driver.character.nationality && (
+                  <span className="truncate text-muted-foreground/70">
+                    {driver.character.nationality}
+                  </span>
+                )}
+              </Link>
+            ))
+          )}
+        </div>
+
+        {(removeError || onEdit || onRemove) && (
+          <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+            <p className="min-w-0 flex-1 truncate text-xs text-destructive">
+              {removeError ?? "\u00A0"}
+            </p>
+
+            <div className="flex shrink-0 items-center gap-2">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(team)}
+                  className={editLinkStyles}
+                  aria-label={`Editar ${team.name}`}
+                >
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Editar
+                </button>
+              )}
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={() => setConfirming(true)}
+                  disabled={isRemoving}
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 h-8 text-sm font-medium ring-offset-background transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                  aria-label={`Remover ${team.name}`}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Remover
+                </button>
+              )}
             </div>
           </div>
+        )}
 
-          <div className="border-t border-border pt-4">
-            {drivers.length > 0 ? (
-              <ul className="space-y-1">
-                {drivers.map((driver) => (
-                  <DriverRow key={driver.characterId} driver={driver} />
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Nenhum piloto vinculado
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-auto flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onEdit(team)}
-          >
-            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-            Editar
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-destructive"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Remover
-          </Button>
-        </div>
+        <ConfirmDialog
+          open={confirming}
+          onClose={() => setConfirming(false)}
+          title="Remover equipe"
+          description={`Deseja remover "${team.name}" do universo? Essa ação não apaga os personagens vinculados.`}
+          onConfirm={() => onRemove?.(team)}
+          isPending={isRemoving}
+        />
       </div>
-
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title="Remover equipe"
-        description={`Deseja remover "${team.name}"? Esta ação não pode ser desfeita.`}
-        onConfirm={() => onRemove(team)}
-        isPending={isRemoving}
-        error={removeError}
-      />
     </article>
   );
 }

@@ -10,6 +10,12 @@ export type Driver = {
     name: string;
     shortName: string | null;
     color: string | null;
+    visualIdentity?: {
+      primary: string;
+      secondary?: string | null;
+      accent?: string | null;
+      foreground?: string | null;
+    } | null;
   } | null;
   createdAt: string;
   updatedAt: string;

@@ -304,6 +304,9 @@ model Team {
   name           String
   shortName      String?
   color          String?
+  // Identidade visual (paleta) que acompanha a entidade Team. Sem suporte
+  // temporal completo: representa a identidade atual da equipe.
+  visualIdentity Json?
   driverProfiles DriverProfile[]
 
   seasonDriverEntries  SeasonDriverEntry[]

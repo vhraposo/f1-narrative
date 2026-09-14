@@ -16,6 +16,12 @@ type Team = {
   shortName: string | null;
   color: string | null;
   userId: string;
+  visualIdentity?: {
+    primary: string;
+    secondary?: string | null;
+    accent?: string | null;
+    foreground?: string | null;
+  } | null;
 };
 
 type Character = {
@@ -24,7 +30,6 @@ type Character = {
   nationality: string;
 };
 
-// Cria uma conta real via endpoint de autenticação e devolve o cookie de sessão.
 async function createUser(
   email: string,
   name: string,
@@ -96,7 +101,6 @@ describe("GET /api/teams", () => {
     const b = await createUser(`tlista-b-${Date.now()}@f1nw.test`, "B");
 
     await createTeam(a, { name: "Minha Equipe", shortName: "MEQ" });
-    // Equipe do outro usuário não deve aparecer na lista de A.
     await createTeam(b, { name: "Equipe de Outro", shortName: "EQO" });
 
     const res = await app.inject({
@@ -110,6 +114,28 @@ describe("GET /api/teams", () => {
     const theirs = body.teams.filter((t: Team) => t.name === "Equipe de Outro");
     expect(mine.length).toBeGreaterThan(0);
     expect(theirs.length).toBe(0);
+  });
+
+  it("lista equipes com visualIdentity persistida", async () => {
+    const u = await createUser(`tvid-${Date.now()}@f1nw.test`, "Vid");
+    await createTeam(u, {
+      name: "Equipe com Identidade",
+      visualIdentity: { primary: "#E80020", secondary: "#FFFFFF" },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/teams",
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const target = res
+      .json()
+      .teams.find((t: Team) => t.name === "Equipe com Identidade");
+    expect(target.visualIdentity).toEqual({
+      primary: "#E80020",
+      secondary: "#FFFFFF",
+    });
   });
 });
 
@@ -174,11 +200,40 @@ describe("POST /api/teams", () => {
     const other = await createUser(`town-other-${Date.now()}@f1nw.test`, "OO");
     const { statusCode, json } = await createTeam(u, {
       name: "Com UserId",
-      // Tentativa de forçar ownership para outro usuário deve ser ignorada.
       userId: other.userId,
     });
     expect(statusCode).toBe(201);
     expect(json.team!.userId).toBe(u.userId);
+  });
+
+  it("cria equipe com visualIdentity completa", async () => {
+    const u = await createUser(`tvida-${Date.now()}@f1nw.test`, "VIDA");
+    const vi = { primary: "#E80020", secondary: "#FFF", accent: "#000", foreground: "#FFFFFF" };
+    const { statusCode, json } = await createTeam(u, {
+      name: "Scuderia Rossa",
+      visualIdentity: vi,
+    });
+    expect(statusCode).toBe(201);
+    expect(json.team!.visualIdentity).toEqual(vi);
+  });
+
+  it("cria equipe com visualIdentity apenas primary", async () => {
+    const u = await createUser(`tvidp-${Date.now()}@f1nw.test`, "VIDP");
+    const { statusCode, json } = await createTeam(u, {
+      name: "Só Primária",
+      visualIdentity: { primary: "#FF8000" },
+    });
+    expect(statusCode).toBe(201);
+    expect(json.team!.visualIdentity!.primary).toBe("#FF8000");
+  });
+
+  it("rejeita visualIdentity sem primary", async () => {
+    const u = await createUser(`tvidnp-${Date.now()}@f1nw.test`, "VIDNP");
+    const { statusCode } = await createTeam(u, {
+      name: "Sem Primary",
+      visualIdentity: { secondary: "#FFF" },
+    });
+    expect(statusCode).toBe(400);
   });
 });
 
@@ -278,6 +333,29 @@ describe("PATCH /api/teams/:id", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("atualiza visualIdentity", async () => {
+    const u = await createUser(`tvidpatch-${Date.now()}@f1nw.test`, "VP");
+    const created = await createTeam(u, {
+      name: "Para Atualizar",
+      visualIdentity: { primary: "#E80020" },
+    });
+    const id = created.json.team!.id;
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/teams/${id}`,
+      headers: { cookie: u.cookie },
+      payload: {
+        visualIdentity: { primary: "#3671C6", foreground: "#FFFFFF" },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().team.visualIdentity).toEqual({
+      primary: "#3671C6",
+      foreground: "#FFFFFF",
+    });
+  });
+
   it("nome duplicado na edição dentro do mesmo usuário → 409", async () => {
     const u = await createUser(`tedit-dup-${Date.now()}@f1nw.test`, "ED");
     await createTeam(u, { name: "Equipe A" });
@@ -341,7 +419,6 @@ describe("DELETE /api/teams/:id", () => {
       birthDate: "1995-05-10",
     });
 
-    // Cria o perfil de piloto via API (exposto em fase anterior).
     const driverRes = await app.inject({
       method: "PUT",
       url: `/api/drivers/${ch.id}`,
@@ -353,8 +430,6 @@ describe("DELETE /api/teams/:id", () => {
     const created = await createTeam(u, { name: "Com Piloto" });
     const teamId = created.json.team!.id;
 
-    // A vinculação de equipe (teamId) é do domínio de Roster; ligamos o
-// piloto diretamente no banco apenas para validar onDelete: Restrict.
     await prisma.driverProfile.update({
       where: { characterId: ch.id },
       data: { teamId },
