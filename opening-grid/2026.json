@@ -1,0 +1,291 @@
+{
+  "year": 2026,
+  "teams": [
+    {
+      "teamExternalId": "mclaren",
+      "name": "McLaren",
+      "shortName": "MCL",
+      "color": "#FF8000",
+      "drivers": [
+        {
+          "externalId": "norris",
+          "name": "Lando Norris",
+          "fullName": "Lando Norris",
+          "nationality": "British",
+          "number": 1,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "piastri",
+          "name": "Oscar Piastri",
+          "fullName": "Oscar Piastri",
+          "nationality": "Australian",
+          "number": 81,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "mercedes",
+      "name": "Mercedes-AMG PETRONAS Formula One Team",
+      "shortName": "MER",
+      "color": "#27F4D2",
+      "drivers": [
+        {
+          "externalId": "russell",
+          "name": "George Russell",
+          "fullName": "George Russell",
+          "nationality": "British",
+          "number": 63,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "antonelli",
+          "name": "Andrea Kimi Antonelli",
+          "fullName": "Andrea Kimi Antonelli",
+          "nationality": "Italian",
+          "number": 12,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "red_bull",
+      "name": "Red Bull Racing",
+      "shortName": "RBR",
+      "color": "#3671C6",
+      "drivers": [
+        {
+          "externalId": "max_verstappen",
+          "name": "Max Verstappen",
+          "fullName": "Max Verstappen",
+          "nationality": "Dutch",
+          "number": 3,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "hadjar",
+          "name": "Isack Hadjar",
+          "fullName": "Isack Hadjar",
+          "nationality": "French",
+          "number": 6,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "ferrari",
+      "name": "Scuderia Ferrari HP",
+      "shortName": "FER",
+      "color": "#E80020",
+      "drivers": [
+        {
+          "externalId": "leclerc",
+          "name": "Charles Leclerc",
+          "fullName": "Charles Leclerc",
+          "nationality": "Monegasque",
+          "number": 16,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "hamilton",
+          "name": "Lewis Hamilton",
+          "fullName": "Lewis Hamilton",
+          "nationality": "British",
+          "number": 44,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "williams",
+      "name": "Atlassian Williams Racing",
+      "shortName": "WIL",
+      "color": "#64C4FF",
+      "drivers": [
+        {
+          "externalId": "albon",
+          "name": "Alexander Albon",
+          "fullName": "Alexander Albon",
+          "nationality": "Thai",
+          "number": 23,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "sainz",
+          "name": "Carlos Sainz",
+          "fullName": "Carlos Sainz",
+          "nationality": "Spanish",
+          "number": 55,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "rb",
+      "name": "Visa Cash App Racing Bulls F1 Team",
+      "shortName": "VCA",
+      "color": "#6692FF",
+      "drivers": [
+        {
+          "externalId": "arvid_lindblad",
+          "name": "Arvid Lindblad",
+          "fullName": "Arvid Lindblad",
+          "nationality": "British",
+          "number": 41,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "lawson",
+          "name": "Liam Lawson",
+          "fullName": "Liam Lawson",
+          "nationality": "New Zealander",
+          "number": 30,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "aston_martin",
+      "name": "Aston Martin Aramco Formula One Team",
+      "shortName": "AST",
+      "color": "#229971",
+      "drivers": [
+        {
+          "externalId": "alonso",
+          "name": "Fernando Alonso",
+          "fullName": "Fernando Alonso",
+          "nationality": "Spanish",
+          "number": 14,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "stroll",
+          "name": "Lance Stroll",
+          "fullName": "Lance Stroll",
+          "nationality": "Canadian",
+          "number": 18,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "haas",
+      "name": "Haas F1 Team",
+      "shortName": "HAA",
+      "color": "#B6BABD",
+      "drivers": [
+        {
+          "externalId": "ocon",
+          "name": "Esteban Ocon",
+          "fullName": "Esteban Ocon",
+          "nationality": "French",
+          "number": 31,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "bearman",
+          "name": "Oliver Bearman",
+          "fullName": "Oliver Bearman",
+          "nationality": "British",
+          "number": 87,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "audi",
+      "name": "Audi Revolut F1 Team",
+      "shortName": "AUD",
+      "color": "#D52B1E",
+      "drivers": [
+        {
+          "externalId": "bortoleto",
+          "name": "Gabriel Bortoleto",
+          "fullName": "Gabriel Bortoleto",
+          "nationality": "Brazilian",
+          "number": 5,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "hulkenberg",
+          "name": "Nico Hülkenberg",
+          "fullName": "Nico Hülkenberg",
+          "nationality": "German",
+          "number": 27,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "alpine",
+      "name": "BWT Alpine Formula One Team",
+      "shortName": "ALP",
+      "color": "#0093CC",
+      "drivers": [
+        {
+          "externalId": "gasly",
+          "name": "Pierre Gasly",
+          "fullName": "Pierre Gasly",
+          "nationality": "French",
+          "number": 10,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "colapinto",
+          "name": "Franco Colapinto",
+          "fullName": "Franco Colapinto",
+          "nationality": "Argentine",
+          "number": 43,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    },
+    {
+      "teamExternalId": "cadillac",
+      "name": "Cadillac Formula 1 Team",
+      "shortName": "CAD",
+      "color": "#A51C30",
+      "drivers": [
+        {
+          "externalId": "perez",
+          "name": "Sergio Pérez",
+          "fullName": "Sergio Pérez",
+          "nationality": "Mexican",
+          "number": 11,
+          "seat": null,
+          "reserve": false
+        },
+        {
+          "externalId": "bottas",
+          "name": "Valtteri Bottas",
+          "fullName": "Valtteri Bottas",
+          "nationality": "Finnish",
+          "number": 77,
+          "seat": null,
+          "reserve": false
+        }
+      ]
+    }
+  ]
+}

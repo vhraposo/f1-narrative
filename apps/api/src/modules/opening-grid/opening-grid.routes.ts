@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import type { OpeningGridClient } from "./opening-grid.client.js";
+import { loadOpeningGridFeed } from "./opening-grid.feed.js";
 import {
   openingGridIngestBodySchema,
   openingGridIngestParamsSchema,
@@ -17,6 +19,36 @@ export const openingGridRoutes: FastifyPluginAsync<OpeningGridRoutesOptions> = a
   options,
 ) => {
   const service = new OpeningGridIngestService(options.client);
+
+  fastify.get("/opening-grid/:year/opening-grid.json", async (request, reply) => {
+    const params = z
+      .object({ year: z.coerce.number().int().min(1950).max(2100) })
+      .safeParse(request.params);
+    if (!params.success) {
+      return reply.code(404).send({
+        error: "Feed de Opening Grid não encontrado",
+        code: "FEED_NOT_FOUND",
+      });
+    }
+    try {
+      const feed = loadOpeningGridFeed(params.data.year);
+      if (!feed) {
+        return reply.code(404).send({
+          error: "Feed de Opening Grid não encontrado",
+          code: "FEED_NOT_FOUND",
+        });
+      }
+      return reply.send(feed);
+    } catch (error) {
+      if (error instanceof OpeningGridError) {
+        return reply.code(502).send({
+          error: "Feed de Opening Grid malformado",
+          code: "SOURCE_MALFORMED",
+        });
+      }
+      throw error;
+    }
+  });
 
   fastify.post(
     "/api/external-sync/:source/opening-grid",

@@ -31,7 +31,8 @@ export type OpeningGridConflictKind =
   | "DUPLICATE_SEAT"
   | "INVALID_SEAT"
   | "AMBIGUOUS_CLAIM"
-  | "DUPLICATE_STARTER";
+  | "DUPLICATE_STARTER"
+  | "RESERVE_AFFILIATION_UNSUPPORTED";
 
 export interface OpeningGridConflict {
   kind: OpeningGridConflictKind;
@@ -45,6 +46,7 @@ export function validateOpeningGridPayload(
 ): OpeningGridConflict[] {
   const conflicts: OpeningGridConflict[] = [];
   const startersByDriver = new Map<string, string>();
+  const reserveTeamsByDriver = new Map<string, string>();
 
   for (const team of season.teams) {
     const seat2ExternalId = new Map<number, string>();
@@ -69,6 +71,20 @@ export function validateOpeningGridPayload(
           message: `driver ${driver.externalId} marcado como reserva com seat declarado`,
         });
         continue;
+      }
+
+      if (driver.reserve === true) {
+        const priorTeam = reserveTeamsByDriver.get(driver.externalId);
+        if (priorTeam && priorTeam !== team.teamExternalId) {
+          conflicts.push({
+            kind: "RESERVE_AFFILIATION_UNSUPPORTED",
+            teamExternalId: team.teamExternalId,
+            externalId: driver.externalId,
+            message: `reserva de ${driver.externalId} declarada em múltiplas equipes (${priorTeam} e ${team.teamExternalId}): afiliação de reserva múltipla não suportada`,
+          });
+          continue;
+        }
+        reserveTeamsByDriver.set(driver.externalId, team.teamExternalId);
       }
 
       if (driver.seat === 1 || driver.seat === 2) {
