@@ -1,0 +1,1158 @@
+{
+  "capturedAt": "2026-09-14T12:15:20.131Z",
+  "dbUrl": {
+    "host": "localhost",
+    "port": "5432",
+    "dbname": "f1_narrative"
+  },
+  "seasons": [
+    {
+      "year": 2026,
+      "name": "2026",
+      "status": "PRE_SEASON",
+      "provenance": "CANONICAL"
+    }
+  ],
+  "bindings": [
+    {
+      "seasonId": "3a10e77f-5ccf-40a8-bd81-2c6341241bf8",
+      "externalSeasonId": "bcae6bec-3b7e-4807-bf84-da82d983040e",
+      "confidence": "CONFIRMED",
+      "boundBy": "ADMIN",
+      "createdAt": "2026-09-13T11:09:59.154Z"
+    }
+  ],
+  "worldState": [
+    {
+      "key": "default",
+      "currentSeasonId": "3a10e77f-5ccf-40a8-bd81-2c6341241bf8"
+    }
+  ],
+  "extSeasons": [
+    {
+      "source": "jolpica",
+      "year": 2026,
+      "name": null,
+      "status": null,
+      "contentHash": "fc48103bc1d4bac5750d3411b6ce8db3e7880c1b05e11212b85b0bb12b31972a",
+      "lastSyncedAt": "2026-09-10T12:01:19.577Z"
+    }
+  ],
+  "extTeams": [
+    {
+      "source": "jolpica",
+      "externalId": "williams",
+      "name": "Williams",
+      "contentHash": "28fc0afaa19909cae61ddc1723cf5fba416c28e97214ed7a7c60592bff74b0bf",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "aston_martin",
+      "name": "Aston Martin",
+      "contentHash": "ebb3d3ddd6eb2208a3d80f343482fa7653ace6c03f5f235c7edf412536851e5c",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "cadillac",
+      "name": "Cadillac F1 Team",
+      "contentHash": "f71315b2ca2501f4b69228329cf9797b948270433f190c98b57229a742bff06f",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "mercedes",
+      "name": "Mercedes",
+      "contentHash": "8b4b90ce8332e71ab9c5845420c589ae7745ff27d56b6da8e3d8dc1a903ed39f",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "ferrari",
+      "name": "Ferrari",
+      "contentHash": "93d5e42312a69465ed2a052a9e4f531b9a6eee3f198ceab4a984d366e4c11383",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "mclaren",
+      "name": "McLaren",
+      "contentHash": "3d3acdb8bee6cadfe04052bdc4c47288ec9545cb391a3cadbb1368f3813a3599",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "red_bull",
+      "name": "Red Bull",
+      "contentHash": "c2a944bd5f0f730927763b480173fbba5be5f8c5d62cabdd75b2f79f4e63a9bc",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "rb",
+      "name": "RB F1 Team",
+      "contentHash": "a2d4fe538bb39c2109d800b0093ea479eb2b2ee55cc0a5f824c454f1493e6618",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "alpine",
+      "name": "Alpine F1 Team",
+      "contentHash": "c05d32b0ebc8b85c26999bc1463c491c2b8838ee2d174f2969b4d34308a5df28",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "haas",
+      "name": "Haas F1 Team",
+      "contentHash": "e990b2ba468e6091e7064c8f2326e64b39915db6575caec64bab418a3fb60cfd",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "audi",
+      "name": "Audi",
+      "contentHash": "b4c42b1b27388ede9765b854bf1fb16998f00f633fbf75b2e78315c9e316572a",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    }
+  ],
+  "extDrivers": [
+    {
+      "source": "jolpica",
+      "externalId": "paul_aron",
+      "name": "Paul Aron",
+      "fullName": "Paul Aron",
+      "nationality": null,
+      "number": null,
+      "contentHash": "ed14e49c542c7fa22ec7a973e2c12b30c03ba57d221f778f5d58fc80b210e17d",
+      "sourceRecord": {
+        "code": null,
+        "name": "Paul Aron",
+        "driverId": "paul_aron",
+        "dateOfBirth": null,
+        "nationality": null,
+        "permanentNumber": null
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.700Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "dino_beganovic",
+      "name": "Dino Beganovic",
+      "fullName": "Dino Beganovic",
+      "nationality": null,
+      "number": null,
+      "contentHash": "3ec9860a7987e8e6df6a24b4ca6095cac8ca40b01dfd8a13044821430c7a218a",
+      "sourceRecord": {
+        "code": null,
+        "name": "Dino Beganovic",
+        "driverId": "dino_beganovic",
+        "dateOfBirth": null,
+        "nationality": null,
+        "permanentNumber": null
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.700Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "luke_browning",
+      "name": "Luke Browning",
+      "fullName": "Luke Browning",
+      "nationality": null,
+      "number": null,
+      "contentHash": "d8ecd4b2d98604c0cce9a3f7b8c4dd004314ea2221948986bf64df5eab00b0fa",
+      "sourceRecord": {
+        "code": null,
+        "name": "Luke Browning",
+        "driverId": "luke_browning",
+        "dateOfBirth": null,
+        "nationality": null,
+        "permanentNumber": null
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.700Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "jak_crawford",
+      "name": "Jak Crawford",
+      "fullName": "Jak Crawford",
+      "nationality": null,
+      "number": null,
+      "contentHash": "6e88fc2ad1dcde8c8ae051340401b1e00e8259d4e1c508610d8519c75e2dce5c",
+      "sourceRecord": {
+        "code": null,
+        "name": "Jak Crawford",
+        "driverId": "jak_crawford",
+        "dateOfBirth": null,
+        "nationality": null,
+        "permanentNumber": null
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.700Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "leonardo_fornaroli",
+      "name": "Leonardo Fornaroli",
+      "fullName": "Leonardo Fornaroli",
+      "nationality": null,
+      "number": null,
+      "contentHash": "e9da0529a4ed675a1ac67af665eacac4706d25abb130ffd76854634c5d712dbc",
+      "sourceRecord": {
+        "code": null,
+        "name": "Leonardo Fornaroli",
+        "driverId": "leonardo_fornaroli",
+        "dateOfBirth": null,
+        "nationality": null,
+        "permanentNumber": null
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.700Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "colton_herta",
+      "name": "Colton Herta",
+      "fullName": "Colton Herta",
+      "nationality": null,
+      "number": null,
+      "contentHash": "02a107f63938d7a113faa0e13c7ba609cc77f8247d55c3ee4801911f5ebd196f",
+      "sourceRecord": {
+        "code": null,
+        "name": "Colton Herta",
+        "driverId": "colton_herta",
+        "dateOfBirth": null,
+        "nationality": null,
+        "permanentNumber": null
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.700Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "ryo_hirakawa",
+      "name": "Ryo Hirakawa",
+      "fullName": "Ryo Hirakawa",
+      "nationality": null,
+      "number": null,
+      "contentHash": "e106cb4b2acc8501fa8d2e5a087d73fc17c1a43b730177c91355b7ef6177cc64",
+      "sourceRecord": {
+        "code": null,
+        "name": "Ryo Hirakawa",
+        "driverId": "ryo_hirakawa",
+        "dateOfBirth": null,
+        "nationality": null,
+        "permanentNumber": null
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.700Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "ayumu_iwasa",
+      "name": "Ayumu Iwasa",
+      "fullName": "Ayumu Iwasa",
+      "nationality": null,
+      "number": null,
+      "contentHash": "23e23b91faa3e712e384def71bdc6c4f6f1ffe02d9b7ecebaade7d0be1b6d9bd",
+      "sourceRecord": {
+        "code": null,
+        "name": "Ayumu Iwasa",
+        "driverId": "ayumu_iwasa",
+        "dateOfBirth": null,
+        "nationality": null,
+        "permanentNumber": null
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.700Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "antonelli",
+      "name": "Andrea Kimi Antonelli",
+      "fullName": "Andrea Kimi Antonelli",
+      "nationality": "Italian",
+      "number": 12,
+      "contentHash": "a18c015345bbd90ddd90dff8f0450048cbfde537b212cb1c07fda1a4dfbfecc6",
+      "sourceRecord": {
+        "code": "ANT",
+        "name": "Andrea Kimi Antonelli",
+        "driverId": "antonelli",
+        "dateOfBirth": "2006-08-25",
+        "nationality": "Italian",
+        "permanentNumber": "12"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "russell",
+      "name": "George Russell",
+      "fullName": "George Russell",
+      "nationality": "British",
+      "number": 63,
+      "contentHash": "bb5509f68f054e7f3c17a935933c582a7f62900eb8e5b86833befe9763da66ec",
+      "sourceRecord": {
+        "code": "RUS",
+        "name": "George Russell",
+        "driverId": "russell",
+        "dateOfBirth": "1998-02-15",
+        "nationality": "British",
+        "permanentNumber": "63"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "hamilton",
+      "name": "Lewis Hamilton",
+      "fullName": "Lewis Hamilton",
+      "nationality": "British",
+      "number": 44,
+      "contentHash": "f18a05a0a58b6fc751907aef448a7f42eebb0d635f8ea25e3beb67e57b406af6",
+      "sourceRecord": {
+        "code": "HAM",
+        "name": "Lewis Hamilton",
+        "driverId": "hamilton",
+        "dateOfBirth": "1985-01-07",
+        "nationality": "British",
+        "permanentNumber": "44"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "norris",
+      "name": "Lando Norris",
+      "fullName": "Lando Norris",
+      "nationality": "British",
+      "number": 1,
+      "contentHash": "aad012379c856b0c7821ade5297fa2c62a27cd0f4edf4ee05a5198abaeed5aca",
+      "sourceRecord": {
+        "code": "NOR",
+        "name": "Lando Norris",
+        "driverId": "norris",
+        "dateOfBirth": "1999-11-13",
+        "nationality": "British",
+        "permanentNumber": "1"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "leclerc",
+      "name": "Charles Leclerc",
+      "fullName": "Charles Leclerc",
+      "nationality": "Monegasque",
+      "number": 16,
+      "contentHash": "8684ed69efb529d2837943d33339a86e1866906cb7dd6c68102f91d7a0287b6c",
+      "sourceRecord": {
+        "code": "LEC",
+        "name": "Charles Leclerc",
+        "driverId": "leclerc",
+        "dateOfBirth": "1997-10-16",
+        "nationality": "Monegasque",
+        "permanentNumber": "16"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "max_verstappen",
+      "name": "Max Verstappen",
+      "fullName": "Max Verstappen",
+      "nationality": "Dutch",
+      "number": 3,
+      "contentHash": "6969f4975ef239b501c696d8799da2e4d4dd491e4fef40a5a50d232190a77eb2",
+      "sourceRecord": {
+        "code": "VER",
+        "name": "Max Verstappen",
+        "driverId": "max_verstappen",
+        "dateOfBirth": "1997-09-30",
+        "nationality": "Dutch",
+        "permanentNumber": "3"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "piastri",
+      "name": "Oscar Piastri",
+      "fullName": "Oscar Piastri",
+      "nationality": "Australian",
+      "number": 81,
+      "contentHash": "7641383c95ec48ae9d371f000cd2f511466a2a5e7633b0f82e25fb74f28a84d5",
+      "sourceRecord": {
+        "code": "PIA",
+        "name": "Oscar Piastri",
+        "driverId": "piastri",
+        "dateOfBirth": "2001-04-06",
+        "nationality": "Australian",
+        "permanentNumber": "81"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "hadjar",
+      "name": "Isack Hadjar",
+      "fullName": "Isack Hadjar",
+      "nationality": "French",
+      "number": 6,
+      "contentHash": "8e37043b71104f6a3f3f93ba15404ebac5199104b7b3b76c29c2ee76c6523694",
+      "sourceRecord": {
+        "code": "HAD",
+        "name": "Isack Hadjar",
+        "driverId": "hadjar",
+        "dateOfBirth": "2004-09-28",
+        "nationality": "French",
+        "permanentNumber": "6"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "lawson",
+      "name": "Liam Lawson",
+      "fullName": "Liam Lawson",
+      "nationality": "New Zealander",
+      "number": 30,
+      "contentHash": "189220705edd787c1fac07f4afa922a5fbf4683e215d17bac5acd90caf5b3016",
+      "sourceRecord": {
+        "code": "LAW",
+        "name": "Liam Lawson",
+        "driverId": "lawson",
+        "dateOfBirth": "2002-02-11",
+        "nationality": "New Zealander",
+        "permanentNumber": "30"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "gasly",
+      "name": "Pierre Gasly",
+      "fullName": "Pierre Gasly",
+      "nationality": "French",
+      "number": 10,
+      "contentHash": "59968dc6374b4c834d67bf1cae8b86b7389027d31abead99260130e76f294292",
+      "sourceRecord": {
+        "code": "GAS",
+        "name": "Pierre Gasly",
+        "driverId": "gasly",
+        "dateOfBirth": "1996-02-07",
+        "nationality": "French",
+        "permanentNumber": "10"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "arvid_lindblad",
+      "name": "Arvid Lindblad",
+      "fullName": "Arvid Lindblad",
+      "nationality": "British",
+      "number": 41,
+      "contentHash": "b654a78821757dee8110269d0c947ce4af0a2b7c59cd4399c3d855072d157342",
+      "sourceRecord": {
+        "code": "LIN",
+        "name": "Arvid Lindblad",
+        "driverId": "arvid_lindblad",
+        "dateOfBirth": "2007-08-08",
+        "nationality": "British",
+        "permanentNumber": "41"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "colapinto",
+      "name": "Franco Colapinto",
+      "fullName": "Franco Colapinto",
+      "nationality": "Argentine",
+      "number": 43,
+      "contentHash": "fa81b95162e618d4514c7c6fd463b6f19e2f669e1b9dbc4d734bae52a5a3935f",
+      "sourceRecord": {
+        "code": "COL",
+        "name": "Franco Colapinto",
+        "driverId": "colapinto",
+        "dateOfBirth": "2003-05-27",
+        "nationality": "Argentine",
+        "permanentNumber": "43"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "bearman",
+      "name": "Oliver Bearman",
+      "fullName": "Oliver Bearman",
+      "nationality": "British",
+      "number": 87,
+      "contentHash": "50a07b8e10802c35e8be6e5b6b8200a7f6d6b85cf1b889dc817cc2305573b887",
+      "sourceRecord": {
+        "code": "BEA",
+        "name": "Oliver Bearman",
+        "driverId": "bearman",
+        "dateOfBirth": "2005-05-08",
+        "nationality": "British",
+        "permanentNumber": "87"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "bortoleto",
+      "name": "Gabriel Bortoleto",
+      "fullName": "Gabriel Bortoleto",
+      "nationality": "Brazilian",
+      "number": 5,
+      "contentHash": "667c13fe0338429f7c925f62fe25616c70772d93517873d186a000fc0b255b00",
+      "sourceRecord": {
+        "code": "BOR",
+        "name": "Gabriel Bortoleto",
+        "driverId": "bortoleto",
+        "dateOfBirth": "2004-10-14",
+        "nationality": "Brazilian",
+        "permanentNumber": "5"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "hulkenberg",
+      "name": "Nico Hülkenberg",
+      "fullName": "Nico Hülkenberg",
+      "nationality": "German",
+      "number": 27,
+      "contentHash": "7527b7e7681da5dba3ddbe05e0b3605ac436b06383accd791eca3bf998b49bee",
+      "sourceRecord": {
+        "code": "HUL",
+        "name": "Nico Hülkenberg",
+        "driverId": "hulkenberg",
+        "dateOfBirth": "1987-08-19",
+        "nationality": "German",
+        "permanentNumber": "27"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "sainz",
+      "name": "Carlos Sainz",
+      "fullName": "Carlos Sainz",
+      "nationality": "Spanish",
+      "number": 55,
+      "contentHash": "55368d4b60f9a8e88bd4793be2e9e74d07b93136b61162fb3696560a6020721f",
+      "sourceRecord": {
+        "code": "SAI",
+        "name": "Carlos Sainz",
+        "driverId": "sainz",
+        "dateOfBirth": "1994-09-01",
+        "nationality": "Spanish",
+        "permanentNumber": "55"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "albon",
+      "name": "Alexander Albon",
+      "fullName": "Alexander Albon",
+      "nationality": "Thai",
+      "number": 23,
+      "contentHash": "1ee238452816a3facde1e2fcbeae6fbee25615c910145305c717a90def032203",
+      "sourceRecord": {
+        "code": "ALB",
+        "name": "Alexander Albon",
+        "driverId": "albon",
+        "dateOfBirth": "1996-03-23",
+        "nationality": "Thai",
+        "permanentNumber": "23"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "ocon",
+      "name": "Esteban Ocon",
+      "fullName": "Esteban Ocon",
+      "nationality": "French",
+      "number": 31,
+      "contentHash": "cd8bea4023b1f847a5b56043882e334a475d503e10c53bee1e76f8d6085c26bb",
+      "sourceRecord": {
+        "code": "OCO",
+        "name": "Esteban Ocon",
+        "driverId": "ocon",
+        "dateOfBirth": "1996-09-17",
+        "nationality": "French",
+        "permanentNumber": "31"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "alonso",
+      "name": "Fernando Alonso",
+      "fullName": "Fernando Alonso",
+      "nationality": "Spanish",
+      "number": 14,
+      "contentHash": "db2e5b29e3ff963317661ad5f775b15c2d12b8e8b15cb9031f0f8c3f0a1c4572",
+      "sourceRecord": {
+        "code": "ALO",
+        "name": "Fernando Alonso",
+        "driverId": "alonso",
+        "dateOfBirth": "1981-07-29",
+        "nationality": "Spanish",
+        "permanentNumber": "14"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "tsunoda",
+      "name": "Yuki Tsunoda",
+      "fullName": "Yuki Tsunoda",
+      "nationality": "Japanese",
+      "number": 22,
+      "contentHash": "058d726207b18183f86357a669850184fcd6ff9558b16c48a4d8af3932501255",
+      "sourceRecord": {
+        "code": "TSU",
+        "name": "Yuki Tsunoda",
+        "driverId": "tsunoda",
+        "dateOfBirth": "2000-05-11",
+        "nationality": "Japanese",
+        "permanentNumber": "22"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "stroll",
+      "name": "Lance Stroll",
+      "fullName": "Lance Stroll",
+      "nationality": "Canadian",
+      "number": 18,
+      "contentHash": "0d1f7ad223c6247c863d86766837b141558d4bc80051a138acfc6e3af2ef18f1",
+      "sourceRecord": {
+        "code": "STR",
+        "name": "Lance Stroll",
+        "driverId": "stroll",
+        "dateOfBirth": "1998-10-29",
+        "nationality": "Canadian",
+        "permanentNumber": "18"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "bottas",
+      "name": "Valtteri Bottas",
+      "fullName": "Valtteri Bottas",
+      "nationality": "Finnish",
+      "number": 77,
+      "contentHash": "7f480c0caa6db067d663cd5d07ed6097f183fe83596345218be28f4dd0a9f774",
+      "sourceRecord": {
+        "code": "BOT",
+        "name": "Valtteri Bottas",
+        "driverId": "bottas",
+        "dateOfBirth": "1989-08-28",
+        "nationality": "Finnish",
+        "permanentNumber": "77"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "externalId": "perez",
+      "name": "Sergio Pérez",
+      "fullName": "Sergio Pérez",
+      "nationality": "Mexican",
+      "number": 11,
+      "contentHash": "2ddf359ceba1f05be5c6203385ebc3ff68a6a9f516277f5e2d8d81272ecccb18",
+      "sourceRecord": {
+        "code": "PER",
+        "name": "Sergio Pérez",
+        "driverId": "perez",
+        "dateOfBirth": "1990-01-26",
+        "nationality": "Mexican",
+        "permanentNumber": "11"
+      },
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    }
+  ],
+  "extDriverSeasons": [
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "4f34a0d8-137b-43d3-9ec2-804675627174",
+      "teamExternalId": "mercedes",
+      "role": null,
+      "number": 12,
+      "contentHash": "9ab42f8e4e63e2487c1943441b8ef0c824c0d40f958b6729a5e55eda9b805430",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "fff3613a-9fe3-4d4c-8254-a8894baad433",
+      "teamExternalId": "mercedes",
+      "role": null,
+      "number": 63,
+      "contentHash": "2dc9b4f537e81c29e571bdfb897377d4f6fafa4c524a0b0c92743fe765be92fd",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "da8070fe-a5e5-4ac3-b915-396abbdfe058",
+      "teamExternalId": "ferrari",
+      "role": null,
+      "number": 44,
+      "contentHash": "76dc7e04cc9896fc940ee70212c2afc55b84f4f1acf1e0618b60d76df49b9f0f",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "c2fb4034-36a5-4f2d-a71c-bcec4554248b",
+      "teamExternalId": "mclaren",
+      "role": null,
+      "number": 1,
+      "contentHash": "9981308d2924a600e2fc919339bc7ac30eddb173f2f56ffeccb5372ad8310a09",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "f4d2f398-abe4-455c-a3ba-b1902bce5508",
+      "teamExternalId": "ferrari",
+      "role": null,
+      "number": 16,
+      "contentHash": "dd0e30444bfa9d49beead6c420e0c3a6e3467e0d30f2d697791cf969b81a3060",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "e8bff8ba-63a2-4c91-b9b9-25941e0b6004",
+      "teamExternalId": "red_bull",
+      "role": null,
+      "number": 3,
+      "contentHash": "22a4276cabffd63b9aac4fc94780233afb2b53ec1cdfb3569303ba15013bd1cd",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "47cea202-cc16-4876-9b87-87816214c705",
+      "teamExternalId": "mclaren",
+      "role": null,
+      "number": 81,
+      "contentHash": "6f8f860514462f9c7f30147b200a1f9a0df966ab303f81335cd0cff0ea1da03f",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "5ce8b771-c37e-4dcb-9cb5-71535af0dc3c",
+      "teamExternalId": "red_bull",
+      "role": null,
+      "number": 6,
+      "contentHash": "efccbf481f35bd666d730ad0951f05e871816211bd3c0015009734a5f2a2abc9",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "f3013d97-ba7d-4e9d-814c-50bbd6c3a2aa",
+      "teamExternalId": "rb",
+      "role": null,
+      "number": 30,
+      "contentHash": "f11f0718f516956b433efe1516c195887244720dfbe00f1d9fd545063d8736ea",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "04531018-c1c0-41c9-b9ac-ac41d8c2c314",
+      "teamExternalId": "alpine",
+      "role": null,
+      "number": 10,
+      "contentHash": "7dd83d2028aa43611d1750db35f69e8d628dccac1530f63cfe3b1062adffdc72",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "2c7f9705-5d28-4c8a-a322-9acec8ac7f7a",
+      "teamExternalId": "rb",
+      "role": null,
+      "number": 41,
+      "contentHash": "b6dbeabc13b807456969757f780677612b67f450a00950c9ce2d7116d8059c00",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "59d2822e-a28c-4baf-a77d-37cb8d727334",
+      "teamExternalId": "alpine",
+      "role": null,
+      "number": 43,
+      "contentHash": "3e95e1d3cb5fbf3ac1c3390bebb983b666109f777a87995d0ee2704604deb470",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "4df4a988-aad0-4075-bcb7-80e8e2ac1cac",
+      "teamExternalId": "haas",
+      "role": null,
+      "number": 87,
+      "contentHash": "7f6e45b6b465af74e74f28abdae6e16bac20c9bb960b1448fe381ed19e17e895",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "11e96470-3e8a-43f6-8739-1a573545bb72",
+      "teamExternalId": "audi",
+      "role": null,
+      "number": 5,
+      "contentHash": "a11475716a513c89b5963925aa6474d30e88875962a94b20c4375862433b3234",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "681c9adb-a48d-4fc7-b5c6-30818254410c",
+      "teamExternalId": "audi",
+      "role": null,
+      "number": 27,
+      "contentHash": "c2194b3633c6946abb385e6e44afffa81c7cad1f63300979a26c5cb46f466850",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "2b29acea-e869-4bda-860e-7d56444cfe20",
+      "teamExternalId": "williams",
+      "role": null,
+      "number": 55,
+      "contentHash": "a467c38e94bbaf75ddb28b9bf6972efa1f8119047f148174bb67aa305d17d2eb",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "793117f9-e10a-47d8-a183-504052f6cbb1",
+      "teamExternalId": "williams",
+      "role": null,
+      "number": 23,
+      "contentHash": "e42052fc346737e7ed525eea2683a6658e780b46debdb3fb7222cf49eaf5c635",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "6cb764d9-3bc7-4a77-935e-e70eb4b63c1c",
+      "teamExternalId": "haas",
+      "role": null,
+      "number": 31,
+      "contentHash": "4bffe05fd85549b5186981f62e8b776795f9cb53334d02e0ba7d27e16bfaf5c9",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "79fe4666-39b0-4aa3-a55b-8165841c66fd",
+      "teamExternalId": "aston_martin",
+      "role": null,
+      "number": 14,
+      "contentHash": "0928427726ca6fccb5b29075f2795e17c45d15f20da67251dddbc7034b02ed31",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "624daf3f-279c-4685-9306-6f9a5208079a",
+      "teamExternalId": "rb",
+      "role": null,
+      "number": 22,
+      "contentHash": "680e5d9225765db0fbb4c71073ead76c31b299e30085dac77ce4bb08509bc3b6",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "45d84d18-df2f-49d9-afe9-a0ffe39a6599",
+      "teamExternalId": "aston_martin",
+      "role": null,
+      "number": 18,
+      "contentHash": "15fa68d166c9c142cc9046aa5fe43e79436e988f58a00e729c5a6739d538b2f5",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "59f36629-0417-48e7-a233-df43fa96f26c",
+      "teamExternalId": "cadillac",
+      "role": null,
+      "number": 77,
+      "contentHash": "5913e43bb12f728461faeb22b3e1dd5a99d901ada4e50409ce7b1cab2c4af10d",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    },
+    {
+      "source": "jolpica",
+      "seasonYear": 2026,
+      "driverExternalId": "b474d024-fb63-4c5b-9e4a-fcc2d4ed60bf",
+      "teamExternalId": "cadillac",
+      "role": null,
+      "number": 11,
+      "contentHash": "3e3356defdf0210cca155bdc2e7ec13224fee6e88c981cb8edb6dbd98889e9a2",
+      "lastSyncedAt": "2026-09-10T12:01:19.794Z"
+    }
+  ],
+  "teams": [
+    {
+      "id": "d3b6ce7c-7cc4-4fff-87ec-f190b2f5ecf8",
+      "name": "McLaren",
+      "shortName": "MCL",
+      "color": "#ff8000",
+      "userId": "9d277695-4c26-4ed9-8b49-80b8a55f1cf6",
+      "createdAt": "2026-09-09T09:45:16.602Z"
+    }
+  ],
+  "characters": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "userId": null,
+      "controlledBy": "AI",
+      "name": "Luca Moretti",
+      "nationality": "Italiana",
+      "gender": null,
+      "birthDate": "1991-03-14T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-05T02:21:53.592Z"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "userId": null,
+      "controlledBy": "AI",
+      "name": "Mia Sorensen",
+      "nationality": "Sueca",
+      "gender": null,
+      "birthDate": "1994-07-02T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-05T02:21:53.604Z"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "userId": null,
+      "controlledBy": "AI",
+      "name": "Ravi Chandra",
+      "nationality": "Indiana",
+      "gender": null,
+      "birthDate": "1988-11-23T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-05T02:21:53.607Z"
+    },
+    {
+      "id": "74fa197a-d18c-4118-8e0a-1ea1c269f83e",
+      "userId": "cb1a7575-3bfc-4bea-a151-77b6dc0a10ec",
+      "controlledBy": "USER",
+      "name": "Piloto Validador",
+      "nationality": "Brasileira",
+      "gender": "neutro",
+      "birthDate": "1990-05-20T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-05T02:23:33.774Z"
+    },
+    {
+      "id": "dd1b82fb-c19f-4a2e-8a21-ae46ecfd8842",
+      "userId": "7b1dbd9e-5292-4e48-a5ca-10f410e69a3c",
+      "controlledBy": "USER",
+      "name": "Piloto Smoke",
+      "nationality": "Brasileira",
+      "gender": "neutro",
+      "birthDate": "1995-03-10T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-05T02:52:08.747Z"
+    },
+    {
+      "id": "6d0c3d04-d066-4bf3-b0b6-5cc17f2fce29",
+      "userId": "ef078364-dc12-441a-b83d-fbaec6e1a0da",
+      "controlledBy": "USER",
+      "name": "Jornalista RAG",
+      "nationality": "Brasileira",
+      "gender": "neutro",
+      "birthDate": "1992-06-15T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-05T03:21:58.876Z"
+    },
+    {
+      "id": "eb6ce3ac-b248-457d-920b-6c111536a76d",
+      "userId": "9d277695-4c26-4ed9-8b49-80b8a55f1cf6",
+      "controlledBy": "USER",
+      "name": "Lando Norris",
+      "nationality": "British",
+      "gender": null,
+      "birthDate": "1999-11-13T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-09T09:45:16.572Z"
+    },
+    {
+      "id": "b38e8454-8bce-4a87-9d0a-2c26e00818c6",
+      "userId": "9d277695-4c26-4ed9-8b49-80b8a55f1cf6",
+      "controlledBy": "USER",
+      "name": "Alicya Piastri",
+      "nationality": "Australian",
+      "gender": null,
+      "birthDate": "2001-04-06T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-09T09:45:16.583Z"
+    },
+    {
+      "id": "01ac0d67-9e68-4bfe-be60-7979c39958c2",
+      "userId": "9d277695-4c26-4ed9-8b49-80b8a55f1cf6",
+      "controlledBy": "USER",
+      "name": "Reserve X",
+      "nationality": "Unknown",
+      "gender": null,
+      "birthDate": "2000-01-01T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-09T09:45:16.585Z"
+    },
+    {
+      "id": "478c495a-322d-4818-ae99-06892c563efe",
+      "userId": "9d277695-4c26-4ed9-8b49-80b8a55f1cf6",
+      "controlledBy": "USER",
+      "name": "Oscar Piastri",
+      "nationality": "Australian",
+      "gender": null,
+      "birthDate": "2001-04-06T00:00:00.000Z",
+      "imageUrl": null,
+      "createdAt": "2026-09-09T09:45:16.587Z"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "e7e0c2dc-ce60-49b4-b707-19fbf90a8eb9",
+      "characterId": "eb6ce3ac-b248-457d-920b-6c111536a76d",
+      "teamId": null,
+      "number": 2
+    },
+    {
+      "id": "9bfa4296-ee40-4377-a567-d4771ddbec28",
+      "characterId": "b38e8454-8bce-4a87-9d0a-2c26e00818c6",
+      "teamId": null,
+      "number": 2
+    },
+    {
+      "id": "6e17de6d-259b-46b5-8cc0-9c6b459ae6de",
+      "characterId": "01ac0d67-9e68-4bfe-be60-7979c39958c2",
+      "teamId": null,
+      "number": 88
+    },
+    {
+      "id": "5777078c-b84e-493a-b28f-79a30fd3d874",
+      "characterId": "478c495a-322d-4818-ae99-06892c563efe",
+      "teamId": null,
+      "number": 4
+    }
+  ],
+  "entries": [],
+  "conversations": 4,
+  "users": [
+    {
+      "id": "336f6467-4346-4d1a-8ec3-bcc23c9017ab",
+      "name": "Navegador Teste",
+      "email": "web17882036...",
+      "role": "USER"
+    },
+    {
+      "id": "f9d6c99a-25b1-442c-8699-3be797744371",
+      "name": "Navegador Teste",
+      "email": "web17882037...",
+      "role": "USER"
+    },
+    {
+      "id": "6f50fc3e-d85d-456a-8f5c-f174209ab47b",
+      "name": "Navegador Teste",
+      "email": "web17882038...",
+      "role": "USER"
+    },
+    {
+      "id": "3884deff-061d-4373-95b0-97751aab313b",
+      "name": "Navegador Teste",
+      "email": "web17882060...",
+      "role": "USER"
+    },
+    {
+      "id": "d1d678ec-03d9-4132-963f-1f51324e065d",
+      "name": "Navegador Teste",
+      "email": "web17882072...",
+      "role": "USER"
+    },
+    {
+      "id": "cb1a7575-3bfc-4bea-a151-77b6dc0a10ec",
+      "name": "Validador STEP 50",
+      "email": "step50-val-...",
+      "role": "USER"
+    },
+    {
+      "id": "7b1dbd9e-5292-4e48-a5ca-10f410e69a3c",
+      "name": "Smoke STEP 54",
+      "email": "step54-smok...",
+      "role": "USER"
+    },
+    {
+      "id": "ef078364-dc12-441a-b83d-fbaec6e1a0da",
+      "name": "RAG Smoke F13",
+      "email": "step57-rag-...",
+      "role": "USER"
+    },
+    {
+      "id": "1976d699-e035-4be5-96c9-df6938a8000c",
+      "name": "Step61 Verify",
+      "email": "step61-fix-...",
+      "role": "USER"
+    },
+    {
+      "id": "2224d8f5-6c17-4a0a-a413-4346b01f5e3d",
+      "name": "S63",
+      "email": "step63-1788...",
+      "role": "USER"
+    },
+    {
+      "id": "db9670b0-70de-4e78-b20e-d8027920ac3c",
+      "name": "Step61B Verify",
+      "email": "step61b-e15...",
+      "role": "USER"
+    },
+    {
+      "id": "1b2de3b8-894f-44e1-9dbd-470987c8500d",
+      "name": "Alice",
+      "email": "alice@email...",
+      "role": "USER"
+    },
+    {
+      "id": "794e9c38-9c69-4813-aab9-284210413229",
+      "name": "teste",
+      "email": "teste@email...",
+      "role": "USER"
+    },
+    {
+      "id": "9d277695-4c26-4ed9-8b49-80b8a55f1cf6",
+      "name": "Recon Admin",
+      "email": "recon-admin...",
+      "role": "USER"
+    },
+    {
+      "id": "75d5e398-5f79-42ae-b723-9bd154e65832",
+      "name": "Victor",
+      "email": "victorhcrap...",
+      "role": "ADMIN"
+    }
+  ],
+  "ogSeasons": [],
+  "ogTeams": [],
+  "ogDrivers": [],
+  "ogDriverSeasons": []
+}
