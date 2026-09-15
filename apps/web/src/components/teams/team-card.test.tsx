@@ -90,7 +90,10 @@ describe("TeamCard", () => {
   });
 
   it("sem cor: usa fallback neutro sem hardcode", () => {
-    const { container } = renderCard(makeTeam({ color: null }), []);
+    const { container } = renderCard(
+      makeTeam({ name: "Equipe Desconhecida", color: null }),
+      [],
+    );
     const accentBar = container.querySelector(
       'article > span[aria-hidden="true"]',
     ) as HTMLElement | null;
@@ -194,9 +197,9 @@ describe("TeamCard", () => {
     expect(article.className).toContain("before:bg-[image:var(--team-gradient)]");
     expect(article.className).toContain("hover:before:opacity-100");
     expect(article.className).toContain("hover:border-[color:var(--team-border)]");
-    expect(article.style.getPropertyValue("--team-gradient")).toContain(
-      "linear-gradient(135deg, #E80020, #FFF)",
-    );
+    const gradient = article.style.getPropertyValue("--team-gradient");
+    expect(gradient).toContain("#E80020");
+    expect(gradient).toContain("#FFF");
   });
 
   it("o wrapper da página não recebe a identidade", () => {
@@ -219,7 +222,10 @@ describe("TeamCard", () => {
           team={makeTeam({ visualIdentity: { primary: "#E80020" } })}
           drivers={[]}
         />
-        <TeamCard team={makeTeam({ id: "t2", color: null })} drivers={[]} />
+        <TeamCard
+          team={makeTeam({ id: "t2", name: "Equipe Desconhecida", color: null })}
+          drivers={[]}
+        />
       </div>,
     );
     const articles = container.querySelectorAll("article");
@@ -260,19 +266,39 @@ describe("TeamCard", () => {
     expect(content?.className).toContain("z-[1]");
   });
 
-  it("cores reais das equipes 2026", () => {
-    const cases: [string, string, string][] = [
-      ["Ferrari", "#E80020", "rgb(232, 0, 32)"],
-      ["Red Bull", "#3671C6", "rgb(54, 113, 198)"],
-      ["Mercedes", "#27F4D2", "rgb(39, 244, 210)"],
-      ["McLaren", "#FF8000", "rgb(255, 128, 0)"],
+  it("resolve RB F1 Team para a identidade Racing Bulls sem afetar o wrapper", () => {
+    const { container, wrapper } = renderCardInWrapper(
+      makeTeam({ name: "RB F1 Team", color: null }),
+      [],
+    );
+    const article = container.querySelector("article") as HTMLElement;
+    expect(article.style.getPropertyValue("--team-primary")).toBe("#6692ff");
+    expect(article.style.getPropertyValue("--team-secondary")).toBe("#f6f8ff");
+    expect(article.style.getPropertyValue("--team-accent")).toBe("#1f4bc5");
+    expect(article.style.getPropertyValue("--team-gradient")).toContain("#6692ff");
+    expect(article.className).toContain("before:bg-[image:var(--team-gradient)]");
+    expect(article.className).toContain("hover:before:opacity-100");
+    expect(wrapper.style.getPropertyValue("--team-primary")).toBe("");
+    expect(wrapper.style.getPropertyValue("--team-gradient")).toBe("");
+  });
+
+  it("usa a identidade visual 2026 centralizada", () => {
+    const cases: [string, string][] = [
+      ["Scuderia Ferrari HP", "#e80020"],
+      ["Red Bull Racing", "#1e41ff"],
+      ["Mercedes-AMG PETRONAS Formula One Team", "#00a19b"],
+      ["McLaren", "#ff8000"],
+      ["BWT Alpine Formula One Team", "#0093cc"],
+      ["Audi Revolut F1 Team", "#b0b4b7"],
     ];
-    for (const [name, hex, rgb] of cases) {
-      const { unmount } = renderCard(makeTeam({ name, color: hex }), []);
-      const bars = Array.from(
-        document.querySelectorAll('article > span[aria-hidden="true"]'),
-      ) as HTMLElement[];
-      expect(bars.some((b) => b.style.backgroundColor === rgb)).toBe(true);
+    for (const [name, primary] of cases) {
+      const { container, unmount } = renderCard(
+        makeTeam({ name, color: null }),
+        [],
+      );
+      const article = container.querySelector("article") as HTMLElement;
+      expect(article.style.getPropertyValue("--team-primary")).toBe(primary);
+      expect(article.style.getPropertyValue("--team-gradient")).toContain(primary);
       unmount();
     }
   });

@@ -209,8 +209,12 @@ describe("DriverCard", () => {
     render(
       <DriverCard driver={makeDriver()} onRemove={() => undefined} isRemoving={false} />,
     );
-    const flag = screen.getByRole("img", { name: "Brasileira" });
-    expect(flag.textContent!.length).toBeGreaterThan(0);
+    const flag = screen.getByRole("img", {
+      name: "Brazil flag",
+    }) as HTMLImageElement;
+    expect(flag.getAttribute("src")).toBe(
+      "https://flags.restcountries.com/v5/svg/br.svg",
+    );
   });
 
   it("não mostra bandeira para nacionalidade desconhecida", () => {
@@ -228,7 +232,7 @@ describe("DriverCard", () => {
         isRemoving={false}
       />,
     );
-    expect(screen.queryByRole("img", { name: "Atlantean" })).toBeNull();
+    expect(screen.queryByRole("img", { name: "Atlantean flag" })).toBeNull();
   });
 
   it("hover da nacionalidade aplica apenas no próprio card, de forma sutil", () => {
@@ -241,12 +245,14 @@ describe("DriverCard", () => {
     expect(article.className).toContain("before:bg-[image:var(--national-gradient)]");
     expect(article.className).toContain("hover:before:opacity-100");
     const gradient = article.style.getPropertyValue("--national-gradient");
-    expect(gradient).toMatch(/linear-gradient\(135deg,\s*#[0-9a-f]{6}1f,\s*#[0-9a-f]{6}1f\)/i);
-    expect(article.style.getPropertyValue("--national-border")).toMatch(
-      /#[0-9a-f]{6}59/i,
+    expect(gradient).toBe(
+      "linear-gradient(135deg, rgba(0,156,59,0.16) 0%, rgba(255,223,0,0.14) 52%, rgba(0,39,118,0.16) 100%)",
     );
-    expect(article.style.getPropertyValue("--national-glow")).toMatch(
-      /#[0-9a-f]{6}1f/i,
+    expect(article.style.getPropertyValue("--national-border")).toBe(
+      "rgba(0,39,118,0.35)",
+    );
+    expect(article.style.getPropertyValue("--national-glow")).toBe(
+      "rgba(0,39,118,0.14)",
     );
   });
 

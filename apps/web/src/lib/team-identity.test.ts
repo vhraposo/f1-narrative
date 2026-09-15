@@ -8,6 +8,8 @@ import {
   parseHex,
   relativeLuminance,
   resolveTeamIdentity,
+  teamIdentityFor,
+  TEAM_IDENTITIES_2026,
   withAlpha,
 } from "./team-identity";
 
@@ -100,8 +102,9 @@ describe("resolveTeamIdentity", () => {
     expect(r!.gradient).toContain("#ff0000");
   });
 
-  it("visualIdentity.primary overrides team.color", () => {
+  it("persisted visualIdentity overrides the 2026 catalog and team.color", () => {
     const r = resolveTeamIdentity({
+      name: "McLaren",
       color: "#000000",
       visualIdentity: { primary: "#3671c6" },
     });
@@ -119,6 +122,48 @@ describe("resolveTeamIdentity", () => {
 
   it("gradient contains primary and secondary", () => {
     const r = resolveTeamIdentity({ visualIdentity: { primary: "#aaa", secondary: "#bbb" } });
-    expect(r!.gradient).toBe("linear-gradient(135deg, #aaa, #bbb)");
+    expect(r!.gradient).toContain("#aaa");
+    expect(r!.gradient).toContain("#bbb");
+    expect(r!.gradient).toContain(r!.accent);
+  });
+
+  it("resolves the 11 central 2026 team identities from materialized names", () => {
+    const teams: [string, string][] = [
+      ["Mercedes-AMG PETRONAS Formula One Team", "#00a19b"],
+      ["Scuderia Ferrari HP", "#e80020"],
+      ["McLaren", "#ff8000"],
+      ["Red Bull Racing", "#1e41ff"],
+      ["Visa Cash App Racing Bulls F1 Team", "#6692ff"],
+      ["RB F1 Team", "#6692ff"],
+      ["BWT Alpine Formula One Team", "#0093cc"],
+      ["Haas F1 Team", "#ffffff"],
+      ["Audi Revolut F1 Team", "#b0b4b7"],
+      ["Atlassian Williams Racing", "#64c4ff"],
+      ["Aston Martin Aramco Formula One Team", "#006f62"],
+      ["Cadillac Formula 1 Team", "#121212"],
+    ];
+    expect(Object.keys(TEAM_IDENTITIES_2026)).toHaveLength(11);
+    for (const [name, primary] of teams) {
+      const identity = teamIdentityFor(name);
+      expect(identity?.primary).toBe(primary);
+      expect(identity?.secondary).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(identity?.accent).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(identity?.foreground).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(identity?.muted).toMatch(/^rgba\(/);
+      expect(identity?.border).toMatch(/^rgba\(/);
+      expect(identity?.gradient).toContain(primary);
+    }
+  });
+
+  it("uses the central identity before Team.color for known teams", () => {
+    const r = resolveTeamIdentity({
+      name: "McLaren",
+      color: "#123456",
+      visualIdentity: null,
+    });
+    expect(r?.primary).toBe("#ff8000");
+    expect(r?.secondary).toBe("#1d1d1b");
+    expect(r?.accent).toBe("#00a19b");
+    expect(r?.gradient).toContain("#00a19b");
   });
 });

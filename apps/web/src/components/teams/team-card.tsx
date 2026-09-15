@@ -37,12 +37,15 @@ export function TeamCard({
   return (
     <article
       className={cn(
-        "relative isolate flex overflow-hidden rounded-xl border border-border bg-card transition-colors duration-200",
+        "relative isolate flex overflow-hidden rounded-xl border border-border bg-card transition-all duration-200 ease-out",
         identity
           ? cn(
-              "group hover:border-[color:var(--team-border)] hover:shadow-[0_8px_30px_var(--team-border)]",
-              "before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:bg-[image:var(--team-gradient)] before:opacity-0 before:transition-opacity before:duration-200 before:content-['']",
-              "hover:before:opacity-100",
+              "group hover:border-[color:var(--team-border)]/60",
+              "hover:shadow-[0_6px_20px_var(--team-border)]/45",
+              "before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit]",
+              "before:bg-[image:var(--team-gradient)] before:opacity-0",
+              "before:transition-opacity before:duration-500 before:ease-out",
+              "before:content-[''] hover:before:opacity-15",
             )
           : "hover:border-brand/50",
       )}
@@ -60,13 +63,12 @@ export function TeamCard({
           : undefined
       }
     >
-
       <span
         aria-hidden="true"
         className={cn(
-          "w-1 shrink-0 self-stretch transition-colors duration-200",
+          "w-1 shrink-0 self-stretch transition-colors duration-500",
           identity
-            ? "bg-[var(--team-fg)]/10 group-hover:bg-[var(--team-fg)]/25"
+            ? "bg-[var(--team-fg)]/10 group-hover:bg-[var(--team-fg)]/20"
             : "bg-foreground/10",
         )}
         style={accentColor ? { backgroundColor: accentColor } : undefined}
@@ -74,14 +76,10 @@ export function TeamCard({
 
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col p-4">
         <div className="flex items-center justify-between gap-2">
-          <h3
-            className={cn(
-              "truncate font-semibold leading-none text-foreground transition-colors duration-200",
-              identity && "group-hover:text-[color:var(--team-fg)]",
-            )}
-          >
+          <h3 className="truncate font-semibold leading-none text-foreground">
             {team.name}
           </h3>
+
           {team.shortName && (
             <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-xs font-bold text-foreground/70">
               {team.shortName}
@@ -91,8 +89,8 @@ export function TeamCard({
 
         <p
           className={cn(
-            "mt-1 text-xs text-muted-foreground transition-colors duration-200",
-            identity && "group-hover:text-[color:var(--team-muted)]",
+            "mt-1 text-xs text-muted-foreground transition-colors duration-500",
+            identity && "group-hover:text-[color:var(--team-muted)]/90",
           )}
         >
           {drivers.length} {drivers.length === 1 ? "PILOTO" : "PILOTOS"}
@@ -102,8 +100,8 @@ export function TeamCard({
           {drivers.length === 0 ? (
             <span
               className={cn(
-                "text-sm italic text-muted-foreground transition-colors duration-200",
-                identity && "group-hover:text-[color:var(--team-muted)]",
+                "text-sm italic text-muted-foreground transition-colors duration-500",
+                identity && "group-hover:text-[color:var(--team-muted)]/90",
               )}
             >
               Nenhum piloto vinculado
@@ -126,15 +124,19 @@ export function TeamCard({
                     aria-hidden="true"
                     className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground/60"
                   >
-                    {driver.character.name.trim().charAt(0).toUpperCase() || "?"}
+                    {driver.character.name.trim().charAt(0).toUpperCase() ||
+                      "?"}
                   </span>
                 )}
+
                 <span className="tabular-nums text-foreground">
                   {driver.number !== null ? `#${driver.number}` : "—"}
                 </span>
+
                 <span className="truncate text-muted-foreground">
                   {driver.character.name}
                 </span>
+
                 {driver.character.nationality && (
                   <span className="truncate text-muted-foreground/70">
                     {driver.character.nationality}
@@ -163,6 +165,7 @@ export function TeamCard({
                   Editar
                 </button>
               )}
+
               {onRemove && (
                 <button
                   type="button"

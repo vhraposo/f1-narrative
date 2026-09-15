@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { flagUrlForIso } from "@/lib/nationalities";
 
 type CountryFlagProps = {
   iso: string;
@@ -7,14 +8,13 @@ type CountryFlagProps = {
 };
 
 export function CountryFlag({ iso, label, className }: CountryFlagProps) {
-  const chars = iso
-    .toUpperCase()
-    .split("")
-    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
-    .join("");
   return (
-    <span role="img" aria-label={label} className={cn("text-[0.8em] leading-none align-middle", className)}>
-      {chars}
-    </span>
+    <img
+      src={flagUrlForIso(iso)}
+      alt={label}
+      width={20}
+      height={14}
+      className={cn("h-3.5 w-5 rounded-[2px] object-cover shadow-sm", className)}
+    />
   );
 }

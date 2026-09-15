@@ -286,7 +286,7 @@ function StepIndicator({ step }: { step: number }) {
               {done ? (
                 <Check className="h-3 w-3" aria-hidden="true" />
               ) : (
-                <span>{item.id}</span>
+                <span>{item.id} • </span>
               )}
               {item.label}
             </li>

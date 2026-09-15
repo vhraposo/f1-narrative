@@ -69,9 +69,11 @@ export function DriverCard({
               "--national-primary": nationalityInfo.palette.primary,
               "--national-secondary": nationalityInfo.palette.secondary,
               "--national-accent": nationalityInfo.palette.accent,
-              "--national-border": `${nationalityInfo.palette.accent}59`,
-              "--national-glow": `${nationalityInfo.palette.accent}1f`,
-              "--national-gradient": `linear-gradient(135deg, ${nationalityInfo.palette.primary}1f, ${nationalityInfo.palette.accent}1f)`,
+              "--national-fg": nationalityInfo.palette.foreground,
+              "--national-muted": nationalityInfo.palette.muted,
+              "--national-border": nationalityInfo.palette.border,
+              "--national-glow": nationalityInfo.palette.glow,
+              "--national-gradient": nationalityInfo.palette.gradient,
             } as React.CSSProperties)
           : undefined
       }
@@ -103,10 +105,10 @@ export function DriverCard({
             </h3>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground sm:text-sm">
               <span className="inline-flex items-center gap-1">
-                {nationalityInfo.flag && (
+                {nationalityInfo.iso && nationalityInfo.flagUrl && (
                   <CountryFlag
-                    iso={nationalityInfo.iso!}
-                    label={driver.character.nationality}
+                    iso={nationalityInfo.iso}
+                    label={`${nationalityInfo.countryName ?? driver.character.nationality} flag`}
                   />
                 )}
                 {driver.character.nationality}
