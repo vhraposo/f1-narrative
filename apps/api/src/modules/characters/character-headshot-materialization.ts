@@ -1,4 +1,5 @@
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { normalizeF1HeadshotUrl } from "../external-openf1/openf1.images.js";
 
 export interface CharacterHeadshotMaterializationReport {
   considered: number;
@@ -31,13 +32,22 @@ export class CharacterHeadshotMaterializationService {
         continue;
       }
       const currentImageUrl = binding.character.imageUrl;
-      if (currentImageUrl !== null && currentImageUrl !== "") {
+      const targetImageUrl = normalizeF1HeadshotUrl(headshotUrl) as string;
+      if (
+        currentImageUrl !== null &&
+        currentImageUrl !== "" &&
+        currentImageUrl !== headshotUrl
+      ) {
+        charactersPreserved += 1;
+        continue;
+      }
+      if (currentImageUrl === targetImageUrl) {
         charactersPreserved += 1;
         continue;
       }
       await prisma.character.update({
         where: { id: binding.characterId },
-        data: { imageUrl: headshotUrl },
+        data: { imageUrl: targetImageUrl },
       });
       charactersUpdated += 1;
     }

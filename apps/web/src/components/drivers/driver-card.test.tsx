@@ -347,6 +347,29 @@ describe("DriverCard", () => {
     expect(img.className).toContain("object-cover");
   });
 
+  it("prefere a imagem do character (alta resolução) quando headshotUrl também existe", () => {
+    render(
+      <DriverCard
+        driver={makeDriver({
+          headshotUrl: "https://media.formula1.com/a.png.transform/1col/image.png",
+          character: {
+            id: "c1",
+            name: "Alicya Kucharski",
+            nationality: "Brasileira",
+            imageUrl:
+              "https://media.formula1.com/a.png.transform/2col-retina/image.png",
+          },
+        })}
+        onRemove={() => undefined}
+        isRemoving={false}
+      />,
+    );
+    const img = screen.getByRole("img", { name: "Alicya Kucharski" }) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(
+      "https://media.formula1.com/a.png.transform/2col-retina/image.png",
+    );
+  });
+
   it("usa imageUrl quando headshotUrl é nulo", () => {
     render(
       <DriverCard

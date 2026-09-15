@@ -175,6 +175,62 @@ describe("CharacterHeadshotMaterializationService", () => {
     expect(report.charactersUpdated - before.charactersUpdated).toBe(0);
     expect(await readImageUrl(character.id)).toBeNull();
   });
+
+  it("preenche headshot da CDN F1 com rendition de alta resolução", async () => {
+    const before = await baseline();
+    const user = await createUser();
+    const character = await createCharacter(user.id, "Piloto F1", null);
+    const driver = await createExternalDriver(
+      "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/A/ALEALB01_Alexander_Albon/alealb01.png.transform/1col/image.png",
+    );
+    await createBinding(character.id, driver.id);
+
+    const report = await new CharacterHeadshotMaterializationService().materialize();
+
+    expect(report.charactersUpdated - before.charactersUpdated).toBe(1);
+    expect(await readImageUrl(character.id)).toBe(
+      "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/A/ALEALB01_Alexander_Albon/alealb01.png.transform/2col-retina/image.png",
+    );
+  });
+
+  it("faz upgrade de imageUrl já materializada pelo fluxo (1col) sem tocar em custom", async () => {
+    const before = await baseline();
+    const user = await createUser();
+    const autoMaterialized = await createCharacter(
+      user.id,
+      "Piloto Matrix",
+      "https://media.formula1.com/x/y.png.transform/1col/image.png",
+    );
+    const customF1 = await createCharacter(
+      user.id,
+      "Piloto Costume",
+      "https://media.formula1.com/c/d.png.transform/4col/image.png",
+    );
+    const autoDriver = await createExternalDriver(
+      "https://media.formula1.com/x/y.png.transform/1col/image.png",
+    );
+    const customDriver = await createExternalDriver(
+      "https://media.formula1.com/c/d.png.transform/4col/image.png",
+    );
+    await createBinding(autoMaterialized.id, autoDriver.id);
+    await createBinding(customF1.id, customDriver.id);
+
+    const first = await new CharacterHeadshotMaterializationService().materialize();
+    expect(first.charactersUpdated - before.charactersUpdated).toBe(1);
+    expect(await readImageUrl(autoMaterialized.id)).toBe(
+      "https://media.formula1.com/x/y.png.transform/2col-retina/image.png",
+    );
+    expect(await readImageUrl(customF1.id)).toBe(
+      "https://media.formula1.com/c/d.png.transform/4col/image.png",
+    );
+
+    const second = await new CharacterHeadshotMaterializationService().materialize();
+    expect(second.charactersUpdated).toBe(first.charactersUpdated - 1);
+    expect(second.charactersPreserved).toBe(first.charactersPreserved + 1);
+    expect(await readImageUrl(autoMaterialized.id)).toBe(
+      "https://media.formula1.com/x/y.png.transform/2col-retina/image.png",
+    );
+  });
 });
 
 describe("Character headshot materialization routes — admin-only", () => {

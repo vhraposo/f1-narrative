@@ -51,7 +51,7 @@ export function DriverCard({
         .join(" · ")
     : null;
 
-  const portraitUrl = driver.headshotUrl ?? driver.character.imageUrl;
+  const portraitUrl = driver.character.imageUrl ?? driver.headshotUrl;
 
   return (
     <article
