@@ -468,8 +468,11 @@ model ExternalDriver {
   externalId    String
   name          String
   fullName      String?
-  nationality   String?
+nationality String?
   number        Int?
+  // Enriquecimento visual externo: URL da foto do rosto fornecida por uma
+  // fonte de mídia (ex.: OpenF1). Nunca tratada como truth de personagem.
+  headshotUrl   String?
   contentHash   String
   firstSyncedAt DateTime @default(now())
   lastSyncedAt  DateTime @default(now())

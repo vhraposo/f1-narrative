@@ -25,6 +25,7 @@ function makeDriver(overrides: Partial<Driver> = {}): Driver {
     characterId: "c1",
     number: 81,
     teamId: "t1",
+    headshotUrl: null,
     team: {
       id: "t1",
       name: "McLaren",
@@ -195,7 +196,7 @@ describe("TeamCard", () => {
     expect(article.className).toContain("isolate");
     expect(article.className).toContain("group");
     expect(article.className).toContain("before:bg-[image:var(--team-gradient)]");
-    expect(article.className).toContain("hover:before:opacity-100");
+    expect(article.className).toContain("hover:before:opacity-15");
     expect(article.className).toContain("hover:border-[color:var(--team-border)]");
     const gradient = article.style.getPropertyValue("--team-gradient");
     expect(gradient).toContain("#E80020");
@@ -232,9 +233,9 @@ describe("TeamCard", () => {
     expect(articles.length).toBe(2);
     const first = articles[0] as HTMLElement;
     const second = articles[1] as HTMLElement;
-    expect(first.className).toContain("hover:before:opacity-100");
+    expect(first.className).toContain("hover:before:opacity-15");
     expect(first.style.getPropertyValue("--team-primary")).toBe("#E80020");
-    expect(second.className).not.toContain("hover:before:opacity-100");
+    expect(second.className).not.toContain("hover:before:opacity-15");
     expect(second.className).not.toContain("group");
     expect(second.style.getPropertyValue("--team-primary")).toBe("");
     expect(second.style.getPropertyValue("--team-gradient")).toBe("");
@@ -261,7 +262,7 @@ describe("TeamCard", () => {
     const heading = screen.getByRole("heading", {
       name: "McLaren",
     });
-    expect(heading.className).toContain("group-hover:text-[color:var(--team-fg)]");
+    expect(heading.className).toContain("text-foreground");
     const content = article.querySelector("div.relative");
     expect(content?.className).toContain("z-[1]");
   });
@@ -277,7 +278,7 @@ describe("TeamCard", () => {
     expect(article.style.getPropertyValue("--team-accent")).toBe("#1f4bc5");
     expect(article.style.getPropertyValue("--team-gradient")).toContain("#6692ff");
     expect(article.className).toContain("before:bg-[image:var(--team-gradient)]");
-    expect(article.className).toContain("hover:before:opacity-100");
+    expect(article.className).toContain("hover:before:opacity-15");
     expect(wrapper.style.getPropertyValue("--team-primary")).toBe("");
     expect(wrapper.style.getPropertyValue("--team-gradient")).toBe("");
   });

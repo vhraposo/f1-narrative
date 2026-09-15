@@ -51,6 +51,8 @@ export function DriverCard({
         .join(" · ")
     : null;
 
+  const portraitUrl = driver.headshotUrl ?? driver.character.imageUrl;
+
   return (
     <article
       className={cn(
@@ -134,9 +136,9 @@ export function DriverCard({
           </div>
 
           <div className="hidden shrink-0 sm:block">
-            {driver.character.imageUrl ? (
+            {portraitUrl ? (
               <img
-                src={driver.character.imageUrl}
+                src={portraitUrl}
                 alt={driver.character.name}
                 className="h-16 w-20 rounded-lg object-cover"
               />

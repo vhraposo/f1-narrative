@@ -12,6 +12,7 @@ function makeDriver(overrides: Partial<Driver> = {}): Driver {
     characterId: "c1",
     number: 81,
     teamId: "t1",
+    headshotUrl: null,
     team: {
       id: "t1",
       name: "McLaren",
@@ -329,5 +330,52 @@ describe("DriverCard", () => {
         />,
       ),
     ).not.toThrow();
+  });
+
+  it("mostra headshot quando headshotUrl está presente", () => {
+    render(
+      <DriverCard
+        driver={makeDriver({ headshotUrl: "https://img.test/h.png" })}
+        onRemove={() => undefined}
+        isRemoving={false}
+      />,
+    );
+    const img = screen.getByRole("img", { name: "Alicya Kucharski" }) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("https://img.test/h.png");
+    expect(img.className).toContain("h-16");
+    expect(img.className).toContain("w-20");
+    expect(img.className).toContain("object-cover");
+  });
+
+  it("usa imageUrl quando headshotUrl é nulo", () => {
+    render(
+      <DriverCard
+        driver={makeDriver({
+          headshotUrl: null,
+          character: {
+            id: "c1",
+            name: "Alicya Kucharski",
+            nationality: "Brasileira",
+            imageUrl: "https://img.test/c.jpg",
+          },
+        })}
+        onRemove={() => undefined}
+        isRemoving={false}
+      />,
+    );
+    const img = screen.getByRole("img", { name: "Alicya Kucharski" }) as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("https://img.test/c.jpg");
+  });
+
+  it("fallback para inicial quando headshotUrl e imageUrl são nulos", () => {
+    render(
+      <DriverCard
+        driver={makeDriver({ headshotUrl: null })}
+        onRemove={() => undefined}
+        isRemoving={false}
+      />,
+    );
+    expect(screen.queryByRole("img", { name: "Alicya Kucharski" })).toBeNull();
+    expect(screen.getByText("A")).toBeDefined();
   });
 });

@@ -101,6 +101,24 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
         entries.map((entry) => [entry.driverProfileId, entry]),
       );
 
+      const characterIds = profiles.map((profile) => profile.characterId);
+      const bindings =
+        characterIds.length > 0
+          ? await prisma.externalBindingDriver.findMany({
+              where: { characterId: { in: characterIds } },
+              select: {
+                characterId: true,
+                externalDriver: { select: { headshotUrl: true } },
+              },
+            })
+          : [];
+      const headshotByCharacter = new Map<string, string | null>(
+        bindings.map((binding) => [
+          binding.characterId,
+          binding.externalDriver.headshotUrl,
+        ]),
+      );
+
       const drivers = profiles
         .map((profile) => {
           const entry = entryByProfile.get(profile.id);
@@ -111,6 +129,7 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
             number: active ? (entry!.number ?? profile.number) : profile.number,
             teamId: active ? (entry!.teamId ?? null) : null,
             team: active ? (entry!.team ?? null) : null,
+            headshotUrl: headshotByCharacter.get(profile.characterId) ?? null,
             createdAt: profile.createdAt,
             updatedAt: profile.updatedAt,
             character: profile.character,

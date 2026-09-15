@@ -48,6 +48,7 @@ function makeDriver(
     characterId: "c1",
     number: 16,
     teamId: "t1",
+    headshotUrl: null,
     team: {
       id: "t1",
       name: "Ferrari",

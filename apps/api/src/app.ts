@@ -55,6 +55,11 @@ import { OpeningGridTransport } from "./modules/opening-grid/opening-grid.transp
 import openingGridRoutes, {
   type OpeningGridRoutesOptions,
 } from "./modules/opening-grid/opening-grid.routes.js";
+import { OpenF1Client } from "./modules/external-openf1/openf1.client.js";
+import { OpenF1Transport } from "./modules/external-openf1/openf1.transport.js";
+import openF1EnrichmentRoutes, {
+  type OpenF1EnrichmentRoutesOptions,
+} from "./modules/external-openf1/openf1.routes.js";
 
 function defaultRagProvider(): EmbeddingProviderWithInputType {
   const apiKey = process.env.COHERE_API_KEY;
@@ -77,6 +82,7 @@ export function buildApp(
   generationProvider?: GenerationProvider,
   jolpicaClient?: JolpicaClient,
   openingGridClient?: OpeningGridClient,
+  openF1Client?: OpenF1Client,
 ): FastifyInstance {
   const app = Fastify({
     logger: {
@@ -156,6 +162,16 @@ export function buildApp(
       }),
   };
   void app.register(openingGridRoutes, openingGridOptions);
+  const openF1Options: OpenF1EnrichmentRoutesOptions = {
+    client:
+      openF1Client ??
+      new OpenF1Client({
+        baseUrl: env.OPENF1_BASE_URL,
+        timeoutMs: env.OPENF1_TIMEOUT_MS,
+        maxRetries: env.OPENF1_MAX_RETRIES,
+      }),
+  };
+  void app.register(openF1EnrichmentRoutes, openF1Options);
   void app.register(reconciliationRoutes);
   void app.register(universeInitRoutes);
   void app.register(playerEntryRoutes);

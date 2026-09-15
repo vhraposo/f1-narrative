@@ -28,6 +28,7 @@ function makeDriver(overrides: Partial<Driver> = {}): Driver {
     characterId: "c1",
     number: 81,
     teamId: "t1",
+    headshotUrl: null,
     team: { id: "t1", name: "McLaren", shortName: "MCL", color: "#ff8000" },
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",

@@ -29,6 +29,7 @@ type Driver = {
   characterId: string;
   number: number | null;
   teamId: string | null;
+  headshotUrl: string | null;
   team: {
     id: string;
     name: string;
@@ -912,5 +913,43 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("VALIDATION_ERROR");
+  });
+});
+
+describe("GET /api/drivers — headshotUrl do enriquecimento externo (STEP 107.16)", () => {
+  it("expõe headshotUrl do ExternalDriver vinculado e null sem vínculo", async () => {
+    const user = await createDbUser(
+      "step10716",
+      `step10716-${Date.now()}@f1nw.test`,
+    );
+    const chCom = await createDbCharacter(user.userId, "Com Headshot");
+    const chSem = await createDbCharacter(user.userId, "Sem Headshot");
+    await createDbDriver(chCom.id, 44);
+    await createDbDriver(chSem.id, 5);
+
+    const ext = await prisma.externalDriver.create({
+      data: {
+        source: "jolpica",
+        externalId: `step10716-${Date.now()}`,
+        name: "Com Headshot",
+        number: 44,
+        headshotUrl: "https://img.example/44.jpg",
+        contentHash: "ch-step10716",
+      },
+      select: { id: true },
+    });
+    await prisma.externalBindingDriver.create({
+      data: { externalDriverId: ext.id, characterId: chCom.id },
+    });
+
+    const { status, drivers } = await getDrivers(user, "", "10.16.1.1");
+    expect(status).toBe(200);
+
+    const com = drivers.find((d) => d.characterId === chCom.id)!;
+    const sem = drivers.find((d) => d.characterId === chSem.id)!;
+    expect(com.headshotUrl).toBe("https://img.example/44.jpg");
+    expect(sem.headshotUrl).toBeNull();
+
+    await prisma.externalDriver.delete({ where: { id: ext.id } });
   });
 });

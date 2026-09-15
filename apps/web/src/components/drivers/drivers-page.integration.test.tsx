@@ -44,10 +44,11 @@ const SEASONS: Season[] = [
 
 const DRIVERS: Driver[] = [
   {
-    id: "d1",
+id: "d1",
     characterId: "c1",
     number: 81,
     teamId: "t1",
+    headshotUrl: null,
     team: { id: "t1", name: "McLaren", shortName: "MCL", color: "#ff8000" },
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -59,10 +60,11 @@ const DRIVERS: Driver[] = [
     },
   },
   {
-    id: "d2",
+id: "d2",
     characterId: "c2",
     number: 44,
     teamId: "t2",
+    headshotUrl: null,
     team: {
       id: "t2",
       name: "Mercedes",

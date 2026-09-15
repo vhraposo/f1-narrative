@@ -5,6 +5,7 @@ export type Driver = {
   characterId: string;
   number: number | null;
   teamId: string | null;
+  headshotUrl: string | null;
   team: {
     id: string;
     name: string;
