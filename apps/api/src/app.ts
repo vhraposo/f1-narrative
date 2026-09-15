@@ -9,6 +9,7 @@ import authPlugin from "./infrastructure/auth/auth-plugin.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import healthRoutes from "./modules/health/health.routes.js";
 import charactersRoutes from "./modules/characters/characters.routes.js";
+import characterHeadshotMaterializationRoutes from "./modules/characters/character-headshot-materialization.routes.js";
 import driversRoutes from "./modules/drivers/driver-profile.routes.js";
 import teamsRoutes from "./modules/teams/team.routes.js";
 import rosterRoutes from "./modules/roster/roster.routes.js";
@@ -116,6 +117,7 @@ export function buildApp(
   void app.register(healthRoutes);
   void app.register(authRoutes);
   void app.register(charactersRoutes);
+  void app.register(characterHeadshotMaterializationRoutes);
   void app.register(driversRoutes);
   void app.register(teamsRoutes);
   void app.register(rosterRoutes);
