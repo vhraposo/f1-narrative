@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import {
   seasonIdParamSchema,
   teamIdBodySchema,
+  teamIdQuerySchema,
 } from "./universe-editor.schemas.js";
 import { universeEditorService, UniverseEditorError } from "./universe-editor.service.js";
 import { RosterError } from "../roster/roster.service.js";
@@ -52,6 +53,39 @@ export const universeEditorRoutes: FastifyPluginAsync = async (fastify) => {
           parsed.data.seasonId,
         );
         return reply.send(comparison);
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  fastify.get(
+    "/api/universe/roster-comparison/:seasonId/decisions",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const paramsParsed = seasonIdParamSchema.safeParse(request.params);
+      if (!paramsParsed.success) {
+        return reply.code(400).send({
+          error: "Dados inválidos",
+          code: "VALIDATION_ERROR",
+          issues: paramsParsed.error.issues,
+        });
+      }
+      const queryParsed = teamIdQuerySchema.safeParse(request.query ?? {});
+      if (!queryParsed.success) {
+        return reply.code(400).send({
+          error: "Dados inválidos",
+          code: "VALIDATION_ERROR",
+          issues: queryParsed.error.issues,
+        });
+      }
+      try {
+        const result = await universeEditorService.listDecisions(
+          request.user!.id,
+          paramsParsed.data.seasonId,
+          queryParsed.data.teamId,
+        );
+        return reply.send(result);
       } catch (error) {
         return sendError(reply, error);
       }

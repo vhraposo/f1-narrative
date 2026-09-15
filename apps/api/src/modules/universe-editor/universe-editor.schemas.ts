@@ -8,5 +8,10 @@ export const teamIdBodySchema = z.object({
   teamId: z.string().uuid("Identificador de equipe inválido"),
 });
 
+export const teamIdQuerySchema = z.object({
+  teamId: z.string().uuid("Identificador de equipe inválido"),
+});
+
 export type SeasonIdParam = z.infer<typeof seasonIdParamSchema>;
 export type TeamIdBody = z.infer<typeof teamIdBodySchema>;
+export type TeamIdQuery = z.infer<typeof teamIdQuerySchema>;

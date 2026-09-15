@@ -181,6 +181,8 @@ model User {
   teams           Team[]
   externalSources ExternalSource[]
 
+  universeEditorDecisions UniverseEditorDecision[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -312,6 +314,8 @@ model Team {
   seasonDriverEntries  SeasonDriverEntry[]
   externalTeamBindings ExternalBindingTeam[]
 
+  universeEditorDecisions UniverseEditorDecision[]
+
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -336,6 +340,8 @@ model Season {
 
   seasonDriverEntries    SeasonDriverEntry[]
   externalSeasonBindings ExternalBindingSeason[]
+
+  universeEditorDecisions UniverseEditorDecision[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -460,6 +466,27 @@ model DriverEntryEvent {
   createdAt DateTime             @default(now())
 
   @@index([entryId, createdAt])
+}
+
+/// Registro durável e anexável da decisão "manter o universo" tomada no
+/// Universe Editor para uma equipe em uma temporada. Não é fonte de verdade
+/// do roster (SeasonDriverEntry permanece autoridade); preserva apenas o
+/// reconhecimento do usuário sobre divergências naquele momento. A criação
+/// é idempotente por signature (estado dos assentos reconhecido).
+model UniverseEditorDecision {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seasonId  String   @db.Uuid
+  season    Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  teamId    String   @db.Uuid
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  signature String
+  seats     Json
+  createdAt DateTime @default(now())
+
+  @@unique([userId, seasonId, teamId, signature])
+  @@index([userId, seasonId, teamId])
 }
 
 model ExternalDriver {

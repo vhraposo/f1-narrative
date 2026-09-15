@@ -1,6 +1,7 @@
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { rosterService } from "../roster/roster.service.js";
 import { JOLPICA_SOURCE } from "../external-sync/jolpica.service.js";
+import { OPENING_GRID_SOURCE } from "../opening-grid/opening-grid.source.js";
 
 export class UniverseEditorError extends Error {
   constructor(
@@ -137,7 +138,63 @@ async function resolveTeam(userId: string, teamId: string): Promise<TeamInfo> {
   };
 }
 
-async function resolveSourceSeats(extTeamExternalId: string, sourceYear: number): Promise<SourceSeat[]> {
+const RACE_SEAT_ROLE_BY_SEAT: Record<1 | 2, string> = {
+  1: "RACE_SEAT:1",
+  2: "RACE_SEAT:2",
+};
+
+async function resolveSourceSeats(
+  extTeamExternalId: string,
+  sourceYear: number,
+): Promise<SourceSeat[]> {
+  const claims = await prisma.externalDriverSeason.findMany({
+    where: {
+      source: OPENING_GRID_SOURCE,
+      seasonYear: sourceYear,
+      teamExternalId: extTeamExternalId,
+      role: { in: ["RACE_SEAT:1", "RACE_SEAT:2"] },
+    },
+    include: {
+      externalDriver: { select: { externalId: true, name: true, number: true } },
+    },
+  });
+
+  if (claims.length === 0) {
+    return resolveSourceSeatsFromParticipants(extTeamExternalId, sourceYear);
+  }
+
+  const seats: SourceSeat[] = [];
+  for (const seat of [1, 2] as const) {
+    const claim = claims.find((c) => c.role === RACE_SEAT_ROLE_BY_SEAT[seat]);
+    if (!claim) continue;
+    const participant = await prisma.externalDriverSeason.findFirst({
+      where: {
+        source: JOLPICA_SOURCE,
+        seasonYear: sourceYear,
+        externalDriver: {
+          source: JOLPICA_SOURCE,
+          externalId: claim.externalDriver.externalId,
+        },
+      },
+      include: {
+        externalDriver: { select: { id: true, name: true, number: true } },
+      },
+    });
+    if (!participant) continue;
+    seats.push({
+      externalDriverSeasonId: participant.id,
+      externalDriverId: participant.externalDriver.id,
+      name: participant.externalDriver.name,
+      number: participant.number ?? claim.externalDriver.number ?? null,
+    });
+  }
+  return seats;
+}
+
+async function resolveSourceSeatsFromParticipants(
+  extTeamExternalId: string,
+  sourceYear: number,
+): Promise<SourceSeat[]> {
   const rows = await prisma.externalDriverSeason.findMany({
     where: {
       source: JOLPICA_SOURCE,
@@ -347,6 +404,72 @@ async function buildTeamComparison(
   };
 }
 
+function fnv1a(payload: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < payload.length; i++) {
+    hash ^= payload.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return String(hash >>> 0);
+}
+
+type DecisionSeat = {
+  seat: number;
+  status: SeatStatus;
+  source: { externalDriverId: string; name: string; number: number | null } | null;
+  universe: {
+    entryId: string;
+    driverProfileId: string;
+    characterId: string;
+    characterName: string;
+    provenance: string;
+  } | null;
+};
+
+function decisionSeatsOf(team: TeamComparison): DecisionSeat[] {
+  return team.seats.map((seat) => ({
+    seat: seat.seat,
+    status: seat.status,
+    source: seat.source,
+    universe: seat.universe
+      ? {
+          entryId: seat.universe.entryId,
+          driverProfileId: seat.universe.driverProfileId,
+          characterId: seat.universe.characterId,
+          characterName: seat.universe.characterName,
+          provenance: seat.universe.provenance,
+        }
+      : null,
+  }));
+}
+
+async function persistKeepDecision(
+  userId: string,
+  seasonId: string,
+  teamId: string,
+  team: TeamComparison,
+) {
+  if (team.status !== "DIVERGENT") return null;
+  const seats = decisionSeatsOf(team);
+  const signature = fnv1a(JSON.stringify(seats));
+  const existing = await prisma.universeEditorDecision.findUnique({
+    where: {
+      userId_seasonId_teamId_signature: { userId, seasonId, teamId, signature },
+    },
+    select: { id: true },
+  });
+  if (existing) return null;
+  try {
+    return await prisma.universeEditorDecision.create({
+      data: { userId, seasonId, teamId, signature, seats },
+    });
+  } catch (error) {
+    const prismaError = error as { code?: string };
+    if (prismaError.code === "P2002") return null;
+    throw error;
+  }
+}
+
 export const universeEditorService = {
   async comparison(userId: string, seasonId: string): Promise<ComparisonResponse> {
     const { season, sourceYear, comparable } = await resolveComparableSeason(seasonId);
@@ -401,6 +524,7 @@ export const universeEditorService = {
     const teamInfo = await resolveTeam(userId, teamId);
     const driverBindingMap = await resolveDriverBindingMap(sourceYear);
     const team = await buildTeamComparison(seasonId, sourceYear, teamId, teamInfo, driverBindingMap);
+    await persistKeepDecision(userId, seasonId, teamId, team);
     return { team };
   },
 
@@ -454,5 +578,28 @@ export const universeEditorService = {
     const driverBindingMapAfter = await resolveDriverBindingMap(sourceYear);
     const team = await buildTeamComparison(seasonId, sourceYear, teamId, teamInfo, driverBindingMapAfter);
     return { team, restored: toRestore.length };
+  },
+
+  async listDecisions(userId: string, seasonId: string, teamId: string) {
+    const team = await prisma.team.findFirst({
+      where: { id: teamId, userId },
+      select: { id: true },
+    });
+    if (!team) {
+      throw new UniverseEditorError("TEAM_NOT_FOUND", "Equipe não encontrada", 404);
+    }
+    const decisions = await prisma.universeEditorDecision.findMany({
+      where: { userId, seasonId, teamId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        seasonId: true,
+        teamId: true,
+        signature: true,
+        seats: true,
+        createdAt: true,
+      },
+    });
+    return { decisions };
   },
 };
