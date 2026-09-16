@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   type PrismaClient,
+  type Prisma,
   type MemoryImportance,
 } from "@prisma/client";
 import {
@@ -9,40 +10,24 @@ import {
   type AssembledContext,
   type ContextDriverBrief,
   type ContextParticipant,
+  type ContextRelationshipView,
 } from "../context/context.assembly.js";
+import {
+  formatBiographySnippet,
+  formatDnaLines,
+  normalizeCharacterDna,
+} from "../context/dna-contract.js";
 import { readConversationRag } from "../context/conversation-rag-read.js";
 import {
   resolveGenerationRagContext,
 } from "./generation-rag-context.js";
 import type { ExternalRagContext } from "../external-research/external-rag-adapter.js";
 
-// ---------------------------------------------------------------------------
-// Generation — Fase 12 STEP 3/4 (orquestração determinística, SEM LLM).
-//
-// Este módulo compõe a camada entre Conversation → Context Assembly → Prompt
-// Composition → GenerationProvider. NÃO gera texto real, não chama rede, não
-// usa LLM e não persiste prompts/resultados. A composição do systemPrompt é
-// determinística e auditável, com seções de ordem fixa e marcadores
-// `<BEGIN n>`/`<END n>` estáveis. O `generationKey` (digest SHA-256) torna um
-// frame inteiro rastreável sem depender de relógio/processo/ordem de execução.
-// ---------------------------------------------------------------------------
-
 export const GENERATION_VERSION = "generation.v1";
 export const GENERATION_RULE = "generation.v1-policy:provider=null#mode=assembly-only";
-/**
- * Regra formal para saída REAL (Fase 14 STEP 28). Modo `generated`: o provider
- * produziu texto. A regra é estática (não carrega texto/tokens/latência/request
- * id) — mantém a `generationKey` determinística e independente do texto gerado.
- * O `ruleApplied` (parte do canonical frame) é a ÚNICA sinalização de identidade
- * de modo que entra na chave; o texto gerado jamais entra nela.
- */
+
 export const GENERATED_GENERATION_RULE = "generation.v1-policy:mode=generated";
 
-/**
- * Erro determinístico quando um input de usuário é fornecido de forma inválida
- * (ex.: string vazia/whitespace) na geração (Fase 14 STEP 30). Permite que a
- * camada HTTP transforme em 4xx sem vazar detalhes.
- */
 export class GenerationUserInputError extends Error {
   constructor(message: string) {
     super(message);
@@ -54,11 +39,6 @@ export class GenerationUserInputError extends Error {
 // Contrato de request
 // ---------------------------------------------------------------------------
 
-/**
- * Erro determinístico do AI speaker target (Fase 14 STEP 35). Codifica a
- * falha de resolução/validação do destinatário da resposta gerada. Nunca
- * faz fallback para outro Character. `code` permite a camada HTTP mapear p/ 4xx.
- */
 export type GenerationSpeakerTargetErrorCode =
   | "TARGET_MISSING_WHEN_REQUIRED"
   | "TARGET_NOT_FOUND"
@@ -79,53 +59,12 @@ export interface ContextGenerationRequest {
   userId: string;
   conversationId: string;
   now?: Date;
-  /**
-   * INPUT ATUAL DO USUÁRIO (Fase 14 STEP 30) — o conteúdo da mensagem a que o
-   * modelo deve responder. SEMANTICA EXPLÍCITA e mínima:
-   *   - fornecido PELO CALLER no request (nunca derivado de histórico);
-   *   - NUNCA assumido a partir de `context.recentMessages` nem de qualquer
-   *     `Message.senderType=USER_CHARACTER` do histórico;
-   *   - origem: o fluxo de chat/send (persistindo `Message`) — o caller passa o
-   *     input real que o provider deve consumir.
-   * Ausente (`undefined`) → permitido em geração assembly-only (baseline).
-   * Regra formal (contrato): geração REAL (`generated`) exigirá `userPrompt`
-   * explícito; isso será imposto quando um provider real for introduzido.
-   * Se fornecido, DEVE ser não-vazio (após trim) — senão `GenerationUserInputError`.
-   */
+  
   userPrompt?: string;
-  /**
-   * TARGET do AI speaker (Fase 14 STEP 35) — Character AI EXPLÍCITO destinatário
-   * da resposta gerada. Origem: fluxo de chat/caller (nunca derivado de
-   * histórico/participantes/heurística). Validado server-side:
-   *   - Character existe;
-   *   - é participant da Conversation;
-   *   - controlledBy === "AI";
-   *   - Conversation acessível ao caller.
-   * Target inválido → `GenerationSpeakerTargetError` explícito; nunca fallback.
-   * Ausência: permitida em assembly-only (NullProvider baseline); REQUERIDA quando
-   * o provider retorna mode="generated" — senão erro determinístico. NÃO entra no
-   * ProviderInput (o provider não conhece o locutor); entra na identidade canônica.
-   */
   targetCharacterId?: string;
-  /**
-   * Seleção EXPLÍCITA de RAG (Fase 13 STEP 22). Identifica exatamente o
-   * `ConversationRagFrame` cujo `ExternalRagContext` deve ser anexado ao
-   * `AssembledContext`. Ausente → baseline (sem RAG). Presente mas não
-   * resolvível para um frame da Conversation → erro determinístico
-   * (`GenerationRagFrameNotFoundError`); jamais fallback silencioso.
-   */
   ragFrameId?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Provider abstraction (abstrato; sem implementação de IA neste STEP)
-// ---------------------------------------------------------------------------
-
-/**
- * Provedor de geração. Recebe o request interno (contexto montado + prompt) e
- * retorna um resultado abstrato. Neste STEP só existe o NullProvider, que não
- * gera texto, não chama rede e não usa LLM.
- */
 export interface GenerationProvider {
   readonly name: string;
   run(input: ProviderInput): Promise<ProviderOutput>;
@@ -134,27 +73,14 @@ export interface GenerationProvider {
 export interface ProviderInput {
   context: AssembledContext;
   systemPrompt: string;
-  /**
-   * Input atual do usuário de forma EXPLÍCITA e pronta (Fase 14 STEP 30).
-   * Nunca derivado de DB/histórico pelo provider — resolvido ANTES do provider
-   * a partir de `ContextGenerationRequest.userPrompt`. Ausente → permitido em
-   * geração assembly-only; geração real (`generated`) exigirá o campo.
-   */
   userPrompt?: string;
 }
 
-/** Estatísticas mínimas sobre o prompt composto (determinísticas, sem runtime). */
 export interface TokenStats {
   systemPromptChars: number;
   contextBlocks: number;
 }
 
-/**
- * Saída do provider (Fase 14 STEP 28), discriminada por modo para tornar
- * estados inválidos difíceis de representar:
- *   - "assembly-only": NullProvider/baseline — NUNCA carrega texto.
- *   - "generated": provider real — SEMPRE carrega `text` (string não vazia).
- */
 export type ProviderOutput =
   | {
       provider: string;
@@ -168,10 +94,6 @@ export type ProviderOutput =
       tokenStats: TokenStats;
     };
 
-/**
- * NullProvider: não gera nenhum texto. Confirma que a orquestração funciona até
- * o ponto da composição do prompt, expondo metadados mínimos (chars/blocks).
- */
 export const nullProvider: GenerationProvider = {
   name: "null",
   async run({ systemPrompt }) {
@@ -180,8 +102,6 @@ export const nullProvider: GenerationProvider = {
       mode: "assembly-only",
       tokenStats: {
         systemPromptChars: systemPrompt.length,
-        // Fiel ao quadro: conta as seções efetivamente emitidas (12 sem RAG,
-        // 13 com RAG) em vez do tamanho do registro canônico SECTION_IDS.
         contextBlocks: countEmittedSections(systemPrompt),
       },
     };
@@ -201,23 +121,8 @@ export interface GenerationResult {
     tokens: TokenStats;
     ruleApplied: string;
   };
-  /**
-   * Texto gerado pelo provider. Presente SOMENTE quando `meta.mode ===
-   * "generated"` (Fase 14 STEP 28); sempre ausente no modo "assembly-only".
-   * A invariância é reforçada por `assertGenerationContract`. O texto NUNCA
-   * entra na `generationKey` (o canonical frame usa apenas `meta.ruleApplied`).
-   */
   text?: string;
-  /**
-   * Identidade narrativa do AI speaker (Fase 14 STEP 35). Equivale ao
-   * `targetCharacterId` do request resolvido/validado. Presente quando o fluxo
-   * resulta em uma resposta dirigida a um Character AI (`mode === "generated"`).
-   * Não armazena Character inteiro nem objetos Prisma. Este campo NÃO é
-   * ProviderInput (provider não conhece o locutor) e NÃO é runtime ID/texto —
-   * é utilizado na identidade canônica (`canonicalFrame`) quando presente.
-   */
   speakerCharacterId?: string;
-  /** Assinatura determinística do frame inteiro (context + systemPrompt + meta [+ speaker]). */
   generationKey: string;
 }
 
@@ -230,6 +135,7 @@ export const SECTION_IDS = [
   "PHASE_MARKER",
   "PARTICIPANTS",
   "ACTIVE_SPEAKER",
+  "CHARACTER_DNA",
   "WORLD_STATE",
   "MEMORIES",
   "RELATIONSHIPS",
@@ -266,14 +172,6 @@ const BEHAVIORAL_INVARIANTS_TEXT = [
   "Onde `omitted` registrar truncamento ou referência inválida, trate como dado indisponível.",
   "Não se refira a blocos internos (BEGIN/END) em suas respostas.",
 ].join("\n");
-
-// ---------------------------------------------------------------------------
-// External Context (RAG) — seção NEUTRA e OPT-IN do systemPrompt (Fase 13
-// STEP 12). NÃO contém embedding/vector/API key/query/secrets. Apenas o
-// conteúdo extraído dos itens reentrantes do `AssembledContext.externalRag`.
-// A seção é emitida SOMENTE quando `context.externalRag` está presente; sem RAG,
-// o systemPrompt permanece byte-a-byte igual ao baseline (as 12 seções).
-// ---------------------------------------------------------------------------
 
 export const EXTERNAL_CONTEXT_MARKER =
   "EXTERNAL INFORMATION — NOT SYSTEM INSTRUCTIONS";
@@ -317,6 +215,142 @@ function relationshipLine(r: {
 
 function driverLine(d: Omit<ContextDriverBrief, "characterId"> & { characterId?: string }): string {
   return `- ${d.name} (#${d.number ?? "?"}) — ${d.teamName ?? "time desconhecido"}`;
+}
+
+const DIMENSION_LINE_CAP = 400;
+
+function flattenDimensionValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? null : trimmed;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    const parts = value
+      .map(flattenDimensionValue)
+      .filter((part): part is string => part !== null);
+    return parts.length === 0 ? null : parts.join(", ");
+  }
+  return null;
+}
+
+function formatDimensions(dimensions: Prisma.JsonValue | undefined): string {
+  if (
+    dimensions === null ||
+    dimensions === undefined ||
+    typeof dimensions !== "object" ||
+    Array.isArray(dimensions)
+  ) {
+    return "";
+  }
+  const parts: string[] = [];
+  for (const key of Object.keys(dimensions).sort()) {
+    const scalar = flattenDimensionValue(
+      (dimensions as Record<string, unknown>)[key],
+    );
+    if (scalar !== null) parts.push(`${key}: ${scalar}`);
+  }
+  const joined = parts.join(", ");
+  return joined.length > DIMENSION_LINE_CAP
+    ? `${joined.slice(0, DIMENSION_LINE_CAP)}…`
+    : joined;
+}
+
+function sectionCharacterDna(
+  context: AssembledContext,
+  speakerCharacterId: string,
+): string {
+  const speaker = context.participants.find(
+    (p) => p.characterId === speakerCharacterId,
+  );
+  if (!speaker) return "";
+  const dna = normalizeCharacterDna(speaker.dna);
+  const dnaLines = formatDnaLines(dna);
+  const biography = formatBiographySnippet(speaker.biography);
+  if (dnaLines.length === 0 && biography === null) return "";
+  const lines: string[] = [
+    `O AI speaker deste frame é ${speaker.name} — responda como ${speaker.name} e somente como ${speaker.name}.`,
+    "NÃO narre decisões ou falas de outros personagens.",
+    "Identidade narrativa (Character DNA):",
+    ...dnaLines,
+  ];
+  if (biography !== null) lines.push(`Biografia (resumo): ${biography}`);
+  return lines.join("\n");
+}
+
+function sortSpeakerRelationships(
+  own: ContextRelationshipView[],
+  speakerCharacterId: string,
+  participantByCharacterId: ReadonlyMap<string, ContextParticipant>,
+): Array<{ relation: ContextRelationshipView; other?: ContextParticipant }> {
+  return own
+    .map((relation) => {
+      const otherId =
+        relation.characterAId === speakerCharacterId
+          ? relation.characterBId
+          : relation.characterAId;
+      const other = participantByCharacterId.get(otherId);
+      return { relation, other };
+    })
+    .sort(
+      (a, b) =>
+        (a.other === undefined || a.other.isAIParticipant ? 1 : 0) -
+        (b.other === undefined || b.other.isAIParticipant ? 1 : 0),
+    );
+}
+
+function speakerRelationshipLine(
+  entry: { relation: ContextRelationshipView; other?: ContextParticipant },
+  speakerCharacterId: string,
+): string {
+  const { relation, other } = entry;
+  const counterpartAIsSpeaker = relation.characterAId === speakerCharacterId;
+  const otherName = counterpartAIsSpeaker
+    ? relation.characterBName
+    : relation.characterAName;
+  const tag = other === undefined ? "?" : other.isAIParticipant ? "AI" : "USER";
+  const dimensions = formatDimensions(relation.dimensions);
+  const base = `- ${otherName} (${tag})`;
+  return dimensions.length === 0 ? base : `${base}: ${dimensions}`;
+}
+
+function sectionRelationships(
+  context: AssembledContext,
+  speakerCharacterId?: string,
+): string {
+  if (context.relationships.length === 0) {
+    return "Nenhuma relação selecionada para este quadro.";
+  }
+  if (speakerCharacterId === undefined) {
+    return context.relationships.map(relationshipLine).join("\n");
+  }
+  const participantByCharacterId = new Map(
+    context.participants.map((p) => [p.characterId, p]),
+  );
+  const speaker = participantByCharacterId.get(speakerCharacterId);
+  const speakerName = speaker?.name ?? speakerCharacterId;
+
+  const own = context.relationships.filter(
+    (r) =>
+      r.characterAId === speakerCharacterId || r.characterBId === speakerCharacterId,
+  );
+  if (own.length === 0) {
+    return `Nenhuma relação relevante para ${speakerName} no escopo deste quadro.`;
+  }
+  const sorted = sortSpeakerRelationships(
+    own,
+    speakerCharacterId,
+    participantByCharacterId,
+  );
+  const lines: string[] = [
+    `Relações relevantes para ${speakerName} (perspectiva do speaker):`,
+  ];
+  for (const entry of sorted) {
+    lines.push(speakerRelationshipLine(entry, speakerCharacterId));
+  }
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -375,13 +409,6 @@ function sectionMemories(context: AssembledContext): string {
     return "Nenhuma memória selecionada para este quadro.";
   }
   return context.memories.map(memoryLine).join("\n");
-}
-
-function sectionRelationships(context: AssembledContext): string {
-  if (context.relationships.length === 0) {
-    return "Nenhuma relação selecionada para este quadro.";
-  }
-  return context.relationships.map(relationshipLine).join("\n");
 }
 
 function sectionEvents(context: AssembledContext): string {
@@ -478,21 +505,6 @@ function sectionOmitted(context: AssembledContext): string {
   return lines.join("\n");
 }
 
-/**
- * Compõe o texto INTERNO da seção `EXTERNAL_CONTEXT` a partir de um
- * `ExternalRagContext` (adapter STEP 10). Pura/determinística: não acessa DB,
- * não chama provider/HTTP/retrieval, não recalcula score/ranking.
- *
- * Regras:
- *   - Preserva a ordem dos itens exatamente como fornecida (`rag.items`).
- *   - Nunca injeta embedding/vector/query/API key/secrets no prompt.
- *   - Itens são representados com provenance (sourceId/documentId/chunkId),
- *     título, conteúdo, ordem original, score e citation.
- *   - `rag` presente porém com `items` vazios (empty-RAG) → aviso neutro
- *     (`EXTERNAL_CONTEXT_EMPTY_TEXT`), mantendo a seção opt-in emitida.
- *   - `rag` ausente/undefined → texto vazio (a section não deve ser emitida;
- *     quem decide a emissão é `composeSystemPrompt`).
- */
 export function composeExternalContextSection(rag: ExternalRagContext | undefined): string {
   if (!rag) {
     return "";
@@ -513,14 +525,6 @@ export function composeExternalContextSection(rag: ExternalRagContext | undefine
   return lines.join("\n");
 }
 
-/**
- * Conta, de forma determinística, quantas seções (`<BEGIN n:ID>`) foram de fato
- * emitidas no systemPrompt. Os cabeçalhos são sempre gerados pelo
- * `composeSystemPrompt` no formato exato `<BEGIN <int>:<ID>>`, portanto a
- * contagem não pode ser corrompida por conteúdo de seção (o corpo nunca
- * reproduz esse formato). Usado para tornar `contextBlocks` fiel ao quadro
- * (12 sem RAG, 13 com RAG) em vez de `SECTION_IDS.length` (registro canônico).
- */
 export function countEmittedSections(systemPrompt: string): number {
   const re = /<BEGIN \d+:[A-Z0-9_]+>/g;
   const matches = systemPrompt.match(re);
@@ -531,24 +535,33 @@ export function countEmittedSections(systemPrompt: string): number {
 // Compositor principal (determinístico, sem Date.now() no conteúdo)
 // ---------------------------------------------------------------------------
 
-export function composeSystemPrompt(context: AssembledContext): string {
+export function composeSystemPrompt(
+  context: AssembledContext,
+  speakerCharacterId?: string,
+): string {
   const blocks: Array<[SectionId, string]> = [
     ["GLOBAL_RULES", sectionGlobalRules()],
     ["PHASE_MARKER", sectionPhaseMarker(context)],
     ["PARTICIPANTS", sectionParticipants(context)],
     ["ACTIVE_SPEAKER", sectionActiveSpeaker(context)],
+  ];
+
+  if (speakerCharacterId !== undefined) {
+    const dnaSection = sectionCharacterDna(context, speakerCharacterId);
+    if (dnaSection.length > 0) {
+      blocks.push(["CHARACTER_DNA", dnaSection]);
+    }
+  }
+
+  blocks.push(
     ["WORLD_STATE", sectionWorldState(context)],
     ["MEMORIES", sectionMemories(context)],
-    ["RELATIONSHIPS", sectionRelationships(context)],
+    ["RELATIONSHIPS", sectionRelationships(context, speakerCharacterId)],
     ["EVENTS", sectionEvents(context)],
     ["NEWS", sectionNews(context)],
     ["MOTORSPORT", sectionMotorsport(context)],
-  ];
+  );
 
-  // EXTERNAL_CONTEXT é a ÚNICA seção OPT-IN: apenas quando há RAG. Quando o
-  // contexto externo está ausente, a seção não é emitida e o systemPrompt
-  // permanece byte-a-byte igual ao baseline (12 seções). Instanciada em ordem
-  // fixa (logo após MOTORSPORT, antes de OMITTED_CONTEXT), seguindo o SECTION_IDS.
   if (context.externalRag) {
     blocks.push(["EXTERNAL_CONTEXT", composeExternalContextSection(context.externalRag)]);
   }
@@ -570,21 +583,6 @@ export function composeSystemPrompt(context: AssembledContext): string {
 // Canonical frame + generationKey (digest SHA-256 determinístico)
 // ---------------------------------------------------------------------------
 
-/**
- * Serialização canônica e estável do frame. As propriedades são montadas em
- * ordem explícita; os arrays já vêm ordenados pelo Context Assembly. Como o
- * objeto é construído manualmente em ordem fixa de chaves, o
- * `JSON.stringify` é determinístico — não depende de relógio, processo,
- * ordem de execução, random ou conexão.
- *
- * `speakerCharacterId` (Fase 14 STEP 35) é o destinatário AI da resposta. É
- * incluído na posição fixa APENAS quando definido; `undefined` é omitido pelo
- * `JSON.stringify`, preservando byte-a-byte a GenerationKey do baseline
- * assembly-only (que não possui speaker). Dois runs com a mesma conversation +
- * mesmo input + speakers diferentes produzem frames distintos (identity
- * canônica semanticamente diferente); text/usage/latency/request-id jamais
- * entram no frame.
- */
 function canonicalFrame(
   context: AssembledContext,
   systemPrompt: string,
@@ -610,13 +608,6 @@ function canonicalFrame(
   };
 }
 
-/**
- * Digest SHA-256 sobre `canonicalFrame`, na forma estável `sha256:<hex>`.
- * `assembledAt` é propositalmente excluído (é só metadado de tempo, não afeta
- * o conteúdo do frame), preservando a equivalência de frames idênticos.
- * `speakerCharacterId` (opcional, Fase 14 STEP 35) participa da identidade
- * canônica quando presente.
- */
 export function computeGenerationKey(
   context: AssembledContext,
   systemPrompt: string,
@@ -629,15 +620,9 @@ export function computeGenerationKey(
 }
 
 // ---------------------------------------------------------------------------
-// Orquestração principal (STEP 4)
+// Orquestração principal
 // ---------------------------------------------------------------------------
 
-/**
- * Monta o bundle completo de geração para um frame determinístico:
- * ownership (Fase 11) → assembleContext → composeSystemPrompt → provider →
- * GenerationResult → generationKey. Somente orquestra; não duplica regras de
- * seleção/ranking/ownership/WorldState/motorsport. READ-ONLY, sem persistir.
- */
 export async function assembleGenerationBundle(
   db: DbDeps,
   request: ContextGenerationRequest,
@@ -649,26 +634,12 @@ export async function assembleGenerationBundle(
     now: request.now,
   });
 
-  // Fase 14 STEP 35 — resolução/validação do AI speaker target. Origem do valor:
-  // o fluxo de chat/caller, EXPLÍCITO no request (`targetCharacterId`), jamais
-  // derivado de histórico/participantes/heurística. `assembleContext` já garante
-  // que a Conversation é acessível ao caller (ownership); a validação abaixo
-  // assegura que o target existe, é participant desta mesma Conversation e é
-  // controlado por AI. Qualquer violação → `GenerationSpeakerTargetError`
-  // determinístico; NUNCA fallback para outro Character.
   const speakerCharacterId = await resolveGenerationSpeaker(
     db,
     request.conversationId,
     request.targetCharacterId,
   );
 
-  // Fase 13 STEP 22 — anexação OPT-IN e EXPLÍCITA de RAG. Somente quando o
-  // caller fornece `ragFrameId`. Sem `ragFrameId` → `null` (baseline, a chave
-  // `externalRag` é removida e o systemPrompt permanece byte-a-byte igual ao
-  // pré-RAG). Com `ragFrameId`: read service (ownership já aplicado) resolve o
-  // frame; frame inexistente/de outra conversation → erro determinístico; frame
-  // NO_SNAPSHOT/STALE → sem RAG. Reutiliza `withExternalRag` (STEP 11): NÃO
-  // altera context assembly, copia VERBATIM ordem/provenance/score/distance.
   let rag: ExternalRagContext | null = null;
   if (request.ragFrameId !== undefined) {
     const readResult = await readConversationRag(
@@ -679,13 +650,8 @@ export async function assembleGenerationBundle(
     rag = resolveGenerationRagContext(readResult, request.ragFrameId);
   }
   const contextWithRag = rag === null ? context : withExternalRag(context, rag);
+  const systemPrompt = composeSystemPrompt(contextWithRag, speakerCharacterId);
 
-  const systemPrompt = composeSystemPrompt(contextWithRag);
-
-  // Fase 14 STEP 30 — input atual do usuário, EXPLÍCITO no request. Nunca
-  // derivado de `recentMessages`/histórico. Se fornecido, deve ser não-vazio
-  // (após trim); senão erro determinístico 4xx. Ausente → permitido no
-  // baseline assembly-only.
   if (request.userPrompt !== undefined && request.userPrompt.trim().length === 0) {
     throw new GenerationUserInputError(
       "Input de usuário não pode ser vazio quando fornecido na geração.",
@@ -708,11 +674,6 @@ export async function assembleGenerationBundle(
       output.mode === "generated" ? GENERATED_GENERATION_RULE : GENERATION_RULE,
   };
 
-  // Fase 14 STEP 35 — regra de modo baseada na SEMÂNTICA de "generated", não no
-  // nome do provider: uma resposta real SEM um AI speaker é semanticamente
-  // indefinida. Valida ANTES de retornar (não invoca provider duplamente nem
-  // acopia à identidade de "ollama"). assembly-only permanece compatível sem
-  // target (baseline da GenerationKey preservada).
   if (output.mode === "generated" && speakerCharacterId === undefined) {
     throw new GenerationSpeakerTargetError(
       "TARGET_MISSING_WHEN_REQUIRED",
@@ -720,8 +681,6 @@ export async function assembleGenerationBundle(
     );
   }
 
-  // A identidade do speaker participa da identidade canônica quando presente;
-  // ausente (assembly-only) → omitida, preservando a GenerationKey baseline.
   const generationKey = computeGenerationKey(
     contextWithRag,
     systemPrompt,
@@ -734,28 +693,11 @@ export async function assembleGenerationBundle(
     systemPrompt,
     meta,
     generationKey,
-    // O texto gerado segue um contrato explícito no resultado, NUNCA no meta/
-    // canonical frame — preservando a determinismo da generationKey.
     ...(output.mode === "generated" ? { text: output.text } : {}),
     ...(speakerCharacterId !== undefined ? { speakerCharacterId } : {}),
   };
 }
 
-/**
- * Resolve/valida o AI speaker target (Fase 14 STEP 35).
- *
- * - `targetCharacterId` ausente → retorna `undefined` IMEDIATAMENTE, sem
- *   nenhuma query, preservando o baseline assembly-only (NullProvider) e a
- *   GenerationKey histórica.
- * - `targetCharacterId` presente → valida (ordem estável):
- *     1. Character existe  → senão `TARGET_NOT_FOUND`;
- *     2. é participant desta Conversation (`conversationId_characterId`) →
- *        senão `TARGET_NOT_PARTICIPANT`;
- *     3. `controlledBy === "AI"` → senão `TARGET_NOT_AI`.
- *   Retorna somente a identidade mínima (`speakerCharacterId`). NUNCA
- *   seleciona outro Character, NUNCA usa participant[0]/createdAt/score/ordem/
- *   fallback/round-robin, NÃO retorna Character/Prisma entity.
- */
 async function resolveGenerationSpeaker(
   db: DbDeps,
   conversationId: string,
@@ -823,10 +765,6 @@ type DbDeps = Pick<
   | "newsItem"
 >;
 
-/**
- * Alias de compatibilidade (STEP 3): delega ao bundle. Mantém a mesma
- * assinatura pública usada pelos testes anteriores.
- */
 export async function generateGeneration(
   db: DbDeps,
   request: ContextGenerationRequest,
@@ -839,25 +777,15 @@ export async function generateGeneration(
 // Validação de contrato (função pura)
 // ---------------------------------------------------------------------------
 
-/**
- * Valida se um `GenerationResult` respeita o contrato do STEP 3/4. Função pura:
- * não acessa banco, não chama provider, não altera o objeto e NÃO lança para
- * frames inválidos — retorna `true`/`false`.
- */
 export function assertGenerationContract(result: GenerationResult): boolean {
   // 1) provider presente
   if (typeof result.meta?.provider !== "string" || result.meta.provider.length === 0) {
     return false;
   }
-  // 2) mode formal (Fase 14 STEP 28): só "assembly-only" e "generated" são
-  //    válidos. Qualquer outro (ex.: "real-llm") é rejeitado.
   const mode = result.meta.mode;
   if (mode !== "assembly-only" && mode !== "generated") {
     return false;
   }
-  // 2.1) invariante do texto por modo:
-  //   - "generated" exige `text` (string não vazia);
-  //   - "assembly-only" NUNCA carrega texto.
   if (mode === "generated") {
     if (typeof result.text !== "string" || result.text.length === 0) {
       return false;
@@ -865,18 +793,15 @@ export function assertGenerationContract(result: GenerationResult): boolean {
   } else if (result.text !== undefined) {
     return false;
   }
-  // 3) systemPromptChars bate com o tamanho do prompt
   if (typeof result.meta.tokens?.systemPromptChars !== "number") {
     return false;
   }
   if (result.meta.tokens.systemPromptChars !== result.systemPrompt.length) {
     return false;
   }
-  // 4) contextBlocks fiel ao quadro (12 sem RAG, 13 com RAG)
   if (result.meta.tokens.contextBlocks !== countEmittedSections(result.systemPrompt)) {
     return false;
   }
-  // 5) ruleApplied coerente com o modo (estático, sem texto/runtime no canonical frame)
   if (mode === "generated") {
     if (result.meta.ruleApplied !== GENERATED_GENERATION_RULE) {
       return false;
@@ -884,12 +809,10 @@ export function assertGenerationContract(result: GenerationResult): boolean {
   } else if (result.meta.ruleApplied !== GENERATION_RULE) {
     return false;
   }
-  // 6) systemPrompt é string
   if (typeof result.systemPrompt !== "string") {
     return false;
   }
 
-  // 7/8/9) seções, ordem exata, BEGIN/END balanceados e iguais
   const sectionRegex = /<BEGIN (\d+):([A-Z0-9_]+)>[\s\S]*?<END \1:([A-Z0-9_]+)>/g;
   const found: string[] = [];
   let m: RegExpExecArray | null;
@@ -898,7 +821,6 @@ export function assertGenerationContract(result: GenerationResult): boolean {
     const n = Number(m[1]);
     const beginId = m[2];
     const endId = m[3];
-    // ids de BEGIN/END correspondem e são o mesmo índice
     if (beginId !== endId) {
       return false;
     }
@@ -906,22 +828,16 @@ export function assertGenerationContract(result: GenerationResult): boolean {
     if (n !== found.length + 1) {
       return false;
     }
-    // avanço estritamente crescente (evita sobreposição/embaralhamento)
     if (m.index <= pos) {
       return false;
     }
     pos = m.index;
     found.push(beginId);
   }
-  // 10) EXTERNAL_CONTEXT é a ÚNICA seção opt-in. A sequência emitida deve ser
-  // uma subsequência contígua do registro canônico SECTION_IDS: ou o registro
-  // completo (com RAG, 13 seções) ou o registro sem EXTERNAL_CONTEXT (sem RAG,
-  // 12 seções). Nenhum bloco obrigatório pode faltar nem pode haver id fora da
-  // ordem canônica ou duplicado.
-  const hasExternalContext = found.includes("EXTERNAL_CONTEXT");
-  const expectedIds = hasExternalContext
-    ? SECTION_IDS
-    : SECTION_IDS.filter((id) => id !== "EXTERNAL_CONTEXT");
+  const optionalSections = new Set(["EXTERNAL_CONTEXT", "CHARACTER_DNA"]);
+  const expectedIds = SECTION_IDS.filter(
+    (id) => found.includes(id) || !optionalSections.has(id),
+  );
   if (found.length !== expectedIds.length) {
     return false;
   }
@@ -930,16 +846,13 @@ export function assertGenerationContract(result: GenerationResult): boolean {
       return false;
     }
   }
-  // contextBlocks deve bater com as seções efetivamente emitidas
   if (result.meta.tokens.contextBlocks !== found.length) {
     return false;
   }
 
-  // 11) context version
   if (result.context?.meta?.version !== "context.v1") {
     return false;
   }
-  // 12) dados estruturais esperados existem
   if (
     !result.context.participants ||
     !result.context.temporal ||
@@ -966,10 +879,6 @@ export interface ContextBudgetResult {
   maxChars: number;
 }
 
-/**
- * Orçamento de caracteres para um prompt composto. Não conta tokens reais e
- * não usa tokenizer externo — usa apenas `systemPromptChars` neste estágio.
- */
 export function maxContextFitsPolicy(
   budget: number | Pick<GenerationResult, "meta" | "systemPrompt">,
   maxChars: number,
@@ -986,15 +895,9 @@ export function maxContextFitsPolicy(
 }
 
 // ---------------------------------------------------------------------------
-// Response skeleton + composer (STEP 5) — transformação determinística, SEM LLM
+// Response skeleton + composer — transformação determinística, SEM LLM
 // ---------------------------------------------------------------------------
 
-/**
- * Ordem fixa dos estágios de resposta. Serve de contrato de pipeline para um
- * futuro provider (Fase 13). Não inventa responsabilidade inexistente: apenas
- * marca o que já está pronto (contexto/geração), o que depende de provider real
- * (resposta/provider_output) e o que está fora do escopo (persistência).
- */
 export const RESPONSE_SECTION_IDS = [
   "generation_context",
   "narrative_response",
@@ -1005,11 +908,8 @@ export const RESPONSE_SECTION_IDS = [
 export type ResponseSectionId = (typeof RESPONSE_SECTION_IDS)[number];
 
 export type ResponseSectionStatus =
-  // Já preparado pela Fase 12 (contexto/geração prontos).
   | "ready"
-  // Depende de um provider de IA real (Fase 13) — ainda não produzido.
   | "awaiting-provider"
-  // Fora do escopo da Fase 12 — fronteira futura.
   | "future";
 
 export interface ResponseSkeletonSection {
@@ -1020,28 +920,18 @@ export interface ResponseSkeletonSection {
   note: string;
 }
 
-/**
- * Estrutura determinística que um future composer de resposta deverá preencher.
- * NUNCA contém texto de IA inventado; representa quais estágios do pipeline de
- * resposta já estão preparados e quais ainda dependem de provider real.
- */
 export interface ResponseSkeleton {
   generationKey: string;
   status: "assembly-only";
   sections: ResponseSkeletonSection[];
 }
 
-/** Contrato do composer de resposta. O composer NÃO gera conteúdo. */
 export interface ResponseComposer {
   readonly name: string;
   compose(input: GenerationResult): ResponseSkeleton;
 }
 
-/**
- * Composer "assembly-only": transforma um `GenerationResult` em um
- * `ResponseSkeleton` determinístico. Puro: não acessa banco, não usa relógio,
- * não gera UUID, não chama provider e não altera o input.
- */
+
 export const assemblyOnlyResponseComposer: ResponseComposer = {
   name: "assembly-only",
   compose(input: GenerationResult): ResponseSkeleton {
@@ -1093,12 +983,6 @@ export interface ComposerBudgetResult {
   fits: boolean;
 }
 
-/**
- * Orçamento de saída para um `GenerationResult`. Não conta tokens, não usa
- * tokenizer e não calcula custo. `fits` = o input permanece dentro do teto.
- * Assim como o `generateGenerationResult`, NÃO reverte a tipagem mínima e usa
- * `systemPrompt.length` (fonte já validada pelo contrato).
- */
 export function composerBudget(
   input: GenerationResult,
   outputCeilingChars: number,
@@ -1112,7 +996,7 @@ export function composerBudget(
 }
 
 // ---------------------------------------------------------------------------
-// Integration plan (STEP 5) — função pura, não executa integração
+// Integration plan  — função pura, não executa integração
 // ---------------------------------------------------------------------------
 
 export const INTEGRATION_PLAN_VERSION = "integration.v1";
@@ -1120,10 +1004,8 @@ export const INTEGRATION_PLAN_VERSION = "integration.v1";
 export interface IntegrationStage {
   id: string;
   version: string;
-  /** Regra aplicada (nula quando o estágio não é implementado nesta fase). */
   ruleApplied: string | null;
   implemented: boolean;
-  /** Modo declarativo (ex.: "future-provider") para estágios futuros. */
   mode?: string;
   responsibility: string;
 }
@@ -1138,20 +1020,9 @@ export interface IntegrationPlan {
   userId: string;
   conversationId: string;
   stages: IntegrationStage[];
-  /**
-   * Metadado: External Research/RAG é tratado como horizonte Fase 13, NÃO como
-   * dependência executável do fluxo básico de geração.
-   */
   externalResearch: "Fase 13";
 }
 
-/**
- * Plano estático e determinístico dos pontos de integração
- * Conversation → Context → Generation → Prompt → Provider → Response →
- * Persistence. Não executa nenhuma integração; apenas declara o contrato de
- * pipeline e marca com clareza os limites da Fase 12 (provider real e
- * persistência não implementados).
- */
 export function planIntegration(request: IntegrationRequest): IntegrationPlan {
   const stages: IntegrationStage[] = [
     {

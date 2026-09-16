@@ -45,6 +45,8 @@ export interface ContextParticipant {
   nationality: string;
   controlledBy: CharacterController;
   isAIParticipant: boolean;
+  dna?: Prisma.JsonValue;
+  biography?: string | null;
 }
 
 export interface ContextMessageView {
@@ -170,17 +172,7 @@ export interface AssembledContext {
   motorsport: ContextMotorsportBlock | null;
   news: ContextNewsView[];
   omitted: ContextOmitted;
-  /**
-   * Contrato NEUTRO de contexto externo (Fase 13 STEP 10/11).
-   *
-   * Quando o caller fornece um `ExternalRagContext` previamente montado (via
-   * retrieval determinístico → adapter), ele é anexado aqui VERBATIM/neutro,
-   * preservando `ruleApplied`, provenance e ordem já decididas no retrieval.
-   *
-   * Quando NÃO há RAG disponível, a chave é OMITIDA do objeto de saída (não
-   * vira `null`), de modo que o agregado continua byte-a-byte igual ao
-   * contrato anterior (endpoint de contexto intacto).
-   */
+ 
   externalRag?: ExternalRagContext;
 }
 
@@ -188,7 +180,6 @@ export interface AssembledContext {
 // Utilitários determinísticos.
 // ---------------------------------------------------------------------------
 
-// Ordem decrescente de importância para ranking.
 const IMPORTANCE_RANK: Record<MemoryImportance, number> = {
   CRITICAL: 4,
   HIGH: 3,
@@ -202,12 +193,10 @@ const EVENT_RANK: Record<EventImportance, number> = {
   LOW: 1,
 };
 
-// Comparador total e determinístico: desempate final SEMPRE por id.id.
 function byId<A extends { id: string }>(a: A, b: A): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-// Desempate final por characterId (objetos sem campo `id`, ex.: participantes).
 function byCharacterId<A extends { characterId: string }>(a: A, b: A): number {
   return a.characterId < b.characterId ? -1 : a.characterId > b.characterId ? 1 : 0;
 }
@@ -220,8 +209,6 @@ function eventImportanceDesc(a: EventImportance, b: EventImportance): number {
   return EVENT_RANK[b] - EVENT_RANK[a];
 }
 
-// Proximidade temporal a uma data de referência (abs(ms)); null tratado como
-// distância máxima para não polar +. Determinístico.
 function temporalDistance(timestamp: string | Date | null, ref: Date | null): number {
   if (timestamp == null) return Number.MAX_SAFE_INTEGER;
   return Math.abs(new Date(timestamp).getTime() - (ref?.getTime() ?? 0));
@@ -235,32 +222,10 @@ export interface AssemblyInput {
   conversationId: string;
   userId: string;
   now?: Date;
-  /**
-   * Contexto externo (RAG) JÁ materializado no contrato neutro
-   * `ExternalRagContext` pelo pipeline: retrieval determinístico (STEP 9) →
-   * adapter (STEP 10). Opcional. Quando presente, é anexado verbatim ao
-   * `AssembledContext.externalRag`; quando ausente/nulo, a chave é omitida.
-   *
-   * O assembly NÃO executa retrieval, NÃO chama provider/Cohere e NÃO revalida
-   * ownership here — o escopo/isolação já foi aplicado na camada de retrieval.
-   * Este módulo apenas TRANSPORTA o contrato neutro de forma pura/determinística.
-   */
+
   externalRag?: ExternalRagContext | null;
 }
 
-/**
- * Anexa de forma PURA e DETERMINÍSTICA um `ExternalRagContext` opcional ao
- * `AssembledContext` montado.
- *
- * Regras:
- *   - `externalRag` ausente/nulo → a chave é REMOVIDA (objeto novo, sem mutação
- *     da entrada) e a saída fica byte-a-byte igual ao contrato pré-RAG.
- *   - `externalRag` presente → copiado verbatim (shallow clone, sem mutation do
- *     input), preservando `ruleApplied`, provider/model/version/dimensions,
- *     provenance e a ORDEM dos itens já decidida pelo retrieval.
- *   - Nenhum side effect, nenhum filtro/re-rank aqui; isolação já veio do
- *     retrieval (STEP 9).
- */
 export function withExternalRag<C extends AssembledContext>(
   assembled: C,
   externalRag?: ExternalRagContext | null,
@@ -273,19 +238,12 @@ export function withExternalRag<C extends AssembledContext>(
   return { ...(assembled as object), externalRag } as C;
 }
 
-/**
- * Monta o `AssembledContext` de uma Conversation de forma determinística.
- * Assume que a autorização (ownership via Character participante) já foi
- * verificada pela camada de rota. Este serviço é READ-ONLY: não grava nada.
- */
 export async function assembleContext(
   db: Pick<PrismaClient, "conversation" | "conversationParticipant" | "message" | "memory" | "memoryCharacter" | "eventCharacter" | "event" | "relationship" | "worldState" | "character" | "driverProfile" | "team" | "season" | "race" | "raceResult" | "championshipStanding" | "newsItem">,
   input: AssemblyInput,
 ): Promise<AssembledContext> {
   const assembledAt = (input.now ?? new Date()).toISOString();
   const reasons: string[] = [];
-
-  // 1) Conversation + participantes (escopo autorizado).
   const conversation = await db.conversation.findUnique({
     where: { id: input.conversationId },
     select: { id: true, title: true, type: true },
@@ -301,11 +259,17 @@ export async function assembleContext(
   });
   const scope = participantLinks.map((p) => p.characterId);
 
-  // 2) Characters participantes (identidade mínima + controlador USER/AI).
   const characters = scope.length
     ? await db.character.findMany({
         where: { id: { in: scope } },
-        select: { id: true, name: true, nationality: true, controlledBy: true },
+        select: {
+          id: true,
+          name: true,
+          nationality: true,
+          controlledBy: true,
+          dna: true,
+          biography: true,
+        },
       })
     : [];
   const participants = characters
@@ -315,10 +279,11 @@ export async function assembleContext(
       nationality: c.nationality,
       controlledBy: c.controlledBy,
       isAIParticipant: c.controlledBy === "AI",
+      dna: c.dna,
+      biography: c.biography,
     }))
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : byCharacterId(a, b)));
 
-  // 3) WorldState — LEITURA. Referências quebradas são ignoradas (null).
   const world = await db.worldState.findUnique({ where: { key: WORLD_KEY } });
   let currentSeasonId = world?.currentSeasonId ?? null;
   let currentRaceId = world?.currentRaceId ?? null;
@@ -351,7 +316,6 @@ export async function assembleContext(
         ? "SEASON"
         : null;
 
-  // 4) Janela de mensagens (createdAt ASC, janela móvel pela cauda).
   const allMessages = await db.message.findMany({
     where: { conversationId: input.conversationId },
     select: { id: true, senderType: true, characterId: true, content: true, createdAt: true },
@@ -373,7 +337,6 @@ export async function assembleContext(
     createdAt: m.createdAt.toISOString(),
   }));
 
-  // 5) Memórias relevantes ao escopo, ranqueadas (importância → match → tempo → id).
   const memoryLinks = scope.length
     ? await db.memoryCharacter.findMany({
         where: { characterId: { in: scope } },
@@ -417,7 +380,6 @@ export async function assembleContext(
         eventId: m.eventId,
         createdAt: m.createdAt.toISOString(),
         participantCharacterIds: participantIds,
-        // chaves de ranking (não expostas)
         matchScore,
       };
     })
@@ -448,7 +410,6 @@ export async function assembleContext(
       participantCharacterIds: m.participantCharacterIds,
     }));
 
-  // 6) Eventos relevantes ao escopo via EventCharacter.
   const eventLinks = scope.length
     ? await db.eventCharacter.findMany({
         where: { characterId: { in: scope } },
@@ -490,7 +451,6 @@ export async function assembleContext(
       participantCharacterIds: participantIds,
     }));
 
-  // 7) Relações com ambos os endpoints no escopo.
   const allRelationships = scope.length
     ? await db.relationship.findMany({
         where: {
@@ -527,7 +487,6 @@ export async function assembleContext(
     })
     .slice(0, RELATIONSHIP_LIMIT);
 
-  // 8) Motorsport (CONDICIONAL: só se algum participante tiver DriverProfile).
   let motorsport: ContextMotorsportBlock | null = null;
   const driverProfiles = scope.length
     ? await db.driverProfile.findMany({
@@ -619,7 +578,6 @@ export async function assembleContext(
     };
   }
 
-  // 9) News internas — apenas evento do escopo.
   const news = selectedEvents.length
     ? await db.newsItem.findMany({
         where: { eventId: { in: selectedEvents.map((e) => e.id) } },
@@ -645,7 +603,6 @@ export async function assembleContext(
       worldDate: n.worldDate,
     }));
 
-  // 10) Compõe o contrato.
   const userOwnedScope = participants
     .filter((p) => !p.isAIParticipant)
     .map((p) => p.characterId)
