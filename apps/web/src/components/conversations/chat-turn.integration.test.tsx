@@ -7,8 +7,8 @@ import type {
   Conversation,
   ConversationParticipant,
   CreateMessageInput,
-  GenerateMessageInput,
   Message,
+  TurnResponse,
 } from "@/lib/conversations";
 import { conversationMessagesKey } from "@/hooks/use-conversations";
 import { renderWithClient } from "@/test/render-with-client";
@@ -109,20 +109,18 @@ beforeEach(() => {
   });
 
   apiMock.post.mockImplementation(async (path: string, body: unknown) => {
-    if (path.endsWith("/generate")) {
-      callOrder.push("generate");
-      const input = body as GenerateMessageInput;
-      const generated = aiMessage(
-        input.targetCharacterId,
-        `IA respondeu: ${input.userPrompt}`,
-      );
-      messagesFixture.push(generated);
-      return {
-        message: generated,
-        generationKey: "gen-key",
-        provider: "test-provider",
-        mode: "generated",
+    if (path.endsWith("/turn")) {
+      callOrder.push("turn");
+      const input = body as { userPrompt: string };
+      const userMsg = userMessage("user-1", input.userPrompt);
+      const ai = aiMessage("ai-1", `IA respondeu: ${input.userPrompt}`);
+      messagesFixture.push(userMsg, ai);
+      const response: TurnResponse = {
+        userMessage: userMsg,
+        messages: [ai],
+        failedSpeakers: [],
       };
+      return response;
     }
     callOrder.push("messages");
     const input = body as CreateMessageInput;
@@ -149,28 +147,39 @@ const textArea = () => screen.getByPlaceholderText(/escreva/i) as HTMLTextAreaEl
 const gerarBtn = () =>
   screen.getByRole("button", { name: "Gerar resposta IA" }) as HTMLButtonElement;
 
-describe("Chat turn integration (QueryClient real + api mockada)", () => {
-  it("A - roundtrip 201: AI Message visível na MessageList após invalidação/refetch", async () => {
-    const user = userEvent.setup();
-    renderTurn();
+// O composer habilita a digitação quando os participantes carregam e há um
+// character USER do usuário (sem mais select de speaker — o backend decide).
+async function waitComposerReady() {
+  await vi.waitFor(() => expect(textArea().disabled).toBe(false));
+}
 
-    await screen.findByLabelText("Quem deve responder");
+describe("Chat turn integration (QueryClient real + api mockada)", () => {
+  it("A - turno 201: USER + AI Messages visíveis na MessageList após refetch", async () => {
+    const user = userEvent.setup();
+    const h = renderTurn();
+    await waitComposerReady();
 
     await user.type(textArea(), "Olá, mundo!");
     await user.click(gerarBtn());
 
-    await vi.waitFor(() => expect(callOrder).toEqual(["messages", "generate"]));
+    await vi.waitFor(() => expect(callOrder).toEqual(["turn"]));
 
     expect(
       await screen.findByText("IA respondeu: Olá, mundo!"),
     ).toBeTruthy();
+
+    const cached =
+      h.client.getQueryData<Message[]>(conversationMessagesKey(CONV_ID)) ?? [];
+    expect(cached).toHaveLength(2);
+    expect(cached[0].senderType).toBe("USER_CHARACTER");
+    expect(cached[1].senderType).toBe("AI_CHARACTER");
   });
 
-  it("B - falha no USER insert: generate não chamado, cache vazio, erro visível, estado consistente", async () => {
+  it("B - falha no turn (500): um único request, cache vazio, texto preservado", async () => {
     apiMock.post.mockImplementation(async (path: string) => {
-      if (path.endsWith("/generate")) {
-        callOrder.push("generate");
-        throw new ApiError("não deve ocorrer", 500);
+      if (path.endsWith("/turn")) {
+        callOrder.push("turn");
+        throw new ApiError("Falha na rede", 500);
       }
       callOrder.push("messages");
       throw new ApiError("Falha na rede", 500);
@@ -178,12 +187,12 @@ describe("Chat turn integration (QueryClient real + api mockada)", () => {
 
     const user = userEvent.setup();
     const h = renderTurn();
+    await waitComposerReady();
 
-    await screen.findByLabelText("Quem deve responder");
     await user.type(textArea(), "Olá");
     await user.click(gerarBtn());
 
-    await vi.waitFor(() => expect(callOrder).toEqual(["messages"]));
+    await vi.waitFor(() => expect(callOrder).toEqual(["turn"]));
 
     const cached =
       h.client.getQueryData<Message[]>(conversationMessagesKey(CONV_ID)) ?? [];
@@ -191,15 +200,15 @@ describe("Chat turn integration (QueryClient real + api mockada)", () => {
     expect(textArea().value).toBe("Olá");
   });
 
-  it("C - turno completo: QueryCache com USER e AI em ordem; AI visível", async () => {
+  it("C - turno único: QueryCache com USER e AI em ordem; AI visível", async () => {
     const user = userEvent.setup();
     const h = renderTurn();
+    await waitComposerReady();
 
-    await screen.findByLabelText("Quem deve responder");
     await user.type(textArea(), "Ola");
     await user.click(gerarBtn());
 
-    await vi.waitFor(() => expect(callOrder).toEqual(["messages", "generate"]));
+    await vi.waitFor(() => expect(callOrder).toEqual(["turn"]));
     expect(await screen.findByText("IA respondeu: Ola")).toBeTruthy();
 
     const cached =

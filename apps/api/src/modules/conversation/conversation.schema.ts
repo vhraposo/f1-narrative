@@ -1,27 +1,5 @@
 import { z } from "zod";
 
-// Esquemas de validação para o domínio de Conversation (Conversas entre
-// Characters do universo).
-//
-// Conversation é uma entidade do universo: NÃO possui userId/ownerId. A
-// autorização (ownership) é ancorada nos Characters participantes — um usuário
-// só pode acessar/manipular uma Conversation se possuir (userId) ao menos UM
-// dos Characters participantes. PARTICIPAÇÃO ≠ OWNERSHIP: Characters USER e AI
-// podem participar livremente (basta existirem); Characters controlados por IA
-// participam sem conceder acesso de manipulação.
-//
-// Participantes N:N via ConversationParticipant, com
-// `@@unique([conversationId, characterId])` impedindo duplicação.
-//
-// Messages usam MessageSenderType:
-//   - USER_CHARACTER: characterId obrigatório E o Character deve pertencer ao
-//     usuário autenticado.
-//   - AI_CHARACTER : characterId obrigatório E o Character deve ser
-//     controlledBy = AI.
-//   - SYSTEM       : characterId deve ser null/ausente.
-//
-// DM = exatamente 2 participantes; GROUP = 1 ou mais (semântica de
-// ConversationType).
 
 export const conversationTypeSchema = z.enum(["GROUP", "DM"]);
 
@@ -31,9 +9,6 @@ export const messageSenderTypeSchema = z.enum([
   "SYSTEM",
 ]);
 
-// Criação de Conversation: exige ao menos um participante (Character).
-// A regra DM = 2 participantes é validada no server (requer acesso ao banco):
-// aqui garantimos só a presença e unicidade da lista de participants.
 export const createConversationSchema = z.object({
   title: z
     .string()
@@ -49,8 +24,6 @@ export const createConversationSchema = z.object({
 
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 
-// PATCH: title e/ou type opcionais. Participantes são gerenciados pelos
-// endpoints dedicados (espelha o padrão de Memory).
 export const updateConversationSchema = z.object({
   title: z
     .string()
@@ -80,10 +53,6 @@ export type AddConversationParticipantInput = z.infer<
   typeof addConversationParticipantSchema
 >;
 
-// Criação de Message. senderType obrigatório; characterId interpretado conforme
-// senderType:
-//   - USER_CHARACTER / AI_CHARACTER: obrigatório (uuid);
-//   - SYSTEM: deve estar ausente ou null (validado no server).
 export const createMessageSchema = z.object({
   senderType: messageSenderTypeSchema,
   characterId: z
@@ -99,3 +68,17 @@ export const createMessageSchema = z.object({
 });
 
 export type CreateMessageInput = z.infer<typeof createMessageSchema>;
+
+export const turnBodySchema = z.object({
+  userPrompt: z
+    .string()
+    .trim()
+    .min(1, "Informe o prompt do turno")
+    .max(5000, "Prompt muito longo (máx. 5000 caracteres)"),
+  ragFrameId: z
+    .string()
+    .uuid("Identificador de frame de RAG inválido")
+    .optional(),
+});
+
+export type TurnBodyInput = z.infer<typeof turnBodySchema>;

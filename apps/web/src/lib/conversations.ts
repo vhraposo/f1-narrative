@@ -217,6 +217,32 @@ export function generateMessage(
   );
 }
 
+export type TurnMessageInput = {
+  userPrompt: string;
+  ragFrameId?: string;
+};
+
+export type TurnFailedSpeaker = {
+  characterId: string;
+  error: string;
+};
+
+export type TurnResponse = {
+  userMessage: Message;
+  messages: Message[];
+  failedSpeakers: TurnFailedSpeaker[];
+};
+
+export function turnMessage(
+  conversationId: string,
+  input: TurnMessageInput,
+): Promise<TurnResponse> {
+  return post<TurnResponse>(
+    `/api/conversations/${conversationId}/turn`,
+    input,
+  );
+}
+
 export const DEFAULT_GROUP_NAME = "Grupo dos Pilotos";
 
 export function isDefaultGroupTitle(title: string | null): boolean {

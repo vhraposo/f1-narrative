@@ -12,11 +12,13 @@ import {
   listConversationParticipants,
   listConversations,
   removeConversationParticipant,
+  turnMessage,
   updateConversation,
   type Conversation,
   type CreateConversationInput,
   type CreateMessageInput,
   type GenerateMessageInput,
+  type TurnMessageInput,
   type UpdateConversationInput,
 } from "@/lib/conversations";
 
@@ -146,15 +148,27 @@ export function useCreateMessage(conversationId: string) {
   });
 }
 
-// Geração real (Fase 14): POST /api/conversations/:id/generate. O backend
-// persiste a Message AI (201) ou retorna assembly-only (200). Em ambos os
-// casos o padrão de invalidação/refetch atual é preservado; nenhuma Message
-// falsa é inserida manualmente no cache.
 export function useGenerateMessage(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: GenerateMessageInput) =>
       generateMessage(conversationId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: conversationMessagesKey(conversationId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: conversationKey(conversationId),
+      });
+      void queryClient.invalidateQueries({ queryKey: conversationsKey });
+    },
+  });
+}
+
+export function useTurnMessage(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TurnMessageInput) => turnMessage(conversationId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: conversationMessagesKey(conversationId),
