@@ -4,8 +4,45 @@ export type ConversationType = "GROUP" | "DM";
 
 export type MessageSenderType = "USER_CHARACTER" | "AI_CHARACTER" | "SYSTEM";
 
-// Participante de uma Conversation. controlledBy/userId vêm do backend para
-// distinguir Characters USER (userId do usuário) de Characters AI (userId null).
+export type MessageContextJson = {
+  family: string;
+  generationKey: string;
+  provider: string;
+  ruleApplied: string;
+  conversationType: ConversationType;
+  assembledAt: string;
+  activeSpeaker: { characterId: string | null; senderType: MessageSenderType };
+  participantCharacterIds: string[];
+  temporal: {
+    worldDate: string | null;
+    currentSeasonId: string | null;
+    currentRaceId: string | null;
+    currentSession: string | null;
+    phaseMarker: string | null;
+  };
+  fidelity: {
+    messages: number;
+    memories: number;
+    events: number;
+    relationships: number;
+    news: number;
+    omitted: {
+      oldestMessagesTruncated: number;
+      memoriesOmitted: number;
+      reasons: string[];
+    };
+  };
+  stats: { systemPromptChars: number; contextBlocks: number };
+  rag: {
+    used: boolean;
+    provider: string | null;
+    model: string | null;
+    dimensions: number | null;
+    ruleApplied: string | null;
+    items: number;
+  };
+};
+
 export type ConversationParticipant = {
   id: string;
   name: string;
@@ -31,6 +68,7 @@ export type Message = {
   senderType: MessageSenderType;
   characterId: string | null;
   content: string;
+  contextJson?: MessageContextJson | null;
   createdAt: string;
 };
 

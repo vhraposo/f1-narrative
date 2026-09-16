@@ -163,6 +163,12 @@ type GenerateJson = {
     senderType: string;
     characterId: string;
     content: string;
+    contextJson: {
+      family: string;
+      provider: string;
+      generationKey: string;
+      rag: { used: boolean };
+    };
   };
   generationKey: string;
   provider: string;
@@ -451,10 +457,17 @@ describe("generation-generate routes", () => {
     expect(message.characterId).toBe(aiA);
     expect(message.content).toBe("resposta spy");
     expect(message.conversationId).toBe(conv1);
+    expect(message.contextJson).toBeDefined();
+    expect(message.contextJson.family).toBe("generation-context.v1");
+    expect(message.contextJson.provider).toBe("spy");
+    expect(message.contextJson.rag.used).toBe(false);
     const stored = await prisma.message.findUniqueOrThrow({ where: { id: message.id } });
     expect(stored.senderType).toBe("AI_CHARACTER");
     expect(stored.characterId).toBe(aiA);
     expect(stored.content).toBe("resposta spy");
+    const storedCtx = stored.contextJson as { generationKey: string; family: string };
+    expect(storedCtx.family).toBe("generation-context.v1");
+    expect(storedCtx.generationKey).toBe(message.contextJson.generationKey);
   });
 
   it("J) provider recebe systemPrompt + userPrompt e NÃO speaker", async () => {

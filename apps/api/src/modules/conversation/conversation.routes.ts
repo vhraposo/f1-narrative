@@ -65,6 +65,7 @@ const messageSelect = {
   senderType: true,
   characterId: true,
   content: true,
+  contextJson: true,
   createdAt: true,
 } as const;
 
@@ -75,8 +76,6 @@ function isConflict(error: unknown): boolean {
   );
 }
 
-// Resolve se a Conversation é alcançável pelo usuário: o usuário possui ao
-// menos um dos Characters participantes. Retorna o id ou null (404, sem vazar).
 async function accessibleConversationId(conversationId: string, userId: string) {
   const membership = await prisma.conversationParticipant.findFirst({
     where: {
@@ -88,12 +87,6 @@ async function accessibleConversationId(conversationId: string, userId: string) 
   return membership?.conversationId ?? null;
 }
 
-// Valida a combinação senderType + characterId de uma Message.
-// Retorna um erro HTTP ({ statusCode, error, code }) ou null se válida.
-// As regras são as da arquitetura oficial:
-//   USER_CHARACTER: characterId obrigatório + Character do usuário autenticado.
-//   AI_CHARACTER  : characterId obrigatório + Character controlledBy = AI.
-//   SYSTEM        : characterId deve ser null/ausente.
 async function validateMessageSender(
   conversationId: string,
   body: { senderType: string; characterId?: string | null },
@@ -112,7 +105,6 @@ async function validateMessageSender(
     return null;
   }
 
-  // USER_CHARACTER e AI_CHARACTER exigem characterId.
   if (!characterId) {
     return {
       statusCode: 400,
@@ -121,7 +113,6 @@ async function validateMessageSender(
     };
   }
 
-  // O Character deve existir.
   const character = await prisma.character.findUnique({
     where: { id: characterId },
     select: { id: true, controlledBy: true, userId: true },
@@ -134,7 +125,6 @@ async function validateMessageSender(
     };
   }
 
-  // O remetente deve ser participante da Conversation.
   const participant = await prisma.conversationParticipant.findUnique({
     where: {
       conversationId_characterId: { conversationId, characterId },
@@ -160,7 +150,6 @@ async function validateMessageSender(
     return null;
   }
 
-  // AI_CHARACTER
   if (character.controlledBy !== "AI") {
     return {
       statusCode: 400,
@@ -173,11 +162,9 @@ async function validateMessageSender(
 
 export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
   // ------------------------------------------------------------------
-  // Conversation — camada persistente de comunicação entre Characters.
-  // Acesso ancorado em "possuir ao menos um participante".
+  // Conversation 
   // ------------------------------------------------------------------
 
-  // Listar Conversations alcançáveis pelo usuário, ordenadas por updatedAt desc.
   fastify.get(
     "/api/conversations",
     { preHandler: [fastify.authenticate] },
@@ -200,7 +187,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Criar Conversation ancorada em ao menos um Character próprio.
   fastify.post(
     "/api/conversations",
     { preHandler: [fastify.authenticate] },
@@ -217,8 +203,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { participantIds, type } = parsed.data;
 
-      // DM exige exatamente 2 participantes (semântica de ConversationType).
-      // GROUP exige 1 ou mais (já garantido pela schema com min 1).
       if (type === "DM" && participantIds.length !== 2) {
         return reply.code(400).send({
           error: "Conversa direta (DM) exige exatamente 2 participantes",
@@ -226,7 +210,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Todos os participantes devem existir; ao menos um deve ser do usuário.
       let ownsAny = false;
       for (const characterId of participantIds) {
         const character = await prisma.character.findUnique({
@@ -244,7 +227,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      // Sem nenhum participante próprio, não há como ancorar a Conversation.
       if (!ownsAny) {
         return reply.code(404).send({
           error: "Conversa não criada",
@@ -262,8 +244,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
             select: conversationSelect,
           });
 
-          // Evita participante duplicado (garantia estrutural adicional além do
-          // @@unique). Sem values duplicadas antes do createMany.
           const uniqueIds = [...new Set(participantIds)];
           await tx.conversationParticipant.createMany({
             data: uniqueIds.map((characterId) => ({
@@ -295,7 +275,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Ler uma Conversation (alcançável pelo usuário) com participantes e contagem.
   fastify.get(
     "/api/conversations/:id",
     { preHandler: [fastify.authenticate] },
@@ -326,7 +305,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Editar uma Conversation (alcançável pelo usuário).
   fastify.patch(
     "/api/conversations/:id",
     { preHandler: [fastify.authenticate] },
@@ -374,8 +352,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Excluir uma Conversation (alcançável pelo usuário). Participants e Messages
-  // são removidos em cascata (onDelete: Cascade).
   fastify.delete(
     "/api/conversations/:id",
     { preHandler: [fastify.authenticate] },
@@ -407,7 +383,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
   // ConversationParticipant — vínculo N:N Conversation <-> Character.
   // ------------------------------------------------------------------
 
-  // Listar participantes de uma Conversation (alcançável pelo usuário).
   fastify.get(
     "/api/conversations/:id/participants",
     { preHandler: [fastify.authenticate] },
@@ -441,8 +416,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Adicionar um Character como participante (USER ou AI) de uma Conversation
-  // alcançável pelo usuário.
   fastify.post(
     "/api/conversations/:id/participants",
     { preHandler: [fastify.authenticate] },
@@ -505,7 +478,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // Remover um Character como participante de uma Conversation alcançável.
   fastify.delete(
     "/api/conversations/:id/participants/:characterId",
     { preHandler: [fastify.authenticate] },
@@ -549,11 +521,6 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // ------------------------------------------------------------------
-  // Message — criação e leitura, append-only, ordenação createdAt ASC.
-  // ------------------------------------------------------------------
-
-  // Criar uma Message na Conversation. Sender validado por senderType.
   fastify.post(
     "/api/conversations/:id/messages",
     { preHandler: [fastify.authenticate] },
@@ -603,11 +570,15 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
         select: messageSelect,
       });
 
+      await prisma.conversation.update({
+        where: { id: accessible },
+        data: { updatedAt: new Date() },
+      });
+
       return reply.code(201).send({ message });
     },
   );
 
-  // Listar mensagens de uma Conversation, ordenadas por createdAt ASC.
   fastify.get(
     "/api/conversations/:id/messages",
     { preHandler: [fastify.authenticate] },

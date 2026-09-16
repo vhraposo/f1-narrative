@@ -672,12 +672,17 @@ describe("Conversation - Message sender (USER_CHARACTER / AI_CHARACTER / SYSTEM)
   });
 
   it("USER_CHARACTER com characterId próprio -> 201", async () => {
+    const before = await prisma.conversation.findUniqueOrThrow({ where: { id: convId } });
+    await new Promise((resolve) => setTimeout(resolve, 2));
     const res = await postMessage(owner, convId, {
       senderType: "USER_CHARACTER",
       characterId: charA.id,
       content: "Vocês viram isso?",
     });
     expect(res.statusCode).toBe(201);
+
+    const after = await prisma.conversation.findUniqueOrThrow({ where: { id: convId } });
+    expect(after.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
   });
 
   it("USER_CHARACTER sem characterId -> 400", async () => {
@@ -722,12 +727,17 @@ describe("Conversation - Message sender (USER_CHARACTER / AI_CHARACTER / SYSTEM)
   });
 
   it("AI_CHARACTER com characterId AI participante -> 201", async () => {
+    const before = await prisma.conversation.findUniqueOrThrow({ where: { id: convId } });
+    await new Promise((resolve) => setTimeout(resolve, 2));
     const res = await postMessage(owner, convId, {
       senderType: "AI_CHARACTER",
       characterId: aiC.id,
       content: "Eu nem estava olhando.",
     });
     expect(res.statusCode).toBe(201);
+
+    const after = await prisma.conversation.findUniqueOrThrow({ where: { id: convId } });
+    expect(after.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
   });
 
   it("AI_CHARACTER com characterId USER -> 400", async () => {
@@ -758,11 +768,16 @@ describe("Conversation - Message sender (USER_CHARACTER / AI_CHARACTER / SYSTEM)
   });
 
   it("SYSTEM com characterId null/ausente -> 201", async () => {
+    const before = await prisma.conversation.findUniqueOrThrow({ where: { id: convId } });
+    await new Promise((resolve) => setTimeout(resolve, 2));
     const res = await postMessage(owner, convId, {
       senderType: "SYSTEM",
       content: "Charles iniciou uma chamada.",
     });
     expect(res.statusCode).toBe(201);
+
+    const after = await prisma.conversation.findUniqueOrThrow({ where: { id: convId } });
+    expect(after.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
   });
 
   it("SYSTEM com characterId informado -> 400", async () => {

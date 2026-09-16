@@ -762,6 +762,9 @@ model ConversationParticipant {
 /// Mensagem de chat. O remetente é identificado por senderType + characterId.
 /// - USER_CHARACTER / AI_CHARACTER: characterId obrigatório
 /// - SYSTEM: characterId deve ser null
+/// contextJson: snapshot/metadata do contexto narrativo usado na geração (API
+/// 1:N). NÃO é fonte de verdade — a montagem completa continua no assembly em
+/// request-time; aqui só referência/metadata suficiente para reconstrução.
 model Message {
   id             String            @id @default(uuid()) @db.Uuid
   conversationId String            @db.Uuid
@@ -770,6 +773,7 @@ model Message {
   characterId    String?           @db.Uuid
   character      Character?        @relation(fields: [characterId], references: [id])
   content        String
+  contextJson    Json?
   createdAt      DateTime          @default(now())
 
   @@index([conversationId, createdAt])

@@ -1,5 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type { GenerationResult } from "./generation.assembly.js";
+import { buildMessageContextJson } from "./generation-context-snapshot.js";
 
 /**
  * Ponto de persistência de Message para geração real (Fase 14 STEP 36).
@@ -18,7 +19,8 @@ import type { GenerationResult } from "./generation.assembly.js";
  *   - conversation acessível ao caller (`userId` possui participant)
  *
  * Quando qualquer condição falha → NÃO faz INSERT (nem parcial).
- * NÃO persiste a `generationKey` (é identidade lógica, sem coluna nova).
+ * `contextJson` (Message) carrega o snapshot/metadata do contexto usado na
+ * geração (STEP 108 FASE 4); o `generationKey` entra nesse JSON, sem coluna nova.
  */
 export type GenerationPersistDecision =
   | { persisted: true; message: GenerationMessage }
@@ -30,6 +32,7 @@ export interface GenerationMessage {
   senderType: "AI_CHARACTER";
   characterId: string;
   content: string;
+  contextJson: Prisma.JsonValue | null;
   createdAt: Date;
 }
 
@@ -39,17 +42,17 @@ const messageSelect = {
   senderType: true,
   characterId: true,
   content: true,
+  contextJson: true,
   createdAt: true,
 } as const;
 
-// Converte o row persistido para o tipo público mínimo, garantindo que o
-// senderType gravado é AI_CHARACTER e o characterId é o speaker (não nulo).
 function toGenerationMessage(row: {
   id: string;
   conversationId: string;
   senderType: string;
   characterId: string | null;
   content: string;
+  contextJson: Prisma.JsonValue | null;
   createdAt: Date;
 }): GenerationMessage {
   return {
@@ -58,13 +61,11 @@ function toGenerationMessage(row: {
     senderType: "AI_CHARACTER",
     characterId: row.characterId as string,
     content: row.content,
+    contextJson: row.contextJson,
     createdAt: row.createdAt,
   };
 }
 
-// Resolve se a Conversation é alcançável pelo usuário (regra da Fase 11):
-// usuário possui ao menos um dos Characters participantes. Reutiliza a política
-// existente; não inventa nova.
 async function conversationAccessibleToUser(
   db: PrismaClient,
   conversationId: string,
@@ -90,37 +91,37 @@ export async function persistGeneratedMessage(
   const text = result.text;
   const conversationId = result.context.meta.conversationId;
 
-  // 1) Mode: somente `generated` persiste. assembly-only/sem text → sem INSERT.
   if (mode !== "generated") {
     return { persisted: false, reason: "mode-not-generated" };
   }
-  // 2) Speaker presente (identity já resolvida no STEP 35).
   if (speakerCharacterId === undefined) {
     return { persisted: false, reason: "missing-speaker" };
   }
-  // 3) Texto real presente e não vazio.
   if (typeof text !== "string" || text.trim().length === 0) {
     return { persisted: false, reason: "missing-or-empty-text" };
   }
-  // 4) ConversationId presente.
   if (!conversationId) {
     return { persisted: false, reason: "missing-conversation" };
   }
-  // 5) Ownership: sem acesso → NÃO faz INSERT.
   const accessible = await conversationAccessibleToUser(db, conversationId, userId);
   if (!accessible) {
     return { persisted: false, reason: "no-conversation-access" };
   }
 
-  // Persistência normal (sem deduplicação, sem unique, sem índice novo).
   const message = await db.message.create({
     data: {
       conversationId,
       senderType: "AI_CHARACTER",
       characterId: speakerCharacterId,
       content: text,
+      contextJson: buildMessageContextJson(result) as unknown as Prisma.InputJsonValue,
     },
     select: messageSelect,
+  });
+
+  await db.conversation.update({
+    where: { id: conversationId },
+    data: { updatedAt: new Date() },
   });
 
   return { persisted: true, message: toGenerationMessage(message) };

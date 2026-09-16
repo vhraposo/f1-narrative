@@ -2,7 +2,7 @@
 
 import { ChevronLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 
 import {
   CharacterAvatar,
@@ -51,6 +51,7 @@ export function ConversationThread({
     conversationId ?? undefined,
   );
   const [composerError, setComposerError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   if (conversationId == null) {
     return (
@@ -151,8 +152,8 @@ export function ConversationThread({
         {rightAction}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <MessageList conversationId={conversation.id} />
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <MessageList conversationId={conversation.id} scrollContainerRef={scrollRef} />
       </div>
 
       <div className="shrink-0 border-t border-border bg-background px-2 py-2 sm:px-3">
