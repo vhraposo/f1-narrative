@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   defaultGroupSeasonYear,
@@ -8,6 +8,30 @@ import {
   isDefaultGroup,
   isDefaultGroupTitle,
   type Conversation,
+} from "@/lib/conversations";
+
+const apiMocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  patch: vi.fn(),
+  post: vi.fn(),
+  remove: vi.fn(),
+}));
+
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    get: apiMocks.get,
+    patch: apiMocks.patch,
+    post: apiMocks.post,
+    remove: apiMocks.remove,
+  };
+});
+
+import { ApiError } from "@/lib/api";
+import {
+  createMessage,
+  type Message,
 } from "@/lib/conversations";
 
 function group(id: string, title: string | null): Conversation {
@@ -92,5 +116,63 @@ describe("horários de chat", () => {
   it("formata lista do dia atual como HH:mm (sem status inventado)", () => {
     const label = formatListTime(new Date().toISOString());
     expect(label).toMatch(/^\d{2}:\d{2}$/);
+  });
+});
+
+describe("createMessage — contrato real { message } (FASE 2)", () => {
+  const sentMessage: Message = {
+    id: "m1",
+    conversationId: "c1",
+    senderType: "USER_CHARACTER",
+    characterId: "ch1",
+    content: "Olá",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  beforeEach(() => {
+    apiMocks.post.mockReset();
+  });
+
+  it("desempacota a Message persistida e repassa o corpo correto ao backend", async () => {
+    apiMocks.post.mockResolvedValue({ message: sentMessage });
+
+    await expect(
+      createMessage("c1", {
+        senderType: "USER_CHARACTER",
+        characterId: "ch1",
+        content: "Olá",
+      }),
+    ).resolves.toEqual(sentMessage);
+
+    expect(apiMocks.post).toHaveBeenCalledWith("/api/conversations/c1/messages", {
+      senderType: "USER_CHARACTER",
+      characterId: "ch1",
+      content: "Olá",
+    });
+  });
+
+  it("fixa o envelope { message } como contrato inegociável", async () => {
+    apiMocks.post.mockResolvedValue(sentMessage);
+    await expect(
+      createMessage("c1", {
+        senderType: "USER_CHARACTER",
+        characterId: "ch1",
+        content: "Olá",
+      }),
+    ).resolves.toBeUndefined();
+    expect(apiMocks.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("propaga erro do backend (ApiError) sem engolir", async () => {
+    const err = new ApiError("Falha ao enviar", 400);
+    apiMocks.post.mockRejectedValue(err);
+
+    await expect(
+      createMessage("c1", {
+        senderType: "USER_CHARACTER",
+        characterId: "ch1",
+        content: "Olá",
+      }),
+    ).rejects.toBe(err);
   });
 });

@@ -17,9 +17,6 @@ import { MessageList } from "./message-list";
 
 const CONV_ID = "conv-1";
 
-// Fronteira HTTP mockada: somente @/lib/api. O cliente real de rede é a única
-// coisa substituída; conversations.ts (lib) e os hooks do use-conversations
-// são REAIS — incluindo QueryClient real (renderWithClient).
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
@@ -100,7 +97,6 @@ beforeEach(() => {
       return { participants: [...participantsFixture] };
     }
     if (path.endsWith("/messages")) {
-      // Cópia fresca simulando a resposta persistida do servidor.
       return { messages: [...messagesFixture] };
     }
     if (path === `/api/conversations/${CONV_ID}`) {
@@ -132,7 +128,7 @@ beforeEach(() => {
     const input = body as CreateMessageInput;
     const created = userMessage(input.characterId!, input.content);
     messagesFixture.push(created);
-    return created;
+    return { message: created };
   });
 
   apiMock.patch.mockImplementation(async () => undefined);
@@ -158,17 +154,13 @@ describe("Chat turn integration (QueryClient real + api mockada)", () => {
     const user = userEvent.setup();
     renderTurn();
 
-    // Esperar participants reais carregarem antes de interagir
-    // (textarea fica habilitado só com remetente/speaker resolvidos).
     await screen.findByLabelText("Quem deve responder");
 
     await user.type(textArea(), "Olá, mundo!");
     await user.click(gerarBtn());
 
-    // ORDEM REAL: generate apenas após o success de createMessage.
     await vi.waitFor(() => expect(callOrder).toEqual(["messages", "generate"]));
 
-    // Assertion principal é sobre o DOM: a resposta da IA aparece na lista.
     expect(
       await screen.findByText("IA respondeu: Olá, mundo!"),
     ).toBeTruthy();

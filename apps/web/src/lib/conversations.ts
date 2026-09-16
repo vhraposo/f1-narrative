@@ -140,7 +140,10 @@ export function createMessage(
   conversationId: string,
   input: CreateMessageInput,
 ): Promise<Message> {
-  return post<Message>(`/api/conversations/${conversationId}/messages`, input);
+  return post<{ message: Message }>(
+    `/api/conversations/${conversationId}/messages`,
+    input,
+  ).then((r) => r.message);
 }
 
 export type GenerateMessageInput = {
