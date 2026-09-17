@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { assembleContext } from "../context/context.assembly.js";
+import { assembleContext, type AssembledContext } from "../context/context.assembly.js";
 import { readConversationRag } from "../context/conversation-rag-read.js";
 import {
   assembleGenerationBundle,
@@ -16,6 +16,12 @@ import {
   resolveGenerationRagContext,
 } from "../generation/generation-rag-context.js";
 import { OllamaProviderError } from "../generation/ollama-provider.js";
+import { materializeConversationRag } from "../external-research/conversation-rag-materialization.js";
+import type { EmbeddingProviderWithInputType } from "../external-research/external-embedding-store.js";
+import {
+  shouldResearch,
+  type ResearchTriggerInternalContext,
+} from "../external-research/research-trigger.js";
 import { selectSpeakers } from "./response-orchestrator.js";
 
 
@@ -128,10 +134,62 @@ function describeTurnFailure(err: unknown): string {
   return "generation-error";
 }
 
+export interface ExecuteTurnOptions {
+  ragProvider?: EmbeddingProviderWithInputType;
+}
+
+function toTriggerInternalContext(signals: AssembledContext): ResearchTriggerInternalContext {
+  return {
+    participants: signals.participants.map((p) => ({
+      name: p.name,
+      dna: p.dna,
+      biography: p.biography,
+    })),
+    memories: signals.memories.map((m) => ({ content: m.content, summary: m.summary })),
+    events: signals.events.map((e) => ({ title: e.title, description: e.description })),
+    relationships: signals.relationships.map((r) => ({
+      characterAName: r.characterAName,
+      characterBName: r.characterBName,
+    })),
+    recentMessages: signals.recentMessages.map((m) => ({ content: m.content })),
+    worldState: {
+      worldDate: signals.temporal.worldDate,
+      currentSeasonId: signals.temporal.currentSeasonId,
+      currentRaceId: signals.temporal.currentRaceId,
+      raceNames: signals.motorsport?.races.map((r) => r.name) ?? [],
+    },
+  };
+}
+
+async function autoResearchFrame(
+  db: PrismaClient,
+  ragProvider: EmbeddingProviderWithInputType | undefined,
+  hasAiSpeakers: boolean,
+  input: { conversationId: string; userId: string; userPrompt: string; signals: AssembledContext },
+): Promise<string | undefined> {
+  if (ragProvider === undefined || !hasAiSpeakers) return undefined;
+  const decision = shouldResearch({
+    message: input.userPrompt,
+    internal: toTriggerInternalContext(input.signals),
+  });
+  if (!decision.shouldResearch || decision.queryHint === undefined) return undefined;
+  try {
+    const result = await materializeConversationRag(db, ragProvider, {
+      conversationId: input.conversationId,
+      ownerId: input.userId,
+      frame: { query: decision.queryHint },
+    });
+    return result.itemCount > 0 ? result.frameId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function executeTurn(
   db: PrismaClient,
   provider: GenerationProvider,
   input: TurnInput,
+  options?: ExecuteTurnOptions,
 ): Promise<TurnResult> {
   if (input.ragFrameId !== undefined) {
     const readRag = await readConversationRag(
@@ -191,6 +249,19 @@ export async function executeTurn(
     input.userPrompt,
   );
 
+  const autoRagFrameId = await autoResearchFrame(
+    db,
+    options?.ragProvider,
+    selection.selected.length > 0,
+    {
+      conversationId: input.conversationId,
+      userId: input.userId,
+      userPrompt: input.userPrompt,
+      signals,
+    },
+  );
+  const effectiveRagFrameId = input.ragFrameId ?? autoRagFrameId;
+
   const messages: GenerationMessage[] = [];
   const failedSpeakers: TurnFailedSpeaker[] = [];
 
@@ -203,8 +274,8 @@ export async function executeTurn(
           userId: input.userId,
           userPrompt: input.userPrompt,
           targetCharacterId: speakerId,
-          ...(input.ragFrameId !== undefined
-            ? { ragFrameId: input.ragFrameId }
+          ...(effectiveRagFrameId !== undefined
+            ? { ragFrameId: effectiveRagFrameId }
             : {}),
         },
         provider,

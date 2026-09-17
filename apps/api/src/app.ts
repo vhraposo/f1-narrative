@@ -132,6 +132,7 @@ export function buildApp(
   void app.register(conversationRoutes);
   void app.register(conversationTurnRoutes, {
     provider: generationProvider ?? nullProvider,
+    ragProvider: ragProvider ?? defaultRagProvider(),
   });
   void app.register(contextRoutes);
   void app.register(conversationRagRoutes);

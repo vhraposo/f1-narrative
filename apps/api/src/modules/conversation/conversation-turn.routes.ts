@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import type { GenerationProvider } from "../generation/generation.assembly.js";
 import { GenerationRagFrameNotFoundError } from "../generation/generation-rag-context.js";
+import type { EmbeddingProviderWithInputType } from "../external-research/external-embedding-store.js";
 import { conversationIdParamSchema, turnBodySchema } from "./conversation.schema.js";
 import {
   executeTurn,
@@ -11,6 +12,7 @@ import {
 
 export interface ConversationTurnRoutesOptions {
   provider: GenerationProvider;
+  ragProvider?: EmbeddingProviderWithInputType;
 }
 
 async function accessibleConversationId(conversationId: string, userId: string) {
@@ -60,14 +62,21 @@ export const conversationTurnRoutes: FastifyPluginAsync<ConversationTurnRoutesOp
         }
 
         try {
-          const result = await executeTurn(prisma, provider, {
-            conversationId: accessible,
-            userId,
-            userPrompt: body.data.userPrompt,
-            ...(body.data.ragFrameId !== undefined
-              ? { ragFrameId: body.data.ragFrameId }
-              : {}),
-          });
+          const result = await executeTurn(
+            prisma,
+            provider,
+            {
+              conversationId: accessible,
+              userId,
+              userPrompt: body.data.userPrompt,
+              ...(body.data.ragFrameId !== undefined
+                ? { ragFrameId: body.data.ragFrameId }
+                : {}),
+            },
+            opts.ragProvider !== undefined
+              ? { ragProvider: opts.ragProvider }
+              : undefined,
+          );
 
           return reply.code(201).send({
             userMessage: result.userMessage,
