@@ -43,6 +43,7 @@ type TestUser = { cookie: string; userId: string };
 const createdUserIds: string[] = [];
 const createdCharacterIds: string[] = [];
 const createdConversationIds: string[] = [];
+const createdMemoryIds: string[] = [];
 
 let counter = 0;
 
@@ -287,6 +288,7 @@ afterAll(async () => {
   await prisma.conversation.deleteMany({
     where: { id: { in: createdConversationIds } },
   });
+  await prisma.memory.deleteMany({ where: { id: { in: createdMemoryIds } } });
   await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
   await prisma.$disconnect();
@@ -552,5 +554,29 @@ describe("conversation-turn routes", () => {
     expect(after.updatedAt.getTime()).toBeGreaterThanOrEqual(
       before.updatedAt.getTime(),
     );
+  });
+
+  it("T) memória do tema (Monza) seleciona só o AI que a carrega (109E)", async () => {
+    await resetMessages(conv1);
+    const memory = await prisma.memory.create({
+      data: {
+        content: "A vitória de SpeakerAlpha em Monza foi inesquecível.",
+        summary: "Vitória de SpeakerAlpha em Monza",
+        importance: "HIGH",
+        source: "USER_DEFINED",
+      },
+    });
+    createdMemoryIds.push(memory.id);
+    await prisma.memoryCharacter.create({
+      data: { memoryId: memory.id, characterId: aiA },
+    });
+
+    const res = await turn(appGen, owner, conv1, {
+      userPrompt: "Vocês lembram de Monza?",
+    });
+    expect(res.statusCode).toBe(201);
+    const json = res.json();
+    expect(json.messages.map((m) => m.characterId)).toEqual([aiA]);
+    expect(json.failedSpeakers).toEqual([]);
   });
 });

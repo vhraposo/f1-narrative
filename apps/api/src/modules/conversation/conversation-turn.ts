@@ -231,9 +231,22 @@ export async function executeTurn(
       senderType: m.senderType,
     })),
     memories: signals.memories.map((m) => ({
+      id: m.id,
+      content: m.content,
+      summary: m.summary,
+      importance: m.importance,
+      emotionalImpact: m.emotionalImpact,
+      eventId: m.eventId,
+      createdAt: m.createdAt,
       participantCharacterIds: m.participantCharacterIds,
     })),
     events: signals.events.map((e) => ({
+      id: e.id,
+      type: e.type,
+      importance: e.importance,
+      title: e.title,
+      description: e.description,
+      worldDate: e.worldDate,
       participantCharacterIds: e.participantCharacterIds,
     })),
     relationships: signals.relationships.map((r) => ({

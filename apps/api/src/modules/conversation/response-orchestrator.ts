@@ -1,4 +1,6 @@
 
+import { isTopicMatch } from "./topic-match.js";
+
 export const RESPONSE_ORCHESTRATOR_VERSION = "response-orchestrator.v1";
 
 export type ResponseOrchestratorController = "AI" | "USER";
@@ -20,12 +22,27 @@ export interface ResponseOrchestratorRecentMessage {
   senderType?: string | null;
 }
 
+export type ResponseOrchestratorMemoryImportance = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
 export interface ResponseOrchestratorMemory {
   participantCharacterIds: readonly string[];
+  id?: string;
+  content?: string;
+  summary?: string | null;
+  importance?: ResponseOrchestratorMemoryImportance;
+  emotionalImpact?: number | null;
+  eventId?: string | null;
+  createdAt?: string;
 }
 
 export interface ResponseOrchestratorEvent {
   participantCharacterIds: readonly string[];
+  id?: string;
+  type?: string;
+  importance?: ResponseOrchestratorMemoryImportance;
+  title?: string;
+  description?: string | null;
+  worldDate?: string | null;
 }
 
 export interface ResponseOrchestratorRelationship {
@@ -49,7 +66,15 @@ export interface ResponseOrchestratorWeights {
   questionRelevance: number;
   relationshipRelevance: number;
   memoryRelevance: number;
+  memoryRelatedRelevance: number;
+  memoryTopicRelevance: number;
+  memoryImportanceBoost: number;
+  memoryRelevanceCap: number;
   eventRelevance: number;
+  eventRelatedRelevance: number;
+  eventTopicRelevance: number;
+  eventImportanceBoost: number;
+  eventRelevanceCap: number;
   recencyRelevance: number;
   unavailablePenalty: number;
   noSignalsPenalty: number;
@@ -77,8 +102,16 @@ export const RESPONSE_ORCHESTRATOR_DEFAULT_CONFIG: ResponseOrchestratorConfig = 
     directMentionFirstName: 60,
     questionRelevance: 10,
     relationshipRelevance: 20,
-    memoryRelevance: 15,
-    eventRelevance: 15,
+    memoryRelevance: 18,
+    memoryRelatedRelevance: 12,
+    memoryTopicRelevance: 10,
+    memoryImportanceBoost: 4,
+    memoryRelevanceCap: 20,
+    eventRelevance: 18,
+    eventRelatedRelevance: 12,
+    eventTopicRelevance: 10,
+    eventImportanceBoost: 4,
+    eventRelevanceCap: 20,
     recencyRelevance: 10,
     unavailablePenalty: -25,
     noSignalsPenalty: -100,
@@ -210,6 +243,105 @@ function isQuestionInput(content: string, tokens: readonly string[]): boolean {
   return first !== undefined && INTERROGATIVE_FIRST_TOKENS.has(first);
 }
 
+function buildRelatedIds(
+  candidateId: string,
+  relationships: readonly ResponseOrchestratorRelationship[] | undefined,
+): Set<string> {
+  const related = new Set<string>();
+  for (const relationship of relationships ?? []) {
+    if (relationship.characterAId === candidateId) {
+      related.add(relationship.characterBId);
+    } else if (relationship.characterBId === candidateId) {
+      related.add(relationship.characterAId);
+    }
+  }
+  return related;
+}
+
+function joinedText(parts: Array<string | null | undefined>): string {
+  return parts
+    .filter((part): part is string => typeof part === "string" && part.length > 0)
+    .join(" ");
+}
+
+function isTopImportance(
+  importance: ResponseOrchestratorMemoryImportance | undefined,
+): boolean {
+  return importance === "HIGH" || importance === "CRITICAL";
+}
+
+function memoryItemScore(
+  candidateId: string,
+  memory: ResponseOrchestratorMemory,
+  relatedIds: ReadonlySet<string>,
+  message: string,
+  weights: ResponseOrchestratorWeights,
+): number {
+  const participants = memory.participantCharacterIds;
+  const isDirect = participants.includes(candidateId);
+  const isRelated =
+    !isDirect && [...participants].some((participantId) => relatedIds.has(participantId));
+  const memoryText = joinedText([memory.content, memory.summary]);
+  const topicMatch = memoryText.length > 0 && isTopicMatch(message, memoryText);
+
+  let base: number;
+  if (isDirect) {
+    base = weights.memoryRelevance;
+  } else if (isRelated) {
+    base = weights.memoryRelatedRelevance;
+  } else if (participants.length === 0 && topicMatch) {
+    base = weights.memoryTopicRelevance;
+  } else {
+    return 0;
+  }
+
+  let bonus = 0;
+  if (isTopImportance(memory.importance)) {
+    bonus += weights.memoryImportanceBoost;
+  }
+  if (participants.length > 0 && topicMatch) {
+    bonus += weights.memoryTopicRelevance;
+  }
+
+  return Math.min(base + bonus, weights.memoryRelevanceCap);
+}
+
+function eventItemScore(
+  candidateId: string,
+  event: ResponseOrchestratorEvent,
+  relatedIds: ReadonlySet<string>,
+  message: string,
+  weights: ResponseOrchestratorWeights,
+): number {
+  const participants = event.participantCharacterIds;
+  const isDirect = participants.includes(candidateId);
+  const isRelated =
+    !isDirect && [...participants].some((participantId) => relatedIds.has(participantId));
+  const eventText = joinedText([event.title, event.description]);
+  const topicMatch = eventText.length > 0 && isTopicMatch(message, eventText);
+
+  let base: number;
+  if (isDirect) {
+    base = weights.eventRelevance;
+  } else if (isRelated) {
+    base = weights.eventRelatedRelevance;
+  } else if (participants.length === 0 && topicMatch) {
+    base = weights.eventTopicRelevance;
+  } else {
+    return 0;
+  }
+
+  let bonus = 0;
+  if (isTopImportance(event.importance)) {
+    bonus += weights.eventImportanceBoost;
+  }
+  if (participants.length > 0 && topicMatch) {
+    bonus += weights.eventTopicRelevance;
+  }
+
+  return Math.min(base + bonus, weights.eventRelevanceCap);
+}
+
 export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrchestratorSelection {
   const config = resolveResponseOrchestratorConfig(input.config);
   const contentTokens = tokenize(input.userMessage.content);
@@ -281,15 +413,49 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
       hasPositiveSignal = true;
     }
 
-    if (input.memories?.some((memory) => memory.participantCharacterIds.includes(candidate.characterId))) {
+    const relatedIds = buildRelatedIds(candidate.characterId, input.relationships);
+
+    const memoryContribution = (() => {
+      let best = 0;
+      for (const memory of input.memories ?? []) {
+        best = Math.max(
+          best,
+          memoryItemScore(
+            candidate.characterId,
+            memory,
+            relatedIds,
+            input.userMessage.content,
+            config.weights,
+          ),
+        );
+      }
+      return best;
+    })();
+    if (memoryContribution > 0) {
       reached.push("MEMORY_RELEVANCE");
-      score += config.weights.memoryRelevance;
+      score += memoryContribution;
       hasPositiveSignal = true;
     }
 
-    if (input.events?.some((event) => event.participantCharacterIds.includes(candidate.characterId))) {
+    const eventContribution = (() => {
+      let best = 0;
+      for (const event of input.events ?? []) {
+        best = Math.max(
+          best,
+          eventItemScore(
+            candidate.characterId,
+            event,
+            relatedIds,
+            input.userMessage.content,
+            config.weights,
+          ),
+        );
+      }
+      return best;
+    })();
+    if (eventContribution > 0) {
       reached.push("EVENT_RELEVANCE");
-      score += config.weights.eventRelevance;
+      score += eventContribution;
       hasPositiveSignal = true;
     }
 
