@@ -23,6 +23,10 @@ import {
   type ResearchTriggerInternalContext,
 } from "../external-research/research-trigger.js";
 import { selectSpeakers } from "./response-orchestrator.js";
+import {
+  appendTurnReply,
+  createTurnContext,
+} from "./turn-context.js";
 
 
 export interface TurnInput {
@@ -262,6 +266,20 @@ export async function executeTurn(
     input.userPrompt,
   );
 
+  const userCharacterName =
+    signals.participants.find((p) => p.characterId === userCharacterId)?.name ??
+    userCharacterId;
+  const characterNameBy = new Map(
+    signals.participants.map((p) => [p.characterId, p.name]),
+  );
+
+  let turnContext = createTurnContext({
+    userMessage: input.userPrompt,
+    userCharacterId,
+    userCharacterName,
+    previousReplies: [],
+  });
+
   const autoRagFrameId = await autoResearchFrame(
     db,
     options?.ragProvider,
@@ -287,6 +305,7 @@ export async function executeTurn(
           userId: input.userId,
           userPrompt: input.userPrompt,
           targetCharacterId: speakerId,
+          turnContext,
           ...(effectiveRagFrameId !== undefined
             ? { ragFrameId: effectiveRagFrameId }
             : {}),
@@ -302,6 +321,12 @@ export async function executeTurn(
       const decision = await persistGeneratedMessage(db, result, input.userId);
       if (decision.persisted) {
         messages.push(decision.message);
+        turnContext = appendTurnReply(turnContext, {
+          speakerCharacterId: speakerId,
+          speakerName: characterNameBy.get(speakerId) ?? speakerId,
+          senderType: "AI_CHARACTER",
+          content: decision.message.content,
+        });
       } else {
         failedSpeakers.push({ characterId: speakerId, error: decision.reason });
       }

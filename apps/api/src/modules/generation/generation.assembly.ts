@@ -22,6 +22,11 @@ import {
   resolveGenerationRagContext,
 } from "./generation-rag-context.js";
 import type { ExternalRagContext } from "../external-research/external-rag-adapter.js";
+import {
+  isHighLexicalOverlap,
+  lexicalOverlap,
+} from "../conversation/response-overlap.js";
+import type { TurnContext, TurnReply } from "../conversation/turn-context.js";
 
 export const GENERATION_VERSION = "generation.v1";
 export const GENERATION_RULE = "generation.v1-policy:provider=null#mode=assembly-only";
@@ -63,6 +68,7 @@ export interface ContextGenerationRequest {
   userPrompt?: string;
   targetCharacterId?: string;
   ragFrameId?: string;
+  turnContext?: TurnContext;
 }
 
 export interface GenerationProvider {
@@ -135,6 +141,7 @@ export const SECTION_IDS = [
   "PHASE_MARKER",
   "PARTICIPANTS",
   "ACTIVE_SPEAKER",
+  "CURRENT_TURN",
   "CHARACTER_DNA",
   "WORLD_STATE",
   "MEMORIES",
@@ -532,12 +539,64 @@ export function countEmittedSections(systemPrompt: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// CURRENT_TURN — continuidade narrativa entre speakers do mesmo turno (109F).
+//
+// A seção é OPÇÃO E PURA: aparece somente quando há respostas anteriores deste
+// turno a apresentar ao speaker seguinte. O registro do turno (mensagens)
+// NUNCA é renderizado aqui — o USER message segue exclusivamente em `userPrompt`
+// (role "user"), evitando duplicação. Sinais de continuidade são descritivos
+// (entram no contexto como informação, NÃO como roteiro rígido).
+// ---------------------------------------------------------------------------
+
+export function composeCurrentTurnSection(turnContext: TurnContext | undefined): string {
+  if (turnContext === undefined || turnContext.previousReplies.length === 0) {
+    return "";
+  }
+  const replies = turnContext.previousReplies;
+  const lines: string[] = [];
+  lines.push(
+    "Mensagens deste turno (respostas já geradas por outros AI speakers, em ordem):",
+  );
+  for (const reply of replies) {
+    lines.push(`- [${reply.senderType}] ${reply.speakerName}: "${reply.content}"`);
+  }
+  const last = replies[replies.length - 1];
+  lines.push("Sinais de continuidade:");
+  lines.push(`- previousSpeaker: ${last.speakerName}`);
+  lines.push(
+    `- directReplyOpportunity: sim (a última fala deste turno foi de ${last.speakerName})`,
+  );
+  lines.push(`- repeatedTopic: ${describeRepeatedTopic(replies)}`);
+  return lines.join("\n");
+}
+
+function describeRepeatedTopic(replies: readonly TurnReply[]): string {
+  let max = 0;
+  let label = "não se aplica (menos de duas respostas anteriores neste turno)";
+  for (let i = 0; i < replies.length; i++) {
+    for (let j = i + 1; j < replies.length; j++) {
+      const score = lexicalOverlap(replies[i].content, replies[j].content);
+      if (score > max) {
+        max = score;
+        label = `respostas de ${replies[i].speakerName} e ${replies[j].speakerName} apresentam alta sobreposição lexical (${Math.round(score * 100)}%)`;
+      }
+    }
+  }
+  if (max === 0 && replies.length >= 2) {
+    return "nenhuma sobreposição lexical entre as respostas anteriores";
+  }
+  if (isHighLexicalOverlap(max)) return label;
+  return "nenhuma sobreposição alta entre as respostas anteriores";
+}
+
+// ---------------------------------------------------------------------------
 // Compositor principal (determinístico, sem Date.now() no conteúdo)
 // ---------------------------------------------------------------------------
 
 export function composeSystemPrompt(
   context: AssembledContext,
   speakerCharacterId?: string,
+  turnContext?: TurnContext,
 ): string {
   const blocks: Array<[SectionId, string]> = [
     ["GLOBAL_RULES", sectionGlobalRules()],
@@ -545,6 +604,11 @@ export function composeSystemPrompt(
     ["PARTICIPANTS", sectionParticipants(context)],
     ["ACTIVE_SPEAKER", sectionActiveSpeaker(context)],
   ];
+
+  const currentTurnSection = composeCurrentTurnSection(turnContext);
+  if (currentTurnSection.length > 0) {
+    blocks.push(["CURRENT_TURN", currentTurnSection]);
+  }
 
   if (speakerCharacterId !== undefined) {
     const dnaSection = sectionCharacterDna(context, speakerCharacterId);
@@ -650,7 +714,11 @@ export async function assembleGenerationBundle(
     rag = resolveGenerationRagContext(readResult, request.ragFrameId);
   }
   const contextWithRag = rag === null ? context : withExternalRag(context, rag);
-  const systemPrompt = composeSystemPrompt(contextWithRag, speakerCharacterId);
+  const systemPrompt = composeSystemPrompt(
+    contextWithRag,
+    speakerCharacterId,
+    request.turnContext,
+  );
 
   if (request.userPrompt !== undefined && request.userPrompt.trim().length === 0) {
     throw new GenerationUserInputError(
@@ -778,7 +846,6 @@ export async function generateGeneration(
 // ---------------------------------------------------------------------------
 
 export function assertGenerationContract(result: GenerationResult): boolean {
-  // 1) provider presente
   if (typeof result.meta?.provider !== "string" || result.meta.provider.length === 0) {
     return false;
   }
@@ -834,7 +901,7 @@ export function assertGenerationContract(result: GenerationResult): boolean {
     pos = m.index;
     found.push(beginId);
   }
-  const optionalSections = new Set(["EXTERNAL_CONTEXT", "CHARACTER_DNA"]);
+  const optionalSections = new Set(["EXTERNAL_CONTEXT", "CHARACTER_DNA", "CURRENT_TURN"]);
   const expectedIds = SECTION_IDS.filter(
     (id) => found.includes(id) || !optionalSections.has(id),
   );

@@ -54,7 +54,7 @@ function isSignificant(token: string): boolean {
   return token.length >= 2 && !STOPWORDS.has(token);
 }
 
-function significantTokens(text: string): string[] {
+export function significantTokens(text: string): string[] {
   return [...new Set(normalizedTokens(text).filter(isSignificant))].sort();
 }
 

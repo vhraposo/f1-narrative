@@ -8,6 +8,15 @@ import {
   type ProviderInput,
 } from "../generation/generation.assembly.js";
 import { OllamaProviderError } from "../generation/ollama-provider.js";
+import { computeChunkContentHash } from "../external-research/external-chunking.js";
+import { COHERE_DIMENSIONS } from "../external-research/external-embedding-provider.js";
+import { computeDocumentContentHash } from "../external-research/external-ingest.js";
+import { EXTERNAL_RETRIEVAL_RULE } from "../external-research/external-retrieval.js";
+import {
+  computeConversationRagFrameKey,
+  computeConversationRagFreshnessAnchor,
+  computeRagQueryHash,
+} from "../external-research/conversation-rag.js";
 
 // ---------------------------------------------------------------------------
 // STEP 109B — turno multi-character
@@ -44,6 +53,9 @@ const createdUserIds: string[] = [];
 const createdCharacterIds: string[] = [];
 const createdConversationIds: string[] = [];
 const createdMemoryIds: string[] = [];
+const createdSourceIds: string[] = [];
+const createdDocumentIds: string[] = [];
+const createdChunkIds: string[] = [];
 
 let counter = 0;
 
@@ -279,6 +291,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.conversationRagSnapshotItem.deleteMany({
+    where: { snapshot: { frame: { conversationId: { in: createdConversationIds } } } },
+  });
+  await prisma.conversationRagSnapshot.deleteMany({
+    where: { frame: { conversationId: { in: createdConversationIds } } },
+  });
+  await prisma.conversationRagFrame.deleteMany({
+    where: { conversationId: { in: createdConversationIds } },
+  });
   await prisma.message.deleteMany({
     where: { conversationId: { in: createdConversationIds } },
   });
@@ -289,6 +310,9 @@ afterAll(async () => {
     where: { id: { in: createdConversationIds } },
   });
   await prisma.memory.deleteMany({ where: { id: { in: createdMemoryIds } } });
+  await prisma.externalChunk.deleteMany({ where: { id: { in: createdChunkIds } } });
+  await prisma.externalDocument.deleteMany({ where: { id: { in: createdDocumentIds } } });
+  await prisma.externalSource.deleteMany({ where: { id: { in: createdSourceIds } } });
   await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
   await prisma.$disconnect();
@@ -578,5 +602,375 @@ describe("conversation-turn routes", () => {
     const json = res.json();
     expect(json.messages.map((m) => m.characterId)).toEqual([aiA]);
     expect(json.failedSpeakers).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// STEP 109F — continuidade narrativa entre speakers do mesmo turno.
+//
+// O turno atual = USER message (entregue UMA vez, via userPrompt/role "user")
+// + respostas AI já geradas neste turno (seção CURRENT_TURN para o speaker
+// seguinte, em ordem de geração). Sinais de continuidade entram como contexto
+// descritivo (nunca como roteiro rígido). Os testes T1–T8 provam:
+//   T1 B vê A; o primeiro speaker não tem seção;
+//   T2 C vê A+B em ordem; cada resposta anterior uma única vez; a própria fala
+//      nunca aparece;
+//   T3 sinais de continuidade presentes;
+//   T4 determinismo do bloco CURRENT_TURN para o mesmo input;
+//   T5 falha parcial: B falha, C continua vendo A;
+//   T6 nenhuma Memory/Event é criada durante o turno (relevância não recalc.);
+//   T7 zero/um respondente seguem válidos (regressão do contrato 109B);
+//   T8 pesquisa externa NÃO repetida por speaker: mesmo frame compartilhado.
+// ---------------------------------------------------------------------------
+
+function currentTurnBlock(prompt: string): string {
+  const match = prompt.match(/<BEGIN 5:CURRENT_TURN>[\s\S]*?<END 5:CURRENT_TURN>/);
+  return match ? match[0] : "";
+}
+
+function sequenceProvider(
+  texts: string[],
+  opts: { failures?: number[]; capture?: { inputs: ProviderInput[] } } = {},
+): GenerationProvider {
+  let call = 0;
+  return {
+    name: "seq109f",
+    async run(input) {
+      call += 1;
+      if (opts.failures?.includes(call)) {
+        throw new OllamaProviderError("network", "falha STEP 109F (controlada).");
+      }
+      opts.capture?.inputs.push(input);
+      return {
+        provider: "seq109f",
+        mode: "generated",
+        text: texts[call - 1] ?? `resposta-${call}`,
+        tokenStats: {
+          systemPromptChars: input.systemPrompt.length,
+          contextBlocks: countEmittedSections(input.systemPrompt),
+        },
+      };
+    },
+  };
+}
+
+function ragFrameDefaults() {
+  return {
+    topK: 5,
+    threshold: 0.5,
+    provider: "cohere",
+    model: "embed-multilingual-v3.0",
+    version: "v3.0",
+    dimensions: COHERE_DIMENSIONS,
+    ruleApplied: EXTERNAL_RETRIEVAL_RULE,
+  } as const;
+}
+
+async function seedCurrentRagFrame(conversationId: string): Promise<string> {
+  const query = "resultados da última corrida";
+  const queryHash = computeRagQueryHash(query);
+  const frameKey = computeConversationRagFrameKey({
+    queryHash,
+    ...ragFrameDefaults(),
+  });
+  const frame = await prisma.conversationRagFrame.create({
+    data: {
+      conversationId,
+      queryText: query,
+      queryHash,
+      ...ragFrameDefaults(),
+      frameKey,
+      status: "READY",
+    },
+  });
+
+  const source = await prisma.externalSource.create({
+    data: {
+      url: `https://109f.test/${Date.now()}/${Math.random()}`,
+      title: "fonte109f",
+      visibility: "PRIVATE",
+      ownerId: owner.userId,
+    },
+  });
+  createdSourceIds.push(source.id);
+
+  const doc = await prisma.externalDocument.create({
+    data: {
+      sourceId: source.id,
+      title: "doc109f",
+      content: "relatório da prova",
+      contentHash: computeDocumentContentHash("relatório da prova"),
+      status: "READY",
+    },
+  });
+  createdDocumentIds.push(doc.id);
+
+  const text = "A estratégia de pneus definiu o resultado da corrida.";
+  const contentHash = computeChunkContentHash(text);
+  const chunk = await prisma.externalChunk.create({
+    data: {
+      documentId: doc.id,
+      text,
+      orderOriginal: 0,
+      contentHash,
+      embeddedContentHash: contentHash,
+      embeddingProvider: "cohere",
+      embeddingModel: "embed-multilingual-v3.0",
+      embeddingVersion: "v3.0",
+      embeddingDimensions: COHERE_DIMENSIONS,
+    },
+  });
+  createdChunkIds.push(chunk.id);
+
+  const freshnessAnchor = computeConversationRagFreshnessAnchor({
+    frameKey,
+    scopeSourceIds: frame.scopeSourceIds,
+    topK: frame.topK,
+    threshold: frame.threshold,
+    provider: frame.provider,
+    model: frame.model,
+    version: frame.version,
+    dimensions: frame.dimensions,
+    ruleApplied: frame.ruleApplied,
+    chunkBindings: [
+      { chunkId: chunk.id, contentHash, embeddedContentHash: contentHash },
+    ],
+  });
+  const snapshot = await prisma.conversationRagSnapshot.create({
+    data: {
+      frameId: frame.id,
+      snapshotKey: `${frameKey}#${freshnessAnchor}`,
+      status: "READY",
+      retrievedAt: new Date(),
+      freshnessAnchor,
+    },
+  });
+  await prisma.conversationRagSnapshotItem.create({
+    data: {
+      snapshotId: snapshot.id,
+      chunkId: chunk.id,
+      score: 0.92,
+      distance: 0.1,
+      order: 0,
+      citation: "fonte109f",
+    },
+  });
+  return frame.id;
+}
+
+describe("STEP 109F — continuidade narrativa no turno", () => {
+  it("T1) B vê A no turno atual (CURRENT_TURN no prompt); o primeiro speaker não tem seção", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appF = buildApp(undefined, sequenceProvider(["F1.", "F2."], { capture }));
+    await appF.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appF, owner, conv1, {
+        userPrompt: "SpeakerAlpha e SpeakerBeta respondam!",
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().messages).toHaveLength(2);
+      expect(capture.inputs).toHaveLength(2);
+      const pA = capture.inputs[0].systemPrompt;
+      const pB = capture.inputs[1].systemPrompt;
+      expect(pA).not.toContain("CURRENT_TURN");
+      expect(pB).toContain("<BEGIN 5:CURRENT_TURN>");
+      expect(pB).toContain("SpeakerAlpha");
+      expect((pB.match(/"F1\."/g) ?? []).length).toBe(1);
+      expect(capture.inputs[1].userPrompt).toBe(
+        "SpeakerAlpha e SpeakerBeta respondam!",
+      );
+      expect(pB).not.toContain("SpeakerAlpha e SpeakerBeta respondam!");
+    } finally {
+      await appF.close();
+    }
+  });
+
+  it("T2) C vê A+B em ordem; cada resposta anterior uma única vez; a própria fala nunca aparece", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appF = buildApp(
+      undefined,
+      sequenceProvider(["F1.", "F2.", "F3."], { capture }),
+    );
+    await appF.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appF, owner, conv1, {
+        userPrompt: "SpeakerAlpha, SpeakerBeta e SpeakerGamma respondam!",
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().messages).toHaveLength(3);
+      expect(capture.inputs).toHaveLength(3);
+      const pC = capture.inputs[2].systemPrompt;
+      expect(pC).toContain("<BEGIN 5:CURRENT_TURN>");
+      expect(pC.indexOf('"F1."')).toBeLessThan(pC.indexOf('"F2."'));
+      expect((pC.match(/"F1\."/g) ?? []).length).toBe(1);
+      expect((pC.match(/"F2\."/g) ?? []).length).toBe(1);
+      expect(pC).not.toContain('"F3."');
+      const pB = capture.inputs[1].systemPrompt;
+      expect(pB).toContain('"F1."');
+      expect(pB).not.toContain('"F2."');
+    } finally {
+      await appF.close();
+    }
+  });
+
+  it("T3) sinais de continuidade entram no contexto do speaker seguinte", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appF = buildApp(undefined, sequenceProvider(["F1.", "F2."], { capture }));
+    await appF.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appF, owner, conv1, {
+        userPrompt: "SpeakerAlpha e SpeakerBeta respondam!",
+      });
+      expect(res.statusCode).toBe(201);
+      const pB = capture.inputs[1].systemPrompt;
+      expect(pB).toContain("- previousSpeaker: SpeakerAlpha");
+      expect(pB).toContain("- directReplyOpportunity: sim");
+      expect(pB).toContain("- repeatedTopic:");
+    } finally {
+      await appF.close();
+    }
+  });
+
+  it("T4) determinismo: mesmo input → mesmo bloco CURRENT_TURN em execuções independentes", async () => {
+    const blocks: string[] = [];
+    for (let round = 0; round < 2; round++) {
+      const capture = { inputs: [] as ProviderInput[] };
+      const appF = buildApp(
+        undefined,
+        sequenceProvider(["F1.", "F2."], { capture }),
+      );
+      await appF.ready();
+      try {
+        await resetMessages(conv1);
+        const res = await turn(appF, owner, conv1, {
+          userPrompt: "SpeakerAlpha e SpeakerBeta respondam!",
+        });
+        expect(res.statusCode).toBe(201);
+        expect(capture.inputs).toHaveLength(2);
+        blocks.push(currentTurnBlock(capture.inputs[1].systemPrompt));
+      } finally {
+        await appF.close();
+      }
+    }
+    expect(blocks[0]).not.toBe("");
+    expect(blocks[0]).toBe(blocks[1]);
+  });
+
+  it("T5) falha parcial: B falha; C continua e ainda vê a resposta de A", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appF = buildApp(
+      undefined,
+      sequenceProvider(["F1.", "F3.", "F4."], { failures: [2], capture }),
+    );
+    await appF.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appF, owner, conv1, {
+        userPrompt: "SpeakerAlpha, SpeakerBeta e SpeakerGamma respondam!",
+      });
+      expect(res.statusCode).toBe(201);
+      const json = res.json();
+      expect(json.messages.map((m) => m.characterId)).toEqual([aiA, aiC]);
+      expect(json.failedSpeakers).toEqual([
+        { characterId: aiB, error: "provider-error" },
+      ]);
+      const pC = capture.inputs[1].systemPrompt;
+      expect((pC.match(/"F1\."/g) ?? []).length).toBe(1);
+      expect(pC).not.toContain('"F3."');
+      expect(pC).not.toContain('"F4."');
+    } finally {
+      await appF.close();
+    }
+  });
+
+  it("T6) nenhuma Memory/Event é criada durante o turno (relevância não recalculada)", async () => {
+    await resetMessages(conv1);
+    const [memBefore, evtBefore] = await Promise.all([
+      prisma.memory.count(),
+      prisma.event.count(),
+    ]);
+    const res = await turn(appGen, owner, conv1, {
+      userPrompt: "SpeakerAlpha e SpeakerBeta respondam!",
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().messages).toHaveLength(2);
+    const [memAfter, evtAfter] = await Promise.all([
+      prisma.memory.count(),
+      prisma.event.count(),
+    ]);
+    expect(memAfter).toBe(memBefore);
+    expect(evtAfter).toBe(evtBefore);
+  });
+
+  it("T7) zero e um respondente seguem válidos com o novo turno", async () => {
+    await resetMessages(convUserOnly);
+    const zero = await turn(appGen, owner, convUserOnly, {
+      userPrompt: "Mensagem sem IA",
+    });
+    expect(zero.statusCode).toBe(201);
+    expect(zero.json().messages).toEqual([]);
+    expect(zero.json().failedSpeakers).toEqual([]);
+
+    await resetMessages(conv1);
+    const one = await turn(appGen, owner, conv1, {
+      userPrompt: "Olá, SpeakerAlpha!",
+    });
+    expect(one.statusCode).toBe(201);
+    expect(one.json().messages).toHaveLength(1);
+    expect(one.json().messages[0].characterId).toBe(aiA);
+    expect(one.json().failedSpeakers).toEqual([]);
+  });
+
+  it("T8) pesquisa externa NÃO repetida por speaker: mesmo frame compartilhado e nada materializado", async () => {
+    await resetMessages(conv1);
+    const frameId = await seedCurrentRagFrame(conv1);
+    const frameBefore = await prisma.conversationRagFrame.count({
+      where: { conversationId: conv1 },
+    });
+    const snapshotBefore = await prisma.conversationRagSnapshot.count({
+      where: { frame: { conversationId: conv1 } },
+    });
+    const capture = { inputs: [] as ProviderInput[] };
+    const appF = buildApp(
+      undefined,
+      sequenceProvider(["F1.", "F2."], { capture }),
+    );
+    await appF.ready();
+    try {
+      const res = await turn(appF, owner, conv1, {
+        userPrompt: "SpeakerAlpha e SpeakerBeta respondam!",
+        ragFrameId: frameId,
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().messages).toHaveLength(2);
+      expect(capture.inputs).toHaveLength(2);
+      const externalA = capture.inputs[0].context.externalRag;
+      const externalB = capture.inputs[1].context.externalRag;
+      expect(externalA).toBeDefined();
+      expect(externalB).toBeDefined();
+      // Mesmo frame materializado para ambos: NENHUMA pesquisa per-speaker.
+      expect(externalA?.provider).toBe("cohere");
+      expect(externalB?.provider).toBe("cohere");
+      expect(externalA?.items.length).toBeGreaterThan(0);
+      expect(externalB?.items.length).toBe(externalA?.items.length);
+      const blockA = capture.inputs[0].systemPrompt;
+      const blockB = capture.inputs[1].systemPrompt;
+      expect(blockA).toContain("<BEGIN 11:EXTERNAL_CONTEXT>");
+      expect(blockB).toContain("<BEGIN 12:EXTERNAL_CONTEXT>");
+      // Nenhum frame/snapshot novo foi criado durante o turno.
+      expect(
+        await prisma.conversationRagFrame.count({ where: { conversationId: conv1 } }),
+      ).toBe(frameBefore);
+      expect(
+        await prisma.conversationRagSnapshot.count({
+          where: { frame: { conversationId: conv1 } },
+        }),
+      ).toBe(snapshotBefore);
+    } finally {
+      await appF.close();
+    }
   });
 });
