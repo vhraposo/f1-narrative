@@ -516,3 +516,103 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
     expect(selectSpeakers(input)).toStrictEqual(selectSpeakers(input));
   });
 });
+
+describe("STEP 109I-B - ResponseOrchestrator zero-responder / response-opportunity", () => {
+  const duo = [ai(MAX_ID, "Max Verstappen"), user(USER_ID, "Alicya")];
+  const farewellText = "Boa noite pessoal, até amanhã.";
+  const greetingText = "Bom dia, gente.";
+
+  it("1) despedida sem sinal de resposta → 0 responders, mesmo com memória/evento", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: farewellText },
+      participants: duo,
+      recentMessages: [],
+      relationships: [],
+      memories: [{ participantCharacterIds: [MAX_ID] }],
+      events: [{ participantCharacterIds: [MAX_ID] }],
+    });
+    expect(selection.selected).toEqual([]);
+    const max = selection.candidates[0];
+    expect(max.score).toBe(36); // 18 memória + 18 evento
+    expect(max.excludedReason).toBe("NO_RESPONSE_OPPORTUNITY");
+    expect(max.reasons).toContain("MEMORY_RELEVANCE");
+    expect(max.reasons).toContain("EVENT_RELEVANCE");
+  });
+
+  it("2) saudação genérica preserva a semântica existente (memória/evento continuam selecionando)", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: greetingText },
+      participants: duo,
+      recentMessages: [],
+      relationships: [],
+      memories: [{ participantCharacterIds: [MAX_ID] }],
+      events: [{ participantCharacterIds: [MAX_ID] }],
+    });
+    expect(selection.candidates[0].score).toBe(36);
+    expect(selection.candidates[0].excludedReason).toBeUndefined();
+    expect(selection.selected).toEqual([MAX_ID]);
+  });
+
+  it("3) despedida com menção direta → o mencionado permanece selecionável", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Tchau, Max! Até amanhã." },
+      participants: [ai(MAX_ID, "Max Verstappen"), ai(CHARLES_ID, "Charles Leclerc"), user(USER_ID, "Alicya")],
+      recentMessages: [],
+      relationships: [],
+      memories: [{ participantCharacterIds: [MAX_ID] }, { participantCharacterIds: [CHARLES_ID] }],
+      events: [{ participantCharacterIds: [MAX_ID] }, { participantCharacterIds: [CHARLES_ID] }],
+    });
+    const max = selection.candidates.find((c) => c.characterId === MAX_ID)!;
+    const charles = selection.candidates.find((c) => c.characterId === CHARLES_ID)!;
+    expect(max.reasons).toContain("DIRECT_MENTION");
+    expect(max.score).toBe(96); // 60 menção + 18 memória + 18 evento
+    expect(max.selected).toBe(true);
+    expect(charles.score).toBe(36);
+    expect(charles.excludedReason).toBe("NO_RESPONSE_OPPORTUNITY");
+    expect(selection.selected).toEqual([MAX_ID]);
+  });
+
+  it("4) despedida com pergunta direta → responders permanecem selecionáveis", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Boa noite pessoal, alguém lembra do fim de semana?" },
+      participants: duo,
+      recentMessages: [],
+      relationships: [],
+      memories: [{ participantCharacterIds: [MAX_ID] }],
+      events: [],
+    });
+    const max = selection.candidates[0];
+    expect(max.reasons).toContain("QUESTION_RELEVANCE");
+    expect(max.score).toBe(28); // 10 pergunta + 18 memória
+    expect(max.excludedReason).toBeUndefined();
+    expect(selection.selected).toEqual([MAX_ID]);
+  });
+
+  it("5) memória/evento sozinhos não criam oportunidade; saudação mantém a seleção", () => {
+    const participants = [ai(MAX_ID, "Max Verstappen"), ai(CHARLES_ID, "Charles Leclerc"), user(USER_ID, "Alicya")];
+    const signals = {
+      recentMessages: [],
+      relationships: [],
+      memories: [{ participantCharacterIds: [MAX_ID, CHARLES_ID] }],
+      events: [{ participantCharacterIds: [MAX_ID, CHARLES_ID] }],
+    };
+
+    const noOpportunity = selectSpeakers({
+      userMessage: { content: farewellText },
+      participants,
+      ...signals,
+    });
+    expect(noOpportunity.selected).toEqual([]);
+    expect(
+      noOpportunity.candidates.every((c) => c.excludedReason === "NO_RESPONSE_OPPORTUNITY"),
+    ).toBe(true);
+
+    const greeting = selectSpeakers({
+      userMessage: { content: greetingText },
+      participants,
+      ...signals,
+    });
+    expect(greeting.candidates.every((c) => c.excludedReason === undefined)).toBe(true);
+    expect([...greeting.selected].sort()).toEqual([CHARLES_ID, MAX_ID]);
+  });
+});

@@ -174,7 +174,7 @@ describe("STEP 109C — CHARACTER_DNA (speaker-specific, opt-in)", () => {
     expect(prompt.match(/Personality/g)).toHaveLength(1);
   });
 
-  it("2) speaker sem DNA (dna {}) e sem biography → seção AUSENTE; geração válida", () => {
+  it("2) speaker sem DNA (dna {}) e sem biography → seção AUSENTE; âncora de identidade via RELATIONSHIPS", () => {
     const ctx = mkContext({
       participants: [
         ALICE,
@@ -184,6 +184,10 @@ describe("STEP 109C — CHARACTER_DNA (speaker-specific, opt-in)", () => {
     });
     const prompt = composeSystemPrompt(ctx, KIMI_ID);
     expect(prompt).not.toContain("CHARACTER_DNA");
+    expect(prompt).not.toContain("<BEGIN 5:CHARACTER_DNA>");
+    expect(prompt).toContain("O AI speaker deste frame é Kimi — responda como Kimi e somente como Kimi.");
+    expect(prompt).toContain("NÃO narre decisões ou falas de outros personagens.");
+    expect(prompt).not.toContain("ousada");
     expect(countEmittedSections(prompt)).toBe(12);
     expect(prompt).toContain("<END 12:BEHAVIORAL_INVARIANTS>");
   });

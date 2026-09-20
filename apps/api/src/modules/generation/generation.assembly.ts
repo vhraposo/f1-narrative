@@ -277,14 +277,28 @@ function sectionCharacterDna(
   const dnaLines = formatDnaLines(dna);
   const biography = formatBiographySnippet(speaker.biography);
   if (dnaLines.length === 0 && biography === null) return "";
+
   const lines: string[] = [
-    `O AI speaker deste frame é ${speaker.name} — responda como ${speaker.name} e somente como ${speaker.name}.`,
-    "NÃO narre decisões ou falas de outros personagens.",
     "Identidade narrativa (Character DNA):",
     ...dnaLines,
   ];
   if (biography !== null) lines.push(`Biografia (resumo): ${biography}`);
   return lines.join("\n");
+}
+
+function identityAnchorLines(
+  context: AssembledContext,
+  speakerCharacterId: string | undefined,
+): string[] {
+  if (speakerCharacterId === undefined) return [];
+  const speaker = context.participants.find(
+    (p) => p.characterId === speakerCharacterId,
+  );
+  if (!speaker || !speaker.isAIParticipant) return [];
+  return [
+    `O AI speaker deste frame é ${speaker.name} — responda como ${speaker.name} e somente como ${speaker.name}.`,
+    "NÃO narre decisões ou falas de outros personagens.",
+  ];
 }
 
 function sortSpeakerRelationships(
@@ -327,8 +341,16 @@ function sectionRelationships(
   context: AssembledContext,
   speakerCharacterId?: string,
 ): string {
+  const identityAnchor = identityAnchorLines(context, speakerCharacterId);
+
   if (context.relationships.length === 0) {
-    return "Nenhuma relação selecionada para este quadro.";
+    if (identityAnchor.length === 0) {
+      return "Nenhuma relação selecionada para este quadro.";
+    }
+    return [
+      ...identityAnchor,
+      "Nenhuma relação selecionada para este quadro.",
+    ].join("\n");
   }
   if (speakerCharacterId === undefined) {
     return context.relationships.map(relationshipLine).join("\n");
@@ -344,7 +366,10 @@ function sectionRelationships(
       r.characterAId === speakerCharacterId || r.characterBId === speakerCharacterId,
   );
   if (own.length === 0) {
-    return `Nenhuma relação relevante para ${speakerName} no escopo deste quadro.`;
+    return [
+      ...identityAnchor,
+      `Nenhuma relação relevante para ${speakerName} no escopo deste quadro.`,
+    ].join("\n");
   }
   const sorted = sortSpeakerRelationships(
     own,
@@ -352,6 +377,7 @@ function sectionRelationships(
     participantByCharacterId,
   );
   const lines: string[] = [
+    ...identityAnchor,
     `Relações relevantes para ${speakerName} (perspectiva do speaker):`,
   ];
   for (const entry of sorted) {

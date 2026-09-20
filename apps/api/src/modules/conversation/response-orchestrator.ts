@@ -135,7 +135,8 @@ export type ResponseOrchestratorReasonCode =
 export type ResponseOrchestratorExcludedReason =
   | "BELOW_THRESHOLD"
   | "NO_SIGNALS"
-  | "CAP_REACHED";
+  | "CAP_REACHED"
+  | "NO_RESPONSE_OPPORTUNITY";
 
 export interface ResponseOrchestratorCandidateResult {
   characterId: string;
@@ -170,6 +171,14 @@ const INTERROGATIVE_FIRST_TOKENS = new Set([
   "quem", "que", "qual", "quais", "quando", "onde", "como", "porque",
   "quanto", "quanta", "quantos", "quantas",
   "who", "what", "when", "where", "which", "whose", "why", "how", "whom",
+]);
+
+const FAREWELL_INITIATORS = new Set([
+  "tchau",
+  "adeus",
+  "bye",
+  "goodnight",
+  "farewell",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -241,6 +250,29 @@ function isQuestionInput(content: string, tokens: readonly string[]): boolean {
   }
   const first = tokens[0];
   return first !== undefined && INTERROGATIVE_FIRST_TOKENS.has(first);
+}
+
+function isFarewellInput(tokens: readonly string[]): boolean {
+  const first = tokens[0];
+  if (first === undefined) {
+    return false;
+  }
+  if (first === "boa" && tokens[1] === "noite") {
+    return true;
+  }
+  if (first === "good" && tokens[1] === "night") {
+    return true;
+  }
+  if (first === "see" && tokens[1] === "you") {
+    return true;
+  }
+  if (first === "bye" && tokens[1] === "bye") {
+    return true;
+  }
+  if (first === "ate") {
+    return true;
+  }
+  return FAREWELL_INITIATORS.has(first);
 }
 
 function buildRelatedIds(
@@ -370,10 +402,13 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
     }
   }
 
+  const topicSignalByCharacter = new Map<string, boolean>();
+
   const results: ResponseOrchestratorCandidateResult[] = aiCandidates.map((candidate) => {
     const reached: ResponseOrchestratorReasonCode[] = [];
     let score = 0;
     let hasPositiveSignal = false;
+    let hasTopicSignal = false;
 
     const fullNameTokens = tokenize(candidate.name);
     const firstName = firstTokenOf(candidate.name);
@@ -418,6 +453,13 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
     const memoryContribution = (() => {
       let best = 0;
       for (const memory of input.memories ?? []) {
+        const memoryText = joinedText([memory.content, memory.summary]);
+        if (
+          memoryText.length > 0 &&
+          isTopicMatch(input.userMessage.content, memoryText)
+        ) {
+          hasTopicSignal = true;
+        }
         best = Math.max(
           best,
           memoryItemScore(
@@ -440,6 +482,13 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
     const eventContribution = (() => {
       let best = 0;
       for (const event of input.events ?? []) {
+        const eventText = joinedText([event.title, event.description]);
+        if (
+          eventText.length > 0 &&
+          isTopicMatch(input.userMessage.content, eventText)
+        ) {
+          hasTopicSignal = true;
+        }
         best = Math.max(
           best,
           eventItemScore(
@@ -479,6 +528,8 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
       (a, b) => (REASON_ORDER_INDEX.get(a) ?? 0) - (REASON_ORDER_INDEX.get(b) ?? 0),
     );
 
+    topicSignalByCharacter.set(candidate.characterId, hasTopicSignal);
+
     return {
       characterId: candidate.characterId,
       score,
@@ -491,9 +542,18 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
     (a, b) => b.score - a.score || a.characterId.localeCompare(b.characterId),
   );
 
+  const responseOpportunityGateActive =
+    isFarewellInput(contentTokens) && !isQuestion;
+
   for (const result of results) {
     if (result.reasons.includes("NO_SIGNALS_PENALTY")) {
       result.excludedReason = "NO_SIGNALS";
+    } else if (
+      responseOpportunityGateActive &&
+      !result.reasons.includes("DIRECT_MENTION") &&
+      !(topicSignalByCharacter.get(result.characterId) ?? false)
+    ) {
+      result.excludedReason = "NO_RESPONSE_OPPORTUNITY";
     } else if (result.score < config.threshold) {
       result.excludedReason = "BELOW_THRESHOLD";
     }

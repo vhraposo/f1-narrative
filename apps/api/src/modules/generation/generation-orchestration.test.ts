@@ -282,7 +282,10 @@ describe("STEP32 - DI OllamaProvider (stubbed transport)", () => {
     const input = "pergunta compartilhada";
     const baseReq = { conversationId, userId: owner.userId, userPrompt: input };
 
-    const nullResult = await generateGeneration(prisma, baseReq);
+    const nullResult = await generateGeneration(prisma, {
+      ...baseReq,
+      targetCharacterId: speakerCharacterId,
+    });
     const ollamaResult = await assembleGenerationBundle(
       prisma,
       { ...baseReq, targetCharacterId: speakerCharacterId },
