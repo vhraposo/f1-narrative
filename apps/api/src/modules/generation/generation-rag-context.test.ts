@@ -16,6 +16,7 @@ import {
   generateGeneration,
   GENERATION_RULE,
 } from "./generation.assembly.js";
+import { buildMessageContextJson } from "./generation-context-snapshot.js";
 import {
   resolveGenerationRagContext,
   GenerationRagFrameNotFoundError,
@@ -634,6 +635,40 @@ describe("generateGeneration com ragFrameId — seleção explícita (Fase 13 ST
     const gen = await generateGeneration(prisma, { conversationId: fx.conversationId, userId: fx.ownerId });
     expect(gen.meta.tokens.contextBlocks).toBe(12);
     expect(gen.meta.provider).toBe("null");
+  });
+
+  it("RESOLVER-zero) frame CURRENT com snapshot VAZIO (retrieval zero) selecionado explicitamente → externalRag presente com items vazios; rag.used = true (comportamento ATUAL)", async () => {
+    // Vetores MOCK determinísticos nos fixtures; NUNCA saída real de Cohere.
+    // Cenário: materialização rodou, retrieval retornou ZERO itens e o snapshot
+    // READY ficou sem itens (cf. materialization test W). O caller informa
+    // ragFrameId AO RESOLVER. CAMADA RESOLVER: a seleção CURRENT devolve o
+    // ExternalRagContext (ainda que vazio), então buildMessageContextJson
+    // reporta rag.used = true (used reflete PRESENÇA do contexto, não a contagem
+    // de itens). O teste E2E do turno (Z em conversation-turn-rag) prova que na
+    // ORQUESTRAÇÃO o gate "itemCount > 0" impede esse fluxo (used = false).
+    // Este teste PINTA o comportamento atual do resolver/contexto — desvio do
+    // contrato literal C é documentado no report (radical honesty).
+    const fx = await isolatedFixture("zero-items");
+    const { id: frameId } = await createFrame(fx.conversationId, "query zero-items");
+    await createSnapshot(frameId, []);
+
+    const gen = await generateGeneration(prisma, {
+      conversationId: fx.conversationId,
+      userId: fx.ownerId,
+      ragFrameId: frameId,
+    });
+    expect(gen.context.externalRag).not.toBeNull();
+    expect(gen.context.externalRag!.items).toEqual([]);
+    // Com zero itens a seção é emitida com texto de AUSÊNCIA (sem itens no
+    // corpo, mas o bloco 11 continua presente) → 13 blocos.
+    expect(gen.systemPrompt).toContain("<BEGIN 11:EXTERNAL_CONTEXT>");
+    expect(gen.systemPrompt).toContain(
+      "Nenhum contexto externo (RAG) está disponível neste quadro",
+    );
+    expect(gen.meta.tokens.contextBlocks).toBe(13);
+    const json = buildMessageContextJson(gen);
+    expect(json.rag.used).toBe(true);
+    expect(json.rag.items).toBe(0);
   });
 });
 

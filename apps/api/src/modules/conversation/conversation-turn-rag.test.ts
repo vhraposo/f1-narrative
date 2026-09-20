@@ -19,8 +19,12 @@ import { computeChunkContentHash } from "../external-research/external-chunking.
 //   X) sem gatilho ("Bom dia") → NENHUM frame é criado para a conversa.
 //   Y) internal-first: conceito já presente na biography do participante →
 //      NENHUM frame é criado.
+//   Z) gatilho ativo + retrieval zero (vetor MOCK ortogonal) → frame é
+//      materializado VAZIO, mas o turno NÃO consome RAG: rag.used = false
+//      (gate itemCount > 0 no orquestrador).
 //
 // Provider SEMPRE mock (embedding + geração); NUNCA Cohere/HTTP real.
+// Vetores são MOCK determinísticos (1024 dims), NUNCA saída real de Cohere.
 // ---------------------------------------------------------------------------
 
 const QUERY_VECTOR: number[] = (() => {
@@ -295,5 +299,31 @@ describe("conversation-turn auto external research (109D)", () => {
 
     const frames = await readRagFrames(fx.user, fx.conversationId);
     expect(frames).toEqual([]);
+  });
+
+  it("Z) gatilho ativo + retrieval zero (vetor MOCK ortogonal) → frame vazio materializado; rag.used = false", async () => {
+    const fx = await turnFixture();
+    const sourceId = await newPrivateSource(fx.user.userId);
+    const documentId = await newDocument(sourceId);
+    // Vetor MOCK ortogonal a QUERY_VECTOR (score 0, cosseno 0 < threshold 0.5):
+    // o retrieval (embedding mock → QUERY_VECTOR) retorna ZERO itens.
+    const chunkId = await insertChunk(documentId, "síndrome de protagonista na narrativa", 0);
+    expect(chunkId.length).toBeGreaterThan(0);
+
+    const res = await turn(fx.user, fx.conversationId, {
+      userPrompt: "Valente, o que significa síndrome de protagonista?",
+    });
+    expect(res.statusCode).toBe(201);
+    const json = res.json();
+    // Contrato: zero itens recuperados ⇒ NENHUM RAG alimenta a geração.
+    expect(json.messages[0].contextJson.rag.used).toBe(false);
+    expect(json.messages[0].contextJson.rag.items).toBe(0);
+
+    // Materialização aconteceu mesmo assim: frame READY com snapshot VAZIO.
+    const frames = await readRagFrames(fx.user, fx.conversationId);
+    expect(frames).toHaveLength(1);
+    expect(frames[0].freshness).toBe("CURRENT");
+    const rag = frames[0].externalRag as { items: Array<{ chunkId: string }> };
+    expect(rag.items).toEqual([]);
   });
 });
