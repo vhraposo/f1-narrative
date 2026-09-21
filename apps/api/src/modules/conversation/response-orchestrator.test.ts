@@ -198,8 +198,8 @@ describe("STEP 109A - ResponseOrchestrator normalização e robuteza", () => {
         { characterId: USER_ID, senderType: "USER_CHARACTER" },
         { characterId: MAX_ID, senderType: "AI_CHARACTER" },
       ],
-      memories: [{ participantCharacterIds: [MAX_ID, USER_ID] }],
-      events: [{ participantCharacterIds: [MAX_ID] }],
+      memories: [{ participantCharacterIds: [MAX_ID, USER_ID], content: "você viu o que aconteceu no treino" }],
+      events: [{ participantCharacterIds: [MAX_ID], title: "viu o que aconteceu com os carros" }],
       relationships: [{ characterAId: USER_ID, characterBId: MAX_ID }],
     });
     const max = selection.candidates.find((c) => c.characterId === MAX_ID)!;
@@ -293,7 +293,7 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
       events: extra.events,
     });
 
-  it("1) memória direta eleva e, com pergunta, cruza o threshold", () => {
+  it("1) memória direta eleva e, com pergunta, cruza o threshold (Modelo 1a: exige tópico)", () => {
     const plain = selectSpeakers({
       userMessage: { content: "Vocês lembram daquele fim de semana?" },
       participants: duo,
@@ -303,11 +303,19 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
     expect(plain.candidates[0].score).toBe(10);
     expect(plain.selected).toEqual([]);
 
-    const withMemory = questionOnly("Vocês lembram daquele fim de semana?", {
+    const noTopic = questionOnly("Vocês lembram daquele fim de semana?", {
       memories: [{ participantCharacterIds: [MAX_ID] }],
     });
+    const maxZero = noTopic.candidates.find((c) => c.characterId === MAX_ID)!;
+    expect(maxZero.score).toBe(10); // só pergunta; memória sem tópico = 0
+    expect(maxZero.reasons).not.toContain("MEMORY_RELEVANCE");
+    expect(noTopic.selected).toEqual([]);
+
+    const withMemory = questionOnly("O que vocês acharam do treino de pit stop?", {
+      memories: [{ participantCharacterIds: [MAX_ID], content: "treino de pit stop conjunto na sexta" }],
+    });
     const max = withMemory.candidates.find((c) => c.characterId === MAX_ID)!;
-    expect(max.score).toBe(28); // 18 memória + 10 pergunta
+    expect(max.score).toBe(30); // 10 pergunta + 20 memória (18+10 tópico → cap 20)
     expect(max.selected).toBe(true);
     expect(max.reasons).toContain("MEMORY_RELEVANCE");
     expect(withMemory.selected).toEqual([MAX_ID]);
@@ -330,13 +338,23 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
     expect(result.selected).toEqual([]);
   });
 
-  it("4) evento direto eleva e, com pergunta, cruza o threshold", () => {
-    const result = questionOnly("Vocês lembram daquele fim de semana?", {
+  it("4) evento direto eleva e, com pergunta, cruza o threshold (Modelo 1a: exige tópico)", () => {
+    const noTopic = questionOnly("Vocês lembram daquele fim de semana?", {
       events: [{ participantCharacterIds: [MAX_ID] }],
     });
-    expect(result.candidates[0].score).toBe(28); // 18 evento + 10 pergunta
-    expect(result.selected).toEqual([MAX_ID]);
-    expect(result.candidates[0].reasons).toContain("EVENT_RELEVANCE");
+    const maxZero = noTopic.candidates.find((c) => c.characterId === MAX_ID)!;
+    expect(maxZero.score).toBe(10); // só pergunta; evento sem tópico = 0
+    expect(maxZero.reasons).not.toContain("EVENT_RELEVANCE");
+    expect(noTopic.selected).toEqual([]);
+
+    const withEvent = questionOnly("O que vocês acharam do treino de pit stop?", {
+      events: [{ participantCharacterIds: [MAX_ID], title: "treino de pit stop conjunto" }],
+    });
+    const max = withEvent.candidates.find((c) => c.characterId === MAX_ID)!;
+    expect(max.score).toBe(30); // 10 pergunta + 20 evento (18+10 tópico → cap 20)
+    expect(max.selected).toBe(true);
+    expect(max.reasons).toContain("EVENT_RELEVANCE");
+    expect(withEvent.selected).toEqual([MAX_ID]);
   });
 
   it("5) evento irrelevante (outro personagem) não eleva", () => {
@@ -356,7 +374,7 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
       memories: [{ participantCharacterIds: [MAX_ID], content: "vitória inesquecível em Interlagos" }],
     });
     expect(upper.candidates[0].score).toBe(30); // 18+10 tópico = 28 → cap 20 → +10 pergunta
-    expect(control.candidates[0].score).toBe(28);
+    expect(control.candidates[0].score).toBe(10); // tópico não casa → memória = 0, só pergunta
   });
 
   it("7) tópico ignora diacríticos (Mônaco/monaco)", () => {
@@ -370,7 +388,7 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
     const result = questionOnly("O que houve ontem?", {
       memories: [{ participantCharacterIds: [MAX_ID], content: "o que de em a para" }],
     });
-    expect(result.candidates[0].score).toBe(28); // 18 memória + 10 pergunta, sem tópico
+    expect(result.candidates[0].score).toBe(10); // só pergunta; conteúdo só de stopwords → sem tópico
   });
 
   it("9) importância (HIGH) pesa mais que recência", () => {
@@ -378,7 +396,7 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
       userMessage: { content: "Quem lembra de Monza?" },
       participants: [ai(MAX_ID, "Max Verstappen"), ai(CHARLES_ID, "Charles Leclerc"), user(USER_ID, "Alicya")],
       recentMessages: [{ characterId: CHARLES_ID, senderType: "AI_CHARACTER" }],
-      memories: [{ participantCharacterIds: [MAX_ID], importance: "HIGH", content: "pista antiga" }],
+      memories: [{ participantCharacterIds: [MAX_ID], importance: "HIGH", content: "pista antiga de Monza" }],
       relationships: [],
     });
     const max = result.candidates.find((c) => c.characterId === MAX_ID)!;
@@ -391,13 +409,13 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
 
   it("10) memória antiga continua relevante (createdAt não altera o escore)", () => {
     const old = questionOnly("Vocês lembram daquele fim de semana?", {
-      memories: [{ participantCharacterIds: [MAX_ID], importance: "MEDIUM", createdAt: "2001-01-01T00:00:00.000Z" }],
+      memories: [{ participantCharacterIds: [MAX_ID], importance: "MEDIUM", content: "retiro no fim de semana", createdAt: "2001-01-01T00:00:00.000Z" }],
     });
     const new1 = questionOnly("Vocês lembram daquele fim de semana?", {
-      memories: [{ participantCharacterIds: [MAX_ID], importance: "MEDIUM", createdAt: "2026-09-17T00:00:00.000Z" }],
+      memories: [{ participantCharacterIds: [MAX_ID], importance: "MEDIUM", content: "retiro no fim de semana", createdAt: "2026-09-17T00:00:00.000Z" }],
     });
     expect(new1).toStrictEqual(old);
-    expect(old.candidates[0].score).toBe(28);
+    expect(old.candidates[0].score).toBe(30); // 10 pergunta + 20 memória (18+10 tópico → cap 20)
   });
 
   it("11) ausência de memória/evento não quebra a seleção", () => {
@@ -411,18 +429,18 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
   });
 
   it("12) MEMORY_RELEVANCE/EVENT_RELEVANCE surgem uma única vez cada", () => {
-    const result = questionOnly("Vocês lembram e viram?", {
+    const result = questionOnly("O que vocês acharam do treino de pit stop?", {
       memories: [
-        { participantCharacterIds: [MAX_ID] },
-        { participantCharacterIds: [MAX_ID, USER_ID], importance: "HIGH" },
+        { participantCharacterIds: [MAX_ID], content: "treino de pit stop conjunto" },
+        { participantCharacterIds: [MAX_ID, USER_ID], importance: "HIGH", content: "treino de pit stop na sexta" },
       ],
-      events: [{ participantCharacterIds: [MAX_ID] }],
+      events: [{ participantCharacterIds: [MAX_ID], title: "treino de pit stop", description: "pista" }],
     });
     const max = result.candidates.find((c) => c.characterId === MAX_ID)!;
     expect(max.reasons.filter((r) => r === "MEMORY_RELEVANCE")).toHaveLength(1);
     expect(max.reasons.filter((r) => r === "EVENT_RELEVANCE")).toHaveLength(1);
     expect(max.reasons.filter((r) => r === "QUESTION_RELEVANCE")).toHaveLength(1);
-    expect(max.score).toBe(48); // 10 pergunta + 20 memória (teto) + 18 evento
+    expect(max.score).toBe(50); // 10 pergunta + 20 memória (teto) + 20 evento (teto)
   });
 
   it("13) determinismo com memória/evento, participantes embaralhados", () => {
@@ -430,7 +448,7 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
       userMessage: { content: "Quem lembra de Monza?" },
       participants,
       recentMessages: [{ characterId: MAX_ID, senderType: "AI_CHARACTER" }],
-      memories: [{ participantCharacterIds: [MAX_ID], importance: "HIGH", content: "pista antiga" }],
+      memories: [{ participantCharacterIds: [MAX_ID], importance: "HIGH", content: "pista antiga de Monza" }],
       events: [{ participantCharacterIds: [CHARLES_ID], title: "GP passado" }],
       relationships: [],
     });
@@ -441,25 +459,25 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
 
   it("14) contribuição de memória respeita o cap (20) e maxResponders", () => {
     const result = selectSpeakers({
-      userMessage: { content: "Vocês lembram da vitória em Monza?" },
+      userMessage: { content: "Max, você lembra da vitória em Monza?" },
       participants: [ai(MAX_ID, "Max Verstappen"), ai(CHARLES_ID, "Charles Leclerc"), user(USER_ID, "Alicya")],
       recentMessages: [],
       relationships: [],
       memories: [
         { participantCharacterIds: [MAX_ID], importance: "HIGH", content: "vitória inesquecível em Monza" },
-        { participantCharacterIds: [CHARLES_ID], content: "outra noite chuvosa" },
+        { participantCharacterIds: [CHARLES_ID], content: "noite em Monza" },
       ],
       config: { maxResponders: 1 },
     });
     const max = result.candidates.find((c) => c.characterId === MAX_ID)!;
     const charles = result.candidates.find((c) => c.characterId === CHARLES_ID)!;
-    expect(max.score).toBe(30); // 18+10 tópico+4 HIGH = 32 → cap 20 → +10 pergunta
+    expect(max.score).toBe(90); // 60 menção + 10 pergunta + 20 memória (32 → cap 20)
     expect(max.selected).toBe(true);
-    expect(charles.score).toBe(28); // 18 + 10
+    expect(charles.score).toBe(30); // 10 pergunta + 20 memória (28 → cap 20)
     expect(charles.excludedReason).toBe("CAP_REACHED");
   });
 
-  it("15) menção direta tem prioridade sobre memória", () => {
+  it("15) menção direta tem prioridade sobre memória (sem tópico a memória não compete)", () => {
     const result = selectSpeakers({
       userMessage: { content: "Max Verstappen, conte!" },
       participants: [ai(MAX_ID, "Max Verstappen"), ai(CHARLES_ID, "Charles Leclerc")],
@@ -468,19 +486,20 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
         { participantCharacterIds: [CHARLES_ID] },
       ],
     });
-    expect(result.candidates.map((c) => c.score)).toEqual([118, 18]); // 100 + 18 vs 18
+    expect(result.candidates.map((c) => c.score)).toEqual([100, -100]); // menção 100 vs sem sinal
     expect(result.selected).toEqual([MAX_ID]);
     expect(result.candidates[0].reasons).toContain("DIRECT_MENTION");
+    expect(result.candidates[1].excludedReason).toBe("NO_SIGNALS");
   });
 
-  it("16) relação + memória combinam (10 + 20 + 18 = 48)", () => {
+  it("16) relação + memória topical combinam (10 + 20 + 20 = 50)", () => {
     const result = selectSpeakers({
-      userMessage: { content: "Vocês têm algo a dizer?", senderCharacterId: USER_ID },
+      userMessage: { content: "Vocês têm algo a dizer sobre o treino de pit stop?", senderCharacterId: USER_ID },
       participants: [ai(MAX_ID, "Max Verstappen"), user(USER_ID, "Alicya")],
       relationships: [{ characterAId: USER_ID, characterBId: MAX_ID }],
-      memories: [{ participantCharacterIds: [MAX_ID] }],
+      memories: [{ participantCharacterIds: [MAX_ID], content: "treino de pit stop conjunto na sexta" }],
     });
-    expect(result.candidates[0].score).toBe(48);
+    expect(result.candidates[0].score).toBe(50);
     expect(result.selected).toEqual([MAX_ID]);
     expect(result.candidates[0].reasons).toEqual([
       "QUESTION_RELEVANCE",
@@ -489,14 +508,14 @@ describe("STEP 109E - ResponseOrchestrator memória/evento por relevância", () 
     ]);
   });
 
-  it("17) memória não substitui menção direta (é aditiva)", () => {
+  it("17) memória não substitui menção direta (é aditiva, com tópico)", () => {
     const result = selectSpeakers({
-      userMessage: { content: "Max Verstappen, você lembra?" },
+      userMessage: { content: "Max Verstappen, você lembra do treino de pit stop?" },
       participants: duo,
-      memories: [{ participantCharacterIds: [MAX_ID] }],
+      memories: [{ participantCharacterIds: [MAX_ID], content: "treino de pit stop conjunto na sexta" }],
     });
     const max = result.candidates[0];
-    expect(max.score).toBe(128); // 100 + 10 + 18
+    expect(max.score).toBe(130); // 100 + 10 + 20
     expect(max.reasons).toEqual([
       "DIRECT_MENTION",
       "QUESTION_RELEVANCE",
@@ -522,7 +541,7 @@ describe("STEP 109I-B - ResponseOrchestrator zero-responder / response-opportuni
   const farewellText = "Boa noite pessoal, até amanhã.";
   const greetingText = "Bom dia, gente.";
 
-  it("1) despedida sem sinal de resposta → 0 responders, mesmo com memória/evento", () => {
+  it("1) despedida sem sinal de resposta → 0 responders, mesmo com memória/evento (sem tópico = 0)", () => {
     const selection = selectSpeakers({
       userMessage: { content: farewellText },
       participants: duo,
@@ -533,13 +552,12 @@ describe("STEP 109I-B - ResponseOrchestrator zero-responder / response-opportuni
     });
     expect(selection.selected).toEqual([]);
     const max = selection.candidates[0];
-    expect(max.score).toBe(36); // 18 memória + 18 evento
-    expect(max.excludedReason).toBe("NO_RESPONSE_OPPORTUNITY");
-    expect(max.reasons).toContain("MEMORY_RELEVANCE");
-    expect(max.reasons).toContain("EVENT_RELEVANCE");
+    expect(max.score).toBe(-100);
+    expect(max.excludedReason).toBe("NO_SIGNALS");
+    expect(max.reasons).toEqual(["NO_SIGNALS_PENALTY"]);
   });
 
-  it("2) saudação genérica preserva a semântica existente (memória/evento continuam selecionando)", () => {
+  it("2) saudação genérica → memória/evento sem tópico não selecionam (NO_SIGNALS possível)", () => {
     const selection = selectSpeakers({
       userMessage: { content: greetingText },
       participants: duo,
@@ -548,9 +566,11 @@ describe("STEP 109I-B - ResponseOrchestrator zero-responder / response-opportuni
       memories: [{ participantCharacterIds: [MAX_ID] }],
       events: [{ participantCharacterIds: [MAX_ID] }],
     });
-    expect(selection.candidates[0].score).toBe(36);
-    expect(selection.candidates[0].excludedReason).toBeUndefined();
-    expect(selection.selected).toEqual([MAX_ID]);
+    const max = selection.candidates[0];
+    expect(max.score).toBe(-100);
+    expect(max.excludedReason).toBe("NO_SIGNALS");
+    expect(max.reasons).toEqual(["NO_SIGNALS_PENALTY"]);
+    expect(selection.selected).toEqual([]);
   });
 
   it("3) despedida com menção direta → o mencionado permanece selecionável", () => {
@@ -565,30 +585,31 @@ describe("STEP 109I-B - ResponseOrchestrator zero-responder / response-opportuni
     const max = selection.candidates.find((c) => c.characterId === MAX_ID)!;
     const charles = selection.candidates.find((c) => c.characterId === CHARLES_ID)!;
     expect(max.reasons).toContain("DIRECT_MENTION");
-    expect(max.score).toBe(96); // 60 menção + 18 memória + 18 evento
+    expect(max.score).toBe(60); // menção 60; memória/evento sem tópico = 0
     expect(max.selected).toBe(true);
-    expect(charles.score).toBe(36);
-    expect(charles.excludedReason).toBe("NO_RESPONSE_OPPORTUNITY");
+    expect(charles.score).toBe(-100);
+    expect(charles.excludedReason).toBe("NO_SIGNALS");
     expect(selection.selected).toEqual([MAX_ID]);
   });
 
-  it("4) despedida com pergunta direta → responders permanecem selecionáveis", () => {
+  it("4) despedida com pergunta sobre tópico lembrado → responder permanece", () => {
     const selection = selectSpeakers({
-      userMessage: { content: "Boa noite pessoal, alguém lembra do fim de semana?" },
+      userMessage: { content: "Boa noite pessoal, alguém lembra do treino de pit stop?" },
       participants: duo,
       recentMessages: [],
       relationships: [],
-      memories: [{ participantCharacterIds: [MAX_ID] }],
+      memories: [{ participantCharacterIds: [MAX_ID], content: "treino de pit stop conjunto na sexta" }],
       events: [],
     });
     const max = selection.candidates[0];
     expect(max.reasons).toContain("QUESTION_RELEVANCE");
-    expect(max.score).toBe(28); // 10 pergunta + 18 memória
+    expect(max.reasons).toContain("MEMORY_RELEVANCE");
+    expect(max.score).toBe(30); // 10 pergunta + 20 memória (tema casa)
     expect(max.excludedReason).toBeUndefined();
     expect(selection.selected).toEqual([MAX_ID]);
   });
 
-  it("5) memória/evento sozinhos não criam oportunidade; saudação mantém a seleção", () => {
+  it("5) memória/evento sem tópico não criam oportunidade; saudação também não", () => {
     const participants = [ai(MAX_ID, "Max Verstappen"), ai(CHARLES_ID, "Charles Leclerc"), user(USER_ID, "Alicya")];
     const signals = {
       recentMessages: [],
@@ -604,7 +625,7 @@ describe("STEP 109I-B - ResponseOrchestrator zero-responder / response-opportuni
     });
     expect(noOpportunity.selected).toEqual([]);
     expect(
-      noOpportunity.candidates.every((c) => c.excludedReason === "NO_RESPONSE_OPPORTUNITY"),
+      noOpportunity.candidates.every((c) => c.excludedReason === "NO_SIGNALS"),
     ).toBe(true);
 
     const greeting = selectSpeakers({
@@ -612,7 +633,235 @@ describe("STEP 109I-B - ResponseOrchestrator zero-responder / response-opportuni
       participants,
       ...signals,
     });
-    expect(greeting.candidates.every((c) => c.excludedReason === undefined)).toBe(true);
-    expect([...greeting.selected].sort()).toEqual([CHARLES_ID, MAX_ID]);
+    expect(greeting.selected).toEqual([]);
+    expect(
+      greeting.candidates.every((c) => c.excludedReason === "NO_SIGNALS"),
+    ).toBe(true);
+  });
+});
+
+describe("STEP 109L - gating contextual de memória/evento (Modelo 1a)", () => {
+  const LUCA_ID = "c-luca";
+  const MIA_ID = "c-mia";
+  const RAVI_ID = "c-ravi";
+
+  const trio = () => [
+    ai(LUCA_ID, "Luca Astori"),
+    ai(MIA_ID, "Mia Ferraz"),
+    ai(RAVI_ID, "Ravi Mehta"),
+    user(USER_ID, "Alicya"),
+  ];
+
+  const M_TREINO = {
+    participantCharacterIds: [LUCA_ID, MIA_ID],
+    content: "Treino de pit stop conjunto na sexta com troca de pneus.",
+  };
+  const M_JANELA = {
+    participantCharacterIds: [LUCA_ID, MIA_ID],
+    importance: "LOW" as const,
+    content: "Janela de oportunidade no pit stop durante o GP de Mônaco na curva inicial.",
+  };
+  const EV_MONACO = {
+    participantCharacterIds: [LUCA_ID],
+    importance: "HIGH" as const,
+    title: "Curva inicial movimentada no GP de Mônaco",
+    description: "toque entre os carros",
+  };
+
+  it("1) saudação genérica com só participação em memória/evento → 0 responders (NO_SIGNALS)", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Bom dia, gente.", senderCharacterId: USER_ID },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [M_TREINO, M_JANELA],
+      events: [EV_MONACO],
+    });
+    expect(selection.selected).toEqual([]);
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(luca.score).toBe(-100);
+    expect(luca.excludedReason).toBe("NO_SIGNALS");
+    expect(mia.score).toBe(-100);
+    expect(mia.excludedReason).toBe("NO_SIGNALS");
+    expect(mia.reasons).not.toContain("MEMORY_RELEVANCE");
+    expect(mia.reasons).not.toContain("EVENT_RELEVANCE");
+  });
+
+  it("2) saudação com menção direta → o mencionado permanece selecionável", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Bom dia, Luca!", senderCharacterId: USER_ID },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [M_TREINO, M_JANELA],
+      events: [EV_MONACO],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    expect(luca.reasons).toContain("DIRECT_MENTION");
+    expect(luca.score).toBe(60); // menção; memória/evento sem tópico = 0
+    expect(luca.selected).toBe(true);
+    expect(selection.selected).toEqual([LUCA_ID]);
+  });
+
+  it("3) saudação + relação/recência do remetente preserva comportamento não-membresia", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Bom dia, gente.", senderCharacterId: USER_ID },
+      participants: trio(),
+      recentMessages: [
+        { characterId: LUCA_ID, senderType: "AI_CHARACTER" },
+        { characterId: MIA_ID, senderType: "AI_CHARACTER" },
+      ],
+      relationships: [{ characterAId: USER_ID, characterBId: LUCA_ID }],
+      memories: [],
+      events: [],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    expect(luca.score).toBe(30); // 20 relação + 10 recência
+    expect(luca.reasons).toContain("RELATION_RELEVANCE");
+    expect(luca.reasons).toContain("RECENCY");
+    expect(selection.selected).toEqual([LUCA_ID]);
+  });
+
+  it("4) menção direta → Luca selecionado; co-participante não selecionado só por membresia", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Luca, me conta essa história de novo." },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [M_TREINO, M_JANELA],
+      events: [EV_MONACO],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    const ravi = selection.candidates.find((c) => c.characterId === RAVI_ID)!;
+    expect(luca.score).toBe(60);
+    expect(luca.selected).toBe(true);
+    expect(mia.score).toBe(-100); // membresia sem tópico não cruza o threshold
+    expect(mia.excludedReason).toBe("NO_SIGNALS");
+    expect(ravi.excludedReason).toBe("NO_SIGNALS");
+    expect(selection.selected).toEqual([LUCA_ID]);
+  });
+
+  it("5) pergunta sobre Mônaco → participantes com conexão topical continuam elegíveis (não singleton)", () => {
+    const selection = selectSpeakers({
+      userMessage: {
+        content: "Luca, o que você acha que aconteceu na curva inicial do GP de Mônaco?",
+        senderCharacterId: USER_ID,
+      },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [{ characterAId: LUCA_ID, characterBId: MIA_ID }],
+      memories: [M_TREINO, M_JANELA],
+      events: [EV_MONACO],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    const ravi = selection.candidates.find((c) => c.characterId === RAVI_ID)!;
+    expect(luca.score).toBe(110); // 60 menção + 10 pergunta + 20 memória + 20 evento
+    expect(mia.score).toBe(50); // 10 pergunta + 20 memória + 20 evento (relacionada, topical)
+    expect(mia.selected).toBe(true);
+    expect(mia.reasons).toContain("EVENT_RELEVANCE");
+    expect(mia.reasons).toContain("MEMORY_RELEVANCE");
+    expect(ravi.score).toBe(10);
+    expect(ravi.excludedReason).toBe("BELOW_THRESHOLD");
+    expect([...selection.selected].sort()).toEqual([LUCA_ID, MIA_ID]);
+  });
+
+  it("6) pergunta topical compartilhada → múltiplos participantes com memória topical", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "O que vocês acharam do treino de pit stop?" },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [M_TREINO, M_JANELA],
+      events: [EV_MONACO],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(luca.score).toBe(30); // 10 pergunta + 20 memória
+    expect(mia.score).toBe(30);
+    expect(luca.reasons).toContain("MEMORY_RELEVANCE");
+    expect(mia.reasons).toContain("MEMORY_RELEVANCE");
+    expect(mia.reasons).not.toContain("EVENT_RELEVANCE");
+    expect([...selection.selected].sort()).toEqual([LUCA_ID, MIA_ID]);
+  });
+
+  it("7) afirmação topical sem pergunta/menção → membros não cruzam o threshold", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "O treino de pit stop foi bom." },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [M_TREINO, M_JANELA],
+      events: [EV_MONACO],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(luca.score).toBe(20); // 20 memória < 25
+    expect(luca.excludedReason).toBe("BELOW_THRESHOLD");
+    expect(luca.reasons).toContain("MEMORY_RELEVANCE");
+    expect(mia.score).toBe(20);
+    expect(mia.excludedReason).toBe("BELOW_THRESHOLD");
+    expect(selection.selected).toEqual([]);
+  });
+
+  it("8) um único token forte ainda ativa relevância de memória/evento (Mônaco)", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Falam de Mônaco?" },
+      participants: [ai(LUCA_ID, "Luca Astori"), ai(RAVI_ID, "Ravi Mehta"), user(USER_ID, "Alicya")],
+      recentMessages: [],
+      relationships: [],
+      memories: [],
+      events: [EV_MONACO],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    expect(luca.reasons).toContain("EVENT_RELEVANCE");
+    expect(luca.score).toBe(30); // 10 pergunta + 20 evento (monaco forte)
+    expect(selection.selected).toEqual([LUCA_ID]);
+  });
+
+  it("9) caminho de participante relacionado atua somente com tópico", () => {
+    const comTopico = selectSpeakers({
+      userMessage: { content: "O que vocês lembram da curva inicial do GP de Mônaco?" },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [{ characterAId: LUCA_ID, characterBId: MIA_ID }],
+      memories: [],
+      events: [EV_MONACO],
+    });
+    const miaTop = comTopico.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(miaTop.reasons).toContain("EVENT_RELEVANCE");
+    expect(miaTop.score).toBe(30); // 10 pergunta + 20 evento (relacionada topical)
+    expect([...comTopico.selected].sort()).toEqual([LUCA_ID, MIA_ID]);
+
+    const semTopico = selectSpeakers({
+      userMessage: { content: "A corrida foi boa." },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [{ characterAId: LUCA_ID, characterBId: MIA_ID }],
+      memories: [],
+      events: [EV_MONACO],
+    });
+    const miaSem = semTopico.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(miaSem.reasons).not.toContain("EVENT_RELEVANCE");
+    expect(miaSem.excludedReason).toBe("NO_SIGNALS");
+    expect(semTopico.selected).toEqual([]);
+  });
+
+  it("10) despedida com recência preserva o gate de oportunidade (NO_RESPONSE_OPPORTUNITY)", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Boa noite pessoal, até amanhã." },
+      participants: trio(),
+      recentMessages: [{ characterId: LUCA_ID, senderType: "AI_CHARACTER" }],
+      relationships: [],
+      memories: [],
+      events: [],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    expect(luca.reasons).toContain("RECENCY");
+    expect(luca.reasons).not.toContain("NO_SIGNALS_PENALTY");
+    expect(luca.excludedReason).toBe("NO_RESPONSE_OPPORTUNITY");
+    expect(selection.selected).toEqual([]);
   });
 });

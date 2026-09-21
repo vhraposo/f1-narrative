@@ -317,9 +317,9 @@ function memoryItemScore(
   const topicMatch = memoryText.length > 0 && isTopicMatch(message, memoryText);
 
   let base: number;
-  if (isDirect) {
+  if (isDirect && topicMatch) {
     base = weights.memoryRelevance;
-  } else if (isRelated) {
+  } else if (isRelated && topicMatch) {
     base = weights.memoryRelatedRelevance;
   } else if (participants.length === 0 && topicMatch) {
     base = weights.memoryTopicRelevance;
@@ -353,9 +353,9 @@ function eventItemScore(
   const topicMatch = eventText.length > 0 && isTopicMatch(message, eventText);
 
   let base: number;
-  if (isDirect) {
+  if (isDirect && topicMatch) {
     base = weights.eventRelevance;
-  } else if (isRelated) {
+  } else if (isRelated && topicMatch) {
     base = weights.eventRelatedRelevance;
   } else if (participants.length === 0 && topicMatch) {
     base = weights.eventTopicRelevance;
