@@ -94,13 +94,37 @@ describe("CURRENT_TURN — composição pura (STEP 109F)", () => {
     expect(composeCurrentTurnSection(turn)).toBe("");
   });
 
-  it("uma resposta por speaker, na ordem, com actor/senderType/content", () => {
+  it("uma resposta por speaker, na ordem, com atribuição em linguagem natural", () => {
     const section = composeCurrentTurnSection(turnWithReplies());
-    const kimiLine = '- [AI_CHARACTER] Kimi: "Eu vi a corrida."';
-    const alicyaLine = '- [AI_CHARACTER] Alicya: "Eu também vi a corrida."';
+    const kimiLine = '- Kimi disse anteriormente: "Eu vi a corrida."';
+    const alicyaLine = '- Alicya disse anteriormente: "Eu também vi a corrida."';
     expect(section).toContain(kimiLine);
     expect(section).toContain(alicyaLine);
     expect(section.indexOf(kimiLine)).toBeLessThan(section.indexOf(alicyaLine));
+  });
+
+  it("não usa a gramática de prompt antiga [AI_CHARACTER] Nome: \"...\"", () => {
+    const section = composeCurrentTurnSection(turnWithReplies());
+    expect(section).not.toContain("[AI_CHARACTER]");
+    expect(section).not.toMatch(/\[AI_CHARACTER\][^\n]*: "/);
+    expect(section).not.toContain('Kimi: "');
+    expect(section).not.toContain('Alicya: "');
+  });
+
+  it("contém instrução local de fronteira de saída", () => {
+    const section = composeCurrentTurnSection(turnWithReplies());
+    expect(section).toContain("não as reproduza literalmente");
+    expect(section).toContain("Não reproduza marcadores BEGIN/END");
+    expect(section).toContain("rótulos de seção");
+    expect(section).toContain("rótulos de speaker");
+    expect(section).toContain("fala natural do personagem atual");
+  });
+
+  it("contexto B-depois-de-A distingue cada personagem", () => {
+    const section = composeCurrentTurnSection(turnWithReplies());
+    expect(section).toContain("Kimi disse anteriormente");
+    expect(section).toContain("Alicya disse anteriormente");
+    expect(section).not.toContain("Kimi disse anteriormente: \"Eu também");
   });
 
   it("sinais de continuidade descritivos entram no contexto", () => {
@@ -179,6 +203,51 @@ describe("CURRENT_TURN — composeSystemPrompt + contrato (STEP 109F)", () => {
       "char-kimi",
       turnWithReplies(),
     );
+    expect(assertGenerationContract(resultFrom(prompt))).toBe(true);
+  });
+
+  it("resposta anterior permanece presente e atribuída no prompt", () => {
+    const prompt = composeSystemPrompt(
+      fixturePureContext(),
+      "char-kimi",
+      turnWithReplies(),
+    );
+    expect(prompt).toContain('- Kimi disse anteriormente: "Eu vi a corrida."');
+    expect(prompt).toContain('- Alicya disse anteriormente: "Eu também vi a corrida."');
+    expect(prompt).not.toContain("[AI_CHARACTER]");
+  });
+
+  it("marcadores BEGIN/END da seção permanecem inalterados", () => {
+    const prompt = composeSystemPrompt(
+      fixturePureContext(),
+      "char-kimi",
+      turnWithReplies(),
+    );
+    expect(prompt).toContain("<BEGIN 5:CURRENT_TURN>");
+    expect(prompt).toContain("<END 5:CURRENT_TURN>");
+    expect(prompt).toContain("<BEGIN 4:ACTIVE_SPEAKER>");
+    expect(prompt).toContain("<END 4:ACTIVE_SPEAKER>");
+  });
+
+  it("ACTIVE_SPEAKER explicita iniciador do turno, não o AI speaker gerado", () => {
+    const prompt = composeSystemPrompt(
+      fixturePureContext(),
+      "char-kimi",
+      turnWithReplies(),
+    );
+    expect(prompt).toContain("Speaker ativo (iniciador do turno/usuário):");
+    expect(prompt).toContain("não o AI speaker gerado neste frame");
+    expect(prompt).toContain("anchor de identidade do speaker");
+  });
+
+  it("identidade sem DNA permanece intacta (sem CHARACTER_DNA) com CURRENT_TURN", () => {
+    const prompt = composeSystemPrompt(
+      fixturePureContext(),
+      "char-kimi",
+      turnWithReplies(),
+    );
+    expect(prompt).not.toContain("CHARACTER_DNA");
+    expect(prompt).toContain("<BEGIN 5:CURRENT_TURN>");
     expect(assertGenerationContract(resultFrom(prompt))).toBe(true);
   });
 });
