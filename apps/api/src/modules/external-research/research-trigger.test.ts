@@ -28,6 +28,11 @@ const DEEP_FIXED_CONTEXT: ResearchTriggerInternalContext = {
   },
 };
 
+const PROTAGONIST_CONTEXT: ResearchTriggerInternalContext = {
+  participants: [{ name: "Alicya Vasser", dna: { team: "Golconda" } }],
+  memories: [{ content: "Alicya tem síndrome de protagonista: às vezes ela assume o centro da narrativa sozinha." }],
+};
+
 describe("research-trigger (pure / deterministic)", () => {
   it("versão e regra", () => {
     expect(RESEARCH_TRIGGER_VERSION).toBe("research-trigger.v1");
@@ -95,6 +100,32 @@ describe("research-trigger (pure / deterministic)", () => {
     expect(result.reasons).toContain("INTERNAL_COVERAGE");
   });
 
+  it("scaffolding discursivo não vira conceito (pronome de definição)", () => {
+    const result = shouldResearch({ message: "O que exatamente significa isso?" });
+    expect(result.shouldResearch).toBe(false);
+    expect(result.queryHint).toBeUndefined();
+  });
+
+  it("internal-first real: conceito útil antes do scaffolding é reconhecido", () => {
+    const message = "Alicya tem síndrome de protagonista. O que exatamente significa isso?";
+    const result = shouldResearch({ message, internal: PROTAGONIST_CONTEXT });
+    expect(result.shouldResearch).toBe(false);
+    expect(result.reasons).toContain("INTERNAL_COVERAGE");
+    expect(result.reasons).not.toContain("EXTERNAL_CONCEPT");
+    expect(result.queryHint).toBeUndefined();
+    expect(formulateResearchQuery(message, PROTAGONIST_CONTEXT)).toBe("sindrome de protagonista");
+  });
+
+  it("conceito limpo após scaffolding ainda dispara quando não coberto", () => {
+    const result = shouldResearch({
+      message: "Alicya tem síndrome de protagonista. O que exatamente significa isso?",
+      internal: DEEP_FIXED_CONTEXT,
+    });
+    expect(result.shouldResearch).toBe(true);
+    expect(result.queryHint).toBe("sindrome de protagonista");
+    expect(result.queryHint).not.toContain("o que exatamente");
+  });
+
   it("determinismo: mesma entrada → mesma decisão", () => {
     const input = { message: "O que significa síndrome de protagonista?", internal: DEEP_FIXED_CONTEXT };
     const first = shouldResearch(input);
@@ -144,6 +175,18 @@ describe("research-trigger (pure / deterministic)", () => {
     it("conceito próprio (apelido) em texto correto → extrai runs", () => {
       const q = formulateResearchQuery("O Grande Prêmio do Japão será na próxima semana?", DEEP_FIXED_CONTEXT);
       expect(q).toBe("grande premio do japao");
+    });
+
+    it("scaffolding não altera conceito interrogativo existente", () => {
+      expect(formulateResearchQuery("O que é a janela de oportunidade no pit stop?")).toBe(
+        "janela de oportunidade no pit stop",
+      );
+    });
+
+    it("scaffolding não altera conceito factual existente", () => {
+      expect(
+        formulateResearchQuery("O treino de pit stop melhorou o tempo de troca de pneus em um segundo."),
+      ).toBe("treino de pit stop melhorou");
     });
 
     it("respeita maxConceptTokens", () => {

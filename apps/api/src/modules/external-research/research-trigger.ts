@@ -160,6 +160,15 @@ const FULL_STOPWORDS = new Set([
   "the","a","an","of","in","on","at","to","for","with","and","or","but","not",
 ]);
 
+const DISCOURSE_SCAFFOLDING = new Set<string>([
+  ...INTERROGATIVE_FIRST_TOKENS,
+  ...DEMONSTRATIVES,
+  "exatamente",
+  "exato",
+  "realmente",
+  "afinal",
+]);
+
 const MAX_CONCEPT_CANDIDATES = 5;
 
 function extractConceptCandidates(message: string): string[] {
@@ -170,11 +179,12 @@ function extractConceptCandidates(message: string): string[] {
     if (result.length >= MAX_CONCEPT_CANDIDATES) break;
     const firstTok = tokens[start]!;
     if (firstTok.length < 2) continue;
-    if (FULL_STOPWORDS.has(firstTok) || INTERROGATIVE_FIRST_TOKENS.has(firstTok)) continue;
+    if (FULL_STOPWORDS.has(firstTok) || DISCOURSE_SCAFFOLDING.has(firstTok)) continue;
     let best: string | null = null;
     const endLimit = Math.min(tokens.length, start + maxWindow);
     for (let end = start + 1; end < endLimit; end++) {
       const lastTok = tokens[end]!;
+      if (DISCOURSE_SCAFFOLDING.has(lastTok)) break;
       if (CONNECTORS.has(lastTok) || LEADING_ARTICLES.has(lastTok) || FULL_STOPWORDS.has(lastTok)) continue;
       const candidate = tokens.slice(start, end + 1).join(" ");
       const coreTokens = tokens.slice(start, end + 1).filter((t) => !CONNECTORS.has(t) && !FULL_STOPWORDS.has(t));

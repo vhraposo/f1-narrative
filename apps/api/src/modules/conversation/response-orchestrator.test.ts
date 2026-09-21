@@ -865,3 +865,151 @@ describe("STEP 109L - gating contextual de memória/evento (Modelo 1a)", () => {
     expect(selection.selected).toEqual([]);
   });
 });
+
+describe("STEP 109N-2 - relevância topical não pode ser só nome de personagem (Modelo C)", () => {
+  const LUCA_ID = "c-luca";
+  const MIA_ID = "c-mia";
+  const RAVI_ID = "c-ravi";
+
+  const trio = () => [
+    ai(LUCA_ID, "Luca Astori"),
+    ai(MIA_ID, "Mia Ferraz"),
+    ai(RAVI_ID, "Ravi Mehta"),
+    user(USER_ID, "Alicya"),
+  ];
+
+  const M_TREINO_NAMED = {
+    participantCharacterIds: [LUCA_ID, MIA_ID],
+    content: "Mia e Luca fizeram treino de pit stop na sexta com troca de pneus.",
+  };
+  const M_JANELA_NAMED = {
+    participantCharacterIds: [LUCA_ID, MIA_ID],
+    content: "Luca e Mia discutiram a janela de oportunidade na curva inicial do GP de Mônaco.",
+  };
+  const EV_COLETIVA_NAMED = {
+    participantCharacterIds: [LUCA_ID, MIA_ID],
+    title: "Luca e Mia na coletiva",
+    description: "entrevista sobre a temporada",
+  };
+  const EV_MONACO_NAMED = {
+    participantCharacterIds: [LUCA_ID, MIA_ID],
+    importance: "HIGH" as const,
+    title: "Luca e Mia na curva inicial do GP de Mônaco",
+    description: "toque entre os carros",
+  };
+
+  it("11) pergunta a Luca com memória/evento nomeados → Mia não recebe relevância só pelo nome", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Luca, o que você acha disso?" },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [M_TREINO_NAMED],
+      events: [EV_COLETIVA_NAMED],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(luca.reasons).toContain("DIRECT_MENTION");
+    expect(luca.selected).toBe(true);
+    expect(mia.reasons).not.toContain("MEMORY_RELEVANCE");
+    expect(mia.reasons).not.toContain("EVENT_RELEVANCE");
+    expect(mia.score).toBe(10);
+    expect(mia.excludedReason).toBe("BELOW_THRESHOLD");
+    expect(selection.selected).toEqual([LUCA_ID]);
+  });
+
+  it("12) nome apenas em memória compartilhada → co-participante sem sinal", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Luca, me conta essa história de novo." },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [M_TREINO_NAMED],
+      events: [],
+    });
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(mia.score).toBe(-100);
+    expect(mia.excludedReason).toBe("NO_SIGNALS");
+    expect(mia.reasons).not.toContain("MEMORY_RELEVANCE");
+  });
+
+  it("13) tópico real com nomes no texto → co-participante relacionado continua elegível", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Luca, o que aconteceu na curva inicial do GP de Mônaco?" },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [{ characterAId: LUCA_ID, characterBId: MIA_ID }],
+      memories: [M_JANELA_NAMED],
+      events: [],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(luca.selected).toBe(true);
+    expect(mia.reasons).toContain("MEMORY_RELEVANCE");
+    expect(mia.selected).toBe(true);
+    expect([...selection.selected].sort()).toEqual([LUCA_ID, MIA_ID]);
+  });
+
+  it("14) pergunta topical compartilhada com memória nomeada → múltiplos elegíveis", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "O que vocês acharam do treino de pit stop?" },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [M_TREINO_NAMED],
+      events: [],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(luca.reasons).toContain("MEMORY_RELEVANCE");
+    expect(mia.reasons).toContain("MEMORY_RELEVANCE");
+    expect([...selection.selected].sort()).toEqual([LUCA_ID, MIA_ID]);
+  });
+
+  it("15) token forte não-nome ainda ativa evento nomeado", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Falam de Mônaco?" },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [],
+      events: [EV_MONACO_NAMED],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    const mia = selection.candidates.find((c) => c.characterId === MIA_ID)!;
+    expect(luca.reasons).toContain("EVENT_RELEVANCE");
+    expect(mia.reasons).toContain("EVENT_RELEVANCE");
+    expect([...selection.selected].sort()).toEqual([LUCA_ID, MIA_ID]);
+  });
+
+  it("16) despedida: nome em memória não cria sinal topical (gate coerente)", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Boa noite, Astori." },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [{ participantCharacterIds: [LUCA_ID], content: "Luca Astori lidera o campeonato." }],
+      events: [],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    expect(luca.reasons).not.toContain("MEMORY_RELEVANCE");
+    expect(luca.reasons).toContain("NO_SIGNALS_PENALTY");
+    expect(luca.excludedReason).toBe("NO_SIGNALS");
+    expect(selection.selected).toEqual([]);
+  });
+
+  it("17) despedida: tópico forte não-nome mantém o gate coerente", () => {
+    const selection = selectSpeakers({
+      userMessage: { content: "Boa noite, vamos falar de Mônaco." },
+      participants: trio(),
+      recentMessages: [],
+      relationships: [],
+      memories: [],
+      events: [EV_MONACO_NAMED],
+    });
+    const luca = selection.candidates.find((c) => c.characterId === LUCA_ID)!;
+    expect(luca.reasons).toContain("EVENT_RELEVANCE");
+    expect(luca.excludedReason).toBe("BELOW_THRESHOLD");
+    expect(selection.selected).toEqual([]);
+  });
+});

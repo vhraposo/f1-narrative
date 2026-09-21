@@ -1,5 +1,5 @@
 
-import { isTopicMatch } from "./topic-match.js";
+import { isTopicMatch, significantTokens, topicOverlap } from "./topic-match.js";
 
 export const RESPONSE_ORCHESTRATOR_VERSION = "response-orchestrator.v1";
 
@@ -302,19 +302,32 @@ function isTopImportance(
   return importance === "HIGH" || importance === "CRITICAL";
 }
 
+function isGenuineTopicMatch(
+  message: string,
+  text: string,
+  nameTokens: ReadonlySet<string>,
+): boolean {
+  if (text.length === 0 || !isTopicMatch(message, text)) {
+    return false;
+  }
+  const shared = topicOverlap(message, text);
+  return !(shared.length === 1 && nameTokens.has(shared[0]!));
+}
+
 function memoryItemScore(
   candidateId: string,
   memory: ResponseOrchestratorMemory,
   relatedIds: ReadonlySet<string>,
   message: string,
   weights: ResponseOrchestratorWeights,
+  nameTokens: ReadonlySet<string>,
 ): number {
   const participants = memory.participantCharacterIds;
   const isDirect = participants.includes(candidateId);
   const isRelated =
     !isDirect && [...participants].some((participantId) => relatedIds.has(participantId));
   const memoryText = joinedText([memory.content, memory.summary]);
-  const topicMatch = memoryText.length > 0 && isTopicMatch(message, memoryText);
+  const topicMatch = isGenuineTopicMatch(message, memoryText, nameTokens);
 
   let base: number;
   if (isDirect && topicMatch) {
@@ -344,13 +357,14 @@ function eventItemScore(
   relatedIds: ReadonlySet<string>,
   message: string,
   weights: ResponseOrchestratorWeights,
+  nameTokens: ReadonlySet<string>,
 ): number {
   const participants = event.participantCharacterIds;
   const isDirect = participants.includes(candidateId);
   const isRelated =
     !isDirect && [...participants].some((participantId) => relatedIds.has(participantId));
   const eventText = joinedText([event.title, event.description]);
-  const topicMatch = eventText.length > 0 && isTopicMatch(message, eventText);
+  const topicMatch = isGenuineTopicMatch(message, eventText, nameTokens);
 
   let base: number;
   if (isDirect && topicMatch) {
@@ -389,6 +403,13 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
     const first = firstTokenOf(candidate.name);
     if (first !== null) {
       firstTokenCounts.set(first, (firstTokenCounts.get(first) ?? 0) + 1);
+    }
+  }
+
+  const nameTokens = new Set<string>();
+  for (const participant of input.participants) {
+    for (const token of significantTokens(participant.name)) {
+      nameTokens.add(token);
     }
   }
 
@@ -454,10 +475,7 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
       let best = 0;
       for (const memory of input.memories ?? []) {
         const memoryText = joinedText([memory.content, memory.summary]);
-        if (
-          memoryText.length > 0 &&
-          isTopicMatch(input.userMessage.content, memoryText)
-        ) {
+        if (isGenuineTopicMatch(input.userMessage.content, memoryText, nameTokens)) {
           hasTopicSignal = true;
         }
         best = Math.max(
@@ -468,6 +486,7 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
             relatedIds,
             input.userMessage.content,
             config.weights,
+            nameTokens,
           ),
         );
       }
@@ -483,10 +502,7 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
       let best = 0;
       for (const event of input.events ?? []) {
         const eventText = joinedText([event.title, event.description]);
-        if (
-          eventText.length > 0 &&
-          isTopicMatch(input.userMessage.content, eventText)
-        ) {
+        if (isGenuineTopicMatch(input.userMessage.content, eventText, nameTokens)) {
           hasTopicSignal = true;
         }
         best = Math.max(
@@ -497,6 +513,7 @@ export function selectSpeakers(input: ResponseOrchestratorInput): ResponseOrches
             relatedIds,
             input.userMessage.content,
             config.weights,
+            nameTokens,
           ),
         );
       }
