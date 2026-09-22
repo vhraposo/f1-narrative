@@ -9,13 +9,19 @@ export interface UserPromptProjection {
   core: string | null;
 }
 
-const CORE_MATCHES: ReadonlyArray<readonly [RegExp, string]> = [
-  [/\bquem venceu a corrida de monaco\b/, "quem venceu a corrida de Mônaco"],
-  [/\bquem ficou em primeiro em monaco\b/, "quem ficou em primeiro em Mônaco"],
-  [/\bquem ficou em primeiro na corrida de monaco\b/, "quem ficou em primeiro na corrida de Mônaco"],
-  [/\bqual foi o resultado da corrida de monaco\b/, "qual foi o resultado da corrida de Mônaco"],
-  [/\bqual foi o resultado final do gp de monaco\b/, "qual foi o resultado final do GP de Mônaco"],
-  [/\bquem levou a vitoria em monaco\b/, "quem levou a vitória em Mônaco"],
+interface CoreMatcher {
+  pattern: RegExp;
+  canonical: string;
+}
+
+// Ordem importa: o primeiro matcher que casar define o núcleo canônico.
+const CORE_MATCHERS: readonly CoreMatcher[] = [
+  { pattern: /\bquem venceu a corrida de monaco\b/, canonical: "quem venceu a corrida de Mônaco" },
+  { pattern: /\bquem ficou em primeiro em monaco\b/, canonical: "quem ficou em primeiro em Mônaco" },
+  { pattern: /\bquem ficou em primeiro na corrida de monaco\b/, canonical: "quem ficou em primeiro na corrida de Mônaco" },
+  { pattern: /\bqual foi o resultado da corrida de monaco\b/, canonical: "qual foi o resultado da corrida de Mônaco" },
+  { pattern: /\bqual foi o resultado final do gp de monaco\b/, canonical: "qual foi o resultado final do GP de Mônaco" },
+  { pattern: /\bquem levou a vitoria em monaco\b/, canonical: "quem levou a vitória em Mônaco" },
 ];
 
 function escapeRegex(text: string): string {
@@ -28,11 +34,19 @@ function presentIn(name: string, prompt: string): boolean {
   return new RegExp(`\\b${escapeRegex(normalizedName)}\\b`).test(prompt);
 }
 
-function matchIn(prompt: string): string {
-  for (const [re, nucleus] of CORE_MATCHES) {
-    if (re.test(prompt)) return nucleus;
+function matchCore(prompt: string): string | null {
+  for (const matcher of CORE_MATCHERS) {
+    if (matcher.pattern.test(prompt)) return matcher.canonical;
   }
-  return "";
+  return null;
+}
+
+function buildProjection(core: string, currentSpeaker: string): string {
+  return `O usuário pediu uma resposta sobre ${core}. Nesta execução, responda somente como ${currentSpeaker}.`;
+}
+
+function hasRecipientsSupport(prompt: string, aiParticipants: readonly string[]): string[] {
+  return [...new Set(aiParticipants.filter((name) => presentIn(name, prompt)))];
 }
 
 export function projectUserPromptForSpeaker(
@@ -41,21 +55,21 @@ export function projectUserPromptForSpeaker(
   aiParticipants: readonly string[],
 ): UserPromptProjection {
   const normalizedPrompt = normalizeTopicText(originalPrompt);
-  const recipients = [...new Set(aiParticipants.filter((name) => presentIn(name, normalizedPrompt)))];
-  const core = matchIn(normalizedPrompt);
+  const recipients = hasRecipientsSupport(normalizedPrompt, aiParticipants);
+  const core = matchCore(normalizedPrompt);
 
-  if (recipients.length === 0 || core.length === 0 || !recipients.includes(currentSpeaker)) {
+  if (recipients.length === 0 || core === null || !recipients.includes(currentSpeaker)) {
     return {
       status: "UNSUPPORTED",
       projectedPrompt: null,
       recipients,
-      core: core.length === 0 ? null : core,
+      core,
     };
   }
 
   return {
     status: "SUPPORTED",
-    projectedPrompt: `O usuário pediu uma resposta sobre ${core}. Nesta execução, responda somente como ${currentSpeaker}.`,
+    projectedPrompt: buildProjection(core, currentSpeaker),
     recipients,
     core,
   };

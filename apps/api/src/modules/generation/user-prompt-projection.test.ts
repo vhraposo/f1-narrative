@@ -149,3 +149,101 @@ describe("projectUserPromptForSpeaker — UNSUPPORTED (109Q-10)", () => {
     expect(r.projectedPrompt).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// STEP 109Q-13 — estrutura data-driven (sem ampliar comportamento).
+//   S1 ordem dos recipients reflete a lista de participantes (nenhum reordena);
+//   S2 speaker atual dentro dos recipients → SUPPORTED;
+//   S3 speaker atual fora dos recipients → UNSUPPORTED;
+//   S4 projeção por speaker nunca duplicada e específica;
+//   S5 case/accents/punctuation não quebram a detecção;
+//   S6 originalPrompt jamais é mutado pela projeção;
+//   S7 2 AI → apenas os nomeados são recipients;
+//   S8 3 AI → apenas os nomeados são recipients.
+// ---------------------------------------------------------------------------
+
+describe("STEP 109Q-13 — estrutura data-driven", () => {
+  it("S1) ordem dos recipients preserva a ordem dos participantes", () => {
+    const r = projectUserPromptForSpeaker(
+      "Noah, Mia e Luca, quem venceu a corrida de Mônaco?",
+      "Luca",
+      ["Luca", "Mia", "Noah"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.recipients).toEqual(["Luca", "Mia", "Noah"]);
+  });
+
+  it("S2) speaker atual dentro dos recipients → SUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca e Mia, quem venceu a corrida de Mônaco?",
+      "Mia",
+      ["Luca", "Mia", "Noah"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.recipients).toEqual(["Luca", "Mia"]);
+  });
+
+  it("S3) speaker atual fora dos recipients → UNSUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca, quem venceu a corrida de Mônaco?",
+      "Mia",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("UNSUPPORTED");
+    expect(r.projectedPrompt).toBeNull();
+  });
+
+  it("S4) projeção específica por speaker e sem duplicação", () => {
+    const l = projectUserPromptForSpeaker(
+      "Luca e Mia, quem venceu a corrida de Mônaco?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    const m = projectUserPromptForSpeaker(
+      "Luca e Mia, quem venceu a corrida de Mônaco?",
+      "Mia",
+      ["Luca", "Mia"],
+    );
+    expect(l.projectedPrompt).not.toBe(m.projectedPrompt);
+    expect(l.projectedPrompt).toContain("responda somente como Luca.");
+    expect(m.projectedPrompt).toContain("responda somente como Mia.");
+  });
+
+  it("S5) case, acentos e pontuação não alteram a detecção", () => {
+    const r = projectUserPromptForSpeaker(
+      "  luca  &  mía, QUEM  VENCEU  A  CORRIDA  DE  MONACO!!!  ",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.core).toBe("quem venceu a corrida de Mônaco");
+    expect(r.recipients).toEqual(["Luca", "Mia"]);
+  });
+
+  it("S6) originalPrompt não é mutado pela projeção", () => {
+    const original = "Luca e Mia, quem venceu a corrida de Mônaco?";
+    const snapshot = original;
+    projectUserPromptForSpeaker(original, "Luca", ["Luca", "Mia"]);
+    expect(original).toBe(snapshot);
+  });
+
+  it("S7) 2 AI → apenas os nomeados viram recipients", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca, quem venceu a corrida de Mônaco?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.recipients).toEqual(["Luca"]);
+    expect(r.status).toBe("SUPPORTED");
+  });
+
+  it("S8) 3 AI → apenas os nomeados viram recipients", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca e Mia, quem venceu a corrida de Mônaco?",
+      "Luca",
+      ["Luca", "Mia", "Noah"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.recipients).toEqual(["Luca", "Mia"]);
+  });
+});
