@@ -64,8 +64,14 @@ export interface ContextGenerationRequest {
   userId: string;
   conversationId: string;
   now?: Date;
-  
+  // Mensagem original do usuário. Drive de TODAS as decisões de contexto,
+  // RAG e projeção. Sempre a fala real do usuário, nunca texto projetado.
   userPrompt?: string;
+  // Texto final entregue ao provider na posição user. DIFERE do userPrompt
+  // apenas quando a projeção de speaker é aplicada (ver executeTurn). É o
+  // ÚNICO campo que a projeção pode alterar; contexto, systemPrompt,
+  // contextJson e generationKey continuam derivados de userPrompt.
+  providerUserPrompt?: string;
   targetCharacterId?: string;
   ragFrameId?: string;
   turnContext?: TurnContext;
@@ -768,7 +774,8 @@ export async function assembleGenerationBundle(
     request.turnContext,
   );
 
-  if (request.userPrompt !== undefined && request.userPrompt.trim().length === 0) {
+  const providerUserPrompt = request.providerUserPrompt ?? request.userPrompt;
+  if (providerUserPrompt !== undefined && providerUserPrompt.trim().length === 0) {
     throw new GenerationUserInputError(
       "Input de usuário não pode ser vazio quando fornecido na geração.",
     );
@@ -777,7 +784,7 @@ export async function assembleGenerationBundle(
   const providerInput: ProviderInput = {
     context: contextWithRag,
     systemPrompt,
-    ...(request.userPrompt !== undefined ? { userPrompt: request.userPrompt } : {}),
+    ...(providerUserPrompt !== undefined ? { userPrompt: providerUserPrompt } : {}),
   };
 
   const output = await provider.run(providerInput);

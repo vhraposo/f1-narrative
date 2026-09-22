@@ -308,17 +308,15 @@ export async function executeTurn(
         speakerName,
         aiParticipantNames,
       );
-      const userPromptForSpeaker =
-        projection.status === "SUPPORTED" && projection.projectedPrompt !== null
-          ? projection.projectedPrompt
-          : input.userPrompt;
-
       const result = await assembleGenerationBundle(
         db,
         {
           conversationId: input.conversationId,
           userId: input.userId,
-          userPrompt: userPromptForSpeaker,
+          userPrompt: input.userPrompt,
+          ...(projection.status === "SUPPORTED" && projection.projectedPrompt !== null
+            ? { providerUserPrompt: projection.projectedPrompt }
+            : {}),
           targetCharacterId: speakerId,
           turnContext,
           ...(effectiveRagFrameId !== undefined

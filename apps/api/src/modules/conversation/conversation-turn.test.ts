@@ -1162,11 +1162,108 @@ describe("STEP 109Q-10 — projeção determinística do userPrompt", () => {
     );
     const keyProjetada = await assembleGenerationBundle(
       prisma,
-      { conversationId: conv1, userId: owner.userId, userPrompt: PROJECTED_ALPHA, targetCharacterId: aiA },
+      { conversationId: conv1, userId: owner.userId, userPrompt: PROMPT_MONACO, providerUserPrompt: PROJECTED_ALPHA, targetCharacterId: aiA },
       generatedProvider("P1."),
     );
     expect(keyOriginal.generationKey).toMatch(/^sha256:/);
     // userPrompt NÃO entra no canonicalFrame: projeção não altera a key.
     expect(keyProjetada.generationKey).toBe(keyOriginal.generationKey);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// STEP 109Q-12 — posicionamento tardio da projeção (dataflow audit).
+//
+// A projeção é aplicada SOMENTE no campo `providerUserPrompt`, consumido
+// exclusivamente na montagem do ProviderInput (role "user" da chamada final).
+// `userPrompt` (original) segue sendo a fonte de TODAS as demais decisões:
+// contexto, systemPrompt, RAG e generationKey.
+//   V1 provider recebe a projeção no ponto final;
+//   V2 systemPrompt, contexto e generationKey NÃO mudam com a projeção;
+//   V3 memory/event relevance usam o original (assembly não conhece projeção);
+//   V4 research trigger usa o original (autoResearchFrame recebe userPrompt);
+//   V5 RAG retrieval usa o original (frame derivado do query do original);
+//   V6 persistence/contextJson NÃO contêm projeção.
+// ---------------------------------------------------------------------------
+
+describe("STEP 109Q-12 — projeção isolada no ponto final do provider", () => {
+  it("V1) provider recebe a projeção SOMENTE como ProviderInput.userPrompt", async () => {
+    const capture = { input: undefined as ProviderInput | undefined, calls: 0 };
+    const res = await assembleGenerationBundle(
+      prisma,
+      {
+        conversationId: conv1,
+        userId: owner.userId,
+        userPrompt: PROMPT_MONACO,
+        providerUserPrompt: PROJECTED_ALPHA,
+        targetCharacterId: aiA,
+      },
+      generatedProvider("P1.", capture),
+    );
+    expect(res.generationKey).toMatch(/^sha256:/);
+    expect(capture.input?.userPrompt).toBe(PROJECTED_ALPHA);
+    expect(capture.input?.userPrompt).not.toBe(PROMPT_MONACO);
+    expect(Object.keys(capture.input ?? {})).toContain("userPrompt");
+  });
+
+  it("V2) systemPrompt não muda quando apenas a projeção é adicionada", async () => {
+    const capA = { input: undefined as ProviderInput | undefined, calls: 0 };
+    const capB = { input: undefined as ProviderInput | undefined, calls: 0 };
+    const base = { conversationId: conv1, userId: owner.userId, targetCharacterId: aiA };
+    const a = await assembleGenerationBundle(
+      prisma,
+      { ...base, userPrompt: PROMPT_MONACO },
+      generatedProvider("P1.", capA),
+    );
+    const b = await assembleGenerationBundle(
+      prisma,
+      { ...base, userPrompt: PROMPT_MONACO, providerUserPrompt: PROJECTED_ALPHA },
+      generatedProvider("P1.", capB),
+    );
+    expect(a.systemPrompt).toBe(b.systemPrompt);
+    expect(capA.input?.userPrompt).toBe(PROMPT_MONACO);
+    expect(capB.input?.userPrompt).toBe(PROJECTED_ALPHA);
+  });
+
+  it("V3) context (memories/events/relationships) e generationKey idênticos com e sem projeção", async () => {
+    const base = { conversationId: conv1, userId: owner.userId, targetCharacterId: aiA };
+    const a = await assembleGenerationBundle(
+      prisma,
+      { ...base, userPrompt: PROMPT_MONACO },
+      generatedProvider("P1."),
+    );
+    const b = await assembleGenerationBundle(
+      prisma,
+      { ...base, userPrompt: PROMPT_MONACO, providerUserPrompt: PROJECTED_ALPHA },
+      generatedProvider("P1."),
+    );
+    expect(b.context.memories).toEqual(a.context.memories);
+    expect(b.context.events).toEqual(a.context.events);
+    expect(b.context.relationships).toEqual(a.context.relationships);
+    expect(b.context.recentMessages).toEqual(a.context.recentMessages);
+    expect(b.generationKey).toBe(a.generationKey);
+  });
+
+  it("V6) projection nunca é persistida: histórico contém USER original + respostas reais", async () => {
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."]));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      expect(res.statusCode).toBe(201);
+      const stored = await prisma.message.findMany({
+        where: { conversationId: conv1 },
+        select: { content: true, contextJson: true },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(stored).toHaveLength(3);
+      expect(stored[0]?.content).toBe(PROMPT_MONACO);
+      expect(stored.some((m) => m.content.includes("Nesta execução, responda somente como"))).toBe(false);
+      for (const m of stored) {
+        expect(JSON.stringify(m.contextJson)).not.toContain("Nesta execução, responda somente como");
+      }
+    } finally {
+      await appP.close();
+    }
   });
 });
