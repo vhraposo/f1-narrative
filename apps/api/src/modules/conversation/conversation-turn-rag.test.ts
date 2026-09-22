@@ -5,6 +5,7 @@ import { prisma } from "../../infrastructure/database/prisma.js";
 import {
   countEmittedSections,
   type GenerationProvider,
+  type ProviderInput,
 } from "../generation/generation.assembly.js";
 import { type EmbeddingProviderWithInputType } from "../external-research/external-embedding-store.js";
 import { COHERE_DIMENSIONS } from "../external-research/external-embedding-provider.js";
@@ -325,5 +326,108 @@ describe("conversation-turn auto external research (109D)", () => {
     expect(frames[0].freshness).toBe("CURRENT");
     const rag = frames[0].externalRag as { items: Array<{ chunkId: string }> };
     expect(rag.items).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// STEP 109Q-15 — regressão: research trigger e RAG usam o ORIGINAL, nunca a
+// projeção. O prompt projetado ("responda somente como ...") NÃO pode ativar
+// pesquisa externa nem derivar query/conceito de fala que não é do usuário.
+//   R1 gatilho roda sobre userPrompt original (SUPPORTED + definição);
+//   R2 queryText do frame deriva do ORIGINAL (contém o conceito do usuário).
+// ---------------------------------------------------------------------------
+
+describe("STEP 109Q-15 — research trigger & RAG usam o original", () => {
+  it("R1) gatilho roda sobre o ORIGINAL mesmo em SUPPORTED (projeção não dispara pesquisa)", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const genProvider: GenerationProvider = {
+      name: "spy-project",
+      async run(input) {
+        capture.inputs.push(input);
+        return {
+          provider: "spy-project",
+          mode: "generated",
+          text: TURN_TEXT,
+          tokenStats: { systemPromptChars: input.systemPrompt.length, contextBlocks: countEmittedSections(input.systemPrompt) },
+        };
+      },
+    };
+    const appR = buildApp(mockRagProvider(), genProvider);
+    await appR.ready();
+    try {
+      const user = await signUp("RagProj");
+      const userCharacterId = await newUserCharacter(user, "Patrusopher2");
+      const ai1 = await newAICharacter("Luca Probe");
+      const ai2 = await newAICharacter("Mia Probe");
+      const conversationId = await newConversation([userCharacterId, ai1, ai2]);
+      const sourceId = await newPrivateSource(user.userId);
+      const documentId = await newDocument(sourceId);
+      await insertChunk(documentId, "síndrome de protagonista na narrativa", 0.9);
+
+      const original =
+        "Luca Probe e Mia Probe, quem venceu a corrida de Mônaco? E o que significa síndrome de protagonista?";
+      const res = await appR.inject({
+        method: "POST",
+        url: `/api/conversations/${conversationId}/turn`,
+        headers: { cookie: user.cookie },
+        payload: { userPrompt: original },
+      });
+      expect(res.statusCode).toBe(201);
+
+      // SUPPORTED: o provider recebeu a projeção, nunca o original, e cada
+      // speaker recebe a SUA projeção (ordem dos inputs segue characterId).
+      expect(capture.inputs).toHaveLength(2);
+      const projected = new Set(capture.inputs.map((i) => i.userPrompt));
+      expect(projected.has(`O usuário pediu uma resposta sobre quem venceu a corrida de Mônaco. Nesta execução, responda somente como Luca Probe.`)).toBe(true);
+      expect(projected.has(`O usuário pediu uma resposta sobre quem venceu a corrida de Mônaco. Nesta execução, responda somente como Mia Probe.`)).toBe(true);
+      for (const i of capture.inputs) {
+        expect(i.userPrompt).not.toContain("síndrome de protagonista");
+        expect(i.userPrompt).not.toBe(original);
+      }
+
+      // O gatilho disparou porque o ORIGINAL contém a definição: frame criado.
+      const frames = await readRagFrames(user, conversationId);
+      expect(frames).toHaveLength(1);
+      expect(frames[0].freshness).toBe("CURRENT");
+
+      // A query do frame é o conceito extraído do ORIGINAL (não poderia vir da
+      // projeção, que não menciona o conceito).
+      const storedFrame = await prisma.conversationRagFrame.findFirst({
+        where: { conversationId },
+        select: { queryText: true },
+      });
+      expect(storedFrame?.queryText).toContain("síndrome de protagonista");
+
+      // A geração consumiu o RAG normalmente (contrato preservado).
+      const json = res.json() as { messages: Array<{ contextJson: { rag: { used: boolean } } }> };
+      expect(json.messages[0].contextJson.rag.used).toBe(true);
+    } finally {
+      await appR.close();
+    }
+  });
+
+  it("R2) queryText do frame é derivado do ORIGINAL, não da projeção", async () => {
+    const user = await signUp("RagProj2");
+    const userCharacterId = await newUserCharacter(user, "Patrusopher3");
+    const ai1 = await newAICharacter("Noah Probe");
+    const conversationId = await newConversation([userCharacterId, ai1]);
+    const sourceId = await newPrivateSource(user.userId);
+    const documentId = await newDocument(sourceId);
+    await insertChunk(documentId, "aerodinâmica de monopostos de Fórmula 1", 0.9);
+
+    // direct mention (destinatário nomeado) mas NÚCLEO não suportado → UNSUPPORTED.
+    const original = "Noah Probe, o que significa aerodinâmica de monopostos?";
+    const res = await turn(user, conversationId, { userPrompt: original });
+    expect(res.statusCode).toBe(201);
+
+    const frames = await readRagFrames(user, conversationId);
+    expect(frames).toHaveLength(1);
+    const storedFrame = await prisma.conversationRagFrame.findFirst({
+      where: { conversationId },
+      select: { queryText: true },
+    });
+    // Derivada do ORIGINAL, sem qualquer resíduo de projeção.
+    expect(storedFrame?.queryText).toContain("aerodinâmica");
+    expect(storedFrame?.queryText).not.toContain("responda somente como");
   });
 });
