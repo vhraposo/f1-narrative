@@ -23,6 +23,7 @@ import {
   type ResearchTriggerInternalContext,
 } from "../external-research/research-trigger.js";
 import { selectSpeakers } from "./response-orchestrator.js";
+import { projectUserPromptForSpeaker } from "../generation/user-prompt-projection.js";
 import {
   appendTurnReply,
   createTurnContext,
@@ -272,6 +273,9 @@ export async function executeTurn(
   const characterNameBy = new Map(
     signals.participants.map((p) => [p.characterId, p.name]),
   );
+  const aiParticipantNames = signals.participants
+    .filter((p) => p.isAIParticipant)
+    .map((p) => p.name);
 
   let turnContext = createTurnContext({
     userMessage: input.userPrompt,
@@ -298,12 +302,23 @@ export async function executeTurn(
 
   for (const speakerId of selection.selected) {
     try {
+      const speakerName = characterNameBy.get(speakerId) ?? speakerId;
+      const projection = projectUserPromptForSpeaker(
+        input.userPrompt,
+        speakerName,
+        aiParticipantNames,
+      );
+      const userPromptForSpeaker =
+        projection.status === "SUPPORTED" && projection.projectedPrompt !== null
+          ? projection.projectedPrompt
+          : input.userPrompt;
+
       const result = await assembleGenerationBundle(
         db,
         {
           conversationId: input.conversationId,
           userId: input.userId,
-          userPrompt: input.userPrompt,
+          userPrompt: userPromptForSpeaker,
           targetCharacterId: speakerId,
           turnContext,
           ...(effectiveRagFrameId !== undefined

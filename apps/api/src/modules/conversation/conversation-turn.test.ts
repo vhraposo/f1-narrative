@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import {
+  assembleGenerationBundle,
   countEmittedSections,
   type GenerationProvider,
   type ProviderInput,
@@ -972,5 +973,200 @@ describe("STEP 109F — continuidade narrativa no turno", () => {
     } finally {
       await appF.close();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// STEP 109Q-10 — projeção determinística do userPrompt por AI speaker.
+//
+// A projeção existe APENAS no input do provider daquela geração. Provas:
+//   U1 USER persistida permanece EXATAMENTE original (nunca a projeção);
+//   U2 provider recebe projectedPrompt quando SUPPORTED;
+//   U3 provider recebe o original quando UNSUPPORTED;
+//   U4 cada speaker recebe a SUA projeção (nome do próprio speaker);
+//   U5 dois speakers nunca recebem a mesma identidade projetada;
+//   U6 seleção de speakers inalterada;
+//   U7 nº de messages AI do turno inalterado;
+//   U8 CURRENT_TURN usa as respostas REAIS (nunca a projeção);
+//   U9 contextJson da message NÃO trata a projeção como mensagem USER;
+//   U10 generationKey determinística por speaker (projeção fora do frame).
+// ---------------------------------------------------------------------------
+
+const PROMPT_MONACO = "SpeakerAlpha e SpeakerBeta, quem venceu a corrida de Mônaco?";
+const PROJECTED_ALPHA =
+  "O usuário pediu uma resposta sobre quem venceu a corrida de Mônaco. Nesta execução, responda somente como SpeakerAlpha.";
+const PROJECTED_BETA =
+  "O usuário pediu uma resposta sobre quem venceu a corrida de Mônaco. Nesta execução, responda somente como SpeakerBeta.";
+
+describe("STEP 109Q-10 — projeção determinística do userPrompt", () => {
+  it("U1) USER persistida permanece EXATAMENTE a original (nunca a projeção)", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."], { capture }));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().userMessage.content).toBe(PROMPT_MONACO);
+      const storedUser = await prisma.message.findUniqueOrThrow({
+        where: { id: res.json().userMessage.id },
+      });
+      expect(storedUser.content).toBe(PROMPT_MONACO);
+      expect(storedUser.content).not.toContain("Nesta execução, responda somente como");
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U2) SUPPORTED → provider recebe projectedPrompt (nunca o original)", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."], { capture }));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      expect(res.statusCode).toBe(201);
+      expect(capture.inputs).toHaveLength(2);
+      expect(capture.inputs[0].userPrompt).toBe(PROJECTED_ALPHA);
+      expect(capture.inputs[1].userPrompt).toBe(PROJECTED_BETA);
+      expect(capture.inputs[0].userPrompt).not.toBe(PROMPT_MONACO);
+      expect(capture.inputs[1].userPrompt).not.toBe(PROMPT_MONACO);
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U3) UNSUPPORTED → provider recebe o ORIGINAL sem qualquer projeção", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."], { capture }));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      const prompt = "SpeakerAlpha e SpeakerBeta respondam!";
+      const res = await turn(appP, owner, conv1, { userPrompt: prompt });
+      expect(res.statusCode).toBe(201);
+      expect(capture.inputs).toHaveLength(2);
+      expect(capture.inputs[0].userPrompt).toBe(prompt);
+      expect(capture.inputs[1].userPrompt).toBe(prompt);
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U4) cada speaker recebe a SUA projeção (nome do próprio speaker)", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."], { capture }));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      expect(capture.inputs[0].userPrompt).toContain("responda somente como SpeakerAlpha.");
+      expect(capture.inputs[1].userPrompt).toContain("responda somente como SpeakerBeta.");
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U5) dois speakers nunca recebem a mesma identidade projetada", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."], { capture }));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      expect(capture.inputs[0].userPrompt).not.toBe(capture.inputs[1].userPrompt);
+      expect(capture.inputs[0].userPrompt).not.toContain("SpeakerBeta");
+      expect(capture.inputs[1].userPrompt).not.toContain("SpeakerAlpha");
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U6) seleção de speakers inalterada pela projeção", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."], { capture }));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().messages.map((m) => m.characterId)).toEqual([aiA, aiB]);
+      expect(res.json().failedSpeakers).toEqual([]);
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U7) nº de messages AI do turno inalterado (USER + 2 AI)", async () => {
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."]));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().messages).toHaveLength(2);
+      expect(await messageCount(conv1)).toBe(3);
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U8) CURRENT_TURN usa as respostas REAIS, nunca a projeção", async () => {
+    const capture = { inputs: [] as ProviderInput[] };
+    const appP = buildApp(undefined, sequenceProvider(["real A.", "real B."], { capture }));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      const pB = capture.inputs.find(
+        (i) => i.userPrompt === PROJECTED_BETA,
+      )?.systemPrompt;
+      expect(pB).toBeDefined();
+      expect(pB ?? "").toContain("<BEGIN 5:CURRENT_TURN>");
+      // A resposta REAL de A está no CURRENT_TURN de B;
+      expect((pB ?? "").match(/"real A\."/g) ?? []).toHaveLength(1);
+      // a projeção do usuário NÃO entra no CURRENT_TURN.
+      expect(pB ?? "").not.toContain("Nesta execução, responda somente como");
+      expect(pB ?? "").not.toContain(PROMPT_MONACO);
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U9) contextJson não trata a projeção como mensagem USER", async () => {
+    const appP = buildApp(undefined, sequenceProvider(["P1.", "P2."]));
+    await appP.ready();
+    try {
+      await resetMessages(conv1);
+      const res = await turn(appP, owner, conv1, { userPrompt: PROMPT_MONACO });
+      expect(res.statusCode).toBe(201);
+      for (const m of res.json().messages) {
+        expect(typeof m.contextJson.generationKey).toBe("string");
+        expect(m.contextJson.generationKey).toMatch(/^sha256:/);
+        // fidelity conta MENSAGENS persistidas (USER + respostas reais), não projeção.
+        expect(m.contextJson.fidelity.messages).toBeGreaterThan(0);
+        expect(JSON.stringify(m.contextJson)).not.toContain("Nesta execução, responda somente como");
+      }
+      const alphaMsg = res.json().messages.find((m) => m.characterId === aiA);
+      expect(alphaMsg?.contextJson.fidelity.messages).toBe(1); // só a USER original
+    } finally {
+      await appP.close();
+    }
+  });
+
+  it("U10) generationKey determinística por speaker (projeção fora do frame)", async () => {
+    const keyOriginal = await assembleGenerationBundle(
+      prisma,
+      { conversationId: conv1, userId: owner.userId, userPrompt: PROMPT_MONACO, targetCharacterId: aiA },
+      generatedProvider("P1."),
+    );
+    const keyProjetada = await assembleGenerationBundle(
+      prisma,
+      { conversationId: conv1, userId: owner.userId, userPrompt: PROJECTED_ALPHA, targetCharacterId: aiA },
+      generatedProvider("P1."),
+    );
+    expect(keyOriginal.generationKey).toMatch(/^sha256:/);
+    // userPrompt NÃO entra no canonicalFrame: projeção não altera a key.
+    expect(keyProjetada.generationKey).toBe(keyOriginal.generationKey);
   });
 });
