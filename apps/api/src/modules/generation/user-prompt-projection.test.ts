@@ -247,3 +247,125 @@ describe("STEP 109Q-13 — estrutura data-driven", () => {
     expect(r.recipients).toEqual(["Luca", "Mia"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// STEP 109Q-14 — expansão conservadora de cobertura.
+//   T1 "primeiro lugar" → canônico "em primeiro" (equivalente claro);
+//   T2 "resultado do GP" sem "final" → canônico "resultado final do GP".
+//   T3..T6 variações já cobertas por normalização (ordem/pontuação/case/acentos).
+//   T7..T10 anti-falsos-positivos permanecem UNSUPPORTED.
+// ---------------------------------------------------------------------------
+
+describe("STEP 109Q-14 — expansão conservadora de cobertura", () => {
+  it("T1) 'quem ficou em primeiro lugar' -> canônico 'em primeiro'", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca e Mia, quem ficou em primeiro lugar em Mônaco?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.core).toBe("quem ficou em primeiro em Mônaco");
+    expect(r.recipients).toEqual(["Luca", "Mia"]);
+  });
+
+  it("T2) 'qual foi o resultado do GP' sem 'final' -> canônico 'resultado final'", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca e Mia, qual foi o resultado do GP de Mônaco?",
+      "Mia",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.core).toBe("qual foi o resultado final do GP de Mônaco");
+    expect(r.recipients).toEqual(["Luca", "Mia"]);
+  });
+
+  it("T3) ordem invertida já era coberta -> SUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Quem venceu a corrida de Mônaco, Luca e Mia?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+  });
+
+  it("T4) pontuação intermediária já era coberta -> SUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca, quem venceu a corrida de Mônaco, Mia?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.recipients).toEqual(["Luca", "Mia"]);
+  });
+
+  it("T5) capitalização e acentos extremos já eram cobertos -> SUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "LUCA E MIA, QUEM VENCEU A CORRIDA DE MONACO?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.core).toBe("quem venceu a corrida de Mônaco");
+  });
+
+  it("T6) separadores de ponto já eram cobertos -> SUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca. Quem venceu a corrida de Mônaco? Mia.",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("SUPPORTED");
+    expect(r.recipients).toEqual(["Luca", "Mia"]);
+  });
+
+  it("T7) anti-falso-positivo: 'primeiro lugar' em outro local -> UNSUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca e Mia, quem ficou em primeiro lugar em Ímola?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("UNSUPPORTED");
+    expect(r.projectedPrompt).toBeNull();
+  });
+
+  it("T8) anti-falso-positivo: outro ordinal não deve casar 'primeiro'", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca e Mia, quem ficou em terceiro lugar em Mônaco?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("UNSUPPORTED");
+    expect(r.projectedPrompt).toBeNull();
+  });
+
+  it("T9) anti-falso-positivo: 'ganhou' continua UNSUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca e Mia, quem ganhou a corrida de Mônaco?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("UNSUPPORTED");
+    expect(r.projectedPrompt).toBeNull();
+  });
+
+  it("T10) anti-falso-positivo: 'quem foi o vencedor' continua UNSUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Luca e Mia, quem foi o vencedor da corrida de Mônaco?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("UNSUPPORTED");
+    expect(r.projectedPrompt).toBeNull();
+  });
+
+  it("T11) anti-falso-positivo: referência indireta 'vocês dois' -> UNSUPPORTED", () => {
+    const r = projectUserPromptForSpeaker(
+      "Vocês dois, quem venceu a corrida de Mônaco?",
+      "Luca",
+      ["Luca", "Mia"],
+    );
+    expect(r.status).toBe("UNSUPPORTED");
+    expect(r.recipients).toEqual([]);
+    expect(r.projectedPrompt).toBeNull();
+  });
+});

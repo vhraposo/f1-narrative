@@ -17,9 +17,11 @@ interface CoreMatcher {
 // Ordem importa: o primeiro matcher que casar define o núcleo canônico.
 const CORE_MATCHERS: readonly CoreMatcher[] = [
   { pattern: /\bquem venceu a corrida de monaco\b/, canonical: "quem venceu a corrida de Mônaco" },
+  { pattern: /\bquem ficou em primeiro lugar em monaco\b/, canonical: "quem ficou em primeiro em Mônaco" },
   { pattern: /\bquem ficou em primeiro em monaco\b/, canonical: "quem ficou em primeiro em Mônaco" },
   { pattern: /\bquem ficou em primeiro na corrida de monaco\b/, canonical: "quem ficou em primeiro na corrida de Mônaco" },
   { pattern: /\bqual foi o resultado da corrida de monaco\b/, canonical: "qual foi o resultado da corrida de Mônaco" },
+  { pattern: /\bqual foi o resultado do gp de monaco\b/, canonical: "qual foi o resultado final do GP de Mônaco" },
   { pattern: /\bqual foi o resultado final do gp de monaco\b/, canonical: "qual foi o resultado final do GP de Mônaco" },
   { pattern: /\bquem levou a vitoria em monaco\b/, canonical: "quem levou a vitória em Mônaco" },
 ];
