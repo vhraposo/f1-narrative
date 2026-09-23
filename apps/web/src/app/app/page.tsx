@@ -8,6 +8,7 @@ import { SectionHeading } from "@/components/home/section-heading";
 import { WorldStateCard } from "@/components/world/world-state-card";
 import { useCharacters } from "@/hooks/use-characters";
 import { useSeasons } from "@/hooks/use-championship";
+import { useConversations } from "@/hooks/use-conversations";
 import { useDrivers } from "@/hooks/use-driver-profiles";
 import { useEvents } from "@/hooks/use-events";
 import { useRelationships } from "@/hooks/use-relationships";
@@ -22,6 +23,7 @@ export default function AppPage() {
   const { data: relationships } = useRelationships();
   const { data: seasons } = useSeasons();
   const { data: events } = useEvents();
+  const { data: conversations } = useConversations();
 
   const counts = {
     characters: characters?.length,
@@ -30,6 +32,7 @@ export default function AppPage() {
     relationships: relationships?.length,
     seasons: seasons?.length,
     events: events?.length,
+    conversations: conversations?.length,
   };
 
   return (

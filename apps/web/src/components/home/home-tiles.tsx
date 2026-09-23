@@ -1,6 +1,7 @@
 import {
   Flag,
   HeartHandshake,
+  MessagesSquare,
   Newspaper,
   Shield,
   Trophy,
@@ -18,6 +19,7 @@ export type TileCounts = {
   relationships?: number;
   seasons?: number;
   events?: number;
+  conversations?: number;
 };
 
 type TileDef = {
@@ -75,6 +77,14 @@ export function HomeTiles({ counts }: { counts: TileCounts }) {
       description: "Temporadas, corridas, resultados e classificação.",
       Icon: Trophy,
       meta: metaText(counts.seasons, "temporada", "temporadas"),
+    },
+    {
+      href: "/app/conversations",
+      kicker: "Chat",
+      title: "Conversas",
+      description: "Diálogos entre personagens com respostas de IA.",
+      Icon: MessagesSquare,
+      meta: metaText(counts.conversations, "conversa", "conversas"),
     },
     {
       href: "/app/events",
