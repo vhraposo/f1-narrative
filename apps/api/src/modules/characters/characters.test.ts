@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { syncAiCatalog } from "./ai-catalog.js";
 
 let app: FastifyInstance;
 
@@ -289,5 +290,176 @@ describe("DELETE /api/characters/:id", () => {
       headers: { cookie: intruder.cookie },
     });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe("POST /api/characters/:id/switch-control", () => {
+  it("assume o controle de um AI character e libera os anteriores", async () => {
+    const u = await createUser(`sw-a-${Date.now()}@f1nw.test`, "SWA");
+    const existing = await createCharacter(u, {
+      name: "Meu Antigo",
+      nationality: "Brasileira",
+      birthDate: "1994-04-04",
+    });
+    const count = await syncAiCatalog(prisma);
+    expect(count).toBeGreaterThan(0);
+    const target = await prisma.character.findFirstOrThrow({
+      where: { controlledBy: "AI", userId: null },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/characters/${target.id}/switch-control`,
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.character.id).toBe(target.id);
+    expect(body.character.controlledBy).toBe("USER");
+    expect(body.character.userId).toBe(u.userId);
+    expect(body.releasedCount).toBeGreaterThanOrEqual(1);
+
+    const releasedDb = await prisma.character.findUnique({
+      where: { id: existing.json.character.id as string },
+    });
+    expect(releasedDb?.controlledBy).toBe("AI");
+    expect(releasedDb?.userId).toBeNull();
+
+    const targetDb = await prisma.character.findUnique({
+      where: { id: target.id },
+    });
+    expect(targetDb?.controlledBy).toBe("USER");
+    expect(targetDb?.userId).toBe(u.userId);
+  });
+
+  it("libera todos os USER characters do usuário na troca", async () => {
+    const u = await createUser(`sw-b-${Date.now()}@f1nw.test`, "SWB");
+    const c1 = await createCharacter(u, {
+      name: "Origem Um",
+      nationality: "Italiana",
+      birthDate: "1990-01-01",
+    });
+    const c2 = await createCharacter(u, {
+      name: "Origem Dois",
+      nationality: "Francesa",
+      birthDate: "1991-02-02",
+    });
+    await syncAiCatalog(prisma);
+    const target = await prisma.character.findFirstOrThrow({
+      where: { controlledBy: "AI", userId: null },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/characters/${target.id}/switch-control`,
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().releasedCount).toBe(2);
+
+    for (const c of [c1, c2]) {
+      const row = await prisma.character.findUnique({
+        where: { id: c.json.character.id as string },
+      });
+      expect(row?.controlledBy).toBe("AI");
+      expect(row?.userId).toBeNull();
+    }
+  });
+
+  it("retorna 409 ao tentar controlar personagem já controlado", async () => {
+    const u = await createUser(`sw-c-${Date.now()}@f1nw.test`, "SWC");
+    const created = await createCharacter(u, {
+      name: "Já Meu",
+      nationality: "Espanhola",
+      birthDate: "1996-06-06",
+    });
+    const id = created.json.character.id as string;
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/characters/${id}/switch-control`,
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ALREADY_CONTROLLED");
+  });
+
+  it("retorna 409 ao tentar controlar personagem de outro usuário", async () => {
+    const owner = await createUser(`sw-d1-${Date.now()}@f1nw.test`, "SWD1");
+    const intruder = await createUser(`sw-d2-${Date.now()}@f1nw.test`, "SWD2");
+    const created = await createCharacter(owner, {
+      name: "Do Vizinho",
+      nationality: "Canadense",
+      birthDate: "1993-03-03",
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/characters/${created.json.character.id as string}/switch-control`,
+      headers: { cookie: intruder.cookie },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("NOT_ADOPTABLE");
+  });
+
+  it("retorna 404 para personagem inexistente", async () => {
+    const u = await createUser(`sw-e-${Date.now()}@f1nw.test`, "SWE");
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/characters/00000000-0000-4000-8000-0000000fffff/switch-control",
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("não altera o histórico de mensagens na troca", async () => {
+    const u = await createUser(`sw-f-${Date.now()}@f1nw.test`, "SWF");
+    const created = await createCharacter(u, {
+      name: "Com Histórico",
+      nationality: "Sueca",
+      birthDate: "1995-07-07",
+    });
+    const charId = created.json.character.id as string;
+
+    const hour = 60 * 60 * 1000;
+    const [aiId, conv] = await prisma.$transaction(async (tx) => {
+      const ai = await tx.character.findFirstOrThrow({
+        where: { controlledBy: "AI", userId: null },
+      });
+      const conv = await tx.conversation.create({
+        data: {
+          type: "DM",
+          participants: {
+            create: [
+              { characterId: charId },
+              { characterId: ai.id },
+            ],
+          },
+        },
+      });
+      await tx.message.create({
+        data: {
+          conversationId: conv.id,
+          senderType: "USER_CHARACTER",
+          characterId: charId,
+          content: "histórico imutável",
+          createdAt: new Date(Date.now() - hour),
+        },
+      });
+      return [ai.id, conv.id];
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/characters/${aiId}/switch-control`,
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const messages = await prisma.message.findMany({ where: { conversationId: conv } });
+    expect(messages).toHaveLength(1);
+    expect(messages[0].content).toBe("histórico imutável");
+    expect(messages[0].characterId).toBe(charId);
+    expect(messages[0].senderType).toBe("USER_CHARACTER");
   });
 });

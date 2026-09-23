@@ -181,6 +181,61 @@ export const charactersRoutes: FastifyPluginAsync = async (fastify) => {
 
     return reply.code(204).send();
   });
+
+  fastify.post(
+    "/api/characters/:id/switch-control",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const userId = request.user!.id;
+      const params = characterIdParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({
+          error: "Identificador inválido",
+          code: "VALIDATION_ERROR",
+        });
+      }
+
+      const target = await prisma.character.findUnique({
+        where: { id: params.data.id },
+        select: { id: true, controlledBy: true, userId: true },
+      });
+
+      if (!target) {
+        return reply.code(404).send({
+          error: "Personagem não encontrado",
+          code: "NOT_FOUND",
+        });
+      }
+
+      if (target.controlledBy === "USER" && target.userId === userId) {
+        return reply.code(409).send({
+          error: "Você já controla este personagem",
+          code: "ALREADY_CONTROLLED",
+        });
+      }
+
+      if (target.controlledBy === "USER") {
+        return reply.code(409).send({
+          error: "Este personagem é controlado por outro usuário",
+          code: "NOT_ADOPTABLE",
+        });
+      }
+
+      const [character, released] = await prisma.$transaction([
+        prisma.character.update({
+          where: { id: target.id },
+          data: { controlledBy: "USER", userId },
+          select: characterSelect,
+        }),
+        prisma.character.updateMany({
+          where: { userId, controlledBy: "USER", id: { not: target.id } },
+          data: { controlledBy: "AI", userId: null },
+        }),
+      ]);
+
+      return reply.send({ character, releasedCount: released.count });
+    },
+  );
 };
 
 export default charactersRoutes;

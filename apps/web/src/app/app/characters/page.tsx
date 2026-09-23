@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { CharacterCard } from "@/components/characters/character-card";
+import { CharacterControlPanel } from "@/components/characters/character-control-panel";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -77,7 +78,7 @@ export default function CharactersPage() {
       {!isLoading && !isError && data && data.length === 0 && (
         <EmptyState
           title="Você ainda não tem personagens."
-          description="Crie seu primeiro personagem para começar a narrativa."
+          description="Crie seu primeiro personagem ou assuma o controle de um personagem de IA."
           action={
             <Link href="/app/characters/new" className={primaryLinkStyles}>
               <Plus className="mr-2 h-4 w-4" />
@@ -86,6 +87,8 @@ export default function CharactersPage() {
           }
         />
       )}
+
+      <CharacterControlPanel />
 
       {data && data.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
