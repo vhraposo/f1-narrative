@@ -26,6 +26,9 @@ const CORE_MATCHERS: readonly CoreMatcher[] = [
   { pattern: /\bquem levou a vitoria em monaco\b/, canonical: "quem levou a vitória em Mônaco" },
 ];
 
+export const PROJECTION_SUPPORTED_CANONICALS: readonly string[] =
+  CORE_MATCHERS.map((m) => m.canonical);
+
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

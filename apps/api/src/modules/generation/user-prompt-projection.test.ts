@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { projectUserPromptForSpeaker } from "./user-prompt-projection.js";
+import {
+  PROJECTION_SUPPORTED_CANONICALS,
+  projectUserPromptForSpeaker,
+} from "./user-prompt-projection.js";
 
 const PROJ = (
   prompt: string,
@@ -358,8 +361,8 @@ describe("STEP 109Q-14 — expansão conservadora de cobertura", () => {
     expect(r.projectedPrompt).toBeNull();
   });
 
-  it("T11) anti-falso-positivo: referência indireta 'vocês dois' -> UNSUPPORTED", () => {
-    const r = projectUserPromptForSpeaker(
+it("T11) anti-falso-positivo: referência indireta 'vocês dois' -> UNSUPPORTED", () => {
+    const r = PROJ(
       "Vocês dois, quem venceu a corrida de Mônaco?",
       "Luca",
       ["Luca", "Mia"],
@@ -367,5 +370,97 @@ describe("STEP 109Q-14 — expansão conservadora de cobertura", () => {
     expect(r.status).toBe("UNSUPPORTED");
     expect(r.recipients).toEqual([]);
     expect(r.projectedPrompt).toBeNull();
+  });
+});
+
+describe("STEP 109Q-19 — decisão de cobertura (fronteira explícita)", () => {
+  it("Q1) fronteira de canônicos é exatamente o conjunto data-driven atual (8 cores)", () => {
+    expect(PROJECTION_SUPPORTED_CANONICALS).toEqual([
+      "quem venceu a corrida de Mônaco",
+      "quem ficou em primeiro em Mônaco",
+      "quem ficou em primeiro em Mônaco",
+      "quem ficou em primeiro na corrida de Mônaco",
+      "qual foi o resultado da corrida de Mônaco",
+      "qual foi o resultado final do GP de Mônaco",
+      "qual foi o resultado final do GP de Mônaco",
+      "quem levou a vitória em Mônaco",
+    ]);
+  });
+
+  const suportedFamilies: ReadonlyArray<{ core: string; prompt: () => string }> = [
+    {
+      core: "quem venceu a corrida de Mônaco",
+      prompt: () => "Luca e Mia, quem venceu a corrida de Mônaco?",
+    },
+    {
+      core: "quem ficou em primeiro em Mônaco",
+      prompt: () => "Luca e Mia, quem ficou em primeiro lugar em Mônaco?",
+    },
+    {
+      core: "quem ficou em primeiro em Mônaco",
+      prompt: () => "Luca e Mia, quem ficou em primeiro em Mônaco?",
+    },
+    {
+      core: "quem ficou em primeiro na corrida de Mônaco",
+      prompt: () => "Luca e Mia, quem ficou em primeiro na corrida de Mônaco?",
+    },
+    {
+      core: "qual foi o resultado da corrida de Mônaco",
+      prompt: () => "Luca e Mia, qual foi o resultado da corrida de Mônaco?",
+    },
+    {
+      core: "qual foi o resultado final do GP de Mônaco",
+      prompt: () => "Luca e Mia, qual foi o resultado do GP de Mônaco?",
+    },
+    {
+      core: "qual foi o resultado final do GP de Mônaco",
+      prompt: () => "Luca e Mia, qual foi o resultado final do GP de Mônaco?",
+    },
+    {
+      core: "quem levou a vitória em Mônaco",
+      prompt: () => "Luca e Mia, quem levou a vitória em Mônaco?",
+    },
+  ];
+
+  for (const { core, prompt } of suportedFamilies) {
+    it(`Q2) núcleo '${core}' → SUPPORTED com recipientes preservados`, () => {
+      const r = PROJ(prompt(), "Luca");
+      expect(r.status).toBe("SUPPORTED");
+      expect(r.core).toBe(core);
+      expect(r.recipients).toEqual(["Luca", "Mia"]);
+      expect(r.projectedPrompt).toBe(
+        `O usuário pediu uma resposta sobre ${core}. Nesta execução, responda somente como Luca.`,
+      );
+    });
+  }
+
+  const antiFalsos: ReadonlyArray<{ id: string; prompt: string }> = [
+    { id: "X6", prompt: "Luca e Mia, quem ganhou a corrida de Mônaco?" },
+    { id: "X7", prompt: "Luca e Mia, quem foi o vencedor da corrida de Mônaco?" },
+    { id: "X8", prompt: "Luca e Mia, quem venceu em Interlagos?" },
+    { id: "X9", prompt: "Luca e Mia, quem levou a vitória em Ímola?" },
+    { id: "X10", prompt: "Luca e Mia, qual foi o resultado do GP de Ímola?" },
+    { id: "X11", prompt: "Luca e Mia, quem ficou em terceiro em Mônaco?" },
+    { id: "X12", prompt: "Luca e Mia, quem ficou em segundo na corrida de Mônaco?" },
+  ];
+
+  for (const { id, prompt } of antiFalsos) {
+    it(`Q3) ${id}) fora da fronteira → UNSUPPORTED preservando original`, () => {
+      const r = PROJ(prompt, "Luca");
+      expect(r.status).toBe("UNSUPPORTED");
+      expect(r.projectedPrompt).toBeNull();
+    });
+  }
+
+  it("Q4) cada canônico da fronteira tem ao menos um recipiente e projeção direta por speaker", () => {
+    for (const core of PROJECTION_SUPPORTED_CANONICALS) {
+      const r = projectUserPromptForSpeaker(
+        `Luca e Mia, ${core}?`,
+        "Luca",
+        ["Luca", "Mia"],
+      );
+      expect(r.status).toBe("SUPPORTED");
+      expect(r.core).toBe(core);
+    }
   });
 });
