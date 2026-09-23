@@ -316,6 +316,8 @@ model Team {
 
   universeEditorDecisions UniverseEditorDecision[]
 
+  teamPerformances TeamPerformance[]
+
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -342,6 +344,7 @@ model Season {
   externalSeasonBindings ExternalBindingSeason[]
 
   universeEditorDecisions UniverseEditorDecision[]
+  teamPerformances         TeamPerformance[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -453,6 +456,25 @@ model SeasonDriverEntry {
   @@index([seasonId])
   @@index([driverProfileId])
   @@index([teamId, status])
+}
+
+model TeamPerformance {
+  id       String   @id @default(uuid()) @db.Uuid
+  seasonId String   @db.Uuid
+  season   Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  teamId   String   @db.Uuid
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  carSpeed    Float @default(50)
+  reliability Float @default(50)
+  operations  Float @default(50)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([seasonId, teamId])
+  @@index([seasonId])
+  @@index([teamId])
 }
 
 model DriverEntryEvent {
