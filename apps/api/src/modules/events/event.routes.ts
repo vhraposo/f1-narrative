@@ -14,6 +14,7 @@ import {
 
 import { z } from "zod";
 import { syncNewsForEvent } from "./news.js";
+import { applyEventEvolution } from "./event-evolution.js";
 
 const eventSelect = {
   id: true,
@@ -115,6 +116,8 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
 
         await syncNewsForEvent(tx, created.id);
 
+        await applyEventEvolution(tx, created.id);
+
         return created;
       });
 
@@ -200,6 +203,8 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
 
           await syncNewsForEvent(tx, updated.id);
 
+          await applyEventEvolution(tx, updated.id);
+
           return updated;
         });
 
@@ -233,6 +238,10 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
 
       try {
         await prisma.$transaction(async (tx) => {
+          await tx.memoryCharacter.deleteMany({
+            where: { memory: { eventId: existing.id } },
+          });
+          await tx.memory.deleteMany({ where: { eventId: existing.id } });
           await tx.newsItem.deleteMany({ where: { eventId: existing.id } });
           await tx.event.delete({ where: { id: existing.id } });
         });
@@ -396,6 +405,8 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
           });
 
           await syncNewsForEvent(tx, event.id);
+
+          await applyEventEvolution(tx, event.id);
 
           return created;
         });
