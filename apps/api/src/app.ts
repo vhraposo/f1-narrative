@@ -14,6 +14,8 @@ import driversRoutes from "./modules/drivers/driver-profile.routes.js";
 import teamsRoutes from "./modules/teams/team.routes.js";
 import teamPerformanceRoutes from "./modules/performance/team-performance.routes.js";
 import driverAttributeRoutes from "./modules/performance/driver-attribute.routes.js";
+import simulationRoutes from "./modules/simulation/qualifying.routes.js";
+import raceSimulationRoutes from "./modules/simulation/race-simulation.routes.js";
 import rosterRoutes from "./modules/roster/roster.routes.js";
 import relationshipsRoutes from "./modules/relationships/relationship.routes.js";
 import championshipRoutes from "./modules/championship/championship.routes.js";
@@ -125,6 +127,8 @@ export function buildApp(
   void app.register(teamsRoutes);
   void app.register(teamPerformanceRoutes);
   void app.register(driverAttributeRoutes);
+  void app.register(simulationRoutes);
+  void app.register(raceSimulationRoutes);
   void app.register(rosterRoutes);
   void app.register(relationshipsRoutes);
   void app.register(championshipRoutes);
