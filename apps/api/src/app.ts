@@ -20,6 +20,7 @@ import rosterRoutes from "./modules/roster/roster.routes.js";
 import relationshipsRoutes from "./modules/relationships/relationship.routes.js";
 import championshipRoutes from "./modules/championship/championship.routes.js";
 import championshipProgressionRoutes from "./modules/championship/championship-progression.routes.js";
+import raceNarrativeRoutes from "./modules/narrative/race-narrative.routes.js";
 import eventsRoutes from "./modules/events/event.routes.js";
 import worldRoutes from "./modules/world/world.routes.js";
 import availabilityRoutes from "./modules/availability/availability.routes.js";
@@ -134,6 +135,7 @@ export function buildApp(
   void app.register(relationshipsRoutes);
   void app.register(championshipRoutes);
   void app.register(championshipProgressionRoutes);
+  void app.register(raceNarrativeRoutes);
   void app.register(eventsRoutes);
   void app.register(worldRoutes);
   void app.register(availabilityRoutes);
