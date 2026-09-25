@@ -126,6 +126,9 @@ beforeEach(() => {
       if (failDrivers) throw new ApiError("Falha", 500);
       return { drivers: driversFixture };
     }
+    if (path === "/api/characters") {
+      return { characters: [{ id: "c1" }] };
+    }
     if (path === "/api/world") return { world: worldFixture };
     if (path === "/api/seasons") return { seasons: SEASONS };
     if (path === "/api/seasons/s1/standings") {
@@ -190,8 +193,26 @@ describe("Drivers Page - grid", () => {
     renderWithClient(<DriversPage />);
 
     expect(
-      await screen.findByText("Você ainda não tem pilotos."),
+      await screen.findByText("Nenhum piloto na grid."),
     ).toBeDefined();
+  });
+
+  it("piloto do usuário mantém ações; piloto de IA (não dono) fica somente leitura", async () => {
+    const { container } = renderWithClient(<DriversPage />);
+
+    await screen.findByText("Alicya Kucharski");
+    const owned = screen.getByText("Alicya Kucharski").closest("article")!;
+    expect(owned.querySelector('a[href="/app/characters/c1"]')).not.toBeNull();
+    expect(
+      within(owned as HTMLElement).getByRole("button", { name: /Remover/ }),
+    ).toBeDefined();
+
+    const notOwned = screen.getByText("Lewis Hamilton").closest("article")!;
+    expect(notOwned.querySelector('a[href="/app/characters/c2"]')).toBeNull();
+    expect(
+      within(notOwned as HTMLElement).queryByRole("button", { name: /Remover/ }),
+    ).toBeNull();
+    expect(container.querySelectorAll("article")).toHaveLength(2);
   });
 
 it("estado de erro: falha ao carregar os pilotos", async () => {

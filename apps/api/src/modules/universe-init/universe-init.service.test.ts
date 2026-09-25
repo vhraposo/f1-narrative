@@ -35,8 +35,10 @@ async function snapshotCounts(): Promise<Record<string, number>> {
   return out;
 }
 
-async function snapshotWorldState() {
-  return prisma.worldState.findUnique({ where: { key: "default" } });
+async function snapshotWorldState(universeId: string) {
+  return prisma.worldState.findUnique({
+    where: { universeId_key: { universeId, key: "default" } },
+  });
 }
 
 function conflictKinds(conflicts: { kind: string }[]): string[] {
@@ -58,7 +60,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
     const { ids, cleanup } = fixture;
     actor.id = ids.userId;
     try {
-      const worldBefore = await snapshotWorldState();
+      const worldBefore = await snapshotWorldState(ids.universeId);
 
       const preview = await universeInitService.preview(actor, input(ids));
       expect(preview.conflicts).toEqual([]);
@@ -91,9 +93,17 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
       expect(report.worldState).toEqual({ changed: false });
 
-      expect(await prisma.team.count({ where: { userId: ids.userId } })).toBe(1);
-      expect(await prisma.character.count({ where: { userId: ids.userId } })).toBe(3);
-      expect(await prisma.driverProfile.count({ where: { character: { userId: ids.userId } } })).toBe(3);
+      expect(await prisma.team.count({ where: { universeId: ids.universeId } })).toBe(1);
+      expect(
+        await prisma.character.count({
+          where: { universeId: ids.universeId, userId: null, controlledBy: "AI" },
+        }),
+      ).toBe(3);
+      expect(
+        await prisma.driverProfile.count({
+          where: { character: { universeId: ids.universeId } },
+        }),
+      ).toBe(3);
 
       const entries = await prisma.seasonDriverEntry.findMany({
         where: { seasonId: ids.seasonId },
@@ -133,7 +143,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       ).toBe(3);
       expect(await prisma.externalBindingSeason.count()).toBe(1);
 
-      const worldAfter = await snapshotWorldState();
+      const worldAfter = await snapshotWorldState(ids.universeId);
       if (worldBefore) {
         expect(worldAfter?.currentSeasonId).toBe(worldBefore.currentSeasonId ?? null);
         expect(String(worldAfter?.currentDate)).toBe(String(worldBefore.currentDate));
@@ -182,7 +192,9 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       for (const model of Object.keys(before)) {
         expect(after[model]).toBe(before[model]);
       }
-      expect(await prisma.character.count({ where: { userId: ids.userId } })).toBe(3);
+      expect(
+        await prisma.character.count({ where: { universeId: ids.universeId } }),
+      ).toBe(3);
       expect(await prisma.seasonDriverEntry.count({ where: { seasonId: ids.seasonId } })).toBe(3);
     } finally {
       await cleanup();
@@ -200,6 +212,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
           nationality: "Australian",
           birthDate: new Date("2001-04-06"),
           userId: ids.userId,
+          universeId: ids.universeId,
         },
       });
 
@@ -209,7 +222,12 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       expect(report.summary.charactersReused).toBe(0);
 
       const binding = await prisma.externalBindingDriver.findUniqueOrThrow({
-        where: { externalDriverId: ids.extOscarId },
+        where: {
+          universeId_externalDriverId: {
+            universeId: ids.universeId,
+            externalDriverId: ids.extOscarId,
+          },
+        },
       });
       expect(binding.characterId).not.toBe(canonicalOscar.id);
 
@@ -217,14 +235,18 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
         where: { id: binding.characterId },
       });
       expect(boundOscar.name).toBe("Oscar Piastri");
-      expect(boundOscar.userId).toBe(ids.userId);
+      expect(boundOscar.userId).toBeNull();
+      expect(boundOscar.controlledBy).toBe("AI");
+      expect(boundOscar.universeId).toBe(ids.universeId);
 
       const stillThere = await prisma.character.findUniqueOrThrow({
         where: { id: canonicalOscar.id },
       });
       expect(stillThere.name).toBe("Oscar Piastri");
       expect(String(stillThere.birthDate)).toBe(String(new Date("2001-04-06")));
-      expect(await prisma.character.count({ where: { userId: ids.userId } })).toBe(4);
+      expect(
+        await prisma.character.count({ where: { universeId: ids.universeId } }),
+      ).toBe(4);
     } finally {
       await cleanup();
     }
@@ -236,7 +258,13 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
     actor.id = ids.userId;
     try {
       await prisma.team.create({
-        data: { name: "McLaren", shortName: "MCL", color: "#ff8000", userId: ids.userId },
+        data: {
+          name: "McLaren",
+          shortName: "MCL",
+          color: "#ff8000",
+          userId: ids.userId,
+          universeId: ids.universeId,
+        },
       });
 
       const preview = await universeInitService.preview(actor, input(ids));
@@ -247,8 +275,8 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
         statusCode: 409,
       });
 
-      expect(await prisma.team.count({ where: { userId: ids.userId } })).toBe(1);
-      expect(await prisma.character.count({ where: { userId: ids.userId } })).toBe(0);
+      expect(await prisma.team.count({ where: { universeId: ids.universeId } })).toBe(1);
+      expect(await prisma.character.count({ where: { universeId: ids.universeId } })).toBe(0);
       expect(await prisma.externalBindingTeam.count()).toBe(0);
       expect(await prisma.externalBindingSeason.count()).toBe(0);
     } finally {
@@ -267,6 +295,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
           nationality: "British",
           birthDate: new Date("1999-11-13"),
           userId: ids.userId,
+          universeId: ids.universeId,
         },
       });
       const profile = await prisma.driverProfile.create({
@@ -274,6 +303,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
       await prisma.externalBindingDriver.create({
         data: {
+          universeId: ids.universeId,
           externalDriverId: ids.extLandoId,
           characterId: character.id,
           confidence: "CONFIRMED",
@@ -297,11 +327,18 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
 
       const binding = await prisma.externalBindingDriver.findUniqueOrThrow({
-        where: { externalDriverId: ids.extLandoId },
+        where: {
+          universeId_externalDriverId: {
+            universeId: ids.universeId,
+            externalDriverId: ids.extLandoId,
+          },
+        },
       });
       expect(binding.characterId).toBe(character.id);
       expect(binding.confidence).toBe("CONFIRMED");
-      expect(await prisma.character.count({ where: { userId: ids.userId } })).toBe(3);
+      expect(
+        await prisma.character.count({ where: { universeId: ids.universeId } }),
+      ).toBe(3);
 
       const entry = await prisma.seasonDriverEntry.findUnique({
         where: { seasonId_driverProfileId: { seasonId: ids.seasonId, driverProfileId: profile.id } },
@@ -327,11 +364,13 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
           nationality: "British",
           birthDate: new Date("1999-11-13"),
           userId: ids.userId,
+          universeId: ids.universeId,
         },
       });
       await prisma.driverProfile.create({ data: { characterId: character.id, number: 2 } });
       await prisma.externalBindingDriver.create({
         data: {
+          universeId: ids.universeId,
           externalDriverId: ids.extLandoId,
           characterId: character.id,
           confidence: "SUGGESTED",
@@ -348,7 +387,12 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
 
       const binding = await prisma.externalBindingDriver.findUniqueOrThrow({
-        where: { externalDriverId: ids.extLandoId },
+        where: {
+          universeId_externalDriverId: {
+            universeId: ids.universeId,
+            externalDriverId: ids.extLandoId,
+          },
+        },
       });
       expect(binding.confidence).toBe("SUGGESTED");
       expect(binding.characterId).toBe(character.id);
@@ -365,7 +409,13 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
     actor.id = ids.userId;
     try {
       const redBull = await prisma.team.create({
-        data: { name: "Red Bull", shortName: "RBR", color: "#1e41ff", userId: ids.userId },
+        data: {
+          name: "Red Bull",
+          shortName: "RBR",
+          color: "#1e41ff",
+          userId: ids.userId,
+          universeId: ids.universeId,
+        },
       });
       const oscar = await prisma.character.create({
         data: {
@@ -373,6 +423,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
           nationality: "Australian",
           birthDate: new Date("2001-04-06"),
           userId: ids.userId,
+          universeId: ids.universeId,
         },
       });
       const oscarProfile = await prisma.driverProfile.create({
@@ -380,6 +431,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
       await prisma.externalBindingDriver.create({
         data: {
+          universeId: ids.universeId,
           externalDriverId: ids.extOscarId,
           characterId: oscar.id,
           confidence: "CONFIRMED",
@@ -408,7 +460,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
         statusCode: 409,
       });
 
-      expect(await prisma.team.count({ where: { userId: ids.userId } })).toBe(1);
+      expect(await prisma.team.count({ where: { universeId: ids.universeId } })).toBe(1);
       expect(await prisma.seasonDriverEntry.count({ where: { seasonId: ids.seasonId } })).toBe(1);
       expect(await prisma.externalBindingDriver.count()).toBe(1);
       expect(await prisma.externalBindingSeason.count()).toBe(0);
@@ -423,10 +475,17 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
     actor.id = ids.userId;
     try {
       const team = await prisma.team.create({
-        data: { name: "McLaren", shortName: "MCL", color: "#ff8000", userId: ids.userId },
+        data: {
+          name: "McLaren",
+          shortName: "MCL",
+          color: "#ff8000",
+          userId: ids.userId,
+          universeId: ids.universeId,
+        },
       });
       await prisma.externalBindingTeam.create({
         data: {
+          universeId: ids.universeId,
           externalTeamId: ids.extTeamId,
           teamId: team.id,
           confidence: "CONFIRMED",
@@ -439,6 +498,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
           nationality: "British",
           birthDate: new Date("1999-11-13"),
           userId: ids.userId,
+          universeId: ids.universeId,
         },
       });
       const landoProfile = await prisma.driverProfile.create({
@@ -446,6 +506,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
       await prisma.externalBindingDriver.create({
         data: {
+          universeId: ids.universeId,
           externalDriverId: ids.extLandoId,
           characterId: lando.id,
           confidence: "CONFIRMED",
@@ -503,6 +564,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
           nationality: "Australian",
           birthDate: new Date("2001-04-06"),
           userId: ids.userId,
+          universeId: ids.universeId,
         },
       });
       const oscarProfile = await prisma.driverProfile.create({
@@ -510,6 +572,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
       await prisma.externalBindingDriver.create({
         data: {
+          universeId: ids.universeId,
           externalDriverId: ids.extOscarId,
           characterId: oscar.id,
           confidence: "CONFIRMED",
@@ -549,10 +612,16 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
     const fixture = await seedUniverseInitFixture(2031);
     const { ids, cleanup } = fixture;
     actor.id = ids.userId;
-    const worldBefore = await snapshotWorldState();
+    const worldBefore = await snapshotWorldState(ids.universeId);
     try {
       const redBull = await prisma.team.create({
-        data: { name: "Red Bull", shortName: "RBR", color: "#1e41ff", userId: ids.userId },
+        data: {
+          name: "Red Bull",
+          shortName: "RBR",
+          color: "#1e41ff",
+          userId: ids.userId,
+          universeId: ids.universeId,
+        },
       });
       const oscar = await prisma.character.create({
         data: {
@@ -560,6 +629,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
           nationality: "Australian",
           birthDate: new Date("2001-04-06"),
           userId: ids.userId,
+          universeId: ids.universeId,
         },
       });
       const oscarProfile = await prisma.driverProfile.create({
@@ -567,6 +637,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       });
       await prisma.externalBindingDriver.create({
         data: {
+          universeId: ids.universeId,
           externalDriverId: ids.extOscarId,
           characterId: oscar.id,
           confidence: "CONFIRMED",
@@ -596,7 +667,7 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
       for (const model of Object.keys(before)) {
         expect(after[model]).toBe(before[model]);
       }
-      const worldAfter = await snapshotWorldState();
+      const worldAfter = await snapshotWorldState(ids.universeId);
       if (worldBefore) {
         expect(worldAfter?.currentSeasonId).toBe(worldBefore.currentSeasonId ?? null);
         expect(String(worldAfter?.currentDate)).toBe(String(worldBefore.currentDate));

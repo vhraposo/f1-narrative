@@ -153,6 +153,7 @@ describe("ReconciliationService — candidatos e ciclo de vida de vínculos (202
     await expect(
       prisma.externalBindingDriver.create({
         data: {
+          universeId: ids.universeId,
           externalDriverId: ids.extOscarId,
           characterId: ids.characterLandoId,
           confidence: "SUGGESTED",
@@ -215,7 +216,12 @@ describe("ReconciliationService — candidatos e ciclo de vida de vínculos (202
     ).toBe(3);
 
     const saved = await prisma.externalBindingDriver.findUniqueOrThrow({
-      where: { externalDriverId: ids.extLandoId },
+      where: {
+        universeId_externalDriverId: {
+          universeId: ids.universeId,
+          externalDriverId: ids.extLandoId,
+        },
+      },
     });
     expect(saved.confidence).toBe("CONFIRMED");
     expect(saved.characterId).toBe(ids.characterLandoId);
@@ -232,7 +238,12 @@ describe("ReconciliationService — candidatos e ciclo de vida de vínculos (202
     ).rejects.toMatchObject({ code: "ALREADY_BOUND" });
 
     const saved = await prisma.externalBindingDriver.findUniqueOrThrow({
-      where: { externalDriverId: ids.extLandoId },
+      where: {
+        universeId_externalDriverId: {
+          universeId: ids.universeId,
+          externalDriverId: ids.extLandoId,
+        },
+      },
     });
     expect(saved.characterId).toBe(ids.characterLandoId);
     expect(saved.confidence).toBe("CONFIRMED");
@@ -449,10 +460,6 @@ describe("Reconciliation routes — endpoints (2028)", () => {
   let cleanup: () => Promise<void>;
 
   beforeAll(async () => {
-    const fixture = await seedReconciliationFixture(2028);
-    ids = fixture.ids;
-    cleanup = fixture.cleanup;
-
     app = buildApp(undefined, undefined, makeDummyClient());
     await app.ready();
 
@@ -464,6 +471,15 @@ describe("Reconciliation routes — endpoints (2028)", () => {
     const userEmail = `recon-user-${Date.now()}@f1nw.test`;
     userCookie = await signUpGetCookie(app, userEmail, "Recon User");
 
+    const fixture = await seedReconciliationFixture(2028);
+    ids = fixture.ids;
+    cleanup = fixture.cleanup;
+
+    const adminUniverse = await prisma.universe.upsert({
+      where: { userId: admin.id },
+      update: {},
+      create: { userId: admin.id },
+    });
     await prisma.character.updateMany({
       where: {
         id: {
@@ -475,7 +491,7 @@ describe("Reconciliation routes — endpoints (2028)", () => {
           ],
         },
       },
-      data: { userId: admin.id },
+      data: { userId: admin.id, universeId: adminUniverse.id },
     });
   });
 

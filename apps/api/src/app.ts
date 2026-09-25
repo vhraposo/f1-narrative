@@ -53,6 +53,7 @@ import jolpicaSyncRoutes, {
   type JolpicaSyncRoutesOptions,
 } from "./modules/external-sync/jolpica.routes.js";
 import reconciliationRoutes from "./modules/reconciliation/reconciliation.routes.js";
+import universeRoutes from "./modules/universe/universe.routes.js";
 import universeInitRoutes from "./modules/universe-init/universe-init.routes.js";
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
@@ -192,6 +193,7 @@ export function buildApp(
   };
   void app.register(openF1EnrichmentRoutes, openF1Options);
   void app.register(reconciliationRoutes);
+  void app.register(universeRoutes);
   void app.register(universeInitRoutes);
   void app.register(playerEntryRoutes);
   void app.register(universeEditorRoutes);

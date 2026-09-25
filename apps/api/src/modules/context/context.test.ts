@@ -171,19 +171,33 @@ async function createRelationship(
   return track(createdRelationshipIds, res.json().relationship as { id: string });
 }
 
-async function resetWorld(next: {
-  currentDate?: Date;
-  currentSeasonId?: string | null;
-  currentRaceId?: string | null;
-}): Promise<void> {
+async function universeForUser(userId: string): Promise<string> {
+  const universe = await prisma.universe.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
+  return universe.id;
+}
+
+async function resetWorld(
+  userId: string,
+  next: {
+    currentDate?: Date;
+    currentSeasonId?: string | null;
+    currentRaceId?: string | null;
+  },
+): Promise<void> {
+  const universeId = await universeForUser(userId);
   await prisma.worldState.upsert({
-    where: { key: "default" },
+    where: { universeId_key: { universeId, key: "default" } },
     update: {
       ...(next.currentDate !== undefined ? { currentDate: next.currentDate } : {}),
       ...(next.currentSeasonId !== undefined ? { currentSeasonId: next.currentSeasonId } : {}),
       ...(next.currentRaceId !== undefined ? { currentRaceId: next.currentRaceId } : {}),
     },
     create: {
+      universeId,
       key: "default",
       ...(next.currentDate !== undefined ? { currentDate: next.currentDate } : {}),
       ...(next.currentSeasonId !== undefined ? { currentSeasonId: next.currentSeasonId } : {}),
@@ -583,7 +597,7 @@ describe("Context - WorldState", () => {
   });
 
   it("lê WorldState currentDate quando existir", async () => {
-    await resetWorld({ currentDate: new Date("2026-06-01T12:00:00Z") });
+    await resetWorld(owner.userId, { currentDate: new Date("2026-06-01T12:00:00Z") });
     const res = await getContext(owner, convId);
     expect(res.statusCode).toBe(200);
     const ctx = res.json.context!;
@@ -591,7 +605,7 @@ describe("Context - WorldState", () => {
   });
 
   it("corrige referência quebrada de currentSeasonId para null (sem escrever)", async () => {
-    await resetWorld({ currentSeasonId: randomUUID() });
+    await resetWorld(owner.userId, { currentSeasonId: randomUUID() });
     const res = await getContext(owner, convId);
     const ctx = res.json.context!;
     expect(ctx.temporal.currentSeasonId).toBeNull();
@@ -603,7 +617,7 @@ describe("Context - WorldState", () => {
   });
 
   it("corrige referência quebrada de currentRaceId para null (sem escrever)", async () => {
-    await resetWorld({ currentRaceId: randomUUID() });
+    await resetWorld(owner.userId, { currentRaceId: randomUUID() });
     const res = await getContext(owner, convId);
     const ctx = res.json.context!;
     expect(ctx.temporal.currentRaceId).toBeNull();
@@ -638,16 +652,26 @@ describe("Context - motorsport", () => {
       birthDate: "1995-01-01",
     });
 
+    const ownerUniverseId = await universeForUser(owner.userId);
     const team = track(
       createdTeamIds,
       await prisma.team.create({
-        data: { name: `Team ${suffix}`, userId: owner.userId },
+        data: {
+          name: `Team ${suffix}`,
+          userId: owner.userId,
+          universeId: ownerUniverseId,
+        },
       }),
     );
     const season = track(
       createdSeasonIds,
       await prisma.season.create({
-        data: { year: 2026, name: "2026 Championship", status: "ACTIVE" },
+        data: {
+          universeId: ownerUniverseId,
+          year: 2026,
+          name: "2026 Championship",
+          status: "ACTIVE",
+        },
       }),
     );
     const race = track(
@@ -681,7 +705,7 @@ describe("Context - motorsport", () => {
         },
       }),
     );
-    await resetWorld({ currentSeasonId: season.id });
+    await resetWorld(owner.userId, { currentSeasonId: season.id });
 
     const conv1 = await createConversation(owner, {
       type: "GROUP",
@@ -875,7 +899,7 @@ describe("Context - determinismo", () => {
         { conversationId: convId, senderType: "USER_CHARACTER", characterId: charA.id, content: "d3", createdAt: new Date("2026-08-01T08:00:02Z") },
       ],
     });
-    await resetWorld({ currentDate: new Date("2026-08-01T00:00:00Z") });
+    await resetWorld(owner.userId, { currentDate: new Date("2026-08-01T00:00:00Z") });
   });
 
   it("duas execuções produzem o mesmo frame (só assembledAt difere)", async () => {

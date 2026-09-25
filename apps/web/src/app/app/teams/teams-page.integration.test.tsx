@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api";
@@ -26,6 +26,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
     remove: apiMock.remove,
   };
 });
+
+vi.mock("@/providers/session-provider", () => ({
+  useSession: () => ({ data: { user: { id: "u1" }, session: null } }),
+}));
 
 function makeTeam(overrides: Partial<Team> = {}): Team {
   return {
@@ -188,8 +192,31 @@ describe("Teams Page - constructors", () => {
     renderWithClient(<TeamsPage />);
 
     expect(
-      await screen.findByText("Você ainda não tem equipes."),
+      await screen.findByText("Nenhuma equipe no universo."),
     ).toBeDefined();
+  });
+
+  it("equipe de outro usuário aparece, mas sem ações de edição/remoção", async () => {
+    teamsFixture = [
+      makeTeam(),
+      makeTeam({ id: "t9", name: "Equipe Alheia", shortName: null, userId: "u9" }),
+    ];
+    renderWithClient(<TeamsPage />);
+
+    await screen.findByText("Equipe Alheia");
+    const own = screen.getByText("Ferrari").closest("article") as HTMLElement;
+    const other = screen
+      .getByText("Equipe Alheia")
+      .closest("article") as HTMLElement;
+    expect(
+      within(own).getByRole("button", { name: /Editar Ferrari/ }),
+    ).toBeDefined();
+    expect(
+      within(other).queryByRole("button", { name: /Editar Equipe Alheia/ }),
+    ).toBeNull();
+    expect(
+      within(other).queryByRole("button", { name: /Remover Equipe Alheia/ }),
+    ).toBeNull();
   });
 
   it("estado de erro: falha ao carregar as equipes", async () => {

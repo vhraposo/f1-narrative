@@ -44,7 +44,7 @@ describe("Universe Editor API — invariantes de vínculo de piloto (source matc
     const { ids, cleanup } = fixture;
 
     const ze = await prisma.character.create({
-      data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId },
+      data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId, universeId: ids.universeId },
     });
     const zeDriver = await prisma.driverProfile.create({ data: { characterId: ze.id, number: 44 } });
     const extZe = await prisma.externalDriver.create({
@@ -70,7 +70,7 @@ describe("Universe Editor API — invariantes de vínculo de piloto (source matc
     const { ids } = fixture;
 
     const ze = await prisma.character.create({
-      data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId },
+      data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId, universeId: ids.universeId },
     });
     const zeDriver = await prisma.driverProfile.create({ data: { characterId: ze.id, number: 44 } });
     const extZe = await prisma.externalDriver.create({
@@ -129,12 +129,12 @@ describe("Universe Editor API — invariantes de vínculo de piloto (source matc
     const { ids } = fixture;
 
     const ze = await prisma.character.create({
-      data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId },
+      data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId, universeId: ids.universeId },
     });
     const zeDriver = await prisma.driverProfile.create({ data: { characterId: ze.id, number: 44 } });
 
     const zeJr = await prisma.character.create({
-      data: { name: "Zé da Silva Jr", nationality: "Brasileira", birthDate: new Date("2002-02-02"), userId: ids.userId },
+      data: { name: "Zé da Silva Jr", nationality: "Brasileira", birthDate: new Date("2002-02-02"), userId: ids.userId, universeId: ids.universeId },
     });
     const zeJrDriver = await prisma.driverProfile.create({ data: { characterId: zeJr.id, number: 99 } });
 
@@ -166,7 +166,7 @@ describe("Universe Editor API — invariantes de vínculo de piloto (source matc
     const { ids } = fixture;
 
     const ze = await prisma.character.create({
-      data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId },
+      data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId, universeId: ids.universeId },
     });
     const zeDriver = await prisma.driverProfile.create({ data: { characterId: ze.id, number: 44 } });
     const extZe = await prisma.externalDriver.create({

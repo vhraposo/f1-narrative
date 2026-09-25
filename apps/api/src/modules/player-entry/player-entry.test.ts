@@ -21,26 +21,32 @@ async function createUser(email: string, name: string): Promise<User> {
   return { id: stored.id, cookie };
 }
 
-async function createSeason(year: number): Promise<{ id: string }> {
-  const season = await prisma.season.create({ data: { year } });
+async function createSeason(universeId: string, year: number): Promise<{ id: string }> {
+  const season = await prisma.season.create({ data: { universeId, year } });
   return { id: season.id };
 }
 
-async function setCurrentSeason(seasonId: string | null): Promise<void> {
+async function setCurrentSeason(
+  universeId: string,
+  seasonId: string | null,
+): Promise<void> {
   await prisma.worldState.upsert({
-    where: { key: WORLD_KEY },
+    where: { universeId_key: { universeId, key: WORLD_KEY } },
     update: { currentSeasonId: seasonId },
-    create: { key: WORLD_KEY, currentSeasonId: seasonId },
+    create: { universeId, key: WORLD_KEY, currentSeasonId: seasonId },
   });
 }
 
-async function readCurrentSeason(): Promise<string | null> {
-  const world = await prisma.worldState.findUnique({ where: { key: WORLD_KEY } });
+async function readCurrentSeason(universeId: string): Promise<string | null> {
+  const world = await prisma.worldState.findUnique({
+    where: { universeId_key: { universeId, key: WORLD_KEY } },
+  });
   return world?.currentSeasonId ?? null;
 }
 
 type Fixture = {
   ids: {
+    universeId: string;
     seasonId: string;
     teamId: string;
     extSeasonId: string;
@@ -56,18 +62,34 @@ type Fixture = {
 
 async function seedUniverse2026(userId: string): Promise<Fixture> {
   const runId = Math.random().toString(36).slice(2, 8);
+  const universe = await prisma.universe.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
 
   const season = await prisma.season.create({
-    data: { year: YEAR, name: String(YEAR), status: "PRE_SEASON" },
+    data: {
+      universeId: universe.id,
+      year: YEAR,
+      name: String(YEAR),
+      status: "PRE_SEASON",
+    },
   });
   const team = await prisma.team.create({
-    data: { name: "McLaren", shortName: "MCL", color: "#ff8000", userId },
+    data: {
+      name: "McLaren",
+      shortName: "MCL",
+      color: "#ff8000",
+      userId,
+      universeId: universe.id,
+    },
   });
   const characterLando = await prisma.character.create({
-    data: { name: "Lando Norris", nationality: "British", birthDate: new Date("1999-11-13"), userId },
+    data: { name: "Lando Norris", nationality: "British", birthDate: new Date("1999-11-13"), userId, universeId: universe.id },
   });
   const characterOscar = await prisma.character.create({
-    data: { name: "Oscar Piastri", nationality: "Australian", birthDate: new Date("2001-04-06"), userId },
+    data: { name: "Oscar Piastri", nationality: "Australian", birthDate: new Date("2001-04-06"), userId, universeId: universe.id },
   });
   const driverLando = await prisma.driverProfile.create({
     data: { characterId: characterLando.id, number: 1, teamId: team.id },
@@ -130,22 +152,22 @@ async function seedUniverse2026(userId: string): Promise<Fixture> {
   });
 
   await prisma.externalBindingSeason.create({
-    data: { externalSeasonId: extSeason.id, seasonId: season.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalSeasonId: extSeason.id, seasonId: season.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingTeam.create({
-    data: { externalTeamId: extTeam.id, teamId: team.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalTeamId: extTeam.id, teamId: team.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingDriver.create({
-    data: { externalDriverId: extLando.id, characterId: characterLando.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalDriverId: extLando.id, characterId: characterLando.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingDriver.create({
-    data: { externalDriverId: extOscar.id, characterId: characterOscar.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalDriverId: extOscar.id, characterId: characterOscar.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingDriverSeason.create({
-    data: { externalDriverSeasonId: dsLando.id, seasonDriverEntryId: entryLando.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalDriverSeasonId: dsLando.id, seasonDriverEntryId: entryLando.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingDriverSeason.create({
-    data: { externalDriverSeasonId: dsOscar.id, seasonDriverEntryId: entryOscar.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalDriverSeasonId: dsOscar.id, seasonDriverEntryId: entryOscar.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
 
   const cleanup = async () => {
@@ -172,6 +194,7 @@ async function seedUniverse2026(userId: string): Promise<Fixture> {
 
   return {
     ids: {
+      universeId: universe.id,
       seasonId: season.id,
       teamId: team.id,
       extSeasonId: extSeason.id,
@@ -320,7 +343,7 @@ describe("Player Entry routes — setup (antes das mutações)", () => {
   });
 
   it("POST /api/universe/player-entry com temporada não vinculada → 409", async () => {
-    const orphan = await createSeason(2025);
+    const orphan = await createSeason(fixture.ids.universeId, 2025);
     const res = await postEntry(user, { seasonId: orphan.id, teamId: fixture.ids.teamId, seat: 1, name: "Alicya Orphan" });
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("SEASON_NOT_BOUND");
@@ -353,12 +376,16 @@ describe("Player Entry — criação (A/B/G/H)", () => {
   });
 
   it("B) entra na equipe do universo existente (sem criar time)", async () => {
-    const teamsBefore = await prisma.team.count({ where: { userId: user.id } });
+    const teamsBefore = await prisma.team.count({
+      where: { universeId: fixture.ids.universeId },
+    });
     const res = await postEntry(user, { seasonId: fixture.ids.seasonId, teamId: fixture.ids.teamId, seat: 1, name: "Alicya B" });
     expect(res.statusCode).toBe(201);
     const result = res.json() as PostResult;
     expect(result.entry.teamId).toBe(fixture.ids.teamId);
-    const teamsAfter = await prisma.team.count({ where: { userId: user.id } });
+    const teamsAfter = await prisma.team.count({
+      where: { universeId: fixture.ids.universeId },
+    });
     expect(teamsAfter).toBe(teamsBefore);
   });
 
@@ -371,7 +398,7 @@ describe("Player Entry — criação (A/B/G/H)", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("TEAM_NOT_MIRRORED");
     await prisma.externalBindingTeam.create({
-      data: { externalTeamId: fixture.ids.extTeamId, teamId: fixture.ids.teamId, confidence: "CONFIRMED", boundBy: "ADMIN" },
+      data: { universeId: fixture.ids.universeId, externalTeamId: fixture.ids.extTeamId, teamId: fixture.ids.teamId, confidence: "CONFIRMED", boundBy: "ADMIN" },
     });
   });
 
@@ -482,8 +509,17 @@ describe("Player Entry — bloqueios (F/K)", () => {
   });
 
   it("K) rollback transacional: equipe de outro usuário aborta tudo", async () => {
+    const intruderUniverse = await prisma.universe.upsert({
+      where: { userId: intruder.id },
+      update: {},
+      create: { userId: intruder.id },
+    });
     const strangerTeam = await prisma.team.create({
-      data: { name: "Equipe Alheia", userId: intruder.id },
+      data: {
+        name: "Equipe Alheia",
+        userId: intruder.id,
+        universeId: intruderUniverse.id,
+      },
     });
     const charactersBefore = await prisma.character.count({ where: { userId: user.id } });
     const entriesBefore = await prisma.seasonDriverEntry.count({
@@ -509,13 +545,19 @@ describe("Player Entry — multi-equipes e fonte externa (J)", () => {
   it("J) segundo personagem entra em outra equipe na mesma temporada", async () => {
     const runId = Math.random().toString(36).slice(2, 8);
     const ferrari = await prisma.team.create({
-      data: { name: "Ferrari", shortName: "FER", color: "#dc0000", userId: user.id },
+      data: {
+        name: "Ferrari",
+        shortName: "FER",
+        color: "#dc0000",
+        userId: user.id,
+        universeId: fixture.ids.universeId,
+      },
     });
     const extFerrari = await prisma.externalTeam.create({
       data: { source: JOLPICA_SOURCE, externalId: `ferrari-pe-${runId}`, name: "Ferrari", shortName: "FER", color: "#dc0000", contentHash: "pe-ext-ferrari" },
     });
     await prisma.externalBindingTeam.create({
-      data: { externalTeamId: extFerrari.id, teamId: ferrari.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+      data: { universeId: fixture.ids.universeId, externalTeamId: extFerrari.id, teamId: ferrari.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
     });
 
     const mcl = await postEntry(user, { seasonId: fixture.ids.seasonId, teamId: fixture.ids.teamId, seat: 2, name: "Alicya J-Mcl" });
@@ -536,8 +578,8 @@ describe("Player Entry — multi-equipes e fonte externa (J)", () => {
 
 describe("Player Entry — cache WorldState (L/M)", () => {
   it("L) temporada corrente sincroniza o cache DriverProfile.teamId", async () => {
-    const original = await readCurrentSeason();
-    await setCurrentSeason(fixture.ids.seasonId);
+    const original = await readCurrentSeason(fixture.ids.universeId);
+    await setCurrentSeason(fixture.ids.universeId, fixture.ids.seasonId);
 
     const res = await postEntry(user, { seasonId: fixture.ids.seasonId, teamId: fixture.ids.teamId, seat: 1, name: "Alicya L" });
     expect(res.statusCode).toBe(201);
@@ -550,13 +592,13 @@ describe("Player Entry — cache WorldState (L/M)", () => {
     });
     expect(cached?.teamId).toBe(fixture.ids.teamId);
 
-    await setCurrentSeason(original);
+    await setCurrentSeason(fixture.ids.universeId, original);
   });
 
   it("M) temporada não corrente NÃO atualiza o cache teamId", async () => {
-    const original = await readCurrentSeason();
-    const otherSeason = await createSeason(2027);
-    await setCurrentSeason(otherSeason.id);
+    const original = await readCurrentSeason(fixture.ids.universeId);
+    const otherSeason = await createSeason(fixture.ids.universeId, 2027);
+    await setCurrentSeason(fixture.ids.universeId, otherSeason.id);
 
     const res = await postEntry(user, { seasonId: fixture.ids.seasonId, teamId: fixture.ids.teamId, seat: 1, name: "Alicya M" });
     expect(res.statusCode).toBe(201);
@@ -569,7 +611,7 @@ describe("Player Entry — cache WorldState (L/M)", () => {
     expect(cached?.teamId).toBeNull();
     await prisma.season.delete({ where: { id: otherSeason.id } });
 
-    await setCurrentSeason(original);
+    await setCurrentSeason(fixture.ids.universeId, original);
   });
 });
 
@@ -598,7 +640,13 @@ describe("Player Entry — re-contratação do deslocado (HOTFIX G)", () => {
     expect(before?.teamId).toBeNull();
 
     const newTeam = await prisma.team.create({
-      data: { name: "Equipe Nova", shortName: "NOV", color: "#123456", userId: user.id },
+      data: {
+        name: "Equipe Nova",
+        shortName: "NOV",
+        color: "#123456",
+        userId: user.id,
+        universeId: fixture.ids.universeId,
+      },
     });
 
     const res = await app.inject({

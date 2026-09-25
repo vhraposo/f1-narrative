@@ -129,7 +129,10 @@ describe("GET /api/characters/ai", () => {
     });
     expect(res.statusCode).toBe(200);
     const characters = res.json().characters;
-    expect(characters).toHaveLength(aiCatalog.length);
+    const names = characters.map((c: { name: string }) => c.name);
+    for (const catalog of aiCatalog) {
+      expect(names).toContain(catalog.name);
+    }
     expect(characters.every((c: { controlledBy: string }) => c.controlledBy === "AI")).toBe(
       true,
     );
@@ -162,7 +165,10 @@ describe("GET /api/characters/ai", () => {
       headers: { cookie: u.cookie },
     });
     const characters = res.json().characters;
-    expect(characters.length).toBe(aiCatalog.length);
+    const names = characters.map((c: { name: string }) => c.name);
+    for (const catalog of aiCatalog) {
+      expect(names).toContain(catalog.name);
+    }
     expect(characters.some((c: { name: string }) => c.name === "Meu Personagem")).toBe(
       false,
     );

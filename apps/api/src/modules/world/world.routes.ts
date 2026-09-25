@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 import { rosterService } from "../roster/roster.service.js";
 import { updateWorldSchema } from "./world.schema.js";
 
@@ -16,29 +17,41 @@ const worldSelect = {
   updatedAt: true,
 } as const;
 
-async function resolveWorld() {
-  return prisma.worldState.upsert({
-    where: { key: WORLD_KEY },
-    update: {},
-    create: { key: WORLD_KEY },
-    select: worldSelect,
-  });
+async function resolveWorld(userId: string) {
+  const universe = await ensureUniverse(userId);
+  try {
+    return await prisma.worldState.upsert({
+      where: { universeId_key: { universeId: universe.id, key: WORLD_KEY } },
+      update: {},
+      create: { universeId: universe.id, key: WORLD_KEY },
+      select: worldSelect,
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2002") {
+      return prisma.worldState.findUniqueOrThrow({
+        where: { universeId_key: { universeId: universe.id, key: WORLD_KEY } },
+        select: worldSelect,
+      });
+    }
+    throw error;
+  }
 }
 
 async function findInvalidReference(
+  universeId: string,
   seasonId: string | null | undefined,
   raceId: string | null | undefined,
 ): Promise<string | null> {
   if (seasonId) {
-    const season = await prisma.season.findUnique({
-      where: { id: seasonId },
+    const season = await prisma.season.findFirst({
+      where: { id: seasonId, universeId },
       select: { id: true },
     });
     if (!season) return "Temporada não encontrada";
   }
   if (raceId) {
-    const race = await prisma.race.findUnique({
-      where: { id: raceId },
+    const race = await prisma.race.findFirst({
+      where: { id: raceId, season: { universeId } },
       select: { id: true },
     });
     if (!race) return "Corrida não encontrada";
@@ -50,8 +63,8 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/api/world",
     { preHandler: [fastify.authenticate] },
-    async () => {
-      const world = await resolveWorld();
+    async (request) => {
+      const world = await resolveWorld(request.user!.id);
       return { world };
     },
   );
@@ -69,7 +82,9 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const universe = await ensureUniverse(request.user!.id);
       const invalid = await findInvalidReference(
+        universe.id,
         parsed.data.currentSeasonId,
         parsed.data.currentRaceId,
       );
@@ -81,7 +96,7 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const world = await prisma.worldState.upsert({
-        where: { key: WORLD_KEY },
+        where: { universeId_key: { universeId: universe.id, key: WORLD_KEY } },
         update: {
           ...(parsed.data.currentDate !== undefined
             ? { currentDate: new Date(parsed.data.currentDate) }
@@ -97,6 +112,7 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
             : {}),
         },
         create: {
+          universeId: universe.id,
           key: WORLD_KEY,
           ...(parsed.data.currentDate !== undefined
             ? { currentDate: new Date(parsed.data.currentDate) }
@@ -115,7 +131,7 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       if (parsed.data.currentSeasonId !== undefined) {
-        await rosterService.resyncAllDriverTeamCaches();
+        await rosterService.resyncAllDriverTeamCaches(universe.id);
       }
 
       return reply.send({ world });

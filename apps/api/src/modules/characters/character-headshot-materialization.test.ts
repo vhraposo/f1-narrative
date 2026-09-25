@@ -25,9 +25,15 @@ async function createCharacter(
   name: string,
   imageUrl: string | null,
 ): Promise<{ id: string }> {
+  const universe = await prisma.universe.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
   const character = await prisma.character.create({
     data: {
       userId,
+      universeId: universe.id,
       name,
       nationality: "Brasileira",
       birthDate: new Date("1990-01-01"),
@@ -54,7 +60,17 @@ async function createExternalDriver(headshotUrl: string | null): Promise<{ id: s
 }
 
 async function createBinding(characterId: string, externalDriverId: string) {
-  return prisma.externalBindingDriver.create({ data: { characterId, externalDriverId } });
+  const character = await prisma.character.findUniqueOrThrow({
+    where: { id: characterId },
+    select: { universeId: true },
+  });
+  return prisma.externalBindingDriver.create({
+    data: {
+      universeId: character.universeId!,
+      characterId,
+      externalDriverId,
+    },
+  });
 }
 
 afterAll(async () => {

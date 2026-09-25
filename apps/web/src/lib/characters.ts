@@ -84,14 +84,3 @@ export function updateCharacter(
 export function deleteCharacter(id: string): Promise<void> {
   return remove<void>(`/api/characters/${id}`);
 }
-
-type SwitchControlResponse = {
-  character: Character;
-  releasedCount: number;
-};
-
-export function switchCharacterControl(id: string): Promise<SwitchControlResponse> {
-  return post<SwitchControlResponse>(`/api/characters/${id}/switch-control`, {}).then(
-    (r) => r,
-  );
-}

@@ -5,6 +5,7 @@ export const RECON_YEAR = 2026;
 
 export interface ReconFixtureIds {
   userId: string;
+  universeId: string;
   characterLandoId: string;
   characterAlicyaId: string;
   characterReserveXId: string;
@@ -75,18 +76,19 @@ export async function seedReconciliationFixture(
   const user = await prisma.user.create({
     data: { name: "Recon Admin", email: `recon-admin-${Date.now()}@f1nw.test`, password: "x" },
   });
+  const universe = await prisma.universe.create({ data: { userId: user.id } });
 
   const characterLando = await prisma.character.create({
-    data: { name: "Lando Norris", nationality: "British", birthDate: new Date("1999-11-13"), userId: user.id },
+    data: { name: "Lando Norris", nationality: "British", birthDate: new Date("1999-11-13"), userId: user.id, universeId: universe.id },
   });
   const characterAlicya = await prisma.character.create({
-    data: { name: "Alicya Piastri", nationality: "Australian", birthDate: new Date("2001-04-06"), userId: user.id },
+    data: { name: "Alicya Piastri", nationality: "Australian", birthDate: new Date("2001-04-06"), userId: user.id, universeId: universe.id },
   });
   const characterReserveX = await prisma.character.create({
-    data: { name: "Reserve X", nationality: "Unknown", birthDate: new Date("2000-01-01"), userId: user.id },
+    data: { name: "Reserve X", nationality: "Unknown", birthDate: new Date("2000-01-01"), userId: user.id, universeId: universe.id },
   });
   const characterOscar = await prisma.character.create({
-    data: { name: "Oscar Piastri", nationality: "Australian", birthDate: new Date("2001-04-06"), userId: user.id },
+    data: { name: "Oscar Piastri", nationality: "Australian", birthDate: new Date("2001-04-06"), userId: user.id, universeId: universe.id },
   });
 
   const driverLando = await prisma.driverProfile.create({
@@ -103,11 +105,22 @@ export async function seedReconciliationFixture(
   });
 
   const team = await prisma.team.create({
-    data: { name: "McLaren", shortName: "MCL", color: "#ff8000", userId: user.id },
+    data: {
+      name: "McLaren",
+      shortName: "MCL",
+      color: "#ff8000",
+      userId: user.id,
+      universeId: universe.id,
+    },
   });
 
   const season = await prisma.season.create({
-    data: { year: year, name: String(year), status: "PRE_SEASON" },
+    data: {
+      universeId: universe.id,
+      year: year,
+      name: String(year),
+      status: "PRE_SEASON",
+    },
   });
 
   const entryLando = await prisma.seasonDriverEntry.create({
@@ -216,6 +229,7 @@ export async function seedReconciliationFixture(
 
   const ids: ReconFixtureIds = {
     userId: user.id,
+    universeId: universe.id,
     characterLandoId: characterLando.id,
     characterAlicyaId: characterAlicya.id,
     characterReserveXId: characterReserveX.id,

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 import {
   driverCharacterIdParamSchema,
   driverListQuerySchema,
@@ -60,9 +61,10 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const universe = await ensureUniverse(userId);
       const [profiles, world] = await Promise.all([
         prisma.driverProfile.findMany({
-          where: { character: { userId } },
+          where: { character: { universeId: universe.id } },
           select: {
             id: true,
             characterId: true,
@@ -73,7 +75,7 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
           },
         }),
         prisma.worldState.findUnique({
-          where: { key: WORLD_KEY },
+          where: { universeId_key: { universeId: universe.id, key: WORLD_KEY } },
           select: { currentSeasonId: true },
         }),
       ]);
@@ -85,7 +87,7 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
           ? await prisma.seasonDriverEntry.findMany({
               where: {
                 seasonId,
-                driverProfile: { character: { userId } },
+                driverProfileId: { in: profiles.map((profile) => profile.id) },
               },
               select: {
                 driverProfileId: true,
@@ -105,7 +107,10 @@ export const driversRoutes: FastifyPluginAsync = async (fastify) => {
       const bindings =
         characterIds.length > 0
           ? await prisma.externalBindingDriver.findMany({
-              where: { characterId: { in: characterIds } },
+              where: {
+                characterId: { in: characterIds },
+                universeId: universe.id,
+              },
               select: {
                 characterId: true,
                 externalDriver: { select: { headshotUrl: true } },

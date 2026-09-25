@@ -90,31 +90,52 @@ async function logEvent(
   });
 }
 
-async function assertTeamOwned(tx: Tx, teamId: string, userId: string): Promise<void> {
-  const team = await tx.team.findFirst({
-    where: { id: teamId, userId },
+async function universeIdForUser(tx: Tx, userId: string): Promise<string | null> {
+  const universe = await tx.universe.findUnique({
+    where: { userId },
     select: { id: true },
   });
+  return universe?.id ?? null;
+}
+
+async function assertTeamOwned(tx: Tx, teamId: string, userId: string): Promise<void> {
+  const universeId = await universeIdForUser(tx, userId);
+  const team = universeId
+    ? await tx.team.findFirst({
+        where: { id: teamId, universeId },
+        select: { id: true },
+      })
+    : null;
   if (!team) {
     throw new RosterError("TEAM_NOT_FOUND", "Equipe não encontrada", 404);
   }
 }
 
 async function assertDriverOwned(tx: Tx, driverProfileId: string, userId: string): Promise<void> {
-  const driver = await tx.driverProfile.findFirst({
-    where: { id: driverProfileId, character: { userId } },
-    select: { id: true },
-  });
+  const universeId = await universeIdForUser(tx, userId);
+  const driver = universeId
+    ? await tx.driverProfile.findFirst({
+        where: { id: driverProfileId, character: { universeId } },
+        select: { id: true },
+      })
+    : null;
   if (!driver) {
     throw new RosterError("DRIVER_NOT_FOUND", "Piloto não encontrado", 404);
   }
 }
 
-async function assertSeasonExists(tx: Tx, seasonId: string): Promise<void> {
-  const season = await tx.season.findUnique({
-    where: { id: seasonId },
-    select: { id: true },
-  });
+async function assertSeasonExists(
+  tx: Tx,
+  seasonId: string,
+  userId: string,
+): Promise<void> {
+  const universeId = await universeIdForUser(tx, userId);
+  const season = universeId
+    ? await tx.season.findFirst({
+        where: { id: seasonId, universeId },
+        select: { id: true },
+      })
+    : null;
   if (!season) {
     throw new RosterError("SEASON_NOT_FOUND", "Temporada não encontrada", 404);
   }
@@ -131,10 +152,17 @@ async function assertValidSeat(seat: number): Promise<void> {
 }
 
 async function syncCurrentTeamCache(tx: Tx, driverProfileId: string): Promise<void> {
-  const world = await tx.worldState.findUnique({
-    where: { key: WORLD_KEY },
-    select: { currentSeasonId: true },
+  const profile = await tx.driverProfile.findUnique({
+    where: { id: driverProfileId },
+    select: { character: { select: { universeId: true } } },
   });
+  const universeId = profile?.character.universeId ?? null;
+  const world = universeId
+    ? await tx.worldState.findUnique({
+        where: { universeId_key: { universeId, key: WORLD_KEY } },
+        select: { currentSeasonId: true },
+      })
+    : null;
   const seasonId = world?.currentSeasonId;
   if (!seasonId) {
     await tx.driverProfile.update({
@@ -194,7 +222,7 @@ export const rosterService = {
 
   async assignDriverToSeatInTx(tx: Tx, userId: string, input: AssignInput) {
       await assertValidSeat(input.seat);
-      await assertSeasonExists(tx, input.seasonId);
+      await assertSeasonExists(tx, input.seasonId, userId);
       await assertTeamOwned(tx, input.teamId, userId);
       await assertDriverOwned(tx, input.driverProfileId, userId);
 
@@ -279,7 +307,7 @@ export const rosterService = {
 
   async releaseDriver(userId: string, input: TeamInput) {
     return prisma.$transaction(async (tx) => {
-      await assertSeasonExists(tx, input.seasonId);
+      await assertSeasonExists(tx, input.seasonId, userId);
       await assertTeamOwned(tx, input.teamId, userId);
       await assertDriverOwned(tx, input.driverProfileId, userId);
 
@@ -313,7 +341,7 @@ export const rosterService = {
 
   async hireDriver(userId: string, input: HireInput) {
     return prisma.$transaction(async (tx) => {
-      await assertSeasonExists(tx, input.seasonId);
+      await assertSeasonExists(tx, input.seasonId, userId);
       await assertTeamOwned(tx, input.teamId, userId);
       await assertDriverOwned(tx, input.driverProfileId, userId);
 
@@ -413,7 +441,7 @@ export const rosterService = {
   async promoteReserve(userId: string, input: AssignInput) {
     await assertValidSeat(input.seat);
     return prisma.$transaction(async (tx) => {
-      await assertSeasonExists(tx, input.seasonId);
+      await assertSeasonExists(tx, input.seasonId, userId);
       await assertTeamOwned(tx, input.teamId, userId);
       await assertDriverOwned(tx, input.driverProfileId, userId);
 
@@ -507,14 +535,15 @@ export const rosterService = {
     }));
   },
 
-  async resyncAllDriverTeamCaches() {
+  async resyncAllDriverTeamCaches(universeId: string) {
     const world = await prisma.worldState.findUnique({
-      where: { key: WORLD_KEY },
+      where: { universeId_key: { universeId, key: WORLD_KEY } },
       select: { currentSeasonId: true },
     });
     const seasonId = world?.currentSeasonId ?? null;
     const profiles = await prisma.driverProfile.findMany({
       where: {
+        character: { universeId },
         OR: [
           { teamId: { not: null } },
           ...(seasonId

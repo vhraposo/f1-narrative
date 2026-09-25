@@ -192,6 +192,25 @@ describe("DriverCard", () => {
     expect(screen.getByRole("button", { name: /Remover/ })).toBeDefined();
   });
 
+  it("piloto de outro usuário (isOwned=false): somente leitura, sem links nem ações", () => {
+    const { container } = render(
+      <DriverCard
+        driver={makeDriver()}
+        onRemove={() => undefined}
+        isRemoving={false}
+        isOwned={false}
+      />,
+    );
+    expect(container.querySelector('a[href="/app/characters/c1"]')).toBeNull();
+    expect(screen.queryByRole("link", { name: /Editar perfil/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Remover/ })).toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Alicya Kucharski" }),
+    ).toBeDefined();
+    expect(screen.getByText("#81")).toBeDefined();
+    expect(screen.getByText("McLaren")).toBeDefined();
+  });
+
   it("confirma a remoção via ConfirmDialog", async () => {
     const user = userEvent.setup();
     const onRemove = vi.fn();

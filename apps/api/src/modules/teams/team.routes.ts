@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 import {
   createTeamSchema,
   teamIdParamSchema,
@@ -36,9 +37,9 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/teams",
     { preHandler: [fastify.authenticate] },
     async (request) => {
-      const userId = request.user!.id;
+      const universe = await ensureUniverse(request.user!.id);
       const teams = await prisma.team.findMany({
-        where: { userId },
+        where: { universeId: universe.id },
         select: teamSelect,
         orderBy: { createdAt: "asc" },
       });
@@ -61,7 +62,8 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const data = await buildTeamCreateInput(userId, parsed.data);
+        const universe = await ensureUniverse(userId);
+        const data = await buildTeamCreateInput(userId, universe.id, parsed.data);
         const team = await prisma.team.create({
           data,
           select: teamSelect,
@@ -92,8 +94,9 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const universe = await ensureUniverse(userId);
       const team = await prisma.team.findFirst({
-        where: { id: params.data.id, userId },
+        where: { id: params.data.id, universeId: universe.id },
         select: teamSelect,
       });
 
@@ -130,8 +133,9 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const universe = await ensureUniverse(userId);
       const existing = await prisma.team.findFirst({
-        where: { id: params.data.id, userId },
+        where: { id: params.data.id, universeId: universe.id },
         select: { id: true },
       });
 
@@ -175,8 +179,9 @@ export const teamsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const universe = await ensureUniverse(userId);
       const existing = await prisma.team.findFirst({
-        where: { id: params.data.id, userId },
+        where: { id: params.data.id, universeId: universe.id },
         select: { id: true },
       });
 

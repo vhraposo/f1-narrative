@@ -20,6 +20,7 @@ type DriverCardProps = {
   standing?: ChampionshipStanding | null;
   onRemove: (driver: Driver) => void;
   isRemoving: boolean;
+  isOwned?: boolean;
 };
 
 const editLinkStyles =
@@ -30,6 +31,7 @@ export function DriverCard({
   standing,
   onRemove,
   isRemoving,
+  isOwned = true,
 }: DriverCardProps) {
   const [confirming, setConfirming] = useState(false);
 
@@ -52,6 +54,79 @@ export function DriverCard({
     : null;
 
   const portraitUrl = driver.character.imageUrl ?? driver.headshotUrl;
+
+  const tileContent = (
+    <>
+      <div className="shrink-0">
+        <span
+          className="text-4xl font-black tabular-nums leading-none sm:text-5xl"
+          style={teamColor ? { color: teamColor } : undefined}
+        >
+          {formatDriverNumber(driver.number)}
+        </span>
+      </div>
+
+      <div className="min-w-0 flex-1 space-y-1">
+        <h3 className="truncate text-lg font-black leading-tight tracking-tight text-foreground sm:text-xl">
+          {driver.character.name}
+        </h3>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground sm:text-sm">
+          <span className="inline-flex items-center gap-1">
+            {nationalityInfo.iso && nationalityInfo.flagUrl && (
+              <CountryFlag
+                iso={nationalityInfo.iso}
+                label={`${nationalityInfo.countryName ?? driver.character.nationality} flag`}
+              />
+            )}
+            {driver.character.nationality}
+          </span>
+          {team && (
+            <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-foreground">
+              {teamColor && (
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: teamColor }}
+                />
+              )}
+              <span className="truncate">{team.name}</span>
+            </span>
+          )}
+        </p>
+        {performance && (
+          <p className="pt-0.5 text-xs font-semibold tabular-nums tracking-wide text-muted-foreground sm:text-sm">
+            {performance}
+          </p>
+        )}
+      </div>
+
+      <div className="hidden shrink-0 sm:block">
+        {portraitUrl ? (
+          <img
+            src={portraitUrl}
+            alt={driver.character.name}
+            className="h-16 w-20 rounded-lg object-cover"
+          />
+        ) : (
+          <div className="flex h-16 w-20 items-center justify-center rounded-lg bg-muted">
+            <span
+              aria-hidden="true"
+              className="text-xl font-black uppercase text-muted-foreground/40"
+            >
+              {initial}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {isOwned && (
+        <ArrowUpRight
+          aria-hidden="true"
+          className="absolute right-3 top-3 h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+        />
+      )}
+    </>
+  );
 
   return (
     <article
@@ -88,106 +163,51 @@ export function DriverCard({
       />
 
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col">
-        <Link
-          href={`/app/characters/${driver.characterId}`}
-          className="relative flex flex-1 items-center gap-4 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:gap-5 sm:p-5"
-        >
-          <div className="shrink-0">
-            <span
-              className="text-4xl font-black tabular-nums leading-none sm:text-5xl"
-              style={teamColor ? { color: teamColor } : undefined}
-            >
-              {formatDriverNumber(driver.number)}
-            </span>
-          </div>
-
-          <div className="min-w-0 flex-1 space-y-1">
-            <h3 className="truncate text-lg font-black leading-tight tracking-tight text-foreground sm:text-xl">
-              {driver.character.name}
-            </h3>
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground sm:text-sm">
-              <span className="inline-flex items-center gap-1">
-                {nationalityInfo.iso && nationalityInfo.flagUrl && (
-                  <CountryFlag
-                    iso={nationalityInfo.iso}
-                    label={`${nationalityInfo.countryName ?? driver.character.nationality} flag`}
-                  />
-                )}
-                {driver.character.nationality}
-              </span>
-              {team && (
-                <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-foreground">
-                  {teamColor && (
-                    <span
-                      aria-hidden="true"
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: teamColor }}
-                    />
-                  )}
-                  <span className="truncate">{team.name}</span>
-                </span>
-              )}
-            </p>
-            {performance && (
-              <p className="pt-0.5 text-xs font-semibold tabular-nums tracking-wide text-muted-foreground sm:text-sm">
-                {performance}
-              </p>
-            )}
-          </div>
-
-          <div className="hidden shrink-0 sm:block">
-            {portraitUrl ? (
-              <img
-                src={portraitUrl}
-                alt={driver.character.name}
-                className="h-16 w-20 rounded-lg object-cover"
-              />
-            ) : (
-              <div className="flex h-16 w-20 items-center justify-center rounded-lg bg-muted">
-                <span
-                  aria-hidden="true"
-                  className="text-xl font-black uppercase text-muted-foreground/40"
-                >
-                  {initial}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <ArrowUpRight
-            aria-hidden="true"
-            className="absolute right-3 top-3 h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-          />
-        </Link>
-
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-4 py-2.5">
+        {isOwned ? (
           <Link
             href={`/app/characters/${driver.characterId}`}
-            className={editLinkStyles}
+            className="relative flex flex-1 items-center gap-4 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:gap-5 sm:p-5"
           >
-            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-            Editar perfil
+            {tileContent}
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-destructive"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Remover
-          </Button>
-        </div>
+        ) : (
+          <div className="relative flex flex-1 items-center gap-4 p-4 sm:gap-5 sm:p-5">
+            {tileContent}
+          </div>
+        )}
+
+        {isOwned && (
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-4 py-2.5">
+            <Link
+              href={`/app/characters/${driver.characterId}`}
+              className={editLinkStyles}
+            >
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              Editar perfil
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() => setConfirming(true)}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Remover
+            </Button>
+          </div>
+        )}
       </div>
 
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title="Remover piloto"
-        description={`Deseja remover ${driver.character.name} da lista de pilotos? Essa alteração pode ser feita novamente pela ficha do personagem.`}
-        onConfirm={() => onRemove(driver)}
-        isPending={isRemoving}
-      />
+      {isOwned && (
+        <ConfirmDialog
+          open={confirming}
+          onClose={() => setConfirming(false)}
+          title="Remover piloto"
+          description={`Deseja remover ${driver.character.name} da lista de pilotos? Essa alteração pode ser feita novamente pela ficha do personagem.`}
+          onConfirm={() => onRemove(driver)}
+          isPending={isRemoving}
+        />
+      )}
     </article>
   );
 }

@@ -65,7 +65,7 @@ describe("UniverseInit — proteção do universo inicializado (2033)", () => {
 
   async function saveUniverseRefs() {
     const team = await prisma.team.findFirstOrThrow({
-      where: { userId: ids.userId },
+      where: { universeId: ids.universeId },
       select: { id: true },
     });
     universeTeamId = team.id;
@@ -75,10 +75,12 @@ describe("UniverseInit — proteção do universo inicializado (2033)", () => {
       select: { id: true },
     });
     universeRaceId = race.id;
-    universeLandoCharId = await prisma.character.findFirstOrThrow({
-      where: { userId: ids.userId, name: "Lando Norris" },
-      select: { id: true },
-    }).then((char) => char.id);
+    universeLandoCharId = await prisma.character
+      .findFirstOrThrow({
+        where: { universeId: ids.universeId, name: "Lando Norris" },
+        select: { id: true },
+      })
+      .then((char) => char.id);
   }
 
   beforeAll(async () => {

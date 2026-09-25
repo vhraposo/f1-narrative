@@ -166,6 +166,12 @@ enum DriverEntryEventKind {
 }
 
 /// Conta de acesso da aplicação.
+enum UniverseStatus {
+  PENDING
+  READY
+  FAILED
+}
+
 model User {
   id            String  @id @default(uuid()) @db.Uuid
   email         String  @unique
@@ -175,6 +181,7 @@ model User {
   emailVerified Boolean @default(false)
   image         String?
 
+  universe        Universe?
   characters      Character[]
   sessions        Session[]
   accounts        Account[]
@@ -182,6 +189,33 @@ model User {
   externalSources ExternalSource[]
 
   universeEditorDecisions UniverseEditorDecision[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Raiz do universo de um usuário: Season, Team, Character de piloto,
+/// WorldState e bindings de materialização pertencem a exatamente um Universe.
+/// O External Mirror permanece global/factual.
+model Universe {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @unique @db.Uuid
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    UniverseStatus @default(PENDING)
+  lastError String?
+
+  seasons     Season[]
+  teams       Team[]
+  characters  Character[]
+  worldStates WorldState[]
+
+  bindingDrivers       ExternalBindingDriver[]
+  bindingTeams         ExternalBindingTeam[]
+  bindingSeasons       ExternalBindingSeason[]
+  bindingRaces         ExternalBindingRace[]
+  bindingDriverSeasons ExternalBindingDriverSeason[]
+  bindingResults       ExternalBindingResult[]
+  bindingStandings     ExternalBindingStanding[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -245,6 +279,8 @@ model Character {
   id           String              @id @default(uuid()) @db.Uuid
   userId       String?             @db.Uuid
   user         User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  universeId   String?             @db.Uuid
+  universe     Universe?           @relation(fields: [universeId], references: [id], onDelete: Cascade)
   controlledBy CharacterController @default(USER)
 
   name        String
@@ -276,6 +312,7 @@ model Character {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([universeId])
 }
 
 /// Perfil esportivo de um Character que é piloto (0..1 por personagem).
@@ -322,11 +359,15 @@ model Team {
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, name])
+  @@unique([universeId, name])
   @@index([userId])
+  @@index([universeId])
 }
 
 /// Temporada do campeonato.
@@ -337,6 +378,9 @@ model Season {
   status SeasonStatus @default(PRE_SEASON)
 
   provenance Provenance @default(CANONICAL)
+
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
 
   races                 Race[]
   championshipStandings ChampionshipStanding[]
@@ -351,8 +395,8 @@ model Season {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Não há @@unique([year]) global: múltiplos universos/linhas temporais
-  // podem coexistir no futuro, portanto o ano não é globalmente único.
+  @@unique([universeId, year])
+  @@index([universeId])
 }
 
 /// Corrida do calendário de uma temporada.
@@ -683,7 +727,9 @@ model ExternalStanding {
 
 model ExternalBindingDriver {
   id               String            @id @default(uuid()) @db.Uuid
-  externalDriverId String            @unique @db.Uuid
+  universeId       String            @db.Uuid
+  universe         Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalDriverId String            @db.Uuid
   externalDriver   ExternalDriver    @relation(fields: [externalDriverId], references: [id], onDelete: Cascade)
   characterId      String            @unique @db.Uuid
   character        Character         @relation(fields: [characterId], references: [id], onDelete: Cascade)
@@ -692,11 +738,15 @@ model ExternalBindingDriver {
   boundBy          Role?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+
+  @@unique([universeId, externalDriverId])
 }
 
 model ExternalBindingTeam {
   id             String            @id @default(uuid()) @db.Uuid
-  externalTeamId String            @unique @db.Uuid
+  universeId     String            @db.Uuid
+  universe       Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalTeamId String            @db.Uuid
   externalTeam   ExternalTeam      @relation(fields: [externalTeamId], references: [id], onDelete: Cascade)
   teamId         String            @unique @db.Uuid
   team           Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -705,11 +755,15 @@ model ExternalBindingTeam {
   boundBy        Role?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
+
+  @@unique([universeId, externalTeamId])
 }
 
 model ExternalBindingSeason {
   id               String            @id @default(uuid()) @db.Uuid
-  externalSeasonId String            @unique @db.Uuid
+  universeId       String            @db.Uuid
+  universe         Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalSeasonId String            @db.Uuid
   externalSeason   ExternalSeason    @relation(fields: [externalSeasonId], references: [id], onDelete: Cascade)
   seasonId         String            @unique @db.Uuid
   season           Season            @relation(fields: [seasonId], references: [id], onDelete: Cascade)
@@ -718,11 +772,15 @@ model ExternalBindingSeason {
   boundBy          Role?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+
+  @@unique([universeId, externalSeasonId])
 }
 
 model ExternalBindingRace {
   id             String            @id @default(uuid()) @db.Uuid
-  externalRaceId String            @unique @db.Uuid
+  universeId     String            @db.Uuid
+  universe       Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalRaceId String            @db.Uuid
   externalRace   ExternalRace      @relation(fields: [externalRaceId], references: [id], onDelete: Cascade)
   raceId         String            @unique @db.Uuid
   race           Race              @relation(fields: [raceId], references: [id], onDelete: Cascade)
@@ -731,11 +789,15 @@ model ExternalBindingRace {
   boundBy        Role?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
+
+  @@unique([universeId, externalRaceId])
 }
 
 model ExternalBindingDriverSeason {
   id                     String               @id @default(uuid()) @db.Uuid
-  externalDriverSeasonId String               @unique @db.Uuid
+  universeId             String               @db.Uuid
+  universe               Universe             @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalDriverSeasonId String               @db.Uuid
   externalDriverSeason   ExternalDriverSeason @relation(fields: [externalDriverSeasonId], references: [id], onDelete: Cascade)
   seasonDriverEntryId    String               @unique @db.Uuid
   seasonDriverEntry      SeasonDriverEntry    @relation(fields: [seasonDriverEntryId], references: [id], onDelete: Cascade)
@@ -744,11 +806,15 @@ model ExternalBindingDriverSeason {
   boundBy                Role?
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
+
+  @@unique([universeId, externalDriverSeasonId])
 }
 
 model ExternalBindingResult {
   id               String            @id @default(uuid()) @db.Uuid
-  externalResultId String            @unique @db.Uuid
+  universeId       String            @db.Uuid
+  universe         Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalResultId String            @db.Uuid
   externalResult   ExternalResult    @relation(fields: [externalResultId], references: [id], onDelete: Cascade)
   raceResultId     String            @unique @db.Uuid
   raceResult       RaceResult        @relation(fields: [raceResultId], references: [id], onDelete: Cascade)
@@ -757,11 +823,15 @@ model ExternalBindingResult {
   boundBy          Role?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+
+  @@unique([universeId, externalResultId])
 }
 
 model ExternalBindingStanding {
   id                     String               @id @default(uuid()) @db.Uuid
-  externalStandingId     String               @unique @db.Uuid
+  universeId             String               @db.Uuid
+  universe               Universe             @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalStandingId     String               @db.Uuid
   externalStanding       ExternalStanding     @relation(fields: [externalStandingId], references: [id], onDelete: Cascade)
   championshipStandingId String               @unique @db.Uuid
   championshipStanding   ChampionshipStanding @relation(fields: [championshipStandingId], references: [id], onDelete: Cascade)
@@ -770,6 +840,8 @@ model ExternalBindingStanding {
   boundBy                Role?
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
+
+  @@unique([universeId, externalStandingId])
 }
 
 // ---------------------------------------------------------------
@@ -1145,7 +1217,10 @@ model ConversationRagSnapshotItem {
 /// circularidade. O mundo existe independentemente do chat.
 model WorldState {
   id  String @id @default(uuid()) @db.Uuid
-  key String @unique @default("default")
+  key String @default("default")
+
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
 
   currentDate     DateTime     @default(now())
   currentSeasonId String?      @db.Uuid // referência escalar a Season (sem @relation)
@@ -1154,6 +1229,8 @@ model WorldState {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([universeId, key])
 }
 
 // ---------------------------------------------------------------

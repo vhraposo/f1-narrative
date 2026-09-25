@@ -49,8 +49,19 @@ async function createSession(name: string): Promise<User> {
 async function seedParticipantVsGridFixture(userId: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
+  const universe = await prisma.universe.upsert({
+    where: { userId: user.id },
+    update: {},
+    create: { userId: user.id },
+  });
+
   const season = await prisma.season.create({
-    data: { year: YEAR, name: String(YEAR), status: "PRE_SEASON" },
+    data: {
+      universeId: universe.id,
+      year: YEAR,
+      name: String(YEAR),
+      status: "PRE_SEASON",
+    },
   });
 
   const extSeason = await prisma.externalSeason.create({
@@ -58,7 +69,13 @@ async function seedParticipantVsGridFixture(userId: string) {
   });
 
   await prisma.externalBindingSeason.create({
-    data: { externalSeasonId: extSeason.id, seasonId: season.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: {
+      universeId: universe.id,
+      externalSeasonId: extSeason.id,
+      seasonId: season.id,
+      confidence: "CONFIRMED",
+      boundBy: "ADMIN",
+    },
   });
 
   const extTeam = await prisma.externalTeam.create({
@@ -70,11 +87,23 @@ async function seedParticipantVsGridFixture(userId: string) {
   });
 
   const universeTeam = await prisma.team.create({
-    data: { name: RB.name, shortName: RB.shortName, color: RB.color, userId: user.id },
+    data: {
+      name: RB.name,
+      shortName: RB.shortName,
+      color: RB.color,
+      userId: user.id,
+      universeId: universe.id,
+    },
   });
 
   await prisma.externalBindingTeam.create({
-    data: { externalTeamId: extTeam.id, teamId: universeTeam.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: {
+      universeId: universe.id,
+      externalTeamId: extTeam.id,
+      teamId: universeTeam.id,
+      confidence: "CONFIRMED",
+      boundBy: "ADMIN",
+    },
   });
 
   const jolpicaDriverIds: string[] = [];
@@ -121,7 +150,14 @@ async function seedParticipantVsGridFixture(userId: string) {
 
   cleanupFns.push(cleanup);
 
-  return { userId: user.id, seasonId: season.id, extSeasonId: extSeason.id, extTeamId: extTeam.id, universeTeamId: universeTeam.id };
+  return {
+    userId: user.id,
+    universeId: universe.id,
+    seasonId: season.id,
+    extSeasonId: extSeason.id,
+    extTeamId: extTeam.id,
+    universeTeamId: universeTeam.id,
+  };
 }
 
 beforeAll(async () => {
@@ -192,10 +228,11 @@ describe("Participant vs Opening Grid — 22 starters + 23 participantes (STEP 1
 
   it("3) Tsunoda (3º participante) existe como Character + DriverProfile + SeasonDriverEntry", async () => {
     const tsunoda = await prisma.character.findFirst({
-      where: { userId: fixture.userId, name: "Yuki Tsunoda" },
+      where: { universeId: fixture.universeId, name: "Yuki Tsunoda" },
     });
     expect(tsunoda).toBeTruthy();
-    expect(tsunoda!.controlledBy).toBe("USER");
+    expect(tsunoda!.controlledBy).toBe("AI");
+    expect(tsunoda!.userId).toBeNull();
 
     const profile = await prisma.driverProfile.findUnique({ where: { characterId: tsunoda!.id } });
     expect(profile).toBeTruthy();
@@ -231,7 +268,9 @@ describe("Participant vs Opening Grid — 22 starters + 23 participantes (STEP 1
   });
 
   it("6) todos os 3 pilotos materializados como Characters", async () => {
-    const chars = await prisma.character.findMany({ where: { userId: fixture.userId } });
+    const chars = await prisma.character.findMany({
+      where: { universeId: fixture.universeId },
+    });
     expect(chars).toHaveLength(3);
     const names = chars.map((c) => c.name).sort();
     expect(names).toEqual(["Arvid Lindblad", "Liam Lawson", "Yuki Tsunoda"]);
@@ -239,7 +278,7 @@ describe("Participant vs Opening Grid — 22 starters + 23 participantes (STEP 1
 
   it("7) todos os 3 DriverProfiles materializados", async () => {
     const profiles = await prisma.driverProfile.findMany({
-      where: { character: { userId: fixture.userId } },
+      where: { character: { universeId: fixture.universeId } },
     });
     expect(profiles).toHaveLength(3);
   });
@@ -259,7 +298,7 @@ describe("Participant vs Opening Grid — 22 starters + 23 participantes (STEP 1
     expect(participants.some((p) => p.name === "Yuki Tsunoda")).toBe(true);
   });
 
-  it("9) Tsunoda aparece no Chat (Character acessível via characters API)", async () => {
+  it("9) Tsunoda é Character de IA: fora de /api/characters, presente em /api/characters/ai", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/api/characters",
@@ -267,10 +306,18 @@ describe("Participant vs Opening Grid — 22 starters + 23 participantes (STEP 1
     });
     expect(res.statusCode).toBe(200);
     const characters = res.json().characters as Array<{ id: string; name: string; controlledBy: string; userId: string }>;
-    const tsunoda = characters.find((c) => c.name === "Yuki Tsunoda");
+    expect(characters.find((c) => c.name === "Yuki Tsunoda")).toBeUndefined();
+
+    const aiRes = await app.inject({
+      method: "GET",
+      url: "/api/characters/ai",
+      headers: { cookie: fixtureUser.cookie },
+    });
+    expect(aiRes.statusCode).toBe(200);
+    const aiCharacters = aiRes.json().characters as Array<{ name: string; controlledBy: string }>;
+    const tsunoda = aiCharacters.find((c) => c.name === "Yuki Tsunoda");
     expect(tsunoda).toBeTruthy();
-    expect(tsunoda!.userId).toBe(fixture.userId);
-    expect(tsunoda!.controlledBy).toBe("USER");
+    expect(tsunoda!.controlledBy).toBe("AI");
   });
 
   it("10) Tsunoda aparece na lista de Pilotos", async () => {
@@ -289,9 +336,11 @@ describe("Participant vs Opening Grid — 22 starters + 23 participantes (STEP 1
 
   it("11) segunda execução é idempotente: reusa tudo, não duplica", async () => {
     const before = {
-      teams: await prisma.team.count({ where: { userId: fixture.userId } }),
-      chars: await prisma.character.count({ where: { userId: fixture.userId } }),
-      profiles: await prisma.driverProfile.count({ where: { character: { userId: fixture.userId } } }),
+      teams: await prisma.team.count({ where: { universeId: fixture.universeId } }),
+      chars: await prisma.character.count({ where: { universeId: fixture.universeId } }),
+      profiles: await prisma.driverProfile.count({
+        where: { character: { universeId: fixture.universeId } },
+      }),
       entries: await prisma.seasonDriverEntry.count({ where: { seasonId: fixture.seasonId } }),
       events: await prisma.driverEntryEvent.count({ where: { entry: { seasonId: fixture.seasonId } } }),
     };
@@ -314,9 +363,13 @@ describe("Participant vs Opening Grid — 22 starters + 23 participantes (STEP 1
       bindingsCreated: 0,
     });
 
-    expect(await prisma.team.count({ where: { userId: fixture.userId } })).toBe(before.teams);
-    expect(await prisma.character.count({ where: { userId: fixture.userId } })).toBe(before.chars);
-    expect(await prisma.driverProfile.count({ where: { character: { userId: fixture.userId } } })).toBe(before.profiles);
+    expect(await prisma.team.count({ where: { universeId: fixture.universeId } })).toBe(before.teams);
+    expect(await prisma.character.count({ where: { universeId: fixture.universeId } })).toBe(before.chars);
+    expect(
+      await prisma.driverProfile.count({
+        where: { character: { universeId: fixture.universeId } },
+      }),
+    ).toBe(before.profiles);
     expect(await prisma.seasonDriverEntry.count({ where: { seasonId: fixture.seasonId } })).toBe(before.entries);
     expect(await prisma.driverEntryEvent.count({ where: { entry: { seasonId: fixture.seasonId } } })).toBe(before.events);
   });

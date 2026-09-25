@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { deleteUniverseDataForUsers } from "../../test-utils/universe-cleanup.js";
 import { JolpicaClient } from "./jolpica.client.js";
 import type {
   JolpicaConstructorRaw,
@@ -525,6 +526,14 @@ describe("JolpicaSync routes — endpoint admin-only", () => {
     await prisma.externalDriver.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: syncDriverIds } } });
     await prisma.externalTeam.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: ["mclaren", "ferrari"] } } });
     await prisma.externalSeason.deleteMany({ where: { source: JOLPICA_SOURCE, year: { in: syncYears } } });
+    const syncUsers = await prisma.user.findMany({
+      where: { email: { startsWith: "sync-" } },
+      select: { id: true },
+    });
+    await deleteUniverseDataForUsers(
+      prisma,
+      syncUsers.map((user) => user.id),
+    );
     await prisma.user.deleteMany({ where: { email: { startsWith: "sync-" } } });
     await app.close();
     await prisma.$disconnect();
