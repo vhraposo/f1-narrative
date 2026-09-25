@@ -139,13 +139,13 @@ describe("TeamCard", () => {
     expect(hidden.some((el) => el.textContent === "A")).toBe(true);
   });
 
-  it("links cada piloto para a sua ficha de personagem", () => {
+  it("links cada piloto para a ficha do Driver", () => {
     renderCard(makeTeam(), [makeDriver()]);
 
     const link = screen
       .getByRole("link", { name: /Alicya Kucharski/ })
       .getAttribute("href");
-    expect(link).toBe("/app/characters/c1");
+    expect(link).toBe("/app/drivers/d1");
   });
 
   it("sem pilotos: mostra estado vazio sem inventar linha", () => {

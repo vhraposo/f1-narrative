@@ -110,7 +110,7 @@ export function TeamCard({
             drivers.map((driver) => (
               <Link
                 key={driver.id}
-                href={`/app/characters/${driver.characterId}`}
+                href={`/app/drivers/${driver.id}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-1 text-xs transition-colors hover:border-brand/50 hover:bg-accent"
               >
                 {driver.character.imageUrl ? (

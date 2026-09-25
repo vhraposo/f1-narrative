@@ -168,6 +168,15 @@ describe("Teams Page - constructors", () => {
     ).not.toContain("Charles Leclerc");
   });
 
+  it("o piloto da equipe navega para a rota de Driver (não Character)", async () => {
+    const { container } = renderWithClient(<TeamsPage />);
+
+    await screen.findByText("Ferrari");
+    const link = screen.getByText("Charles Leclerc").closest("a")!;
+    expect(link.getAttribute("href")).toBe("/app/drivers/d1");
+    expect(container.querySelector('a[href^="/app/characters"]')).toBeNull();
+  });
+
   it("equipe sem pilotos: mostra a vaga vazia na composição", async () => {
     driversFixture = DRIVERS.filter((d) => d.teamId !== "t1");
     renderWithClient(<TeamsPage />);

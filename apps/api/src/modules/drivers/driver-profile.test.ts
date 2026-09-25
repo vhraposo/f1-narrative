@@ -983,3 +983,279 @@ describe("GET /api/drivers — headshotUrl do enriquecimento externo (STEP 107.1
     await prisma.externalDriver.delete({ where: { id: ext.id } });
   });
 });
+
+describe("GET/PATCH /api/drivers/:id — ficha do Driver escopada por Universe", () => {
+  async function setupDriver(suffix: string): Promise<{
+    user: TestUser;
+    profileId: string;
+    characterId: string;
+    universeId: string;
+  }> {
+    const user = await createDbUser(suffix, `${suffix}-${Date.now()}@f1nw.test`);
+    const universe = await prisma.universe.create({
+      data: { userId: user.userId, status: "READY" },
+      select: { id: true },
+    });
+    const ch = await prisma.character.create({
+      data: {
+        userId: user.userId,
+        universeId: universe.id,
+        controlledBy: "USER",
+        name: `Driver ${suffix}`,
+        nationality: "Brasileira",
+        birthDate: new Date("1995-01-01"),
+      },
+      select: { id: true },
+    });
+    const profile = await prisma.driverProfile.create({
+      data: { characterId: ch.id, number: 12 },
+      select: { id: true },
+    });
+    return {
+      user,
+      profileId: profile.id,
+      characterId: ch.id,
+      universeId: universe.id,
+    };
+  }
+
+  async function attachExternalHeadshot(
+    characterId: string,
+    universeId: string,
+    url: string,
+  ): Promise<string> {
+    const ext = await prisma.externalDriver.create({
+      data: {
+        source: "jolpica",
+        externalId: `ext-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: "Ext Headshot",
+        number: 11,
+        headshotUrl: url,
+        contentHash: `ch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      },
+      select: { id: true },
+    });
+    await prisma.externalBindingDriver.create({
+      data: {
+        externalDriverId: ext.id,
+        characterId,
+        universeId,
+        confidence: "CONFIRMED",
+      },
+    });
+    return ext.id;
+  }
+
+  it("lê o Driver do próprio Universe por driverId (não por Character)", async () => {
+    const { user, profileId } = await setupDriver("drvget");
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.17.1.1",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json().driver;
+    expect(body.id).toBe(profileId);
+    expect(body.character.name).toBe("Driver drvget");
+    expect(body.number).toBe(12);
+  });
+
+  it("PATCH atualiza o número do Driver do próprio Universe", async () => {
+    const { user, profileId } = await setupDriver("drvpatch");
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { number: 21 },
+      remoteAddress: "10.17.2.1",
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().driver.number).toBe(21);
+
+    const stored = await prisma.driverProfile.findUniqueOrThrow({
+      where: { id: profileId },
+    });
+    expect(stored.number).toBe(21);
+  });
+
+  it("404 ao ler/editar Driver de outro Universe (não vaza entre universos)", async () => {
+    const owner = await setupDriver("drvown");
+    const intruder = await createDbUser(
+      "drvint",
+      `drvint-${Date.now()}@f1nw.test`,
+    );
+    await prisma.universe.create({
+      data: { userId: intruder.userId, status: "READY" },
+    });
+
+    const read = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${owner.profileId}`,
+      headers: { cookie: intruder.cookie },
+      remoteAddress: "10.17.3.1",
+    });
+    expect(read.statusCode).toBe(404);
+
+    const write = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${owner.profileId}`,
+      headers: { cookie: intruder.cookie },
+      payload: { number: 31 },
+      remoteAddress: "10.17.3.2",
+    });
+    expect(write.statusCode).toBe(404);
+
+    const stored = await prisma.driverProfile.findUniqueOrThrow({
+      where: { id: owner.profileId },
+    });
+    expect(stored.number).toBe(12);
+  });
+
+  it("valida número e id (400)", async () => {
+    const { user, profileId } = await setupDriver("drvval");
+
+    const badNumber = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { number: 1 },
+      remoteAddress: "10.17.4.1",
+    });
+    expect(badNumber.statusCode).toBe(400);
+
+    const badId = await app.inject({
+      method: "GET",
+      url: "/api/drivers/nao-e-uuid",
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.17.4.2",
+    });
+    expect(badId.statusCode).toBe(400);
+  });
+
+  it("expõe o headshot externo como imagem padrão do Driver", async () => {
+    const { user, profileId, characterId, universeId } =
+      await setupDriver("drvshot");
+    await attachExternalHeadshot(
+      characterId,
+      universeId,
+      "https://img.example/ext.jpg",
+    );
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.18.1.1",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json().driver;
+    expect(body.headshotUrl).toBe("https://img.example/ext.jpg");
+    expect(body.customHeadshotUrl).toBeNull();
+    expect(body.displayHeadshotUrl).toBe("https://img.example/ext.jpg");
+  });
+
+  it("customHeadshotUrl tem precedência e a remoção volta ao headshot externo", async () => {
+    const { user, profileId, characterId, universeId } =
+      await setupDriver("drvcustom");
+    await attachExternalHeadshot(
+      characterId,
+      universeId,
+      "https://img.example/ext.jpg",
+    );
+
+    const set = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { customHeadshotUrl: "https://img.example/custom.jpg" },
+      remoteAddress: "10.18.2.1",
+    });
+    expect(set.statusCode).toBe(200);
+
+    const withCustom = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.18.2.2",
+    });
+    const customBody = withCustom.json().driver;
+    expect(customBody.customHeadshotUrl).toBe(
+      "https://img.example/custom.jpg",
+    );
+    expect(customBody.headshotUrl).toBe("https://img.example/ext.jpg");
+    expect(customBody.displayHeadshotUrl).toBe(
+      "https://img.example/custom.jpg",
+    );
+
+    const clear = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { customHeadshotUrl: null },
+      remoteAddress: "10.18.2.3",
+    });
+    expect(clear.statusCode).toBe(200);
+
+    const cleared = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.18.2.4",
+    });
+    const clearedBody = cleared.json().driver;
+    expect(clearedBody.customHeadshotUrl).toBeNull();
+    expect(clearedBody.displayHeadshotUrl).toBe(
+      "https://img.example/ext.jpg",
+    );
+  });
+
+  it("sync externo atualiza o headshot externo sem sobrescrever o override", async () => {
+    const { user, profileId, characterId, universeId } =
+      await setupDriver("drvsync");
+    const extId = await attachExternalHeadshot(
+      characterId,
+      universeId,
+      "https://img.example/A.jpg",
+    );
+
+    await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { customHeadshotUrl: "https://img.example/B.jpg" },
+      remoteAddress: "10.18.3.1",
+    });
+
+    await prisma.externalDriver.update({
+      where: { id: extId },
+      data: { headshotUrl: "https://img.example/C.jpg" },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.18.3.2",
+    });
+    const body = res.json().driver;
+    expect(body.headshotUrl).toBe("https://img.example/C.jpg");
+    expect(body.customHeadshotUrl).toBe("https://img.example/B.jpg");
+    expect(body.displayHeadshotUrl).toBe("https://img.example/B.jpg");
+  });
+
+  it("URL inválida no customHeadshotUrl → 400", async () => {
+    const { user, profileId } = await setupDriver("drvbadurl");
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { customHeadshotUrl: "nao-e-url" },
+      remoteAddress: "10.18.4.1",
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});

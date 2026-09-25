@@ -325,6 +325,8 @@ model DriverProfile {
   team   Team?   @relation(fields: [teamId], references: [id])
   number Int?
 
+  customHeadshotUrl String?
+
   results               RaceResult[]
   championshipStandings ChampionshipStanding[]
   seasonDriverEntries   SeasonDriverEntry[]

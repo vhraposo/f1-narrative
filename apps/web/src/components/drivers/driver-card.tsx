@@ -53,7 +53,7 @@ export function DriverCard({
         .join(" · ")
     : null;
 
-  const portraitUrl = driver.character.imageUrl ?? driver.headshotUrl;
+  const portraitUrl = driver.displayHeadshotUrl ?? driver.headshotUrl;
 
   const tileContent = (
     <>
@@ -119,12 +119,10 @@ export function DriverCard({
         )}
       </div>
 
-      {isOwned && (
-        <ArrowUpRight
-          aria-hidden="true"
-          className="absolute right-3 top-3 h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-        />
-      )}
+      <ArrowUpRight
+        aria-hidden="true"
+        className="absolute right-3 top-3 h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+      />
     </>
   );
 
@@ -163,23 +161,17 @@ export function DriverCard({
       />
 
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col">
-        {isOwned ? (
-          <Link
-            href={`/app/characters/${driver.characterId}`}
-            className="relative flex flex-1 items-center gap-4 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:gap-5 sm:p-5"
-          >
-            {tileContent}
-          </Link>
-        ) : (
-          <div className="relative flex flex-1 items-center gap-4 p-4 sm:gap-5 sm:p-5">
-            {tileContent}
-          </div>
-        )}
+        <Link
+          href={`/app/drivers/${driver.id}`}
+          className="relative flex flex-1 items-center gap-4 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:gap-5 sm:p-5"
+        >
+          {tileContent}
+        </Link>
 
         {isOwned && (
           <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-4 py-2.5">
             <Link
-              href={`/app/characters/${driver.characterId}`}
+              href={`/app/drivers/${driver.id}`}
               className={editLinkStyles}
             >
               <Pencil className="mr-1.5 h-3.5 w-3.5" />

@@ -197,22 +197,23 @@ describe("Drivers Page - grid", () => {
     ).toBeDefined();
   });
 
-  it("piloto do usuário mantém ações; piloto de IA (não dono) fica somente leitura", async () => {
+  it("piloto do usuário mantém ações; piloto de IA navega para o Driver", async () => {
     const { container } = renderWithClient(<DriversPage />);
 
     await screen.findByText("Alicya Kucharski");
     const owned = screen.getByText("Alicya Kucharski").closest("article")!;
-    expect(owned.querySelector('a[href="/app/characters/c1"]')).not.toBeNull();
+    expect(owned.querySelector('a[href="/app/drivers/d1"]')).not.toBeNull();
     expect(
       within(owned as HTMLElement).getByRole("button", { name: /Remover/ }),
     ).toBeDefined();
 
     const notOwned = screen.getByText("Lewis Hamilton").closest("article")!;
-    expect(notOwned.querySelector('a[href="/app/characters/c2"]')).toBeNull();
+    expect(notOwned.querySelector('a[href="/app/drivers/d2"]')).not.toBeNull();
     expect(
       within(notOwned as HTMLElement).queryByRole("button", { name: /Remover/ }),
     ).toBeNull();
     expect(container.querySelectorAll("article")).toHaveLength(2);
+    expect(container.querySelector('a[href^="/app/characters"]')).toBeNull();
   });
 
 it("estado de erro: falha ao carregar os pilotos", async () => {

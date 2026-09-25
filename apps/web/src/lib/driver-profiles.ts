@@ -1,4 +1,4 @@
-import { get, put, remove } from "./api";
+import { get, patch, put, remove } from "./api";
 
 export type Driver = {
   id: string;
@@ -6,6 +6,8 @@ export type Driver = {
   number: number | null;
   teamId: string | null;
   headshotUrl: string | null;
+  customHeadshotUrl?: string | null;
+  displayHeadshotUrl?: string | null;
   team: {
     id: string;
     name: string;
@@ -30,6 +32,25 @@ export type Driver = {
 
 export type UpsertDriverInput = {
   number?: number | null;
+  customHeadshotUrl?: string | null;
+};
+
+export type DriverAttributes = {
+  speed: number;
+  consistency: number;
+  racecraft: number;
+  aggression: number;
+};
+
+export type DriverDetail = Driver & {
+  role: string | null;
+  seat: number | null;
+  status: string | null;
+  attributes: DriverAttributes | null;
+  character: Driver["character"] & {
+    birthDate: string;
+    biography: string | null;
+  };
 };
 
 export function formatDriverNumber(number: number | null): string {
@@ -52,6 +73,21 @@ type ItemResponse = { driver: Driver };
 
 export function listDrivers(): Promise<Driver[]> {
   return get<ListResponse>("/api/drivers").then((r) => r.drivers);
+}
+
+export function getDriver(id: string): Promise<DriverDetail> {
+  return get<{ driver: DriverDetail }>(`/api/drivers/${id}`).then(
+    (r) => r.driver,
+  );
+}
+
+export function updateDriver(
+  id: string,
+  input: UpsertDriverInput,
+): Promise<Driver> {
+  return patch<ItemResponse>(`/api/drivers/${id}`, input).then(
+    (r) => r.driver,
+  );
 }
 
 export function upsertDriver(
