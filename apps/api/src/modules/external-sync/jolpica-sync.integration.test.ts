@@ -455,7 +455,7 @@ describe("JolpicaSyncService — sincronização determinística (f1_narrative_t
     server.removeRound(2);
     const report = await service.sync(year, "RACES");
 
-    expect(report.counts.unchanged).toBe(1);
+    expect(report.counts.unchanged).toBe(2);
     expect(
       await prisma.externalRace.count({ where: { source: JOLPICA_SOURCE, seasonYear: year } }),
     ).toBe(2);

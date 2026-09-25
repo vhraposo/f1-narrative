@@ -76,6 +76,7 @@ export const jolpicaSyncRoutes: FastifyPluginAsync<JolpicaSyncRoutesOptions> =
           const report = await service.sync(
             bodyParsed.data.seasonYear,
             params.data.scope,
+            { triggeredById: userId },
           );
           let materialization: AutoMaterializeResult | undefined;
           if ((MATERIALIZABLE_SCOPES as readonly string[]).includes(params.data.scope)) {

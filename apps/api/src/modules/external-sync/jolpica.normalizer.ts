@@ -1,4 +1,5 @@
 import type {
+  JolpicaCircuitRaw,
   JolpicaConstructorRaw,
   JolpicaDriverRaw,
   JolpicaRaceRaw,
@@ -42,9 +43,27 @@ export interface NormalizedRace {
   round: number;
   grandPrix: string | null;
   name: string | null;
+  officialName: string | null;
   circuitName: string | null;
+  circuitExternalId: string | null;
+  locality: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
   date: Date | null;
+  time: string | null;
+  url: string | null;
   status: string | null;
+}
+
+export interface NormalizedCircuit {
+  externalId: string;
+  name: string;
+  url: string | null;
+  locality: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface NormalizedResult {
@@ -212,30 +231,118 @@ export function normalizeRaces(
   for (const race of races) {
     const round = toInt(race.round);
     if (round === null) continue;
+    const circuit = race.Circuit;
     items.push({
       data: {
         seasonYear,
         round,
         grandPrix: emptyToNull(race.raceName),
         name: emptyToNull(race.raceName),
-        circuitName: emptyToNull(race.Circuit?.circuitName),
+        officialName: null,
+        circuitName: emptyToNull(circuit?.circuitName),
+        circuitExternalId: emptyToNull(circuit?.circuitId),
+        locality: normalizeLocality(circuit?.Location?.locality),
+        country: normalizeCountry(circuit?.Location?.country),
+        latitude: toCoordinate(circuit?.Location?.lat, -90, 90),
+        longitude: toCoordinate(circuit?.Location?.long, -180, 180),
         date: toDate(race.date),
+        time: emptyToNull(race.time),
+        url: emptyToNull(race.url),
         status: null,
       },
       sourceRecord: {
         season: emptyToNull(race.season),
         round,
         raceName: emptyToNull(race.raceName),
-        circuitId: emptyToNull(race.Circuit?.circuitId),
-        circuitName: emptyToNull(race.Circuit?.circuitName),
-        locality: emptyToNull(race.Circuit?.Location?.locality),
-        country: emptyToNull(race.Circuit?.Location?.country),
+        url: emptyToNull(race.url),
+        circuitId: emptyToNull(circuit?.circuitId),
+        circuitName: emptyToNull(circuit?.circuitName),
+        locality: emptyToNull(circuit?.Location?.locality),
+        country: emptyToNull(circuit?.Location?.country),
         date: emptyToNull(race.date),
         time: emptyToNull(race.time),
       },
     });
   }
   return items;
+}
+
+export function normalizeCircuits(
+  circuits: JolpicaCircuitRaw[],
+): NormalizedWithSource<NormalizedCircuit>[] {
+  const items: NormalizedWithSource<NormalizedCircuit>[] = [];
+  for (const circuit of circuits) {
+    const externalId = emptyToNull(circuit.circuitId);
+    const name = emptyToNull(circuit.circuitName);
+    if (!externalId || !name) continue;
+    items.push({
+      data: {
+        externalId,
+        name,
+        url: emptyToNull(circuit.url),
+        locality: normalizeLocality(circuit.Location?.locality),
+        country: normalizeCountry(circuit.Location?.country),
+        latitude: toCoordinate(circuit.Location?.lat, -90, 90),
+        longitude: toCoordinate(circuit.Location?.long, -180, 180),
+      },
+      sourceRecord: {
+        circuitId: externalId,
+        url: emptyToNull(circuit.url),
+        circuitName: name,
+        locality: emptyToNull(circuit.Location?.locality),
+        country: emptyToNull(circuit.Location?.country),
+        lat: emptyToNull(circuit.Location?.lat),
+        long: emptyToNull(circuit.Location?.long),
+      },
+    });
+  }
+  return items;
+}
+
+export function normalizeCircuitsFromRaces(
+  races: JolpicaRaceRaw[],
+): NormalizedWithSource<NormalizedCircuit>[] {
+  const circuits = races
+    .map((race) => race.Circuit)
+    .filter((circuit): circuit is JolpicaCircuitRaw => !!circuit);
+  return normalizeCircuits(uniqueBy(circuits, (c) => c.circuitId ?? ""));
+}
+
+const COUNTRY_ALIASES: Record<string, string> = {
+  uk: "United Kingdom",
+  "great britain": "United Kingdom",
+  usa: "United States",
+  "united states of america": "United States",
+  uae: "United Arab Emirates",
+  "south korea": "South Korea",
+  "korea": "South Korea",
+};
+
+export function normalizeCountry(value: unknown): string | null {
+  const raw = emptyToNull(value);
+  if (!raw) return null;
+  const alias = COUNTRY_ALIASES[raw.toLowerCase()];
+  if (alias) return alias;
+  return collapseSpaces(raw);
+}
+
+export function normalizeLocality(value: unknown): string | null {
+  const raw = emptyToNull(value);
+  return raw ? collapseSpaces(raw) : null;
+}
+
+function toCoordinate(
+  value: unknown,
+  min: number,
+  max: number,
+): number | null {
+  const parsed = Number.parseFloat(String(value ?? ""));
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) return null;
+  return parsed;
+}
+
+function collapseSpaces(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 export interface NormalizedDriverSeasonPayload {

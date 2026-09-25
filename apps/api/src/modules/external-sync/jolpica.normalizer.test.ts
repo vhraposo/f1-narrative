@@ -130,8 +130,16 @@ describe("normalizeRaces", () => {
       round: 1,
       grandPrix: "Argentine Grand Prix",
       name: "Argentine Grand Prix",
+      officialName: null,
       circuitName: "Autodromo Juan y Oscar Galvez",
+      circuitExternalId: "buenos_aires",
+      locality: "Buenos Aires",
+      country: "Argentina",
+      latitude: null,
+      longitude: null,
       date: new Date("1975-01-12T00:00:00.000Z"),
+      time: null,
+      url: null,
       status: null,
     });
     expect(first.sourceRecord.locality).toBe("Buenos Aires");

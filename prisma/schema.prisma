@@ -207,12 +207,14 @@ model Universe {
   seasons     Season[]
   teams       Team[]
   characters  Character[]
+  circuits    Circuit[]
   worldStates WorldState[]
 
   bindingDrivers       ExternalBindingDriver[]
   bindingTeams         ExternalBindingTeam[]
   bindingSeasons       ExternalBindingSeason[]
   bindingRaces         ExternalBindingRace[]
+  bindingCircuits      ExternalBindingCircuit[]
   bindingDriverSeasons ExternalBindingDriverSeason[]
   bindingResults       ExternalBindingResult[]
   bindingStandings     ExternalBindingStanding[]
@@ -414,6 +416,9 @@ model Race {
   round   Int?
   status  RaceStatus @default(UPCOMING)
 
+  circuitId String?  @db.Uuid
+  circuitRef Circuit? @relation(fields: [circuitId], references: [id], onDelete: SetNull)
+
   provenance Provenance @default(CANONICAL)
 
   results              RaceResult[]
@@ -424,6 +429,7 @@ model Race {
 
   @@index([seasonId])
   @@index([status])
+  @@index([circuitId])
 }
 
 /// Resultado esportivo determinístico de um piloto em uma corrida.
@@ -658,26 +664,143 @@ model ExternalSeason {
   @@unique([source, year])
 }
 
-model ExternalRace {
-  id            String    @id @default(uuid()) @db.Uuid
+/// Circuito factual do espelho externo (Jolpica e futuras fontes). Não pertence
+/// a nenhum Universe — o Circuit do universo é materializado a partir daqui.
+model ExternalCircuit {
+  id            String   @id @default(uuid()) @db.Uuid
   source        String
-  seasonYear    Int
-  round         Int
-  grandPrix     String?
-  name          String?
-  circuitName   String?
-  date          DateTime?
-  status        String?
+  externalId    String
+  name          String
+  url           String?
+  locality      String?
+  country       String?
+  latitude      Float?
+  longitude     Float?
+  lengthMeters  Int?
+  turns         Int?
+  direction     String?
+  layoutKey     String?
   contentHash   String
   sourceRecord  Json?
-  firstSyncedAt DateTime  @default(now())
-  lastSyncedAt  DateTime  @default(now())
+  firstSyncedAt DateTime @default(now())
+  lastSyncedAt  DateTime @default(now())
+
+  races    ExternalRace[]
+  bindings ExternalBindingCircuit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([source, name])
+}
+
+/// Circuito do universo do usuário: entidade própria, independente do espelho.
+model Circuit {
+  id         String   @id @default(uuid()) @db.Uuid
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
+  name         String
+  shortName    String?
+  locality     String?
+  country      String?
+  latitude     Float?
+  longitude    Float?
+  lengthMeters Int?
+  turns        Int?
+  direction    String?
+  layoutKey    String?
+  layoutUrl    String?
+  photoUrl     String?
+
+  provenance Provenance @default(CANONICAL)
+
+  races    Race[]
+  bindings ExternalBindingCircuit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universeId, name])
+  @@index([universeId])
+}
+
+model ExternalBindingCircuit {
+  id                String            @id @default(uuid()) @db.Uuid
+  universeId        String            @db.Uuid
+  universe          Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalCircuitId String            @db.Uuid
+  externalCircuit   ExternalCircuit   @relation(fields: [externalCircuitId], references: [id], onDelete: Cascade)
+  circuitId         String            @unique @db.Uuid
+  circuit           Circuit           @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  confidence        BindingConfidence @default(SUGGESTED)
+  boundAt           DateTime          @default(now())
+  boundBy           Role?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([universeId, externalCircuitId])
+}
+
+enum ExternalSyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+/// Registro de execução de sincronização externa (auditoria, lock e lastSyncAt).
+model ExternalSyncRun {
+  id            String             @id @default(uuid()) @db.Uuid
+  source        String
+  scope         String
+  seasonYear    Int?
+  status        ExternalSyncStatus @default(RUNNING)
+  startedAt     DateTime           @default(now())
+  finishedAt    DateTime?
+  lastSyncedAt  DateTime?
+  statistics    Json?
+  error         String?
+  triggeredById String?            @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([source, scope, seasonYear, startedAt])
+}
+
+model ExternalRace {
+  id                String           @id @default(uuid()) @db.Uuid
+  source            String
+  seasonYear        Int
+  round             Int
+  grandPrix         String?
+  name              String?
+  officialName      String?
+  circuitName       String?
+  circuitExternalId String?
+  locality          String?
+  country           String?
+  latitude          Float?
+  longitude         Float?
+  time              String?
+  url               String?
+  date              DateTime?
+  status            String?
+  contentHash       String
+  sourceRecord      Json?
+  firstSyncedAt     DateTime         @default(now())
+  lastSyncedAt      DateTime         @default(now())
+
+  externalCircuitId String?          @db.Uuid
+  externalCircuit   ExternalCircuit? @relation(fields: [externalCircuitId], references: [id], onDelete: SetNull)
 
   results  ExternalResult[]
   bindings ExternalBindingRace[]
 
   @@unique([source, seasonYear, round])
   @@index([source, seasonYear])
+  @@index([externalCircuitId])
 }
 
 model ExternalResult {

@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { computeContentHash } from "./jolpica.hash.js";
 import type {
+  NormalizedCircuit,
   NormalizedDriver,
   NormalizedDriverSeason,
   NormalizedRace,
@@ -258,6 +259,62 @@ export async function persistDriverSeasons(
   return result;
 }
 
+export async function persistCircuits(
+  tx: Tx,
+  source: string,
+  items: NormalizedWithSource<NormalizedCircuit>[],
+  now: Date,
+): Promise<PersistResult> {
+  const result = { ...EMPTY_PERSIST_RESULT };
+  for (const item of items) {
+    const hash = computeContentHash(item.data);
+    const existing = await tx.externalCircuit.findUnique({
+      where: { source_externalId: { source, externalId: item.data.externalId } },
+      select: { id: true, contentHash: true },
+    });
+    if (!existing) {
+      await tx.externalCircuit.create({
+        data: {
+          source,
+          externalId: item.data.externalId,
+          name: item.data.name,
+          url: item.data.url,
+          locality: item.data.locality,
+          country: item.data.country,
+          latitude: item.data.latitude,
+          longitude: item.data.longitude,
+          contentHash: hash,
+          sourceRecord: item.sourceRecord as Prisma.InputJsonValue,
+        },
+      });
+      result.created += 1;
+    } else if (existing.contentHash !== hash) {
+      await tx.externalCircuit.update({
+        where: { id: existing.id },
+        data: {
+          name: item.data.name,
+          url: item.data.url,
+          locality: item.data.locality,
+          country: item.data.country,
+          latitude: item.data.latitude,
+          longitude: item.data.longitude,
+          contentHash: hash,
+          sourceRecord: item.sourceRecord as Prisma.InputJsonValue,
+          lastSyncedAt: now,
+        },
+      });
+      result.updated += 1;
+    } else {
+      await tx.externalCircuit.update({
+        where: { id: existing.id },
+        data: { lastSyncedAt: now },
+      });
+      result.unchanged += 1;
+    }
+  }
+  return result;
+}
+
 export async function persistRaces(
   tx: Tx,
   source: string,
@@ -277,6 +334,18 @@ export async function persistRaces(
       },
       select: { id: true, contentHash: true },
     });
+    const externalCircuit = item.data.circuitExternalId
+      ? await tx.externalCircuit.findUnique({
+          where: {
+            source_externalId: {
+              source,
+              externalId: item.data.circuitExternalId,
+            },
+          },
+          select: { id: true },
+        })
+      : null;
+    const externalCircuitId = externalCircuit?.id ?? null;
     if (!existing) {
       await tx.externalRace.create({
         data: {
@@ -285,9 +354,18 @@ export async function persistRaces(
           round: item.data.round,
           grandPrix: item.data.grandPrix,
           name: item.data.name,
+          officialName: item.data.officialName,
           circuitName: item.data.circuitName,
+          circuitExternalId: item.data.circuitExternalId,
+          locality: item.data.locality,
+          country: item.data.country,
+          latitude: item.data.latitude,
+          longitude: item.data.longitude,
+          time: item.data.time,
+          url: item.data.url,
           date: item.data.date,
           status: item.data.status,
+          externalCircuitId,
           contentHash: hash,
           sourceRecord: item.sourceRecord as Prisma.InputJsonValue,
         },
@@ -299,9 +377,18 @@ export async function persistRaces(
         data: {
           grandPrix: item.data.grandPrix,
           name: item.data.name,
+          officialName: item.data.officialName,
           circuitName: item.data.circuitName,
+          circuitExternalId: item.data.circuitExternalId,
+          locality: item.data.locality,
+          country: item.data.country,
+          latitude: item.data.latitude,
+          longitude: item.data.longitude,
+          time: item.data.time,
+          url: item.data.url,
           date: item.data.date,
           status: item.data.status,
+          externalCircuitId,
           contentHash: hash,
           sourceRecord: item.sourceRecord as Prisma.InputJsonValue,
           lastSyncedAt: now,

@@ -20,12 +20,15 @@ export interface JolpicaConstructorRaw {
 }
 
 export interface JolpicaLocationRaw {
+  lat?: string;
+  long?: string;
   locality?: string;
   country?: string;
 }
 
 export interface JolpicaCircuitRaw {
   circuitId?: string;
+  url?: string;
   circuitName?: string;
   Location?: JolpicaLocationRaw;
 }
@@ -33,6 +36,7 @@ export interface JolpicaCircuitRaw {
 export interface JolpicaRaceRaw {
   season?: string;
   round?: string;
+  url?: string;
   raceName?: string;
   Circuit?: JolpicaCircuitRaw;
   date?: string;
@@ -89,6 +93,30 @@ export class JolpicaClient {
     const body = await this.transport.getJson(`${year}.json`);
     const table = readTable(body, "RaceTable");
     return asArray(table.Races) as JolpicaRaceRaw[];
+  }
+
+  async getCircuits(): Promise<JolpicaCircuitRaw[]> {
+    const limit = 100;
+    const collected: JolpicaCircuitRaw[] = [];
+    for (let offset = 0; offset < 500; offset += limit) {
+      const body = await this.transport.getJson(
+        `circuits.json?limit=${limit}&offset=${offset}`,
+      );
+      const table = readTable(body, "CircuitTable");
+      const circuits = asArray(table.Circuits) as JolpicaCircuitRaw[];
+      collected.push(...circuits);
+      const root = asRecord(body);
+      const mrData = root ? asRecord(root.MRData) : null;
+      const total = Number.parseInt(String(mrData?.total ?? ""), 10);
+      if (
+        circuits.length === 0 ||
+        !Number.isInteger(total) ||
+        collected.length >= total
+      ) {
+        break;
+      }
+    }
+    return collected;
   }
 
   async getConstructors(year: number): Promise<JolpicaConstructorRaw[]> {
