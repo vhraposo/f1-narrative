@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 import { JOLPICA_SOURCE } from "../external-sync/jolpica.service.js";
 import { entryInclude, rosterService } from "../roster/roster.service.js";
 import {
@@ -63,8 +64,10 @@ function toStarterView(holder: OpeningGridHolder): { name: string; number: numbe
 
 export const playerEntryService = {
   async setup(userId: string, input: SetupInput) {
+    const universe = await ensureUniverse(userId);
     const seasons = await prisma.season.findMany({
       where: {
+        universeId: universe.id,
         externalSeasonBindings: { some: { confidence: "CONFIRMED" } },
       },
       include: {
@@ -110,7 +113,7 @@ export const playerEntryService = {
 
     const teams = await prisma.team.findMany({
       where: {
-        userId,
+        universeId: universe.id,
         externalTeamBindings: { some: { confidence: "CONFIRMED" } },
       },
       include: {
@@ -212,9 +215,10 @@ export const playerEntryService = {
   },
 
   async create(userId: string, input: CreateInput) {
+    const universe = await ensureUniverse(userId);
     return prisma.$transaction(async (tx: Tx) => {
-      const season = await tx.season.findUnique({
-        where: { id: input.seasonId },
+      const season = await tx.season.findFirst({
+        where: { id: input.seasonId, universeId: universe.id },
         select: { id: true },
       });
       if (!season) {
@@ -238,7 +242,7 @@ export const playerEntryService = {
       }
 
       const team = await tx.team.findFirst({
-        where: { id: input.teamId, userId },
+        where: { id: input.teamId, universeId: universe.id },
         select: { id: true },
       });
       if (!team) {
@@ -311,6 +315,7 @@ export const playerEntryService = {
       const character = await tx.character.create({
         data: {
           userId,
+          universeId: universe.id,
           controlledBy: "USER",
           name: input.name,
           nationality: input.nationality,

@@ -80,10 +80,11 @@ describe("DriverCard", () => {
     expect(container.querySelector('[style*="background-color"]')).not.toBeNull();
   });
 
-  it("usa a imagem do character quando disponível", () => {
+  it("usa a imagem do Driver (displayHeadshotUrl) quando disponível", () => {
     render(
       <DriverCard
         driver={makeDriver({
+          displayHeadshotUrl: "/driver.jpg",
           character: {
             id: "c1",
             name: "Alicya Kucharski",
@@ -97,7 +98,7 @@ describe("DriverCard", () => {
     );
     expect(
       screen.getByRole("img", { name: "Alicya Kucharski" }).getAttribute("src"),
-    ).toBe("/face.jpg");
+    ).toBe("/driver.jpg");
   });
 
   it("usa a inicial como fallback quando não há imagem", () => {
@@ -175,12 +176,12 @@ describe("DriverCard", () => {
     expect(screen.queryByText(/^P/)).toBeNull();
   });
 
-  it("o tile navega para a ficha do character e as ações ficam fora dele", () => {
+  it("o tile navega para a ficha do Driver e as ações ficam fora dele", () => {
     const { container } = render(
       <DriverCard driver={makeDriver()} onRemove={() => undefined} isRemoving={false} />,
     );
     const tile = container.querySelector(
-      'a[href="/app/characters/c1"]',
+      'a[href="/app/drivers/d1"]',
     ) as HTMLAnchorElement;
     expect(tile).not.toBeNull();
     expect(tile.querySelector("a")).toBeNull();
@@ -188,8 +189,28 @@ describe("DriverCard", () => {
       screen
         .getByRole("link", { name: /Editar perfil/ })
         .getAttribute("href"),
-    ).toBe("/app/characters/c1");
+    ).toBe("/app/drivers/d1");
     expect(screen.getByRole("button", { name: /Remover/ })).toBeDefined();
+  });
+
+  it("piloto de outro usuário (isOwned=false): navega para o Driver, sem ações de gestão", () => {
+    const { container } = render(
+      <DriverCard
+        driver={makeDriver()}
+        onRemove={() => undefined}
+        isRemoving={false}
+        isOwned={false}
+      />,
+    );
+    expect(container.querySelector('a[href="/app/drivers/d1"]')).not.toBeNull();
+    expect(container.querySelector('a[href^="/app/characters"]')).toBeNull();
+    expect(screen.queryByRole("link", { name: /Editar perfil/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Remover/ })).toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Alicya Kucharski" }),
+    ).toBeDefined();
+    expect(screen.getByText("#81")).toBeDefined();
+    expect(screen.getByText("McLaren")).toBeDefined();
   });
 
   it("confirma a remoção via ConfirmDialog", async () => {
@@ -347,18 +368,13 @@ describe("DriverCard", () => {
     expect(img.className).toContain("object-cover");
   });
 
-  it("prefere a imagem do character (alta resolução) quando headshotUrl também existe", () => {
+  it("prefere o override (displayHeadshotUrl) sobre o headshot externo", () => {
     render(
       <DriverCard
         driver={makeDriver({
           headshotUrl: "https://media.formula1.com/a.png.transform/1col/image.png",
-          character: {
-            id: "c1",
-            name: "Alicya Kucharski",
-            nationality: "Brasileira",
-            imageUrl:
-              "https://media.formula1.com/a.png.transform/2col-retina/image.png",
-          },
+          displayHeadshotUrl:
+            "https://media.formula1.com/a.png.transform/2col-retina/image.png",
         })}
         onRemove={() => undefined}
         isRemoving={false}
@@ -370,7 +386,7 @@ describe("DriverCard", () => {
     );
   });
 
-  it("usa imageUrl quando headshotUrl é nulo", () => {
+  it("não usa Character.imageUrl para a foto do Driver (fallback inicial)", () => {
     render(
       <DriverCard
         driver={makeDriver({
@@ -386,8 +402,8 @@ describe("DriverCard", () => {
         isRemoving={false}
       />,
     );
-    const img = screen.getByRole("img", { name: "Alicya Kucharski" }) as HTMLImageElement;
-    expect(img.getAttribute("src")).toBe("https://img.test/c.jpg");
+    expect(screen.queryByRole("img", { name: "Alicya Kucharski" })).toBeNull();
+    expect(screen.getByText("A")).toBeDefined();
   });
 
   it("fallback para inicial quando headshotUrl e imageUrl são nulos", () => {

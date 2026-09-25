@@ -1,4 +1,5 @@
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 import { rosterService } from "../roster/roster.service.js";
 import { JOLPICA_SOURCE } from "../external-sync/jolpica.service.js";
 import { OPENING_GRID_SOURCE } from "../opening-grid/opening-grid.source.js";
@@ -110,9 +111,9 @@ async function resolveComparableSeason(seasonId: string) {
   };
 }
 
-async function resolveTeam(userId: string, teamId: string): Promise<TeamInfo> {
+async function resolveTeam(userId: string, universeId: string, teamId: string): Promise<TeamInfo> {
   const team = await prisma.team.findFirst({
-    where: { id: teamId, userId },
+    where: { id: teamId, universeId },
     include: {
       externalTeamBindings: {
         where: { confidence: "CONFIRMED" },
@@ -222,9 +223,13 @@ async function resolveSourceSeatsFromParticipants(
   }));
 }
 
-async function resolveDriverBindingMap(sourceYear: number): Promise<Map<string, DriverBinding>> {
+async function resolveDriverBindingMap(
+  sourceYear: number,
+  universeId: string,
+): Promise<Map<string, DriverBinding>> {
   const bindings = await prisma.externalBindingDriverSeason.findMany({
     where: {
+      universeId,
       confidence: "CONFIRMED",
       externalDriverSeason: { source: JOLPICA_SOURCE, seasonYear: sourceYear },
     },
@@ -472,6 +477,7 @@ async function persistKeepDecision(
 
 export const universeEditorService = {
   async comparison(userId: string, seasonId: string): Promise<ComparisonResponse> {
+    const universe = await ensureUniverse(userId);
     const { season, sourceYear, comparable } = await resolveComparableSeason(seasonId);
     if (!comparable || sourceYear === null) {
       return { season, comparable: false, teams: [] };
@@ -479,7 +485,7 @@ export const universeEditorService = {
 
     const teams = await prisma.team.findMany({
       where: {
-        userId,
+        universeId: universe.id,
         externalTeamBindings: { some: { confidence: "CONFIRMED" } },
       },
       include: {
@@ -495,7 +501,7 @@ export const universeEditorService = {
       return { season, comparable: true, teams: [] };
     }
 
-    const driverBindingMap = await resolveDriverBindingMap(sourceYear);
+    const driverBindingMap = await resolveDriverBindingMap(sourceYear, universe.id);
 
     const teamComparisons: TeamComparison[] = [];
     for (const t of teams) {
@@ -517,23 +523,25 @@ export const universeEditorService = {
   },
 
   async keepUniverse(userId: string, teamId: string, seasonId: string) {
+    const universe = await ensureUniverse(userId);
     const { comparable, sourceYear } = await resolveComparableSeason(seasonId);
     if (!comparable || sourceYear === null) {
       throw new UniverseEditorError("SEASON_NOT_BOUND", "Temporada não possui fonte externa vinculada", 409);
     }
-    const teamInfo = await resolveTeam(userId, teamId);
-    const driverBindingMap = await resolveDriverBindingMap(sourceYear);
+    const teamInfo = await resolveTeam(userId, universe.id, teamId);
+    const driverBindingMap = await resolveDriverBindingMap(sourceYear, universe.id);
     const team = await buildTeamComparison(seasonId, sourceYear, teamId, teamInfo, driverBindingMap);
     await persistKeepDecision(userId, seasonId, teamId, team);
     return { team };
   },
 
   async restoreSource(userId: string, teamId: string, seasonId: string) {
+    const universe = await ensureUniverse(userId);
     const { comparable, sourceYear } = await resolveComparableSeason(seasonId);
     if (!comparable || sourceYear === null) {
       throw new UniverseEditorError("SEASON_NOT_BOUND", "Temporada não possui fonte externa vinculada", 409);
     }
-    const teamInfo = await resolveTeam(userId, teamId);
+    const teamInfo = await resolveTeam(userId, universe.id, teamId);
 
     const sourceSeats = await resolveSourceSeats(teamInfo.extTeamExternalId, sourceYear);
     if (sourceSeats.length === 0) {
@@ -541,7 +549,7 @@ export const universeEditorService = {
       return { team: result.team, restored: 0 };
     }
 
-    const driverBindingMap = await resolveDriverBindingMap(sourceYear);
+    const driverBindingMap = await resolveDriverBindingMap(sourceYear, universe.id);
     const universeSeats = await resolveUniverseSeats(seasonId, teamId);
 
     const toRestore: Array<{ seat: 1 | 2; driverProfileId: string; number: number | null }> = [];
@@ -575,14 +583,15 @@ export const universeEditorService = {
       }
     });
 
-    const driverBindingMapAfter = await resolveDriverBindingMap(sourceYear);
+    const driverBindingMapAfter = await resolveDriverBindingMap(sourceYear, universe.id);
     const team = await buildTeamComparison(seasonId, sourceYear, teamId, teamInfo, driverBindingMapAfter);
     return { team, restored: toRestore.length };
   },
 
   async listDecisions(userId: string, seasonId: string, teamId: string) {
+    const universe = await ensureUniverse(userId);
     const team = await prisma.team.findFirst({
-      where: { id: teamId, userId },
+      where: { id: teamId, universeId: universe.id },
       select: { id: true },
     });
     if (!team) {

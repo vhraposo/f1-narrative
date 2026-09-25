@@ -1,4 +1,5 @@
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { deleteUniverseDataForUsers } from "../../test-utils/universe-cleanup.js";
 import { JOLPICA_SOURCE } from "../external-sync/jolpica.service.js";
 
 export const INIT_YEAR = 2031;
@@ -10,6 +11,7 @@ export const DRIVER_RESERVE = "uni-init-reserve-x";
 
 export interface InitFixtureIds {
   userId: string;
+  universeId: string;
   seasonId: string;
   extSeasonId: string;
   extTeamId: string;
@@ -58,8 +60,12 @@ export async function seedUniverseInitFixture(
     },
   });
 
+  const universe = await prisma.universe.create({
+    data: { userId: user.id },
+  });
+
   const season = await prisma.season.create({
-    data: { year, name: String(year), status: "PRE_SEASON" },
+    data: { universeId: universe.id, year, name: String(year), status: "PRE_SEASON" },
   });
 
   const extSeason = await prisma.externalSeason.create({
@@ -259,6 +265,7 @@ export async function seedUniverseInitFixture(
 
   const ids: InitFixtureIds = {
     userId: user.id,
+    universeId: universe.id,
     seasonId: season.id,
     extSeasonId: extSeason.id,
     extTeamId: extTeam.id,
@@ -280,6 +287,7 @@ export async function seedUniverseInitFixture(
 
   const cleanup = async (extraUserIds: string[] = []) => {
     const userIds = [user.id, ...extraUserIds];
+    await deleteUniverseDataForUsers(prisma, userIds);
     const extResultIds = [
       extResultLando1.id,
       extResultOscar1.id,

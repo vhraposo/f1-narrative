@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 import {
   createRaceResultSchema,
   createRaceSchema,
@@ -118,8 +119,10 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/api/seasons",
     { preHandler: [fastify.authenticate] },
-    async () => {
+    async (request) => {
+      const universe = await ensureUniverse(request.user!.id);
       const seasons = await prisma.season.findMany({
+        where: { universeId: universe.id },
         select: seasonSelect,
         orderBy: { year: "desc" },
       });
@@ -139,8 +142,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           issues: parsed.error.issues,
         });
       }
+      const universe = await ensureUniverse(request.user!.id);
       const season = await prisma.season.create({
-        data: parsed.data,
+        data: { ...parsed.data, universeId: universe.id },
         select: seasonSelect,
       });
       return reply.code(201).send({ season });
@@ -158,8 +162,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "VALIDATION_ERROR",
         });
       }
-      const season = await prisma.season.findUnique({
-        where: { id: params.data.id },
+      const universe = await ensureUniverse(request.user!.id);
+      const season = await prisma.season.findFirst({
+        where: { id: params.data.id, universeId: universe.id },
         select: seasonSelect,
       });
       if (!season) {
@@ -191,8 +196,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           issues: parsed.error.issues,
         });
       }
-      const existing = await prisma.season.findUnique({
-        where: { id: params.data.id },
+      const universe = await ensureUniverse(request.user!.id);
+      const existing = await prisma.season.findFirst({
+        where: { id: params.data.id, universeId: universe.id },
         select: { id: true },
       });
       if (!existing) {
@@ -221,8 +227,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "VALIDATION_ERROR",
         });
       }
-      const existing = await prisma.season.findUnique({
-        where: { id: params.data.id },
+      const universe = await ensureUniverse(request.user!.id);
+      const existing = await prisma.season.findFirst({
+        where: { id: params.data.id, universeId: universe.id },
         select: { id: true },
       });
       if (!existing) {
@@ -252,8 +259,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "VALIDATION_ERROR",
         });
       }
-      const season = await prisma.season.findUnique({
-        where: { id: params.data.seasonId },
+      const universe = await ensureUniverse(request.user!.id);
+      const season = await prisma.season.findFirst({
+        where: { id: params.data.seasonId, universeId: universe.id },
         select: { id: true },
       });
       if (!season) {
@@ -290,8 +298,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           issues: parsed.error.issues,
         });
       }
-      const season = await prisma.season.findUnique({
-        where: { id: params.data.seasonId },
+      const universe = await ensureUniverse(request.user!.id);
+      const season = await prisma.season.findFirst({
+        where: { id: params.data.seasonId, universeId: universe.id },
         select: { id: true },
       });
       if (!season) {
@@ -319,8 +328,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "VALIDATION_ERROR",
         });
       }
-      const race = await prisma.race.findUnique({
-        where: { id: params.data.id },
+      const universe = await ensureUniverse(request.user!.id);
+      const race = await prisma.race.findFirst({
+        where: { id: params.data.id, season: { universeId: universe.id } },
         select: raceSelect,
       });
       if (!race) {
@@ -352,8 +362,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           issues: parsed.error.issues,
         });
       }
-      const existing = await prisma.race.findUnique({
-        where: { id: params.data.id },
+      const universe = await ensureUniverse(request.user!.id);
+      const existing = await prisma.race.findFirst({
+        where: { id: params.data.id, season: { universeId: universe.id } },
         select: { id: true },
       });
       if (!existing) {
@@ -382,8 +393,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "VALIDATION_ERROR",
         });
       }
-      const existing = await prisma.race.findUnique({
-        where: { id: params.data.id },
+      const universe = await ensureUniverse(request.user!.id);
+      const existing = await prisma.race.findFirst({
+        where: { id: params.data.id, season: { universeId: universe.id } },
         select: { id: true },
       });
       if (!existing) {
@@ -413,8 +425,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "VALIDATION_ERROR",
         });
       }
-      const race = await prisma.race.findUnique({
-        where: { id: params.data.raceId },
+      const universe = await ensureUniverse(request.user!.id);
+      const race = await prisma.race.findFirst({
+        where: { id: params.data.raceId, season: { universeId: universe.id } },
         select: { id: true },
       });
       if (!race) {
@@ -455,8 +468,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           issues: parsed.error.issues,
         });
       }
-      const race = await prisma.race.findUnique({
-        where: { id: params.data.raceId },
+      const universe = await ensureUniverse(request.user!.id);
+      const race = await prisma.race.findFirst({
+        where: { id: params.data.raceId, season: { universeId: universe.id } },
         select: { id: true },
       });
       if (!race) {
@@ -598,8 +612,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "VALIDATION_ERROR",
         });
       }
-      const season = await prisma.season.findUnique({
-        where: { id: params.data.seasonId },
+      const universe = await ensureUniverse(request.user!.id);
+      const season = await prisma.season.findFirst({
+        where: { id: params.data.seasonId, universeId: universe.id },
         select: { id: true },
       });
       if (!season) {
@@ -639,8 +654,9 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           issues: parsed.error.issues,
         });
       }
-      const season = await prisma.season.findUnique({
-        where: { id: params.data.seasonId },
+      const universe = await ensureUniverse(request.user!.id);
+      const season = await prisma.season.findFirst({
+        where: { id: params.data.seasonId, universeId: universe.id },
         select: { id: true },
       });
       if (!season) {

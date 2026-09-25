@@ -15,9 +15,9 @@ function actorFor(userId: string): Actor {
   return { id: userId, role: "ADMIN" };
 }
 
-async function readWorldSeason(): Promise<string | null> {
+async function readWorldSeason(universeId: string): Promise<string | null> {
   const world = await prisma.worldState.findUnique({
-    where: { key: WORLD_KEY },
+    where: { universeId_key: { universeId, key: WORLD_KEY } },
     select: { currentSeasonId: true },
   });
   return world?.currentSeasonId ?? null;
@@ -44,15 +44,13 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
   const extSeasonIds: string[] = [];
   const foreignWorldPointers: string[] = [];
   const extraCleanups: Array<() => Promise<void>> = [];
-  let createdWorldRow = false;
+  const createdWorldUniverseIds: string[] = [];
 
-  beforeAll(async () => {
-    await prisma.worldState.deleteMany({});
-  });
-
-  async function captureWorldRowPresence() {
-    const existing = await prisma.worldState.count({ where: { key: WORLD_KEY } });
-    createdWorldRow = existing === 0;
+  async function captureWorldRowPresence(universeId: string) {
+    const existing = await prisma.worldState.count({
+      where: { universeId, key: WORLD_KEY },
+    });
+    if (existing === 0) createdWorldUniverseIds.push(universeId);
   }
 
   async function createExtSeason(year: number, source = JOLPICA_SOURCE) {
@@ -106,8 +104,10 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     if (extSeasonIds.length > 0) {
       await prisma.externalSeason.deleteMany({ where: { id: { in: extSeasonIds } } });
     }
-    if (createdWorldRow) {
-      await prisma.worldState.deleteMany({ where: { key: WORLD_KEY } });
+    if (createdWorldUniverseIds.length > 0) {
+      await prisma.worldState.deleteMany({
+        where: { universeId: { in: createdWorldUniverseIds }, key: WORLD_KEY },
+      });
     }
     for (const cleanup of extraCleanups) {
       await cleanup();
@@ -117,14 +117,14 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     extSeasonIds.length = 0;
     foreignWorldPointers.length = 0;
     extraCleanups.length = 0;
-    createdWorldRow = false;
+    createdWorldUniverseIds.length = 0;
   });
 
   it("primeira temporada: cria Season + binding CONFIRMED e aponta WorldState sem tocar o Mirror", async () => {
     const fixture = await seedUniverseInitFixture(2061);
     extraCleanups.push(() => fixture.cleanup());
     await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-    await captureWorldRowPresence();
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const report = await universeInitService.bootstrapSeason(
       actorFor(fixture.ids.userId),
@@ -134,7 +134,12 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     recordBootstrap(report);
     const seasonId = report.season.universeSeasonId;
     const binding = await prisma.externalBindingSeason.findUnique({
-      where: { externalSeasonId: fixture.ids.extSeasonId },
+      where: {
+        universeId_externalSeasonId: {
+          universeId: fixture.ids.universeId,
+          externalSeasonId: fixture.ids.extSeasonId,
+        },
+      },
     });
     bindingIds.push(binding!.id);
 
@@ -158,7 +163,7 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     expect(binding?.seasonId).toBe(seasonId);
     expect(binding?.confidence).toBe("CONFIRMED");
     expect(binding?.boundBy).toBe("ADMIN");
-    expect(await readWorldSeason()).toBe(seasonId);
+    expect(await readWorldSeason(fixture.ids.universeId)).toBe(seasonId);
 
     expect(await prisma.externalSeason.count({ where: { id: fixture.ids.extSeasonId } })).toBe(1);
     expect(await prisma.externalTeam.count({ where: { id: fixture.ids.extTeamId } })).toBe(1);
@@ -171,7 +176,7 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     const fixture = await seedUniverseInitFixture(2062);
     extraCleanups.push(() => fixture.cleanup());
     await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-    await captureWorldRowPresence();
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const first = await universeInitService.bootstrapSeason(
       actorFor(fixture.ids.userId),
@@ -189,17 +194,18 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     expect(second.season.action).toBe("CREATED");
     expect(second.worldState.changed).toBe(false);
     expect(second.worldState.currentSeasonId).toBe(first.season.universeSeasonId);
-    expect(await readWorldSeason()).toBe(first.season.universeSeasonId);
+    expect(await readWorldSeason(fixture.ids.universeId)).toBe(first.season.universeSeasonId);
     expect(await prisma.season.count({ where: { year: 2063 } })).toBe(1);
   });
 
   it("reusa binding CONFIRMED existente sem duplicar quando WorldState ainda não apontava", async () => {
     const fixture = await seedUniverseInitFixture(2064);
     extraCleanups.push(() => fixture.cleanup());
-    await captureWorldRowPresence();
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const binding = await prisma.externalBindingSeason.create({
       data: {
+        universeId: fixture.ids.universeId,
         externalSeasonId: fixture.ids.extSeasonId,
         seasonId: fixture.ids.seasonId,
         confidence: "CONFIRMED",
@@ -225,17 +231,22 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
       }),
     ).toBe(1);
     expect(await prisma.season.count({ where: { year: 2064 } })).toBe(1);
-    expect(await readWorldSeason()).toBe(fixture.ids.seasonId);
+    expect(await readWorldSeason(fixture.ids.universeId)).toBe(fixture.ids.seasonId);
   });
 
   it("múltiplas temporadas do mesmo ano → conflito sem nenhuma escrita", async () => {
     const fixture = await seedUniverseInitFixture(2065);
     extraCleanups.push(() => fixture.cleanup());
-    const worldBefore = await readWorldSeason();
-    await captureWorldRowPresence();
+    const worldBefore = await readWorldSeason(fixture.ids.universeId);
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const secondSeason = await prisma.season.create({
-      data: { year: 2065, name: "2065B", status: "PRE_SEASON" },
+      data: {
+        universeId: fixture.ids.universeId,
+        year: 2065,
+        name: "2065B",
+        status: "PRE_SEASON",
+      },
     });
     seasonIds.push(secondSeason.id);
 
@@ -252,7 +263,7 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
       }),
     ).toBe(0);
     expect(await prisma.season.count({ where: { year: 2065 } })).toBe(2);
-    expect(await readWorldSeason()).toBe(worldBefore);
+    expect(await readWorldSeason(fixture.ids.universeId)).toBe(worldBefore);
   });
 
   it("binding sugerido → conflito sem escrita", async () => {
@@ -261,6 +272,7 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
 
     const binding = await prisma.externalBindingSeason.create({
       data: {
+        universeId: fixture.ids.universeId,
         externalSeasonId: fixture.ids.extSeasonId,
         seasonId: fixture.ids.seasonId,
         confidence: "SUGGESTED",
@@ -276,7 +288,12 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     ).rejects.toMatchObject({ code: "SEASON_BINDING_SUGGESTED" });
 
     const bindingAfter = await prisma.externalBindingSeason.findUnique({
-      where: { externalSeasonId: fixture.ids.extSeasonId },
+      where: {
+        universeId_externalSeasonId: {
+          universeId: fixture.ids.universeId,
+          externalSeasonId: fixture.ids.extSeasonId,
+        },
+      },
       select: { confidence: true },
     });
     expect(bindingAfter?.confidence).toBe("SUGGESTED");
@@ -290,7 +307,7 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
   it("Season do mesmo ano já existe sem vínculo → reutilizada com binding confirmado sem duplicata", async () => {
     const fixture = await seedUniverseInitFixture(2067);
     extraCleanups.push(() => fixture.cleanup());
-    await captureWorldRowPresence();
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const report = await universeInitService.bootstrapSeason(
       actorFor(fixture.ids.userId),
@@ -303,7 +320,12 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     recordBootstrap(report);
 
     const binding = await prisma.externalBindingSeason.findUnique({
-      where: { externalSeasonId: fixture.ids.extSeasonId },
+      where: {
+        universeId_externalSeasonId: {
+          universeId: fixture.ids.universeId,
+          externalSeasonId: fixture.ids.extSeasonId,
+        },
+      },
     });
     bindingIds.push(binding!.id);
     expect(binding?.seasonId).toBe(fixture.ids.seasonId);
@@ -316,14 +338,14 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
         where: { externalSeasonId: fixture.ids.extSeasonId },
       }),
     ).toBe(1);
-    expect(await readWorldSeason()).toBe(fixture.ids.seasonId);
+    expect(await readWorldSeason(fixture.ids.universeId)).toBe(fixture.ids.seasonId);
   });
 
   it("ExternalSeason inexistente → NOT_FOUND sem nenhuma escrita", async () => {
     const fixture = await seedUniverseInitFixture(2068);
     extraCleanups.push(() => fixture.cleanup());
     const extCountBefore = await prisma.externalSeason.count();
-    const worldBefore = await readWorldSeason();
+    const worldBefore = await readWorldSeason(fixture.ids.universeId);
 
     await expect(
       universeInitService.bootstrapSeason(actorFor(fixture.ids.userId), randomUUID()),
@@ -331,21 +353,27 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
 
     expect(await prisma.externalSeason.count()).toBe(extCountBefore);
     expect(await prisma.externalBindingSeason.count()).toBe(0);
-    expect(await readWorldSeason()).toBe(worldBefore);
+    expect(await readWorldSeason(fixture.ids.universeId)).toBe(worldBefore);
   });
 
   it("WorldState inconsistente (currentSeasonId sem Season) → conflito sem escrita", async () => {
     const fixture = await seedUniverseInitFixture(2069);
     extraCleanups.push(() => fixture.cleanup());
     await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-    await captureWorldRowPresence();
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const bogus = randomUUID();
     foreignWorldPointers.push(bogus);
     await prisma.worldState.upsert({
-      where: { key: WORLD_KEY },
+      where: {
+        universeId_key: { universeId: fixture.ids.universeId, key: WORLD_KEY },
+      },
       update: { currentSeasonId: bogus },
-      create: { key: WORLD_KEY, currentSeasonId: bogus },
+      create: {
+        universeId: fixture.ids.universeId,
+        key: WORLD_KEY,
+        currentSeasonId: bogus,
+      },
     });
 
     await expect(
@@ -367,7 +395,7 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     const fixture = await seedUniverseInitFixture(2070);
     extraCleanups.push(() => fixture.cleanup());
     await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-    const worldBefore = await readWorldSeason();
+    const worldBefore = await readWorldSeason(fixture.ids.universeId);
 
     const otherExt = await createExtSeason(2070, "other-feed");
     await expect(
@@ -378,14 +406,14 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     expect(
       await prisma.externalBindingSeason.count({ where: { externalSeasonId: otherExt.id } }),
     ).toBe(0);
-    expect(await readWorldSeason()).toBe(worldBefore);
+    expect(await readWorldSeason(fixture.ids.universeId)).toBe(worldBefore);
   });
 
   it("idempotente: executar duas vezes não cria duplicatas", async () => {
     const fixture = await seedUniverseInitFixture(2071);
     extraCleanups.push(() => fixture.cleanup());
     await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-    await captureWorldRowPresence();
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const first = await universeInitService.bootstrapSeason(
       actorFor(fixture.ids.userId),
@@ -408,18 +436,19 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
         where: { externalSeasonId: fixture.ids.extSeasonId },
       }),
     ).toBe(1);
-    expect(await readWorldSeason()).toBe(first.season.universeSeasonId);
+    expect(await readWorldSeason(fixture.ids.universeId)).toBe(first.season.universeSeasonId);
   });
 
   it("dados existentes do universo (Team/Character/DriverProfile) não são alterados nem absorvidos", async () => {
     const fixture = await seedUniverseInitFixture(2072);
     extraCleanups.push(() => fixture.cleanup());
     await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-    await captureWorldRowPresence();
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const existingTeam = await prisma.team.create({
       data: {
         userId: fixture.ids.userId,
+        universeId: fixture.ids.universeId,
         name: "Alpha Legacy",
         shortName: "ALP",
         color: "#00ff00",
@@ -428,6 +457,7 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     const existingCharacter = await prisma.character.create({
       data: {
         userId: fixture.ids.userId,
+        universeId: fixture.ids.universeId,
         controlledBy: "USER",
         name: "Legacy Person",
         nationality: "Brazilian",
@@ -479,7 +509,7 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     const fixture = await seedUniverseInitFixture(2073);
     extraCleanups.push(() => fixture.cleanup());
     await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-    await captureWorldRowPresence();
+    await captureWorldRowPresence(fixture.ids.universeId);
 
     const bootstrap = await universeInitService.bootstrapSeason(
       actorFor(fixture.ids.userId),
@@ -516,7 +546,11 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
       }),
     ).toBe(1);
 
-    const world = await prisma.worldState.findUnique({ where: { key: WORLD_KEY } });
+    const world = await prisma.worldState.findUnique({
+      where: {
+        universeId_key: { universeId: fixture.ids.universeId, key: WORLD_KEY },
+      },
+    });
     expect(world?.currentSeasonId).toBe(bootstrap.season.universeSeasonId);
   });
 });
@@ -545,11 +579,6 @@ describe("UniverseInit bootstrap routes — endpoints e autorização", () => {
   }
 
   beforeAll(async () => {
-    const fixture = await seedUniverseInitFixture(2074);
-    ids = fixture.ids;
-    cleanup = fixture.cleanup;
-    await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-
     app = buildApp(undefined, undefined, makeDummyClient());
     await app.ready();
 
@@ -561,6 +590,11 @@ describe("UniverseInit bootstrap routes — endpoints e autorização", () => {
     const userEmail = `bootstrap-user-${Date.now()}@f1nw.test`;
     userCookie = await signUpGetCookie(userEmail, "Bootstrap User");
     userId = (await prisma.user.findUniqueOrThrow({ where: { email: userEmail } })).id;
+
+    const fixture = await seedUniverseInitFixture(2074);
+    ids = fixture.ids;
+    cleanup = fixture.cleanup;
+    await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
   });
 
   afterAll(async () => {

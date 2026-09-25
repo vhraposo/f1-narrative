@@ -202,6 +202,7 @@ interface SyncFixture {
 
 let app: FastifyInstance;
 let admin: User;
+let adminUniverseId = "";
 let fixture: SyncFixture;
 const createdConversationIds: string[] = [];
 let atlasTeamId = "";
@@ -244,8 +245,19 @@ async function syncScopeRaw(scope: string): Promise<{ statusCode: number; body: 
 }
 
 async function setupUniverseFixture(year: number): Promise<SyncFixture> {
+  const universe = await prisma.universe.upsert({
+    where: { userId: admin.id },
+    update: {},
+    create: { userId: admin.id },
+  });
+  adminUniverseId = universe.id;
   const season = await prisma.season.create({
-    data: { year, name: String(year), status: "PRE_SEASON" },
+    data: {
+      universeId: universe.id,
+      year,
+      name: String(year),
+      status: "PRE_SEASON",
+    },
   });
   const externalIds = ["auto-la", "auto-gr", "auto-cd"];
   await prisma.externalResult.deleteMany({
@@ -412,7 +424,7 @@ describe("External Sync -> Materialização automática (107.2)", () => {
 
   it("7) DOB usa data real do espelho (sem inventar)", async () => {
     const ada = await prisma.character.findFirstOrThrow({
-      where: { userId: admin.id, name: "Ada Lovelace" },
+      where: { universeId: adminUniverseId, name: "Ada Lovelace" },
       select: { birthDate: true },
     });
     expect(ada.birthDate.toISOString().slice(0, 10)).toBe("1946-04-01");
@@ -420,11 +432,11 @@ describe("External Sync -> Materialização automática (107.2)", () => {
 
   it("8) Player Entry bloqueado enquanto o grid de abertura está UNRESOLVED (fonte real sem roles)", async () => {
     const atlas = await prisma.team.findFirstOrThrow({
-      where: { userId: admin.id, name: "Atlas Racing" },
+      where: { universeId: adminUniverseId, name: "Atlas Racing" },
       select: { id: true },
     });
     const ada = await prisma.character.findFirstOrThrow({
-      where: { userId: admin.id, name: "Ada Lovelace" },
+      where: { universeId: adminUniverseId, name: "Ada Lovelace" },
       select: { id: true },
     });
     const adaProfile = await prisma.driverProfile.findUniqueOrThrow({
@@ -453,7 +465,7 @@ describe("External Sync -> Materialização automática (107.2)", () => {
 
     expect(
       await prisma.character.count({
-        where: { userId: admin.id, name: "Alicya Auto" },
+        where: { universeId: adminUniverseId, name: "Alicya Auto" },
       }),
     ).toBe(0);
 
@@ -469,10 +481,10 @@ describe("External Sync -> Materialização automática (107.2)", () => {
     expect(displacedEvent).toBeNull();
   });
 
-  it("9) piloto materializado é elegível ao chat: Character USER, sem tipo externo", async () => {
+  it("9) piloto materializado é Character de IA elegível ao chat, sem tipo externo", async () => {
     const res = await app.inject({
       method: "GET",
-      url: "/api/characters",
+      url: "/api/characters/ai",
       headers: { cookie: admin.cookie },
     });
     expect(res.statusCode).toBe(200);
@@ -480,19 +492,32 @@ describe("External Sync -> Materialização automática (107.2)", () => {
       id: string;
       name: string;
       controlledBy: string;
-      userId: string;
+      userId: string | null;
     }[];
     const grace = characters.find((character) => character.name === "Grace Hopper");
     expect(grace).toBeTruthy();
-    expect(grace!.controlledBy).toBe("USER");
-    expect(grace!.userId).toBe(admin.id);
+    expect(grace!.controlledBy).toBe("AI");
+    expect(grace!.userId).toBeNull();
     graceCharId = grace!.id;
+
+    const anchorRes = await app.inject({
+      method: "POST",
+      url: "/api/characters",
+      headers: { cookie: admin.cookie },
+      payload: {
+        name: "Engenheiro Auto",
+        nationality: "Brasileira",
+        birthDate: "1990-01-01",
+      },
+    });
+    expect(anchorRes.statusCode).toBe(201);
+    const anchorId = (anchorRes.json() as { character: { id: string } }).character.id;
 
     const created = await app.inject({
       method: "POST",
       url: "/api/conversations",
       headers: { cookie: admin.cookie },
-      payload: { title: "Rádio automático", participantIds: [grace!.id] },
+      payload: { title: "Rádio automático", participantIds: [anchorId, grace!.id] },
     });
     expect(created.statusCode, `body: ${created.body}`).toBe(201);
     const { conversation } = created.json();
@@ -504,7 +529,7 @@ describe("External Sync -> Materialização automática (107.2)", () => {
     }[];
     const graceParticipant = participants.find((p) => p.name === "Grace Hopper");
     expect(graceParticipant).toBeTruthy();
-    expect(graceParticipant!.controlledBy).toBe("USER");
+    expect(graceParticipant!.controlledBy).toBe("AI");
     expect(Object.keys(graceParticipant!)).not.toContain("externalType");
   });
 
@@ -529,7 +554,15 @@ describe("External Sync -> Materialização automática (107.2)", () => {
     });
     const characters = listRes.json().characters as { id: string; name: string }[];
     expect(characters.some((c) => c.name === "Neo Pit Lane")).toBe(true);
-    expect(characters.some((c) => c.name === "Grace Hopper")).toBe(true);
+    expect(characters.some((c) => c.name === "Grace Hopper")).toBe(false);
+
+    const aiListRes = await app.inject({
+      method: "GET",
+      url: "/api/characters/ai",
+      headers: { cookie: admin.cookie },
+    });
+    const aiCharacters = aiListRes.json().characters as { id: string; name: string }[];
+    expect(aiCharacters.some((c) => c.name === "Grace Hopper")).toBe(true);
 
     const res = await app.inject({
       method: "POST",
@@ -551,14 +584,19 @@ describe("External Sync -> Materialização automática (107.2)", () => {
     const names = participants.map((p) => p.name);
     expect(names.filter((n) => n === "Neo Pit Lane")).toHaveLength(1);
     expect(names.filter((n) => n === "Grace Hopper")).toHaveLength(1);
-    expect(participants.every((p) => p.controlledBy === "USER")).toBe(true);
+    expect(
+      participants.find((p) => p.name === "Neo Pit Lane")!.controlledBy,
+    ).toBe("USER");
+    expect(
+      participants.find((p) => p.name === "Grace Hopper")!.controlledBy,
+    ).toBe("AI");
     expect(participants.every((p) => p.externalType === undefined)).toBe(true);
 
     const graceChar = await prisma.character.findFirstOrThrow({
-      where: { userId: admin.id, name: "Grace Hopper" },
+      where: { universeId: adminUniverseId, name: "Grace Hopper" },
       select: { controlledBy: true },
     });
-    expect(graceChar.controlledBy).toBe("USER");
+    expect(graceChar.controlledBy).toBe("AI");
 
     const cpCount = await prisma.conversationParticipant.count({
       where: { conversationId: conversation.id },
@@ -568,7 +606,13 @@ describe("External Sync -> Materialização automática (107.2)", () => {
 
   it("11) divergência narrativa não é sobrescrita: sync continua 200, materialização vira CONFLICT", async () => {
     const redBull = await prisma.team.create({
-      data: { name: "Red Smoke", shortName: "RSM", color: "#9400d3", userId: admin.id },
+      data: {
+        name: "Red Smoke",
+        shortName: "RSM",
+        color: "#9400d3",
+        userId: admin.id,
+        universeId: adminUniverseId,
+      },
     });
     await prisma.seasonDriverEntry.update({
       where: { id: (await prisma.seasonDriverEntry.findFirstOrThrow({
@@ -587,8 +631,12 @@ describe("External Sync -> Materialização automática (107.2)", () => {
     });
     expect(adaEntry.teamId).toBe(redBull.id);
     expect(adaEntry.provenance).toBe("HYBRID");
-    expect(await prisma.team.count({ where: { userId: admin.id } })).toBe(3);
-    expect(await prisma.character.count({ where: { userId: admin.id } })).toBe(4);
+    expect(await prisma.team.count({ where: { universeId: adminUniverseId } })).toBe(3);
+    expect(
+      await prisma.character.count({
+        where: { universeId: adminUniverseId, controlledBy: "AI" },
+      }),
+    ).toBe(3);
   });
 
   it("12) fonte externa permanece intacta após sync + materialização", async () => {

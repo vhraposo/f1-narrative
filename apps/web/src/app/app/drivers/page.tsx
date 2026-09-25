@@ -1,7 +1,6 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { DriverCard } from "@/components/drivers/driver-card";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { useCharacters } from "@/hooks/use-characters";
 import { useSeasons, useStandings } from "@/hooks/use-championship";
 import { useDeleteDriver, useDrivers } from "@/hooks/use-driver-profiles";
 import { useWorld } from "@/hooks/use-world";
@@ -17,10 +17,16 @@ import { compareDrivers, type Driver } from "@/lib/driver-profiles";
 export default function DriversPage() {
   const { data, isLoading, isError, isRefetching, error, refetch } =
     useDrivers();
+  const { data: characters } = useCharacters();
   const { data: world } = useWorld();
   const { data: seasons } = useSeasons();
   const deleteMutation = useDeleteDriver();
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const ownedCharacterIds = useMemo(
+    () => new Set((characters ?? []).map((character) => character.id)),
+    [characters],
+  );
 
   const sortedDrivers = useMemo(
     () => [...(data ?? [])].sort(compareDrivers),
@@ -91,18 +97,8 @@ export default function DriversPage() {
 
       {!isLoading && !isError && data && data.length === 0 && (
         <EmptyState
-          title="Você ainda não tem pilotos."
-          description="Abra um personagem e torne-o piloto para começar."
-          action={
-            <Button>
-              <Link
-                href="/app/characters"
-                className="inline-flex items-center gap-2"
-              >
-                Ir para personagens
-              </Link>
-            </Button>
-          }
+          title="Nenhum piloto na grid."
+          description="A temporada atual ainda não tem pilotos na grade."
         />
       )}
 
@@ -113,6 +109,7 @@ export default function DriversPage() {
               key={driver.characterId}
               driver={driver}
               standing={standingByDriver.get(driver.id) ?? null}
+              isOwned={ownedCharacterIds.has(driver.characterId)}
               onRemove={handleRemove}
               isRemoving={removingId === driver.characterId}
             />

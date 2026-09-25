@@ -44,4 +44,37 @@ export const auth = betterAuth({
   trustedOrigins: [env.CLIENT_ORIGIN, env.BETTER_AUTH_URL],
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          try {
+            const { provisionUniverse } = await import(
+              "../../modules/universe/universe.service.js"
+            );
+            await provisionUniverse(user.id);
+          } catch {
+            // Provisionamento nunca deve impedir a criação da conta.
+          }
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (session) => {
+          try {
+            const { getUniverseForUser, provisionUniverse } = await import(
+              "../../modules/universe/universe.service.js"
+            );
+            const universe = await getUniverseForUser(session.userId);
+            if (!universe || universe.status !== "READY") {
+              await provisionUniverse(session.userId);
+            }
+          } catch {
+            // Provisionamento nunca deve impedir a criação da sessão.
+          }
+        },
+      },
+    },
+  },
 });

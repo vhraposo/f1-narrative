@@ -166,15 +166,29 @@ async function createRelationshipDirect(
   );
 }
 
+async function universeForUser(userId: string): Promise<string> {
+  const universe = await prisma.universe.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
+  return universe.id;
+}
+
 async function createTeam(userId: string, name: string): Promise<{ id: string }> {
+  const universeId = await universeForUser(userId);
   return track(
     createdTeamIds,
-    await prisma.team.create({ data: { name, userId } }),
+    await prisma.team.create({ data: { name, userId, universeId } }),
   );
 }
 
-async function createSeason(): Promise<{ id: string }> {
-  return track(createdSeasonIds, await prisma.season.create({ data: { year: 2026 } }));
+async function createSeason(userId: string): Promise<{ id: string }> {
+  const universeId = await universeForUser(userId);
+  return track(
+    createdSeasonIds,
+    await prisma.season.create({ data: { universeId, year: 2026 } }),
+  );
 }
 
 async function createRace(seasonId: string, name: string): Promise<{ id: string }> {
@@ -229,14 +243,18 @@ async function createStanding(
   );
 }
 
-async function resetWorld(next: {
-  currentDate?: Date;
-  currentSeasonId?: string | null;
-  currentRaceId?: string | null;
-  currentSession?: string | null;
-}): Promise<void> {
+async function resetWorld(
+  userId: string,
+  next: {
+    currentDate?: Date;
+    currentSeasonId?: string | null;
+    currentRaceId?: string | null;
+    currentSession?: string | null;
+  },
+): Promise<void> {
+  const universeId = await universeForUser(userId);
   await prisma.worldState.upsert({
-    where: { key: "default" },
+    where: { universeId_key: { universeId, key: "default" } },
     update: {
       ...(next.currentDate !== undefined ? { currentDate: next.currentDate } : {}),
       ...(next.currentSeasonId !== undefined ? { currentSeasonId: next.currentSeasonId } : {}),
@@ -244,6 +262,7 @@ async function resetWorld(next: {
       ...(next.currentSession !== undefined ? { currentSession: next.currentSession as never } : {}),
     },
     create: {
+      universeId,
       key: "default",
       ...(next.currentDate !== undefined ? { currentDate: next.currentDate } : {}),
       ...(next.currentSeasonId !== undefined ? { currentSeasonId: next.currentSeasonId } : {}),
@@ -454,7 +473,7 @@ describe("Generation - composição e sections", () => {
     await createRelationshipDirect(charA.id, aiB.id);
     await createNewsDirect(event.id, "Corrida historica em Interlagos");
 
-    await resetWorld({
+    await resetWorld(owner.userId, {
       currentDate: new Date("2026-03-01T00:00:00Z"),
       currentSeasonId: null,
       currentRaceId: null,
@@ -645,7 +664,7 @@ describe("Generation - omissions e fallback", () => {
     }
 
     // WorldState apontando para referências quebradas.
-    await resetWorld({
+    await resetWorld(owner.userId, {
       currentDate: new Date("2026-06-01T00:00:00Z"),
       currentSeasonId: randomUUID(),
       currentRaceId: randomUUID(),
@@ -696,14 +715,14 @@ describe("Generation - motorsport", () => {
     });
 
     const team = await createTeam(owner.userId, "Scuderia Test");
-    const season = await createSeason();
+    const season = await createSeason(owner.userId);
     const race = await createRace(season.id, "GP Test");
     const dp = await createDriverProfile(charDriver.id, team.id, 44);
     await createRaceResult(race.id, dp.id, 1, 25);
     await createStanding(season.id, dp.id, 1, 25);
 
     // Motorport usa WorldState.currentSeasonId para ancorar calendário/resultados.
-    await resetWorld({
+    await resetWorld(owner.userId, {
       currentSeasonId: season.id,
       currentRaceId: race.id,
       currentSession: null,

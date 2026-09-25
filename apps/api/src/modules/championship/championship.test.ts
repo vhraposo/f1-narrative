@@ -112,6 +112,9 @@ let season: Season;
 let race: Race;
 let driver: Driver;
 let intruderDriver: Driver;
+let intruderSeason: Season;
+let intruderRace: Race;
+let intruderRace2: Race;
 
 const createdSeasonIds: string[] = [];
 
@@ -142,6 +145,19 @@ beforeAll(async () => {
     country: "Brasil",
     date: "2026-11-15T14:00:00.000Z",
     round: 1,
+  });
+
+  intruderSeason = await createSeason(intruder, {
+    year: 2032,
+    name: "Temporada Intruso",
+  });
+  intruderRace = await createRace(intruder, intruderSeason.id, {
+    name: "GP Alheio",
+    round: 1,
+  });
+  intruderRace2 = await createRace(intruder, intruderSeason.id, {
+    name: "GP Alheio 2",
+    round: 2,
   });
 });
 
@@ -232,11 +248,19 @@ describe("Seasons (globais — qualquer usuário autenticado)", () => {
     const patch = await app.inject({
       method: "PATCH",
       url: `/api/seasons/${created.id}`,
-      headers: { cookie: intruder.cookie },
+      headers: { cookie: owner.cookie },
       payload: { status: "ACTIVE" },
     });
     expect(patch.statusCode).toBe(200);
     expect(patch.json().season.status).toBe("ACTIVE");
+
+    const patchOther = await app.inject({
+      method: "PATCH",
+      url: `/api/seasons/${created.id}`,
+      headers: { cookie: intruder.cookie },
+      payload: { status: "FINISHED" },
+    });
+    expect(patchOther.statusCode).toBe(404);
 
     const del = await app.inject({
       method: "DELETE",
@@ -261,11 +285,18 @@ describe("Races (globais, vinculadas a Season)", () => {
     const res = await app.inject({
       method: "GET",
       url: `/api/seasons/${season.id}/races`,
-      headers: { cookie: intruder.cookie },
+      headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(200);
     const names = (res.json().races as Race[]).map((r) => r.name);
     expect(names).toContain("GP Brasil");
+
+    const other = await app.inject({
+      method: "GET",
+      url: `/api/seasons/${season.id}/races`,
+      headers: { cookie: intruder.cookie },
+    });
+    expect(other.statusCode).toBe(404);
   });
 
   it("retorna 404 ao criar corrida em temporada inexistente", async () => {
@@ -296,10 +327,17 @@ describe("Races (globais, vinculadas a Season)", () => {
     const get = await app.inject({
       method: "GET",
       url: `/api/races/${created.id}`,
-      headers: { cookie: intruder.cookie },
+      headers: { cookie: owner.cookie },
     });
     expect(get.statusCode).toBe(200);
     expect(get.json().race.name).toBe("GP Interino");
+
+    const getOther = await app.inject({
+      method: "GET",
+      url: `/api/races/${created.id}`,
+      headers: { cookie: intruder.cookie },
+    });
+    expect(getOther.statusCode).toBe(404);
 
     const patch = await app.inject({
       method: "PATCH",
@@ -388,7 +426,7 @@ describe("RaceResults (ownership indireta via DriverProfile)", () => {
     });
     await app.inject({
       method: "POST",
-      url: `/api/races/${otherRace.id}/results`,
+      url: `/api/races/${intruderRace2.id}/results`,
       headers: { cookie: intruder.cookie },
       payload: { driverProfileId: intruderDriver.id, position: 4 },
     });
@@ -408,7 +446,7 @@ describe("RaceResults (ownership indireta via DriverProfile)", () => {
   it("lê, atualiza e exclui resultado próprio; detalhe alheio → 404", async () => {
     const res = await app.inject({
       method: "POST",
-      url: `/api/races/${race.id}/results`,
+      url: `/api/races/${intruderRace.id}/results`,
       headers: { cookie: intruder.cookie },
       payload: { driverProfileId: intruderDriver.id, position: 2, points: 18 },
     });
@@ -509,7 +547,7 @@ describe("ChampionshipStandings (ownership indireta via DriverProfile)", () => {
   it("lista, atualiza e exclui classificação própria", async () => {
     const res = await app.inject({
       method: "POST",
-      url: `/api/seasons/${season.id}/standings`,
+      url: `/api/seasons/${intruderSeason.id}/standings`,
       headers: { cookie: intruder.cookie },
       payload: { driverProfileId: intruderDriver.id, points: 18, position: 2 },
     });
@@ -518,7 +556,7 @@ describe("ChampionshipStandings (ownership indireta via DriverProfile)", () => {
 
     const list = await app.inject({
       method: "GET",
-      url: `/api/seasons/${season.id}/standings`,
+      url: `/api/seasons/${intruderSeason.id}/standings`,
       headers: { cookie: intruder.cookie },
     });
     expect(list.statusCode).toBe(200);
@@ -526,15 +564,13 @@ describe("ChampionshipStandings (ownership indireta via DriverProfile)", () => {
       .filter((s) => s.driverProfile.character.name === "Piloto Alheio");
     expect(mine.length).toBeGreaterThan(0);
 
-    // Ownership: outro usuário não vê a do intruder
+    // Ownership: outro usuário não acessa a temporada do intruder
     const listOwner = await app.inject({
       method: "GET",
-      url: `/api/seasons/${season.id}/standings`,
+      url: `/api/seasons/${intruderSeason.id}/standings`,
       headers: { cookie: owner.cookie },
     });
-    const alheia = (listOwner.json().standings as { driverProfile: { character: { name: string } } }[])
-      .filter((s) => s.driverProfile.character.name === "Piloto Alheio");
-    expect(alheia.length).toBe(0);
+    expect(listOwner.statusCode).toBe(404);
 
     const patch = await app.inject({
       method: "PATCH",

@@ -143,6 +143,7 @@ export interface InitStatus {
 }
 
 export interface InitReport {
+  universeId: string;
   season: {
     universeSeasonId: string;
     externalSeasonId: string;
@@ -248,13 +249,21 @@ function pushConflict(
 }
 
 export class UniverseInitService {
-  async preview(actor: Actor, input: UniverseInitializationInput): Promise<InitReport> {
-    return this.buildPlan(prisma, actor, input);
+  async preview(
+    actor: Actor,
+    input: UniverseInitializationInput,
+    universeId?: string,
+  ): Promise<InitReport> {
+    return this.buildPlan(prisma, actor, input, universeId);
   }
 
-  async execute(actor: Actor, input: UniverseInitializationInput): Promise<InitReport> {
+  async execute(
+    actor: Actor,
+    input: UniverseInitializationInput,
+    universeId?: string,
+  ): Promise<InitReport> {
     return prisma.$transaction(async (tx) => {
-      const plan = await this.buildPlan(tx, actor, input);
+      const plan = await this.buildPlan(tx, actor, input, universeId);
       if (plan.conflicts.length > 0) {
         throw new UniverseInitError(
           "CONFLICT",
@@ -262,13 +271,17 @@ export class UniverseInitService {
           409,
         );
       }
-      await this.materialize(tx, actor, input, plan);
+      await this.materialize(tx, actor, input, plan, plan.universeId);
       return plan;
     });
   }
 
-  async status(actor: Actor, input: UniverseInitializationInput): Promise<InitStatus> {
-    const plan = await this.buildPlan(prisma, actor, input);
+  async status(
+    actor: Actor,
+    input: UniverseInitializationInput,
+    universeId?: string,
+  ): Promise<InitStatus> {
+    const plan = await this.buildPlan(prisma, actor, input, universeId);
     const initialized =
       plan.conflicts.length === 0 &&
       plan.summary.bindingsCreated === 0 &&
@@ -292,8 +305,13 @@ export class UniverseInitService {
     };
   }
 
-  async bootstrapSeason(actor: Actor, externalSeasonId: string): Promise<BootstrapReport> {
+  async bootstrapSeason(
+    actor: Actor,
+    externalSeasonId: string,
+    universeId?: string,
+  ): Promise<BootstrapReport> {
     return prisma.$transaction(async (tx) => {
+      const scopeUniverseId = universeId ?? (await this.ensureActorUniverse(tx, actor.id));
       const extSeason = await tx.externalSeason.findUnique({
         where: { id: externalSeasonId },
         select: { id: true, source: true, year: true },
@@ -309,10 +327,15 @@ export class UniverseInitService {
         );
       }
 
-      const world = await this.resolveWorldForBootstrap(tx);
+      const world = await this.resolveWorldForBootstrap(tx, scopeUniverseId);
 
       const existingBinding = await tx.externalBindingSeason.findUnique({
-        where: { externalSeasonId },
+        where: {
+          universeId_externalSeasonId: {
+            universeId: scopeUniverseId,
+            externalSeasonId,
+          },
+        },
         select: { id: true, seasonId: true, confidence: true },
       });
 
@@ -342,7 +365,7 @@ export class UniverseInitService {
         universeSeasonId = existingBinding.seasonId;
       } else {
         const candidates = await tx.season.findMany({
-          where: { year: extSeason.year },
+          where: { universeId: scopeUniverseId, year: extSeason.year },
           select: { id: true },
         });
         if (candidates.length > 1) {
@@ -368,6 +391,7 @@ export class UniverseInitService {
         } else {
           const season = await tx.season.create({
             data: {
+              universeId: scopeUniverseId,
               year: extSeason.year,
               name: String(extSeason.year),
               status: "PRE_SEASON",
@@ -380,6 +404,7 @@ export class UniverseInitService {
         bindingCreated = true;
         await tx.externalBindingSeason.create({
           data: {
+            universeId: scopeUniverseId,
             externalSeasonId: extSeason.id,
             seasonId: universeSeasonId,
             confidence: "CONFIRMED",
@@ -392,9 +417,15 @@ export class UniverseInitService {
       let worldChanged = false;
       if (previousSeasonId === null) {
         await tx.worldState.upsert({
-          where: { key: WORLD_DEFAULT_KEY },
+          where: {
+            universeId_key: { universeId: scopeUniverseId, key: WORLD_DEFAULT_KEY },
+          },
           update: { currentSeasonId: universeSeasonId },
-          create: { key: WORLD_DEFAULT_KEY, currentSeasonId: universeSeasonId },
+          create: {
+            universeId: scopeUniverseId,
+            key: WORLD_DEFAULT_KEY,
+            currentSeasonId: universeSeasonId,
+          },
         });
         worldChanged = true;
       }
@@ -421,11 +452,22 @@ export class UniverseInitService {
     });
   }
 
+  private async ensureActorUniverse(db: Db, userId: string): Promise<string> {
+    const universe = await db.universe.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+      select: { id: true },
+    });
+    return universe.id;
+  }
+
   private async resolveWorldForBootstrap(
     db: Db,
+    universeId: string,
   ): Promise<{ currentSeasonId: string | null }> {
     const world = await db.worldState.findUnique({
-      where: { key: WORLD_DEFAULT_KEY },
+      where: { universeId_key: { universeId, key: WORLD_DEFAULT_KEY } },
       select: { currentSeasonId: true },
     });
     if (world?.currentSeasonId) {
@@ -448,17 +490,26 @@ export class UniverseInitService {
     db: Db,
     actor: Actor,
     input: UniverseInitializationInput,
+    universeId?: string,
   ): Promise<InitReport> {
     const scopes: InitializationScope[] = input.scopes ?? [...INITIALIZATION_SCOPE_VALUES];
     const conflicts: InitConflict[] = [];
 
     const season = await db.season.findUnique({
       where: { id: input.seasonId },
-      select: { id: true },
+      select: { id: true, universeId: true },
     });
     if (!season) {
       throw new UniverseInitError("NOT_FOUND", "Temporada do universo não encontrada", 404);
     }
+    if (universeId && season.universeId !== universeId) {
+      throw new UniverseInitError(
+        "SEASON_UNIVERSE_MISMATCH",
+        "A temporada do universo não pertence ao universo informado",
+        409,
+      );
+    }
+    const scopeUniverseId = universeId ?? season.universeId;
     const extSeason = await db.externalSeason.findUnique({
       where: { id: input.externalSeasonId },
       select: { id: true, source: true, year: true },
@@ -469,6 +520,7 @@ export class UniverseInitService {
 
     const seasonBindingCreate = await this.resolveSeasonBinding(
       db,
+      scopeUniverseId,
       input.seasonId,
       input.externalSeasonId,
       conflicts,
@@ -520,10 +572,17 @@ export class UniverseInitService {
             .filter((id): id is string => Boolean(id)),
         ),
       ];
-      teams = await this.planTeams(db, actor, extSeason.source, teamExternalIds, conflicts);
+      teams = await this.planTeams(
+        db,
+        scopeUniverseId,
+        extSeason.source,
+        teamExternalIds,
+        conflicts,
+      );
       const plannedDrivers = await this.planDrivers(
         db,
         input.seasonId,
+        scopeUniverseId,
         scopes,
         driverSeasons,
         gridClaims,
@@ -533,7 +592,7 @@ export class UniverseInitService {
       drivers = plannedDrivers.drivers;
       const profiles = plannedDrivers.resolvedProfiles;
       if (scopes.includes("RACES")) {
-        races = await this.planRaces(db, input.seasonId, extSeason, conflicts);
+        races = await this.planRaces(db, input.seasonId, scopeUniverseId, extSeason, conflicts);
       }
       if (scopes.includes("RESULTS")) {
         results = await this.planResults(db, extSeason, races, profiles, conflicts);
@@ -548,7 +607,7 @@ export class UniverseInitService {
         );
       }
     } else if (scopes.includes("RACES")) {
-      races = await this.planRaces(db, input.seasonId, extSeason, conflicts);
+      races = await this.planRaces(db, input.seasonId, scopeUniverseId, extSeason, conflicts);
     }
 
     const bindingsCreated =
@@ -583,6 +642,7 @@ export class UniverseInitService {
     };
 
     return {
+      universeId: scopeUniverseId,
       season: {
         universeSeasonId: input.seasonId,
         externalSeasonId: input.externalSeasonId,
@@ -625,12 +685,15 @@ export class UniverseInitService {
 
   private async resolveSeasonBinding(
     db: Db,
+    universeId: string,
     seasonId: string,
     externalSeasonId: string,
     conflicts: InitConflict[],
   ): Promise<boolean> {
     const binding = await db.externalBindingSeason.findUnique({
-      where: { externalSeasonId },
+      where: {
+        universeId_externalSeasonId: { universeId, externalSeasonId },
+      },
       select: { seasonId: true, confidence: true },
     });
     if (!binding) return true;
@@ -659,7 +722,7 @@ export class UniverseInitService {
 
   private async planTeams(
     db: Db,
-    actor: Actor,
+    universeId: string,
     source: string,
     externalIds: string[],
     conflicts: InitConflict[],
@@ -675,7 +738,9 @@ export class UniverseInitService {
         continue;
       }
       const binding = await db.externalBindingTeam.findUnique({
-        where: { externalTeamId: extTeam.id },
+        where: {
+          universeId_externalTeamId: { universeId, externalTeamId: extTeam.id },
+        },
         select: { id: true, confidence: true, teamId: true },
       });
       if (binding) {
@@ -695,7 +760,7 @@ export class UniverseInitService {
         continue;
       }
       const sameName = await db.team.findFirst({
-        where: { userId: actor.id, name: extTeam.name },
+        where: { universeId, name: extTeam.name },
         select: { id: true },
       });
       if (sameName) {
@@ -718,6 +783,7 @@ export class UniverseInitService {
   private async planDrivers(
     db: Db,
     seasonId: string,
+    universeId: string,
     scopes: InitializationScope[],
     driverSeasons: Array<{
       id: string;
@@ -750,7 +816,9 @@ export class UniverseInitService {
       };
       const label = ds.externalDriver.name;
       const binding = await db.externalBindingDriver.findUnique({
-        where: { externalDriverId: ds.externalDriverId },
+        where: {
+          universeId_externalDriverId: { universeId, externalDriverId: ds.externalDriverId },
+        },
         select: { confidence: true, characterId: true },
       });
       let resolved = false;
@@ -938,7 +1006,12 @@ export class UniverseInitService {
           !(draft.number != null && existingEntry.number != null && existingEntry.number !== draft.number);
         if (same) {
           const entryBinding = await db.externalBindingDriverSeason.findUnique({
-            where: { externalDriverSeasonId: draft.ds.id },
+            where: {
+              universeId_externalDriverSeasonId: {
+                universeId,
+                externalDriverSeasonId: draft.ds.id,
+              },
+            },
             select: { confidence: true },
           });
           if (entryBinding && entryBinding.confidence !== "CONFIRMED") {
@@ -1000,6 +1073,7 @@ export class UniverseInitService {
   private async planRaces(
     db: Db,
     seasonId: string,
+    universeId: string,
     extSeason: { source: string; year: number },
     conflicts: InitConflict[],
   ): Promise<PlannedRace[]> {
@@ -1019,7 +1093,9 @@ export class UniverseInitService {
       const label = ext.grandPrix ?? ext.name ?? `Rodada ${ext.round}`;
       const status: "FINISHED" | "UPCOMING" = ext._count.results > 0 ? "FINISHED" : "UPCOMING";
       const binding = await db.externalBindingRace.findUnique({
-        where: { externalRaceId: ext.id },
+        where: {
+          universeId_externalRaceId: { universeId, externalRaceId: ext.id },
+        },
         select: { raceId: true, confidence: true, race: { select: { seasonId: true } } },
       });
       if (binding) {
@@ -1308,10 +1384,17 @@ export class UniverseInitService {
     actor: Actor,
     input: UniverseInitializationInput,
     plan: InitReport,
+    universeId: string,
   ): Promise<void> {
+    const universe = await tx.universe.findUniqueOrThrow({
+      where: { id: universeId },
+      select: { userId: true },
+    });
+
     if (plan.seasonBindingCreated) {
       await tx.externalBindingSeason.create({
         data: {
+          universeId,
           externalSeasonId: input.externalSeasonId,
           seasonId: input.seasonId,
           confidence: "CONFIRMED",
@@ -1325,7 +1408,8 @@ export class UniverseInitService {
       await tx.team.create({
         data: {
           id: team.universeTeamId,
-          userId: actor.id,
+          universeId,
+          userId: universe.userId,
           name: team.name,
           shortName: team.shortName,
           color: team.color,
@@ -1333,6 +1417,7 @@ export class UniverseInitService {
       });
       await tx.externalBindingTeam.create({
         data: {
+          universeId,
           externalTeamId: await this.externalTeamId(tx, plan.season.source, team.externalId),
           teamId: team.universeTeamId,
           confidence: "CONFIRMED",
@@ -1346,8 +1431,9 @@ export class UniverseInitService {
         await tx.character.create({
           data: {
             id: driver.characterId,
-            userId: actor.id,
-            controlledBy: "USER",
+            userId: null,
+            controlledBy: "AI",
+            universeId,
             name: driver.name,
             nationality: driver.nationality ?? "Unknown",
             gender: null,
@@ -1373,6 +1459,7 @@ export class UniverseInitService {
       if (driver.driverBindingCreate && driver.characterId) {
         await tx.externalBindingDriver.create({
           data: {
+            universeId,
             externalDriverId: await this.externalDriverId(tx, plan.season.source, driver.externalId),
             characterId: driver.characterId,
             confidence: "CONFIRMED",
@@ -1396,6 +1483,7 @@ export class UniverseInitService {
         });
         await tx.externalBindingDriverSeason.create({
           data: {
+            universeId,
             externalDriverSeasonId: await this.externalDriverSeasonId(
               tx,
               plan.season.source,
@@ -1429,6 +1517,7 @@ export class UniverseInitService {
       ) {
         await tx.externalBindingDriverSeason.create({
           data: {
+            universeId,
             externalDriverSeasonId: await this.externalDriverSeasonId(
               tx,
               plan.season.source,
@@ -1460,6 +1549,7 @@ export class UniverseInitService {
         });
         await tx.externalBindingRace.create({
           data: {
+            universeId,
             externalRaceId: race.externalRaceId,
             raceId: race.universeRaceId,
             confidence: "CONFIRMED",
@@ -1469,6 +1559,7 @@ export class UniverseInitService {
       } else if (race.bindingCreate && race.universeRaceId) {
         await tx.externalBindingRace.create({
           data: {
+            universeId,
             externalRaceId: race.externalRaceId,
             raceId: race.universeRaceId,
             confidence: "CONFIRMED",
@@ -1498,6 +1589,7 @@ export class UniverseInitService {
       });
       await tx.externalBindingResult.create({
         data: {
+          universeId,
           externalResultId: result.externalResultId,
           raceResultId: result.raceResultId,
           confidence: "CONFIRMED",
@@ -1529,6 +1621,7 @@ export class UniverseInitService {
       });
       await tx.externalBindingStanding.create({
         data: {
+          universeId,
           externalStandingId: standing.externalStandingId,
           championshipStandingId: standing.standingId,
           confidence: "CONFIRMED",

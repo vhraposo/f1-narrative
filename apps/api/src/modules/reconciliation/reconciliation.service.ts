@@ -1,5 +1,6 @@
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { JOLPICA_SOURCE } from "../external-sync/jolpica.service.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 import type { Role } from "@prisma/client";
 import type { ReconciliationKind } from "./reconciliation.schemas.js";
 
@@ -452,36 +453,103 @@ export class ReconciliationService {
     }
   }
 
-  async getBinding(kind: ReconciliationKind, resolved: ResolvedExternal) {
+  async getBinding(
+    kind: ReconciliationKind,
+    resolved: ResolvedExternal,
+    universeId?: string,
+  ) {
     switch (kind) {
       case "DRIVER":
-        return prisma.externalBindingDriver.findUnique({
-          where: { externalDriverId: resolved.externalDriverId! },
-        });
+        return universeId
+          ? prisma.externalBindingDriver.findUnique({
+              where: {
+                universeId_externalDriverId: {
+                  universeId,
+                  externalDriverId: resolved.externalDriverId!,
+                },
+              },
+            })
+          : prisma.externalBindingDriver.findFirst({
+              where: { externalDriverId: resolved.externalDriverId! },
+            });
       case "TEAM":
-        return prisma.externalBindingTeam.findUnique({
-          where: { externalTeamId: resolved.externalTeamId! },
-        });
+        return universeId
+          ? prisma.externalBindingTeam.findUnique({
+              where: {
+                universeId_externalTeamId: {
+                  universeId,
+                  externalTeamId: resolved.externalTeamId!,
+                },
+              },
+            })
+          : prisma.externalBindingTeam.findFirst({
+              where: { externalTeamId: resolved.externalTeamId! },
+            });
       case "SEASON":
-        return prisma.externalBindingSeason.findUnique({
-          where: { externalSeasonId: resolved.externalSeasonId! },
-        });
+        return universeId
+          ? prisma.externalBindingSeason.findUnique({
+              where: {
+                universeId_externalSeasonId: {
+                  universeId,
+                  externalSeasonId: resolved.externalSeasonId!,
+                },
+              },
+            })
+          : prisma.externalBindingSeason.findFirst({
+              where: { externalSeasonId: resolved.externalSeasonId! },
+            });
       case "RACE":
-        return prisma.externalBindingRace.findUnique({
-          where: { externalRaceId: resolved.externalRaceId! },
-        });
+        return universeId
+          ? prisma.externalBindingRace.findUnique({
+              where: {
+                universeId_externalRaceId: {
+                  universeId,
+                  externalRaceId: resolved.externalRaceId!,
+                },
+              },
+            })
+          : prisma.externalBindingRace.findFirst({
+              where: { externalRaceId: resolved.externalRaceId! },
+            });
       case "DRIVER_SEASON":
-        return prisma.externalBindingDriverSeason.findUnique({
-          where: { externalDriverSeasonId: resolved.externalDriverSeasonId! },
-        });
+        return universeId
+          ? prisma.externalBindingDriverSeason.findUnique({
+              where: {
+                universeId_externalDriverSeasonId: {
+                  universeId,
+                  externalDriverSeasonId: resolved.externalDriverSeasonId!,
+                },
+              },
+            })
+          : prisma.externalBindingDriverSeason.findFirst({
+              where: { externalDriverSeasonId: resolved.externalDriverSeasonId! },
+            });
       case "RESULT":
-        return prisma.externalBindingResult.findUnique({
-          where: { externalResultId: resolved.externalResultId! },
-        });
+        return universeId
+          ? prisma.externalBindingResult.findUnique({
+              where: {
+                universeId_externalResultId: {
+                  universeId,
+                  externalResultId: resolved.externalResultId!,
+                },
+              },
+            })
+          : prisma.externalBindingResult.findFirst({
+              where: { externalResultId: resolved.externalResultId! },
+            });
       case "STANDING":
-        return prisma.externalBindingStanding.findUnique({
-          where: { externalStandingId: resolved.externalStandingId! },
-        });
+        return universeId
+          ? prisma.externalBindingStanding.findUnique({
+              where: {
+                universeId_externalStandingId: {
+                  universeId,
+                  externalStandingId: resolved.externalStandingId!,
+                },
+              },
+            })
+          : prisma.externalBindingStanding.findFirst({
+              where: { externalStandingId: resolved.externalStandingId! },
+            });
     }
   }
 
@@ -568,18 +636,24 @@ export class ReconciliationService {
   async candidatesForDriver(
     userId: string,
     external: { name: string; fullName?: string | null; nationality?: string | null },
+    universeId?: string,
   ): Promise<Candidate[]> {
-    const scope = userId
-      ? { OR: [{ userId }, { userId: null }] }
-      : {};
+    const scope = universeId
+      ? { universeId }
+      : userId
+        ? { OR: [{ userId }, { userId: null }] }
+        : {};
     const characters = await prisma.character.findMany({
       where: { ...scope, driverProfile: { isNot: null } },
       select: { id: true, name: true },
     });
     const boundCharacterIds = new Set(
-      (await prisma.externalBindingDriver.findMany({ select: { characterId: true } })).map(
-        (b) => b.characterId,
-      ),
+      (
+        await prisma.externalBindingDriver.findMany({
+          where: universeId ? { universeId } : {},
+          select: { characterId: true },
+        })
+      ).map((b) => b.characterId),
     );
     return characters
       .filter((character) => !boundCharacterIds.has(character.id))
@@ -598,15 +672,19 @@ export class ReconciliationService {
   async candidatesForTeam(
     userId: string,
     external: { name: string; shortName?: string | null },
+    universeId?: string,
   ): Promise<Candidate[]> {
     const teams = await prisma.team.findMany({
-      where: { userId },
+      where: universeId ? { universeId } : { userId },
       select: { id: true, name: true, shortName: true },
     });
     const boundTeamIds = new Set(
-      (await prisma.externalBindingTeam.findMany({ select: { teamId: true } })).map(
-        (b) => b.teamId,
-      ),
+      (
+        await prisma.externalBindingTeam.findMany({
+          where: universeId ? { universeId } : {},
+          select: { teamId: true },
+        })
+      ).map((b) => b.teamId),
     );
     return teams
       .filter((team) => !boundTeamIds.has(team.id))
@@ -623,15 +701,23 @@ export class ReconciliationService {
       .sort((a, b) => b.score - a.score);
   }
 
-  async candidatesForSeason(external: { year: number }): Promise<Candidate[]> {
+  async candidatesForSeason(
+    external: { year: number },
+    universeId?: string,
+  ): Promise<Candidate[]> {
     const seasons = await prisma.season.findMany({
-      where: { year: external.year },
+      where: universeId
+        ? { year: external.year, universeId }
+        : { year: external.year },
       select: { id: true, year: true, name: true },
     });
     const boundSeasonIds = new Set(
-      (await prisma.externalBindingSeason.findMany({ select: { seasonId: true } })).map(
-        (b) => b.seasonId,
-      ),
+      (
+        await prisma.externalBindingSeason.findMany({
+          where: universeId ? { universeId } : {},
+          select: { seasonId: true },
+        })
+      ).map((b) => b.seasonId),
     );
     return seasons
       .filter((season) => !boundSeasonIds.has(season.id))
@@ -644,9 +730,11 @@ export class ReconciliationService {
 
   async candidatesForRace(
     external: { seasonYear: number; round: number; grandPrix?: string | null; name?: string | null },
+    universeId?: string,
   ): Promise<Candidate[]> {
     const seasonBinding = await prisma.externalBindingSeason.findFirst({
       where: {
+        ...(universeId ? { universeId } : {}),
         externalSeason: { year: external.seasonYear },
         confidence: "CONFIRMED",
       },
@@ -658,9 +746,12 @@ export class ReconciliationService {
       select: { id: true, name: true, round: true },
     });
     const boundRaceIds = new Set(
-      (await prisma.externalBindingRace.findMany({ select: { raceId: true } })).map(
-        (b) => b.raceId,
-      ),
+      (
+        await prisma.externalBindingRace.findMany({
+          where: universeId ? { universeId } : {},
+          select: { raceId: true },
+        })
+      ).map((b) => b.raceId),
     );
     return races
       .filter((race) => !boundRaceIds.has(race.id))
@@ -687,16 +778,22 @@ export class ReconciliationService {
       teamExternalId?: string | null;
       teamNameSnapshot?: string | null;
     },
+    universeId?: string,
   ): Promise<Candidate[]> {
     const seasonBinding = await prisma.externalBindingSeason.findFirst({
       where: {
+        ...(universeId ? { universeId } : {}),
         externalSeason: { year: external.seasonYear },
         confidence: "CONFIRMED",
       },
       select: { seasonId: true },
     });
     const driverBinding = await prisma.externalBindingDriver.findFirst({
-      where: { externalDriverId: external.externalDriverId, confidence: "CONFIRMED" },
+      where: {
+        ...(universeId ? { universeId } : {}),
+        externalDriverId: external.externalDriverId,
+        confidence: "CONFIRMED",
+      },
       select: { characterId: true },
     });
     if (!seasonBinding || !driverBinding) return [];
@@ -708,7 +805,10 @@ export class ReconciliationService {
     });
     const boundEntryIds = new Set(
       (
-        await prisma.externalBindingDriverSeason.findMany({ select: { seasonDriverEntryId: true } })
+        await prisma.externalBindingDriverSeason.findMany({
+          where: universeId ? { universeId } : {},
+          select: { seasonDriverEntryId: true },
+        })
       ).map((b) => b.seasonDriverEntryId),
     );
     return entries
@@ -728,13 +828,22 @@ export class ReconciliationService {
 
   async candidatesForResult(
     external: { externalRaceId: string; externalDriverId: string },
+    universeId?: string,
   ): Promise<Candidate[]> {
     const raceBinding = await prisma.externalBindingRace.findFirst({
-      where: { externalRaceId: external.externalRaceId, confidence: "CONFIRMED" },
+      where: {
+        ...(universeId ? { universeId } : {}),
+        externalRaceId: external.externalRaceId,
+        confidence: "CONFIRMED",
+      },
       select: { raceId: true },
     });
     const driverBinding = await prisma.externalBindingDriver.findFirst({
-      where: { externalDriverId: external.externalDriverId, confidence: "CONFIRMED" },
+      where: {
+        ...(universeId ? { universeId } : {}),
+        externalDriverId: external.externalDriverId,
+        confidence: "CONFIRMED",
+      },
       select: { characterId: true },
     });
     if (!raceBinding || !driverBinding) return [];
@@ -760,16 +869,22 @@ export class ReconciliationService {
 
   async candidatesForStanding(
     external: { seasonYear: number; externalDriverId: string },
+    universeId?: string,
   ): Promise<Candidate[]> {
     const seasonBinding = await prisma.externalBindingSeason.findFirst({
       where: {
+        ...(universeId ? { universeId } : {}),
         externalSeason: { year: external.seasonYear },
         confidence: "CONFIRMED",
       },
       select: { seasonId: true },
     });
     const driverBinding = await prisma.externalBindingDriver.findFirst({
-      where: { externalDriverId: external.externalDriverId, confidence: "CONFIRMED" },
+      where: {
+        ...(universeId ? { universeId } : {}),
+        externalDriverId: external.externalDriverId,
+        confidence: "CONFIRMED",
+      },
       select: { characterId: true },
     });
     if (!seasonBinding || !driverBinding) return [];
@@ -797,20 +912,21 @@ export class ReconciliationService {
     kind: ReconciliationKind,
     resolved: ResolvedExternal,
     userId: string,
+    universeId?: string,
   ): Promise<Candidate[]> {
     switch (kind) {
       case "DRIVER":
-        return this.candidatesForDriver(userId, { name: resolved.label });
+        return this.candidatesForDriver(userId, { name: resolved.label }, universeId);
       case "TEAM":
-        return this.candidatesForTeam(userId, { name: resolved.label });
+        return this.candidatesForTeam(userId, { name: resolved.label }, universeId);
       case "SEASON":
-        return this.candidatesForSeason({ year: Number(resolved.label) });
+        return this.candidatesForSeason({ year: Number(resolved.label) }, universeId);
       case "RACE": {
         const race = await prisma.externalRace.findUnique({
           where: { id: resolved.externalRaceId! },
           select: { seasonYear: true, round: true, grandPrix: true, name: true },
         });
-        return race ? this.candidatesForRace(race) : [];
+        return race ? this.candidatesForRace(race, universeId) : [];
       }
       case "DRIVER_SEASON": {
         const ext = await prisma.externalDriverSeason.findUnique({
@@ -822,21 +938,21 @@ export class ReconciliationService {
             teamNameSnapshot: true,
           },
         });
-        return ext ? this.candidatesForDriverSeason(userId, ext) : [];
+        return ext ? this.candidatesForDriverSeason(userId, ext, universeId) : [];
       }
       case "RESULT": {
         const ext = await prisma.externalResult.findUnique({
           where: { id: resolved.externalResultId! },
           select: { externalRaceId: true, externalDriverId: true },
         });
-        return ext ? this.candidatesForResult(ext) : [];
+        return ext ? this.candidatesForResult(ext, universeId) : [];
       }
       case "STANDING": {
         const ext = await prisma.externalStanding.findUnique({
           where: { id: resolved.externalStandingId! },
           select: { seasonYear: true, externalDriverId: true },
         });
-        return ext ? this.candidatesForStanding(ext) : [];
+        return ext ? this.candidatesForStanding(ext, universeId) : [];
       }
     }
   }
@@ -846,8 +962,9 @@ export class ReconciliationService {
     kind: ReconciliationKind,
     query: ReconciliationQuery,
   ): Promise<CandidateListing> {
+    const universe = await ensureUniverse(userId);
     const resolved = await this.resolveExternal(kind, query);
-    const binding = await this.getBinding(kind, resolved);
+    const binding = await this.getBinding(kind, resolved, universe.id);
     const currentBinding = binding
       ? {
           id: binding.id,
@@ -858,7 +975,7 @@ export class ReconciliationService {
     return {
       external: { kind, source: resolved.source, label: resolved.label },
       currentBinding,
-      candidates: await this.candidatesOf(kind, resolved, userId),
+      candidates: await this.candidatesOf(kind, resolved, userId, universe.id),
     };
   }
 
@@ -868,8 +985,9 @@ export class ReconciliationService {
     query: ReconciliationQuery,
     candidateId: string,
   ) {
+    const universe = await ensureUniverse(actor.id);
     const resolved = await this.resolveExternal(kind, query);
-    const existing = await this.getBinding(kind, resolved);
+    const existing = await this.getBinding(kind, resolved, universe.id);
     if (existing) {
       throw new ReconciliationError(
         "ALREADY_BOUND",
@@ -877,7 +995,7 @@ export class ReconciliationService {
         409,
       );
     }
-    const candidates = await this.candidatesOf(kind, resolved, actor.id);
+    const candidates = await this.candidatesOf(kind, resolved, actor.id, universe.id);
     if (!candidates.some((candidate) => candidate.id === candidateId)) {
       throw new ReconciliationError(
         "INVALID_CANDIDATE",
@@ -885,19 +1003,21 @@ export class ReconciliationService {
         400,
       );
     }
-    await this.createSuggestion(kind, resolved, candidateId);
-    return this.getBinding(kind, resolved);
+    await this.createSuggestion(kind, resolved, candidateId, universe.id);
+    return this.getBinding(kind, resolved, universe.id);
   }
 
   private async createSuggestion(
     kind: ReconciliationKind,
     resolved: ResolvedExternal,
     candidateId: string,
+    universeId: string,
   ) {
     switch (kind) {
       case "DRIVER":
         return prisma.externalBindingDriver.create({
           data: {
+            universeId,
             externalDriverId: resolved.externalDriverId!,
             characterId: candidateId,
             confidence: "SUGGESTED",
@@ -906,6 +1026,7 @@ export class ReconciliationService {
       case "TEAM":
         return prisma.externalBindingTeam.create({
           data: {
+            universeId,
             externalTeamId: resolved.externalTeamId!,
             teamId: candidateId,
             confidence: "SUGGESTED",
@@ -914,6 +1035,7 @@ export class ReconciliationService {
       case "SEASON":
         return prisma.externalBindingSeason.create({
           data: {
+            universeId,
             externalSeasonId: resolved.externalSeasonId!,
             seasonId: candidateId,
             confidence: "SUGGESTED",
@@ -922,6 +1044,7 @@ export class ReconciliationService {
       case "RACE":
         return prisma.externalBindingRace.create({
           data: {
+            universeId,
             externalRaceId: resolved.externalRaceId!,
             raceId: candidateId,
             confidence: "SUGGESTED",
@@ -930,6 +1053,7 @@ export class ReconciliationService {
       case "DRIVER_SEASON":
         return prisma.externalBindingDriverSeason.create({
           data: {
+            universeId,
             externalDriverSeasonId: resolved.externalDriverSeasonId!,
             seasonDriverEntryId: candidateId,
             confidence: "SUGGESTED",
@@ -938,6 +1062,7 @@ export class ReconciliationService {
       case "RESULT":
         return prisma.externalBindingResult.create({
           data: {
+            universeId,
             externalResultId: resolved.externalResultId!,
             raceResultId: candidateId,
             confidence: "SUGGESTED",
@@ -946,6 +1071,7 @@ export class ReconciliationService {
       case "STANDING":
         return prisma.externalBindingStanding.create({
           data: {
+            universeId,
             externalStandingId: resolved.externalStandingId!,
             championshipStandingId: candidateId,
             confidence: "SUGGESTED",
@@ -955,18 +1081,19 @@ export class ReconciliationService {
   }
 
   async confirmBinding(actor: Actor, kind: ReconciliationKind, query: ReconciliationQuery) {
+    const universe = await ensureUniverse(actor.id);
     const resolved = await this.resolveExternal(kind, query);
-    const existing = await this.getBinding(kind, resolved);
+    const existing = await this.getBinding(kind, resolved, universe.id);
     if (existing) {
       if (existing.confidence === "CONFIRMED") {
         return existing;
       }
-      await this.requireDerivedParents(kind, resolved);
+      await this.requireDerivedParents(kind, resolved, universe.id);
       const updated = await this.updateConfidence(kind, existing.id, actor.role);
       return updated;
     }
-    await this.requireDerivedParents(kind, resolved);
-    const candidates = await this.candidatesOf(kind, resolved, actor.id);
+    await this.requireDerivedParents(kind, resolved, universe.id);
+    const candidates = await this.candidatesOf(kind, resolved, actor.id, universe.id);
     if (candidates.length === 0) {
       throw new ReconciliationError(
         "NO_CANDIDATES",
@@ -981,7 +1108,7 @@ export class ReconciliationService {
         409,
       );
     }
-    return this.createConfirmed(kind, resolved, candidates[0].id, actor.role);
+    return this.createConfirmed(kind, resolved, candidates[0].id, actor.role, universe.id);
   }
 
   private async updateConfidence(
@@ -1013,8 +1140,10 @@ export class ReconciliationService {
     resolved: ResolvedExternal,
     candidateId: string,
     role: Role | null | undefined,
+    universeId: string,
   ) {
     const data = {
+      universeId,
       confidence: "CONFIRMED" as Terminated,
       boundBy: role ?? null,
     };
@@ -1066,14 +1195,23 @@ export class ReconciliationService {
     }
   }
 
-  async requireDerivedParents(kind: ReconciliationKind, resolved: ResolvedExternal): Promise<void> {
+  async requireDerivedParents(
+    kind: ReconciliationKind,
+    resolved: ResolvedExternal,
+    universeId?: string,
+  ): Promise<void> {
     if (kind === "DRIVER_SEASON") {
       const driver = await prisma.externalBindingDriver.findFirst({
-        where: { externalDriverId: resolved.externalDriverId, confidence: "CONFIRMED" },
+        where: {
+          ...(universeId ? { universeId } : {}),
+          externalDriverId: resolved.externalDriverId,
+          confidence: "CONFIRMED",
+        },
         select: { id: true },
       });
       const season = await prisma.externalBindingSeason.findFirst({
         where: {
+          ...(universeId ? { universeId } : {}),
           externalSeason: { source: resolved.source, year: resolved.seasonYear ?? 0 },
           confidence: "CONFIRMED",
         },
@@ -1089,11 +1227,19 @@ export class ReconciliationService {
     }
     if (kind === "RESULT") {
       const race = await prisma.externalBindingRace.findFirst({
-        where: { externalRaceId: resolved.externalRaceId, confidence: "CONFIRMED" },
+        where: {
+          ...(universeId ? { universeId } : {}),
+          externalRaceId: resolved.externalRaceId,
+          confidence: "CONFIRMED",
+        },
         select: { id: true },
       });
       const driver = await prisma.externalBindingDriver.findFirst({
-        where: { externalDriverId: resolved.externalDriverId, confidence: "CONFIRMED" },
+        where: {
+          ...(universeId ? { universeId } : {}),
+          externalDriverId: resolved.externalDriverId,
+          confidence: "CONFIRMED",
+        },
         select: { id: true },
       });
       if (!race || !driver) {
@@ -1106,11 +1252,19 @@ export class ReconciliationService {
     }
     if (kind === "STANDING") {
       const driver = await prisma.externalBindingDriver.findFirst({
-        where: { externalDriverId: resolved.externalDriverId, confidence: "CONFIRMED" },
+        where: {
+          ...(universeId ? { universeId } : {}),
+          externalDriverId: resolved.externalDriverId,
+          confidence: "CONFIRMED",
+        },
         select: { id: true },
       });
       const season = await prisma.externalBindingSeason.findFirst({
-        where: { externalSeason: { source: resolved.source, year: resolved.seasonYear ?? 0 }, confidence: "CONFIRMED" },
+        where: {
+          ...(universeId ? { universeId } : {}),
+          externalSeason: { source: resolved.source, year: resolved.seasonYear ?? 0 },
+          confidence: "CONFIRMED",
+        },
         select: { id: true },
       });
       if (!driver || !season) {
@@ -1525,13 +1679,14 @@ export class ReconciliationService {
   async buildRosterDiff(seasonId: string): Promise<RosterDiff> {
     const season = await prisma.season.findUnique({
       where: { id: seasonId },
-      select: { id: true },
+      select: { id: true, universeId: true },
     });
     if (!season) {
       throw new ReconciliationError("NOT_FOUND", "Temporada não encontrada", 404);
     }
+    const universeId = season.universeId;
     const seasonBinding = await prisma.externalBindingSeason.findFirst({
-      where: { seasonId, confidence: "CONFIRMED" },
+      where: { universeId, seasonId, confidence: "CONFIRMED" },
       select: { externalSeason: { select: { id: true, year: true } } },
     });
     if (!seasonBinding) {
@@ -1549,7 +1704,7 @@ export class ReconciliationService {
 
     for (const ext of externalList) {
       const entryBinding = await prisma.externalBindingDriverSeason.findFirst({
-        where: { externalDriverSeasonId: ext.id, confidence: "CONFIRMED" },
+        where: { universeId, externalDriverSeasonId: ext.id, confidence: "CONFIRMED" },
         select: {
           id: true,
           confidence: true,
@@ -1592,7 +1747,7 @@ export class ReconciliationService {
         }
       } else {
         const driverBinding = await prisma.externalBindingDriver.findFirst({
-          where: { externalDriverId: ext.externalDriverId, confidence: "CONFIRMED" },
+          where: { universeId, externalDriverId: ext.externalDriverId, confidence: "CONFIRMED" },
           select: { characterId: true },
         });
         if (driverBinding) {
@@ -1627,9 +1782,11 @@ export class ReconciliationService {
             differences = ["identified-without-driver-profile"];
           }
         } else {
-          suggestions = await this.candidatesForDriver("", {
-            name: ext.externalDriver.name,
-          });
+          suggestions = await this.candidatesForDriver(
+            "",
+            { name: ext.externalDriver.name },
+            universeId,
+          );
           status = suggestions.length > 0 ? "SUGGESTED" : "UNMATCHED";
           differences = suggestions.length > 0 ? ["candidate-exists"] : ["no-candidate"];
         }
@@ -1737,13 +1894,14 @@ export class ReconciliationService {
   async buildChampionshipDiff(seasonId: string): Promise<ChampionshipDiff> {
     const season = await prisma.season.findUnique({
       where: { id: seasonId },
-      select: { id: true },
+      select: { id: true, universeId: true },
     });
     if (!season) {
       throw new ReconciliationError("NOT_FOUND", "Temporada não encontrada", 404);
     }
+    const universeId = season.universeId;
     const seasonBinding = await prisma.externalBindingSeason.findFirst({
-      where: { seasonId, confidence: "CONFIRMED" },
+      where: { universeId, seasonId, confidence: "CONFIRMED" },
       select: { externalSeason: { select: { id: true, year: true } } },
     });
     if (!seasonBinding) {
@@ -1766,7 +1924,7 @@ export class ReconciliationService {
 
     for (const ext of externalList) {
       const standingBinding = await prisma.externalBindingStanding.findFirst({
-        where: { externalStandingId: ext.id, confidence: "CONFIRMED" },
+        where: { universeId, externalStandingId: ext.id, confidence: "CONFIRMED" },
         select: {
           id: true,
           confidence: true,
@@ -1805,7 +1963,7 @@ export class ReconciliationService {
         }
       } else {
         const driverBinding = await prisma.externalBindingDriver.findFirst({
-          where: { externalDriverId: ext.externalDriverId, confidence: "CONFIRMED" },
+          where: { universeId, externalDriverId: ext.externalDriverId, confidence: "CONFIRMED" },
           select: { characterId: true },
         });
         if (driverBinding) {
@@ -1883,13 +2041,14 @@ export class ReconciliationService {
   async buildResultsDiff(raceId: string): Promise<ResultsDiff> {
     const race = await prisma.race.findUnique({
       where: { id: raceId },
-      select: { id: true },
+      select: { id: true, season: { select: { universeId: true } } },
     });
     if (!race) {
       throw new ReconciliationError("NOT_FOUND", "Corrida não encontrada", 404);
     }
+    const universeId = race.season.universeId;
     const raceBinding = await prisma.externalBindingRace.findFirst({
-      where: { raceId, confidence: "CONFIRMED" },
+      where: { universeId, raceId, confidence: "CONFIRMED" },
       select: { externalRace: { select: { id: true, seasonYear: true, round: true } } },
     });
     if (!raceBinding) {
@@ -1910,7 +2069,7 @@ export class ReconciliationService {
 
     for (const ext of externalList) {
       const resultBinding = await prisma.externalBindingResult.findFirst({
-        where: { externalResultId: ext.id, confidence: "CONFIRMED" },
+        where: { universeId, externalResultId: ext.id, confidence: "CONFIRMED" },
         select: {
           id: true,
           confidence: true,
@@ -1950,7 +2109,7 @@ export class ReconciliationService {
         }
       } else {
         const driverBinding = await prisma.externalBindingDriver.findFirst({
-          where: { externalDriverId: ext.externalDriverId, confidence: "CONFIRMED" },
+          where: { universeId, externalDriverId: ext.externalDriverId, confidence: "CONFIRMED" },
           select: { characterId: true },
         });
         if (driverBinding) {

@@ -40,6 +40,7 @@ async function getEvents(entryId: string): Promise<{ kind: string }[]> {
 type RolesFixture = {
   ids: {
     userId: string;
+    universeId: string;
     seasonId: string;
     extSeasonId: string;
     extTeamId: string;
@@ -69,8 +70,9 @@ async function seedRolesFixture(
       role: "ADMIN",
     },
   });
+  const universe = await prisma.universe.create({ data: { userId: user.id } });
   const season = await prisma.season.create({
-    data: { year, name: String(year), status: "PRE_SEASON" },
+    data: { universeId: universe.id, year, name: String(year), status: "PRE_SEASON" },
   });
   const extSeason = await prisma.externalSeason.create({
     data: { source, year, name: String(year), status: "ACTIVE", contentHash: "roles-ext-season" },
@@ -130,6 +132,7 @@ async function seedRolesFixture(
   return {
     ids: {
       userId: user.id,
+      universeId: universe.id,
       seasonId: season.id,
       extSeasonId: extSeason.id,
       extTeamId: extTeam.id,
@@ -142,9 +145,13 @@ function gridInput(ids: RolesFixture["ids"]): UniverseInitializationInput {
   return { seasonId: ids.seasonId, externalSeasonId: ids.extSeasonId, scopes: ["DRIVER_GRID"] };
 }
 
-async function createDriver(userId: string, name: string): Promise<{ driverProfileId: string }> {
+async function createDriver(
+  userId: string,
+  universeId: string,
+  name: string,
+): Promise<{ driverProfileId: string }> {
   const character = await prisma.character.create({
-    data: { userId, name, nationality: "Teste", birthDate: new Date("1995-05-10") },
+    data: { userId, universeId, name, nationality: "Teste", birthDate: new Date("1995-05-10") },
   });
   const profile = await prisma.driverProfile.create({ data: { characterId: character.id } });
   return { driverProfileId: profile.id };
@@ -223,9 +230,13 @@ describe("STEP 107.7 — papéis temporais, participantes e pool de reservas", (
         entriesReused: 3,
       });
 
-      expect(await prisma.character.count({ where: { userId: ids.userId } })).toBe(3);
       expect(
-        await prisma.driverProfile.count({ where: { character: { userId: ids.userId } } }),
+        await prisma.character.count({ where: { universeId: ids.universeId } }),
+      ).toBe(3);
+      expect(
+        await prisma.driverProfile.count({
+          where: { character: { universeId: ids.universeId } },
+        }),
       ).toBe(3);
       expect(await prisma.seasonDriverEntry.count({ where: { seasonId: ids.seasonId } })).toBe(3);
       expect(
@@ -329,10 +340,17 @@ describe("STEP 107.7 — papéis temporais, participantes e pool de reservas", (
     const actor: Actor = { id: ids.userId, role: "ADMIN" };
     try {
       const team = await prisma.team.create({
-        data: { name: "Racing Bulls", shortName: "VCARB", color: "#6692ff", userId: ids.userId },
+        data: {
+          name: "Racing Bulls",
+          shortName: "VCARB",
+          color: "#6692ff",
+          userId: ids.userId,
+          universeId: ids.universeId,
+        },
       });
       await prisma.externalBindingTeam.create({
         data: {
+          universeId: ids.universeId,
           externalTeamId: ids.extTeamId,
           teamId: team.id,
           confidence: "CONFIRMED",
@@ -345,6 +363,7 @@ describe("STEP 107.7 — papéis temporais, participantes e pool de reservas", (
           nationality: "Unknown",
           birthDate: new Date("1997-01-01"),
           userId: ids.userId,
+          universeId: ids.universeId,
         },
       });
       const occupantProfile = await prisma.driverProfile.create({
@@ -392,10 +411,15 @@ describe("STEP 107.7 — papéis temporais, participantes e pool de reservas", (
       },
     });
     try {
-      const season = await prisma.season.create({ data: { year: 2030 } });
-      const team = await prisma.team.create({ data: { name: "Alpha", userId: user.id } });
-      const driver1 = await createDriver(user.id, "Piloto Um");
-      const driver2 = await createDriver(user.id, "Piloto Dois");
+      const universe = await prisma.universe.create({ data: { userId: user.id } });
+      const season = await prisma.season.create({
+        data: { universeId: universe.id, year: 2030 },
+      });
+      const team = await prisma.team.create({
+        data: { name: "Alpha", userId: user.id, universeId: universe.id },
+      });
+      const driver1 = await createDriver(user.id, universe.id, "Piloto Um");
+      const driver2 = await createDriver(user.id, universe.id, "Piloto Dois");
 
       await rosterService.assignDriverToSeat(user.id, {
         seasonId: season.id,
@@ -483,9 +507,14 @@ describe("STEP 107.7 — papéis temporais, participantes e pool de reservas", (
       },
     });
     try {
-      const season = await prisma.season.create({ data: { year: 2031 } });
-      const team = await prisma.team.create({ data: { name: "Beta", userId: user.id } });
-      const driver = await createDriver(user.id, "Piloto Status");
+      const universe = await prisma.universe.create({ data: { userId: user.id } });
+      const season = await prisma.season.create({
+        data: { universeId: universe.id, year: 2031 },
+      });
+      const team = await prisma.team.create({
+        data: { name: "Beta", userId: user.id, universeId: universe.id },
+      });
+      const driver = await createDriver(user.id, universe.id, "Piloto Status");
 
       await rosterService.assignDriverToSeat(user.id, {
         seasonId: season.id,
@@ -542,9 +571,11 @@ describe("STEP 107.7 — papéis temporais, participantes e pool de reservas", (
     try {
       await universeInitService.execute(actor, gridInput(ids));
 
-      const team = await prisma.team.findFirstOrThrow({ where: { userId: ids.userId } });
+      const team = await prisma.team.findFirstOrThrow({
+        where: { universeId: ids.universeId },
+      });
       const tsunoda = await prisma.character.findFirstOrThrow({
-        where: { userId: ids.userId, name: "Yuki Tsunoda" },
+        where: { universeId: ids.universeId, name: "Yuki Tsunoda" },
       });
       const tsunodaProfile = await prisma.driverProfile.findUniqueOrThrow({
         where: { characterId: tsunoda.id },

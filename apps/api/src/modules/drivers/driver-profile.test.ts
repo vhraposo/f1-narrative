@@ -160,7 +160,7 @@ describe("GET /api/drivers", () => {
     });
 
     await putDriver(a, cha.id, { number: 44 });
-    await putDriver(b, chb.id, { number: 1 });
+    await putDriver(b, chb.id, { number: 2 });
 
     const res = await app.inject({
       method: "GET",
@@ -363,22 +363,39 @@ describe("DELETE /api/drivers/:characterId", () => {
   });
 });
 
-async function createSeason(year: number): Promise<string> {
-  const season = await prisma.season.create({ data: { year } });
+async function universeForUser(userId: string): Promise<string> {
+  const universe = await prisma.universe.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
+  return universe.id;
+}
+
+async function createSeason(userId: string, year: number): Promise<string> {
+  const universeId = await universeForUser(userId);
+  const season = await prisma.season.create({ data: { universeId, year } });
   createdSeasonIds.push(season.id);
   return season.id;
 }
 
-async function setCurrentSeason(seasonId: string | null): Promise<void> {
+async function setCurrentSeason(
+  userId: string,
+  seasonId: string | null,
+): Promise<void> {
+  const universeId = await universeForUser(userId);
   await prisma.worldState.upsert({
-    where: { key: WORLD_KEY },
+    where: { universeId_key: { universeId, key: WORLD_KEY } },
     update: { currentSeasonId: seasonId },
-    create: { key: WORLD_KEY, currentSeasonId: seasonId },
+    create: { universeId, key: WORLD_KEY, currentSeasonId: seasonId },
   });
 }
 
-async function readCurrentSeason(): Promise<string | null> {
-  const world = await prisma.worldState.findUnique({ where: { key: WORLD_KEY } });
+async function readCurrentSeason(userId: string): Promise<string | null> {
+  const universeId = await universeForUser(userId);
+  const world = await prisma.worldState.findUnique({
+    where: { universeId_key: { universeId, key: WORLD_KEY } },
+  });
   return world?.currentSeasonId ?? null;
 }
 
@@ -484,14 +501,14 @@ describe("PUT /api/drivers/:characterId — vinculação de Team é do roster", 
       birthDate: "1989-06-06",
     });
     const team = await createTeam(u, { name: "Time Preservado" });
-    const seasonId = await createSeason(2026);
-    const originalSeason = await readCurrentSeason();
+    const seasonId = await createSeason(u.userId, 2026);
+    const originalSeason = await readCurrentSeason(u.userId);
 
     await putDriver(u, ch.id, { number: 12 });
     const driverRow = await prisma.driverProfile.findUnique({
       where: { characterId: ch.id },
     });
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(u.userId, seasonId);
     await rosterService.assignDriverToSeat(u.userId, {
       seasonId,
       teamId: team.id,
@@ -505,7 +522,7 @@ describe("PUT /api/drivers/:characterId — vinculação de Team é do roster", 
     expect(body!.teamId).toBe(team.id);
     expect(body!.team!.id).toBe(team.id);
 
-    await setCurrentSeason(originalSeason);
+    await setCurrentSeason(u.userId, originalSeason);
   });
 
   it("rejeita teamId mesmo com equipe de outro usuário → 400 ROSTER_OPERATION_REQUIRED (não vaza 404)", async () => {
@@ -584,8 +601,8 @@ describe("GET /api/drivers — Team na resposta e pilotos sem Team", () => {
       birthDate: "1983-02-02",
     });
     const team = await createTeam(u, { name: "Time do GET" });
-    const seasonId = await createSeason(2026);
-    const originalSeason = await readCurrentSeason();
+    const seasonId = await createSeason(u.userId, 2026);
+    const originalSeason = await readCurrentSeason(u.userId);
 
     await putDriver(u, chCom.id, { number: 20 });
     await putDriver(u, chSem.id, { number: 21 });
@@ -593,7 +610,7 @@ describe("GET /api/drivers — Team na resposta e pilotos sem Team", () => {
       where: { characterId: chCom.id },
     });
 
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(u.userId, seasonId);
     await rosterService.assignDriverToSeat(u.userId, {
       seasonId,
       teamId: team.id,
@@ -620,7 +637,7 @@ describe("GET /api/drivers — Team na resposta e pilotos sem Team", () => {
     expect(withoutTeam.teamId).toBeNull();
     expect(withoutTeam.team).toBeNull();
 
-    await setCurrentSeason(originalSeason);
+    await setCurrentSeason(u.userId, originalSeason);
   });
 });
 
@@ -690,8 +707,15 @@ async function createDbCharacter(
   name: string,
   nationality = "Brasileira",
 ): Promise<{ id: string }> {
+  const universeId = await universeForUser(userId);
   const character = await prisma.character.create({
-    data: { userId, name, nationality, birthDate: new Date("1990-01-01") },
+    data: {
+      userId,
+      universeId,
+      name,
+      nationality,
+      birthDate: new Date("1990-01-01"),
+    },
     select: { id: true },
   });
   return character;
@@ -706,8 +730,9 @@ async function createDbDriver(characterId: string, number: number | null): Promi
 }
 
 async function createDbTeam(userId: string, name: string): Promise<Team> {
+  const universeId = await universeForUser(userId);
   return prisma.team.create({
-    data: { userId, name },
+    data: { userId, universeId, name },
     select: {
       id: true,
       name: true,
@@ -734,13 +759,13 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
   it("participante materializado (cache nulo) retorna a equipe da SeasonDriverEntry", async () => {
     const { user, profileId } = await makeDriverUser("step14a", "Cache Nulo");
     const team = await createDbTeam(user.userId, "Time da Entrada");
-    const seasonId = await createSeason(2027);
+    const seasonId = await createSeason(user.userId, 2027);
     await createMaterializedEntry({ seasonId, teamId: team.id, driverProfileId: profileId, seat: 1 });
 
     const cached = await prisma.driverProfile.findUnique({ where: { id: profileId } });
     expect(cached!.teamId).toBeNull();
 
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(user.userId, seasonId);
     const { status, drivers } = await getDrivers(user, "", "10.14.1.1");
     const found = drivers.find((d) => d.id === profileId)!;
     expect(status).toBe(200);
@@ -753,10 +778,10 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
   it("retorna o número da SeasonDriverEntry (fonte de verdade) sobre o número base", async () => {
     const { user, profileId } = await makeDriverUser("step14b", "Número da Entrada");
     const team = await createDbTeam(user.userId, "Time do Número");
-    const seasonId = await createSeason(2027);
+    const seasonId = await createSeason(user.userId, 2027);
     await createMaterializedEntry({ seasonId, teamId: team.id, driverProfileId: profileId, number: 88, seat: 1 });
 
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(user.userId, seasonId);
     const { drivers } = await getDrivers(user, "", "10.14.1.2");
     expect(drivers.find((d) => d.id === profileId)!.number).toBe(88);
   });
@@ -764,7 +789,7 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
   it("participante sem seat (role/seat nulos) continua com a equipe", async () => {
     const { user, profileId } = await makeDriverUser("step14c", "Sem Seat");
     const team = await createDbTeam(user.userId, "Time Sem Seat");
-    const seasonId = await createSeason(2027);
+    const seasonId = await createSeason(user.userId, 2027);
     await createMaterializedEntry({
       seasonId,
       teamId: team.id,
@@ -775,7 +800,7 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
       status: "ACTIVE",
     });
 
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(user.userId, seasonId);
     const { drivers } = await getDrivers(user, "", "10.14.1.3");
     const driver = drivers.find((d) => d.id === profileId)!;
     expect(driver.teamId).toBe(team.id);
@@ -786,14 +811,14 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
   it("piloto sem equipe na temporada não gera equipe fictícia", async () => {
     const { user, profileId } = await makeDriverUser("step14d", "Sem Equipe");
     const team = await createDbTeam(user.userId, "Time de Referência");
-    const seasonId = await createSeason(2027);
-    const otherSeasonId = await createSeason(2028);
+    const seasonId = await createSeason(user.userId, 2027);
+    const otherSeasonId = await createSeason(user.userId, 2028);
 
     const chOutra = await createDbCharacter(user.userId, "Em Outra Temporada", "Italiana");
     const outId = await createDbDriver(chOutra.id, 30);
     await createMaterializedEntry({ seasonId: otherSeasonId, teamId: team.id, driverProfileId: outId, seat: 1 });
 
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(user.userId, seasonId);
     const { drivers } = await getDrivers(user, "", "10.14.1.4");
     expect(drivers.find((d) => d.id === profileId)!.teamId).toBeNull();
     expect(drivers.find((d) => d.id === profileId)!.team).toBeNull();
@@ -802,7 +827,7 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
 
   it("ordena a listagem por número ASC", async () => {
     const { user } = await makeDriverUser("step14e", "Fora de Ordem");
-    const seasonId = await createSeason(2027);
+    const seasonId = await createSeason(user.userId, 2027);
 
     const names = ["Cinquenta", "Dezena", "Primeiro"];
     const numbers = [50, 10, 1];
@@ -813,7 +838,7 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
       created.push({ id: profileId, number: numbers[i] });
     }
 
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(user.userId, seasonId);
     const { drivers } = await getDrivers(user, "", "10.14.1.5");
     const ids = drivers.filter((d) => created.some((c) => c.id === d.id));
     expect(ids.map((d) => d.number)).toEqual([1, 10, 50]);
@@ -824,7 +849,7 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
       "step14f",
       `step14f-${Date.now()}@f1nw.test`,
     );
-    const seasonId = await createSeason(2027);
+    const seasonId = await createSeason(user.userId, 2027);
 
     const rows: { name: string; number: number | null }[] = [
       { name: "Zed Sem Número", number: null },
@@ -839,7 +864,7 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
       ids.push(profileId);
     }
 
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(user.userId, seasonId);
     const { drivers } = await getDrivers(user, "", "10.14.1.6");
     const ordered = drivers.filter((d) => ids.includes(d.id));
     expect(ordered.map((d) => d.character.name)).toEqual([
@@ -854,12 +879,12 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
     const { user, profileId } = await makeDriverUser("step14g", "Duas Temporadas");
     const teamA = await createDbTeam(user.userId, "Time 2027");
     const teamB = await createDbTeam(user.userId, "Time 2028");
-    const season27 = await createSeason(2027);
-    const season28 = await createSeason(2028);
+    const season27 = await createSeason(user.userId, 2027);
+    const season28 = await createSeason(user.userId, 2028);
     await createMaterializedEntry({ seasonId: season27, teamId: teamA.id, driverProfileId: profileId, seat: 1 });
     await createMaterializedEntry({ seasonId: season28, teamId: teamB.id, driverProfileId: profileId, seat: 1 });
 
-    await setCurrentSeason(season27);
+    await setCurrentSeason(user.userId, season27);
     const s27 = await getDrivers(user, "", "10.14.1.7");
     const s28 = await getDrivers(user, `?seasonId=${season28}`, "10.14.1.8");
     const d27 = s27.drivers.find((d) => d.id === profileId)!;
@@ -871,8 +896,8 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
   it("player-created driver (PUT + roster) mantém equipe e número corretos", async () => {
     const { user, profileId } = await makeDriverUser("step14h", "Player Criado");
     const team = await createDbTeam(user.userId, "Time Player");
-    const seasonId = await createSeason(2027);
-    await setCurrentSeason(seasonId);
+    const seasonId = await createSeason(user.userId, 2027);
+    await setCurrentSeason(user.userId, seasonId);
     await rosterService.assignDriverToSeat(user.userId, {
       seasonId,
       teamId: team.id,
@@ -892,11 +917,11 @@ describe("GET /api/drivers — Piloto ↔ Equipe pela SeasonDriverEntry (STEP 14
     const { user, profileId } = await makeDriverUser("step14i", "Cache Stale");
     const teamReal = await createDbTeam(user.userId, "Time Real da Entrada");
     const teamStale = await createDbTeam(user.userId, "Time Stale do Cache");
-    const seasonId = await createSeason(2027);
+    const seasonId = await createSeason(user.userId, 2027);
     await createMaterializedEntry({ seasonId, teamId: teamReal.id, driverProfileId: profileId, seat: 1 });
     await prisma.driverProfile.update({ where: { id: profileId }, data: { teamId: teamStale.id } });
 
-    await setCurrentSeason(seasonId);
+    await setCurrentSeason(user.userId, seasonId);
     const { drivers } = await getDrivers(user, "", "10.14.1.10");
     const driver = drivers.find((d) => d.id === profileId)!;
     expect(driver.teamId).toBe(teamReal.id);
@@ -938,8 +963,13 @@ describe("GET /api/drivers — headshotUrl do enriquecimento externo (STEP 107.1
       },
       select: { id: true },
     });
+    const universeId = await universeForUser(user.userId);
     await prisma.externalBindingDriver.create({
-      data: { externalDriverId: ext.id, characterId: chCom.id },
+      data: {
+        universeId,
+        externalDriverId: ext.id,
+        characterId: chCom.id,
+      },
     });
 
     const { status, drivers } = await getDrivers(user, "", "10.16.1.1");
@@ -951,5 +981,281 @@ describe("GET /api/drivers — headshotUrl do enriquecimento externo (STEP 107.1
     expect(sem.headshotUrl).toBeNull();
 
     await prisma.externalDriver.delete({ where: { id: ext.id } });
+  });
+});
+
+describe("GET/PATCH /api/drivers/:id — ficha do Driver escopada por Universe", () => {
+  async function setupDriver(suffix: string): Promise<{
+    user: TestUser;
+    profileId: string;
+    characterId: string;
+    universeId: string;
+  }> {
+    const user = await createDbUser(suffix, `${suffix}-${Date.now()}@f1nw.test`);
+    const universe = await prisma.universe.create({
+      data: { userId: user.userId, status: "READY" },
+      select: { id: true },
+    });
+    const ch = await prisma.character.create({
+      data: {
+        userId: user.userId,
+        universeId: universe.id,
+        controlledBy: "USER",
+        name: `Driver ${suffix}`,
+        nationality: "Brasileira",
+        birthDate: new Date("1995-01-01"),
+      },
+      select: { id: true },
+    });
+    const profile = await prisma.driverProfile.create({
+      data: { characterId: ch.id, number: 12 },
+      select: { id: true },
+    });
+    return {
+      user,
+      profileId: profile.id,
+      characterId: ch.id,
+      universeId: universe.id,
+    };
+  }
+
+  async function attachExternalHeadshot(
+    characterId: string,
+    universeId: string,
+    url: string,
+  ): Promise<string> {
+    const ext = await prisma.externalDriver.create({
+      data: {
+        source: "jolpica",
+        externalId: `ext-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: "Ext Headshot",
+        number: 11,
+        headshotUrl: url,
+        contentHash: `ch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      },
+      select: { id: true },
+    });
+    await prisma.externalBindingDriver.create({
+      data: {
+        externalDriverId: ext.id,
+        characterId,
+        universeId,
+        confidence: "CONFIRMED",
+      },
+    });
+    return ext.id;
+  }
+
+  it("lê o Driver do próprio Universe por driverId (não por Character)", async () => {
+    const { user, profileId } = await setupDriver("drvget");
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.17.1.1",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json().driver;
+    expect(body.id).toBe(profileId);
+    expect(body.character.name).toBe("Driver drvget");
+    expect(body.number).toBe(12);
+  });
+
+  it("PATCH atualiza o número do Driver do próprio Universe", async () => {
+    const { user, profileId } = await setupDriver("drvpatch");
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { number: 21 },
+      remoteAddress: "10.17.2.1",
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().driver.number).toBe(21);
+
+    const stored = await prisma.driverProfile.findUniqueOrThrow({
+      where: { id: profileId },
+    });
+    expect(stored.number).toBe(21);
+  });
+
+  it("404 ao ler/editar Driver de outro Universe (não vaza entre universos)", async () => {
+    const owner = await setupDriver("drvown");
+    const intruder = await createDbUser(
+      "drvint",
+      `drvint-${Date.now()}@f1nw.test`,
+    );
+    await prisma.universe.create({
+      data: { userId: intruder.userId, status: "READY" },
+    });
+
+    const read = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${owner.profileId}`,
+      headers: { cookie: intruder.cookie },
+      remoteAddress: "10.17.3.1",
+    });
+    expect(read.statusCode).toBe(404);
+
+    const write = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${owner.profileId}`,
+      headers: { cookie: intruder.cookie },
+      payload: { number: 31 },
+      remoteAddress: "10.17.3.2",
+    });
+    expect(write.statusCode).toBe(404);
+
+    const stored = await prisma.driverProfile.findUniqueOrThrow({
+      where: { id: owner.profileId },
+    });
+    expect(stored.number).toBe(12);
+  });
+
+  it("valida número e id (400)", async () => {
+    const { user, profileId } = await setupDriver("drvval");
+
+    const badNumber = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { number: 1 },
+      remoteAddress: "10.17.4.1",
+    });
+    expect(badNumber.statusCode).toBe(400);
+
+    const badId = await app.inject({
+      method: "GET",
+      url: "/api/drivers/nao-e-uuid",
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.17.4.2",
+    });
+    expect(badId.statusCode).toBe(400);
+  });
+
+  it("expõe o headshot externo como imagem padrão do Driver", async () => {
+    const { user, profileId, characterId, universeId } =
+      await setupDriver("drvshot");
+    await attachExternalHeadshot(
+      characterId,
+      universeId,
+      "https://img.example/ext.jpg",
+    );
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.18.1.1",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json().driver;
+    expect(body.headshotUrl).toBe("https://img.example/ext.jpg");
+    expect(body.customHeadshotUrl).toBeNull();
+    expect(body.displayHeadshotUrl).toBe("https://img.example/ext.jpg");
+  });
+
+  it("customHeadshotUrl tem precedência e a remoção volta ao headshot externo", async () => {
+    const { user, profileId, characterId, universeId } =
+      await setupDriver("drvcustom");
+    await attachExternalHeadshot(
+      characterId,
+      universeId,
+      "https://img.example/ext.jpg",
+    );
+
+    const set = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { customHeadshotUrl: "https://img.example/custom.jpg" },
+      remoteAddress: "10.18.2.1",
+    });
+    expect(set.statusCode).toBe(200);
+
+    const withCustom = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.18.2.2",
+    });
+    const customBody = withCustom.json().driver;
+    expect(customBody.customHeadshotUrl).toBe(
+      "https://img.example/custom.jpg",
+    );
+    expect(customBody.headshotUrl).toBe("https://img.example/ext.jpg");
+    expect(customBody.displayHeadshotUrl).toBe(
+      "https://img.example/custom.jpg",
+    );
+
+    const clear = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { customHeadshotUrl: null },
+      remoteAddress: "10.18.2.3",
+    });
+    expect(clear.statusCode).toBe(200);
+
+    const cleared = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.18.2.4",
+    });
+    const clearedBody = cleared.json().driver;
+    expect(clearedBody.customHeadshotUrl).toBeNull();
+    expect(clearedBody.displayHeadshotUrl).toBe(
+      "https://img.example/ext.jpg",
+    );
+  });
+
+  it("sync externo atualiza o headshot externo sem sobrescrever o override", async () => {
+    const { user, profileId, characterId, universeId } =
+      await setupDriver("drvsync");
+    const extId = await attachExternalHeadshot(
+      characterId,
+      universeId,
+      "https://img.example/A.jpg",
+    );
+
+    await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { customHeadshotUrl: "https://img.example/B.jpg" },
+      remoteAddress: "10.18.3.1",
+    });
+
+    await prisma.externalDriver.update({
+      where: { id: extId },
+      data: { headshotUrl: "https://img.example/C.jpg" },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.18.3.2",
+    });
+    const body = res.json().driver;
+    expect(body.headshotUrl).toBe("https://img.example/C.jpg");
+    expect(body.customHeadshotUrl).toBe("https://img.example/B.jpg");
+    expect(body.displayHeadshotUrl).toBe("https://img.example/B.jpg");
+  });
+
+  it("URL inválida no customHeadshotUrl → 400", async () => {
+    const { user, profileId } = await setupDriver("drvbadurl");
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/drivers/${profileId}`,
+      headers: { cookie: user.cookie },
+      payload: { customHeadshotUrl: "nao-e-url" },
+      remoteAddress: "10.18.4.1",
+    });
+    expect(res.statusCode).toBe(400);
   });
 });

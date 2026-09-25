@@ -21,8 +21,22 @@ export const upsertDriverSchema = z.object({
 
 export type UpsertDriverInput = z.infer<typeof upsertDriverSchema>;
 
+export const updateDriverProfileSchema = upsertDriverSchema.extend({
+  customHeadshotUrl: z
+    .string()
+    .trim()
+    .url("Informe uma URL válida para a imagem")
+    .max(2048, "URL muito longa")
+    .nullable()
+    .optional(),
+});
+
 export const driverCharacterIdParamSchema = z.object({
   characterId: z.string().uuid("Identificador de personagem inválido"),
+});
+
+export const driverIdParamSchema = z.object({
+  id: z.string().uuid("Identificador de piloto inválido"),
 });
 
 export const driverListQuerySchema = z.object({

@@ -7,7 +7,6 @@ import {
   getCharacter,
   listAiCharacters,
   listCharacters,
-  switchCharacterControl,
   updateCharacter,
   type Character,
   type CreateCharacterInput,
@@ -73,17 +72,6 @@ export function useDeleteCharacter() {
     onSuccess: (_data, id) => {
       void queryClient.invalidateQueries({ queryKey: charactersKey });
       void queryClient.removeQueries({ queryKey: characterKey(id) });
-    },
-  });
-}
-
-export function useSwitchCharacterControl() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => switchCharacterControl(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: charactersKey });
-      void queryClient.invalidateQueries({ queryKey: aiCharactersKey });
     },
   });
 }

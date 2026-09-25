@@ -31,25 +31,41 @@ type DecisionSeatShape = {
 
 async function seedMirrorWithClaims(userId: string, claimLandoSeat: 1 | 2 = 1): Promise<Fixture> {
   const runId = Math.random().toString(36).slice(2, 8);
+  const universe = await prisma.universe.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
 
   const season = await prisma.season.create({
-    data: { year: YEAR, name: String(YEAR), status: "PRE_SEASON" },
+    data: {
+      universeId: universe.id,
+      year: YEAR,
+      name: String(YEAR),
+      status: "PRE_SEASON",
+    },
   });
   const team = await prisma.team.create({
-    data: { name: `McLaren ${runId}`, shortName: "MCL", color: "#ff8000", userId },
+    data: {
+      name: `McLaren ${runId}`,
+      shortName: "MCL",
+      color: "#ff8000",
+      userId,
+      universeId: universe.id,
+    },
   });
 
   const characterLando = await prisma.character.create({
-    data: { name: "Lando Norris", nationality: "British", birthDate: new Date("1999-11-13"), userId },
+    data: { name: "Lando Norris", nationality: "British", birthDate: new Date("1999-11-13"), userId, universeId: universe.id },
   });
   const characterOscar = await prisma.character.create({
-    data: { name: "Oscar Piastri", nationality: "Australian", birthDate: new Date("2001-04-06"), userId },
+    data: { name: "Oscar Piastri", nationality: "Australian", birthDate: new Date("2001-04-06"), userId, universeId: universe.id },
   });
   const characterZe = await prisma.character.create({
-    data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-06-14"), userId },
+    data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-06-14"), userId, universeId: universe.id },
   });
   const characterBia = await prisma.character.create({
-    data: { name: "Bia Fonseca", nationality: "Brasileira", birthDate: new Date("2003-05-20"), userId },
+    data: { name: "Bia Fonseca", nationality: "Brasileira", birthDate: new Date("2003-05-20"), userId, universeId: universe.id },
   });
 
   const driverLando = await prisma.driverProfile.create({
@@ -156,22 +172,22 @@ async function seedMirrorWithClaims(userId: string, claimLandoSeat: 1 | 2 = 1): 
   });
 
   await prisma.externalBindingSeason.create({
-    data: { externalSeasonId: extSeason.id, seasonId: season.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalSeasonId: extSeason.id, seasonId: season.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingTeam.create({
-    data: { externalTeamId: extTeam.id, teamId: team.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalTeamId: extTeam.id, teamId: team.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingDriver.create({
-    data: { externalDriverId: extLando.id, characterId: characterLando.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalDriverId: extLando.id, characterId: characterLando.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingDriver.create({
-    data: { externalDriverId: extOscar.id, characterId: characterOscar.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalDriverId: extOscar.id, characterId: characterOscar.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingDriverSeason.create({
-    data: { externalDriverSeasonId: dsLando.id, seasonDriverEntryId: entryLando.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalDriverSeasonId: dsLando.id, seasonDriverEntryId: entryLando.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
   await prisma.externalBindingDriverSeason.create({
-    data: { externalDriverSeasonId: dsOscar.id, seasonDriverEntryId: entryOscar.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
+    data: { universeId: universe.id, externalDriverSeasonId: dsOscar.id, seasonDriverEntryId: entryOscar.id, confidence: "CONFIRMED", boundBy: "ADMIN" },
   });
 
   const cleanup = async () => {

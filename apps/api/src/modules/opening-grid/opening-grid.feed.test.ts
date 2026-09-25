@@ -425,8 +425,14 @@ describe("STEP 107.12 — Feed curado e versionado de Opening Grid (fonte oficia
         role: "ADMIN",
       },
     });
+    const universe = await prisma.universe.create({ data: { userId: user.id } });
     const season = await prisma.season.create({
-      data: { year: YEAR, name: String(YEAR), status: "PRE_SEASON" },
+      data: {
+        universeId: universe.id,
+        year: YEAR,
+        name: String(YEAR),
+        status: "PRE_SEASON",
+      },
     });
     const actor: Actor = { id: user.id, role: "ADMIN" };
     try {

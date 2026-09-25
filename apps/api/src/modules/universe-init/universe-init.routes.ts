@@ -10,6 +10,7 @@ import {
   type UniverseInitializationInput,
 } from "./universe-init.schemas.js";
 import { UniverseInitError, universeInitService } from "./universe-init.service.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 
 function sendError(reply: FastifyReply, error: unknown): FastifyReply {
   if (error instanceof UniverseInitError) {
@@ -94,9 +95,11 @@ export const universeInitRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
       try {
+        const universe = await ensureUniverse(request.user!.id);
         const report = await universeInitService.preview(
           { id: request.user!.id, role: adminRole },
           inputFrom(parsed.data),
+          universe.id,
         );
         return reply.send({ report });
       } catch (error) {
@@ -120,9 +123,11 @@ export const universeInitRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
       try {
+        const universe = await ensureUniverse(request.user!.id);
         const report = await universeInitService.execute(
           { id: request.user!.id, role: adminRole },
           inputFrom(parsed.data),
+          universe.id,
         );
         return reply.send({ report });
       } catch (error) {
@@ -146,9 +151,11 @@ export const universeInitRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
       try {
+        const universe = await ensureUniverse(request.user!.id);
         const report = await universeInitService.bootstrapSeason(
           { id: request.user!.id, role: adminRole },
           parsed.data.externalSeasonId,
+          universe.id,
         );
         return reply.send({ bootstrap: report });
       } catch (error) {
@@ -179,6 +186,7 @@ export const universeInitRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
       try {
+        const universe = await ensureUniverse(request.user!.id);
         const status = await universeInitService.status(
           { id: request.user!.id, role: adminRole },
           {
@@ -186,6 +194,7 @@ export const universeInitRoutes: FastifyPluginAsync = async (fastify) => {
             externalSeasonId: parsed.data.externalSeasonId,
             scopes,
           },
+          universe.id,
         );
         return reply.send({ status });
       } catch (error) {

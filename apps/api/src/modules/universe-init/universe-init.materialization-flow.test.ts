@@ -17,7 +17,7 @@ type CharacterListRow = {
   id: string;
   name: string;
   controlledBy: string;
-  userId: string;
+  userId: string | null;
 };
 type ParticipantRow = {
   id: string;
@@ -34,6 +34,8 @@ let fixture: {
 };
 
 const createdConversationIds: string[] = [];
+let adminUniverseId = "";
+let adminSeasonId = "";
 let mclarenTeamId = "";
 let landoCharId = "";
 let mclarenLandoEntryId = "";
@@ -61,7 +63,7 @@ async function postInitialization(scopes?: string[]) {
     url: "/api/universe/initialization",
     headers: { cookie: admin.cookie },
     payload: {
-      seasonId: fixture.ids.seasonId,
+      seasonId: adminSeasonId,
       externalSeasonId: fixture.ids.extSeasonId,
       ...(scopes ? { scopes } : {}),
     },
@@ -69,13 +71,18 @@ async function postInitialization(scopes?: string[]) {
 }
 
 async function saveUniverseRefs() {
-  const team = await prisma.team.findFirstOrThrow({
+  const universe = await prisma.universe.findUniqueOrThrow({
     where: { userId: admin.id },
+    select: { id: true },
+  });
+  adminUniverseId = universe.id;
+  const team = await prisma.team.findFirstOrThrow({
+    where: { universeId: adminUniverseId },
     select: { id: true },
   });
   mclarenTeamId = team.id;
   const lando = await prisma.character.findFirstOrThrow({
-    where: { userId: admin.id, name: "Lando Norris" },
+    where: { universeId: adminUniverseId, name: "Lando Norris" },
     select: { id: true },
   });
   landoCharId = lando.id;
@@ -86,7 +93,7 @@ async function saveUniverseRefs() {
   const landoEntry = await prisma.seasonDriverEntry.findUniqueOrThrow({
     where: {
       seasonId_driverProfileId: {
-        seasonId: fixture.ids.seasonId,
+        seasonId: adminSeasonId,
         driverProfileId: landoProfile.id,
       },
     },
@@ -94,7 +101,7 @@ async function saveUniverseRefs() {
   });
   mclarenLandoEntryId = landoEntry.id;
   const oscar = await prisma.character.findFirstOrThrow({
-    where: { userId: admin.id, name: "Oscar Piastri" },
+    where: { universeId: adminUniverseId, name: "Oscar Piastri" },
     select: { id: true },
   });
   const oscarProfile = await prisma.driverProfile.findUniqueOrThrow({
@@ -110,6 +117,22 @@ beforeAll(async () => {
   admin = await createSession("Init Admin Flow");
   await prisma.user.update({ where: { id: admin.id }, data: { role: "ADMIN" } });
   fixture = await seedUniverseInitFixture(YEAR);
+
+  const adminUniverse = await prisma.universe.upsert({
+    where: { userId: admin.id },
+    update: {},
+    create: { userId: admin.id },
+  });
+  adminUniverseId = adminUniverse.id;
+  const adminSeason = await prisma.season.create({
+    data: {
+      universeId: adminUniverseId,
+      year: YEAR,
+      name: String(YEAR),
+      status: "PRE_SEASON",
+    },
+  });
+  adminSeasonId = adminSeason.id;
 
   const res = await postInitialization();
   expect(res.statusCode).toBe(200);
@@ -139,21 +162,28 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     expect(team.userId).toBe(admin.id);
   });
 
-  it("2) ExternalDriver → Character + DriverProfile (controlledBy USER, do usuário)", async () => {
-    const characters = await prisma.character.findMany({ where: { userId: admin.id } });
+  it("2) ExternalDriver → Character de IA + DriverProfile do universo", async () => {
+    const characters = await prisma.character.findMany({
+      where: { universeId: adminUniverseId },
+    });
     expect(characters).toHaveLength(3);
-    expect(characters.map((c) => c.controlledBy)).toEqual(["USER", "USER", "USER"]);
+    expect(characters.map((c) => c.controlledBy)).toEqual(["AI", "AI", "AI"]);
+    expect(characters.map((c) => c.userId)).toEqual([null, null, null]);
     expect(characters.map((c) => c.name).sort()).toEqual([
       "Lando Norris",
       "Oscar Piastri",
       "Reserve X",
     ]);
-    expect(await prisma.driverProfile.count({ where: { character: { userId: admin.id } } })).toBe(3);
+    expect(
+      await prisma.driverProfile.count({
+        where: { character: { universeId: adminUniverseId } },
+      }),
+    ).toBe(3);
   });
 
   it("3) ExternalDriverSeason → SeasonDriverEntry (role/seat/número, ACTIVE, provenance IMPORTED)", async () => {
     const entries = await prisma.seasonDriverEntry.findMany({
-      where: { seasonId: fixture.ids.seasonId },
+      where: { seasonId: adminSeasonId },
     });
     expect(entries).toHaveLength(3);
     const landoEntry = entries.find((entry) => entry.number === 2)!;
@@ -174,14 +204,19 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
 
   it("4) eventos de grid (CREATED) e bindings coerentes preservam a provenance", async () => {
     const events = await prisma.driverEntryEvent.findMany({
-      where: { entry: { seasonId: fixture.ids.seasonId } },
+      where: { entry: { seasonId: adminSeasonId } },
       select: { kind: true },
     });
     expect(events).toHaveLength(3);
     expect(events.every((event) => event.kind === "CREATED")).toBe(true);
 
     const teamBinding = await prisma.externalBindingTeam.findUniqueOrThrow({
-      where: { externalTeamId: fixture.ids.extTeamId },
+      where: {
+        universeId_externalTeamId: {
+          universeId: adminUniverseId,
+          externalTeamId: fixture.ids.extTeamId,
+        },
+      },
     });
     expect(teamBinding.confidence).toBe("CONFIRMED");
     expect(teamBinding.boundBy).toBe("ADMIN");
@@ -205,23 +240,35 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
       }),
     ).toBe(3);
     const driverBinding = await prisma.externalBindingDriver.findUniqueOrThrow({
-      where: { externalDriverId: fixture.ids.extReserveId },
+      where: {
+        universeId_externalDriverId: {
+          universeId: adminUniverseId,
+          externalDriverId: fixture.ids.extReserveId,
+        },
+      },
     });
     expect(driverBinding.confidence).toBe("CONFIRMED");
   });
 
   it("5) a temporada do universo vinculada é a correta (season correctness)", async () => {
     const binding = await prisma.externalBindingSeason.findUniqueOrThrow({
-      where: { externalSeasonId: fixture.ids.extSeasonId },
+      where: {
+        universeId_externalSeasonId: {
+          universeId: adminUniverseId,
+          externalSeasonId: fixture.ids.extSeasonId,
+        },
+      },
     });
-    expect(binding.seasonId).toBe(fixture.ids.seasonId);
+    expect(binding.seasonId).toBe(adminSeasonId);
     expect(binding.confidence).toBe("CONFIRMED");
   });
 
   it("6) re-execução é idempotente (reusa, não duplica) e status informed", async () => {
-    const beforeTeams = await prisma.team.count({ where: { userId: admin.id } });
-    const beforeCharacters = await prisma.character.count({ where: { userId: admin.id } });
-    const beforeEntries = await prisma.seasonDriverEntry.count({ where: { seasonId: fixture.ids.seasonId } });
+    const beforeTeams = await prisma.team.count({ where: { universeId: adminUniverseId } });
+    const beforeCharacters = await prisma.character.count({
+      where: { universeId: adminUniverseId },
+    });
+    const beforeEntries = await prisma.seasonDriverEntry.count({ where: { seasonId: adminSeasonId } });
 
     const res = await postInitialization();
     expect(res.statusCode).toBe(200);
@@ -239,13 +286,15 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
       bindingsCreated: 0,
     });
 
-    expect(await prisma.team.count({ where: { userId: admin.id } })).toBe(beforeTeams);
-    expect(await prisma.character.count({ where: { userId: admin.id } })).toBe(beforeCharacters);
-    expect(await prisma.seasonDriverEntry.count({ where: { seasonId: fixture.ids.seasonId } })).toBe(beforeEntries);
+    expect(await prisma.team.count({ where: { universeId: adminUniverseId } })).toBe(beforeTeams);
+    expect(await prisma.character.count({ where: { universeId: adminUniverseId } })).toBe(
+      beforeCharacters,
+    );
+    expect(await prisma.seasonDriverEntry.count({ where: { seasonId: adminSeasonId } })).toBe(beforeEntries);
 
     const statusRes = await app.inject({
       method: "GET",
-      url: `/api/universe/initialization/status?seasonId=${fixture.ids.seasonId}&externalSeasonId=${fixture.ids.extSeasonId}`,
+      url: `/api/universe/initialization/status?seasonId=${adminSeasonId}&externalSeasonId=${fixture.ids.extSeasonId}`,
       headers: { cookie: admin.cookie },
     });
     expect(statusRes.statusCode).toBe(200);
@@ -272,7 +321,7 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     expect(teamNames).toContain("McLaren");
   });
 
-  it("8) pilotos materializados elegíveis ao chat: GET /api/characters retorna os mesmos Characters", async () => {
+  it("8) pilotos materializados são IA: fora de /api/characters e no catálogo /api/characters/ai", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/api/characters",
@@ -280,19 +329,37 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     });
     expect(res.statusCode).toBe(200);
     const characters = res.json().characters as CharacterListRow[];
-    const lando = characters.find((character) => character.name === "Lando Norris");
+    expect(characters.find((character) => character.name === "Lando Norris")).toBeUndefined();
+
+    const aiRes = await app.inject({
+      method: "GET",
+      url: "/api/characters/ai",
+      headers: { cookie: admin.cookie },
+    });
+    expect(aiRes.statusCode).toBe(200);
+    const aiCharacters = aiRes.json().characters as CharacterListRow[];
+    const lando = aiCharacters.find((character) => character.name === "Lando Norris");
     expect(lando).toBeTruthy();
     expect(lando!.id).toBe(landoCharId);
-    expect(lando!.controlledBy).toBe("USER");
-    expect(lando!.userId).toBe(admin.id);
+    expect(lando!.controlledBy).toBe("AI");
   });
 
-  it("9) conversa GROUP pode incluir piloto materializado (participante de Character, sem tipo externo)", async () => {
+  it("9) conversa GROUP pode incluir piloto materializado (Character de IA do universo)", async () => {
+    const anchor = await prisma.character.create({
+      data: {
+        userId: admin.id,
+        universeId: adminUniverseId,
+        controlledBy: "USER",
+        name: "Engenheiro do Jogador",
+        nationality: "Brasileira",
+        birthDate: new Date("1990-01-01"),
+      },
+    });
     const res = await app.inject({
       method: "POST",
       url: "/api/conversations",
       headers: { cookie: admin.cookie },
-      payload: { title: "Rádio do grid", participantIds: [landoCharId] },
+      payload: { title: "Rádio do grid", participantIds: [anchor.id, landoCharId] },
     });
     expect(res.statusCode).toBe(201);
     const { conversation } = res.json();
@@ -300,13 +367,19 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     const participants = conversation.participants as ParticipantRow[];
     const lando = participants.find((participant) => participant.name === "Lando Norris");
     expect(lando).toBeTruthy();
-    expect(lando!.controlledBy).toBe("USER");
-    expect(lando!.userId).toBe(admin.id);
+    expect(lando!.controlledBy).toBe("AI");
+    expect(lando!.userId).toBeNull();
   });
 
   it("10) divergência narrativa (Lando → Ferrari) não é sobrescrita e gera CONFLICT", async () => {
     const ferrari = await prisma.team.create({
-      data: { name: "Ferrari", shortName: "FER", color: "#e80020", userId: admin.id },
+      data: {
+        name: "Ferrari",
+        shortName: "FER",
+        color: "#e80020",
+        userId: admin.id,
+        universeId: adminUniverseId,
+      },
     });
     await prisma.seasonDriverEntry.update({
       where: { id: mclarenLandoEntryId },
@@ -322,9 +395,13 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     });
     expect(landoEntry.teamId).toBe(ferrari.id);
     expect(landoEntry.seat).toBe(1);
-    expect(await prisma.team.count({ where: { userId: admin.id } })).toBe(2);
-    expect(await prisma.character.count({ where: { userId: admin.id } })).toBe(3);
-    expect(await prisma.seasonDriverEntry.count({ where: { seasonId: fixture.ids.seasonId } })).toBe(3);
+    expect(await prisma.team.count({ where: { universeId: adminUniverseId } })).toBe(2);
+    expect(
+      await prisma.character.count({
+        where: { universeId: adminUniverseId, controlledBy: "AI" },
+      }),
+    ).toBe(3);
+    expect(await prisma.seasonDriverEntry.count({ where: { seasonId: adminSeasonId } })).toBe(3);
   });
 
   it("11) Player Entry bloqueado quando o grid de abertura está UNRESOLVED (participante e assento aberto)", async () => {
@@ -333,7 +410,7 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
       url: "/api/universe/player-entry",
       headers: { cookie: admin.cookie },
       payload: {
-        seasonId: fixture.ids.seasonId,
+        seasonId: adminSeasonId,
         teamId: mclarenTeamId,
         seat: 2,
         name: "Alicya Materializada",
@@ -345,16 +422,18 @@ describe("Materialização automática da F1 no Universo — fluxo real (107.1)"
     expect(res.json().code).toBe("OPENING_GRID_UNRESOLVED");
 
     expect(
-      await prisma.character.count({ where: { userId: admin.id, name: "Alicya Materializada" } }),
+      await prisma.character.count({
+        where: { universeId: adminUniverseId, name: "Alicya Materializada" },
+      }),
     ).toBe(0);
     expect(
       await prisma.seasonDriverEntry.count({
-        where: { seasonId: fixture.ids.seasonId, teamId: mclarenTeamId, seat: 2 },
+        where: { seasonId: adminSeasonId, teamId: mclarenTeamId, seat: 2 },
       }),
     ).toBe(0);
 
     const oscarEntry = await prisma.seasonDriverEntry.findFirstOrThrow({
-      where: { seasonId: fixture.ids.seasonId, driverProfileId: oscarProfileId },
+      where: { seasonId: adminSeasonId, driverProfileId: oscarProfileId },
     });
     expect(oscarEntry.status).toBe("ACTIVE");
     expect(oscarEntry.role).toBeNull();

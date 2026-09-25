@@ -41,10 +41,18 @@ async function createUser(email: string, name: string): Promise<User> {
   return { id: user.id, cookie };
 }
 
+let ownerUniverseId = "";
+
 async function createDriver(userId: string, name: string): Promise<Driver> {
+  const universe = await prisma.universe.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
   const character = await prisma.character.create({
     data: {
       userId,
+      universeId: universe.id,
       name,
       nationality: "Teste",
       birthDate: new Date("1995-05-10"),
@@ -57,15 +65,20 @@ async function createDriver(userId: string, name: string): Promise<Driver> {
 }
 
 async function createTeam(userId: string, name: string): Promise<Team> {
+  const universe = await prisma.universe.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
   const team = await prisma.team.create({
-    data: { name, userId },
+    data: { name, userId, universeId: universe.id },
   });
   return { id: team.id };
 }
 
 async function createSeason(year: number): Promise<Season> {
   const season = await prisma.season.create({
-    data: { year },
+    data: { universeId: ownerUniverseId, year },
   });
   createdSeasonIds.push(season.id);
   return { id: season.id };
@@ -73,14 +86,16 @@ async function createSeason(year: number): Promise<Season> {
 
 async function setCurrentSeason(seasonId: string | null): Promise<void> {
   await prisma.worldState.upsert({
-    where: { key: WORLD_KEY },
+    where: { universeId_key: { universeId: ownerUniverseId, key: WORLD_KEY } },
     update: { currentSeasonId: seasonId },
-    create: { key: WORLD_KEY, currentSeasonId: seasonId },
+    create: { universeId: ownerUniverseId, key: WORLD_KEY, currentSeasonId: seasonId },
   });
 }
 
 async function readCurrentSeason(): Promise<string | null> {
-  const world = await prisma.worldState.findUnique({ where: { key: WORLD_KEY } });
+  const world = await prisma.worldState.findUnique({
+    where: { universeId_key: { universeId: ownerUniverseId, key: WORLD_KEY } },
+  });
   return world?.currentSeasonId ?? null;
 }
 
@@ -111,6 +126,13 @@ beforeAll(async () => {
   await app.ready();
   owner = await createUser(`roster-owner-${Date.now()}@f1nw.test`, "Roster");
   intruder = await createUser(`roster-intr-${Date.now()}@f1nw.test`, "RIntr");
+  ownerUniverseId = (
+    await prisma.universe.upsert({
+      where: { userId: owner.id },
+      update: {},
+      create: { userId: owner.id },
+    })
+  ).id;
   teamA = await createTeam(owner.id, "Equipe Alfa");
   teamB = await createTeam(owner.id, "Equipe Beta");
 });

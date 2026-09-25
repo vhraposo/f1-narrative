@@ -16,6 +16,7 @@ import {
   useTeams,
   useUpdateTeam,
 } from "@/hooks/use-teams";
+import { useSession } from "@/providers/session-provider";
 import type { Driver } from "@/lib/driver-profiles";
 import type { Team } from "@/lib/teams";
 
@@ -28,9 +29,15 @@ export default function TeamsPage() {
   const { data, isLoading, isError, isRefetching, error, refetch } =
     useTeams();
   const { data: drivers } = useDrivers();
+  const { data: session } = useSession();
   const createMutation = useCreateTeam();
   const updateMutation = useUpdateTeam();
   const deleteMutation = useDeleteTeam();
+
+  const sessionUserId = session.user?.id ?? null;
+  function canManage(team: Team): boolean {
+    return sessionUserId !== null && team.userId === sessionUserId;
+  }
 
   const driversByTeam = new Map<string, Driver[]>();
   for (const driver of drivers ?? []) {
@@ -170,8 +177,8 @@ export default function TeamsPage() {
 
       {!isLoading && !isError && data && data.length === 0 && (
         <EmptyState
-          title="Você ainda não tem equipes."
-          description="Crie uma equipe para começar e depois vincule seus pilotos a ela."
+          title="Nenhuma equipe no universo."
+          description="Crie a primeira equipe do paddock."
           action={
             form.mode === "hidden" ? (
               <Button onClick={() => setForm({ mode: "create" })}>
@@ -191,13 +198,17 @@ export default function TeamsPage() {
                 key={team.id}
                 team={team}
                 drivers={driversByTeam.get(team.id) ?? []}
-                onEdit={(t) => {
-                  setForm({ mode: "edit", team: t });
-                  setFormError(null);
-                }}
-                onRemove={handleRemove}
+                onEdit={
+                  canManage(team)
+                    ? (t) => {
+                        setForm({ mode: "edit", team: t });
+                        setFormError(null);
+                      }
+                    : undefined
+                }
+                onRemove={canManage(team) ? handleRemove : undefined}
                 isRemoving={removingId === team.id}
-                removeError={deleteErrors[team.id] ?? null}
+                removeError={canManage(team) ? (deleteErrors[team.id] ?? null) : null}
               />
             ))}
         </div>

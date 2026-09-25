@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { deleteUniverseDataForUsers } from "../../test-utils/universe-cleanup.js";
 
 let app: FastifyInstance;
 
@@ -70,9 +71,27 @@ beforeAll(async () => {
   race = await createRace(owner, season.id, "GP Estado do Mundo");
 });
 
+async function universeIdOf(userId: string): Promise<string> {
+  const universe = await prisma.universe.findUniqueOrThrow({ where: { userId } });
+  return universe.id;
+}
+
+async function countWorldsForUser(userId: string): Promise<number> {
+  const universeId = await universeIdOf(userId);
+  return prisma.worldState.count({ where: { universeId } });
+}
+
 afterAll(async () => {
   await prisma.race.deleteMany({ where: { id: race.id } });
   await prisma.season.deleteMany({ where: { id: season.id } });
+  const users = await prisma.user.findMany({
+    where: { email: { startsWith: "world-" } },
+    select: { id: true },
+  });
+  await deleteUniverseDataForUsers(
+    prisma,
+    users.map((user) => user.id),
+  );
   await prisma.user.deleteMany({ where: { email: { startsWith: "world-" } } });
   await prisma.$disconnect();
   await app.close();
@@ -93,13 +112,10 @@ describe("auth — 401 sem sessão", () => {
   });
 });
 
-describe("WorldState — singleton global", () => {
-  it("GET autenticado cria o singleton default na primeira resolução", async () => {
-    // Baseline limpo: o teste é determinístico independentemente de resíduos
-    // de outros arquivos de teste que compartilham o mesmo banco. O singleton
-    // é recriado no próprio GET (seria 401/400 se não houvesse rota).
-    await prisma.worldState.deleteMany({});
-    const before = await prisma.worldState.count();
+describe("WorldState — singleton por universo", () => {
+  it("GET autenticado cria o WorldState default do universo na primeira resolução", async () => {
+    const universeId = await universeIdOf(owner.userId);
+    await prisma.worldState.deleteMany({ where: { universeId } });
     const res = await app.inject({
       method: "GET",
       url: "/api/world",
@@ -110,16 +126,14 @@ describe("WorldState — singleton global", () => {
     expect(world.key).toBe("default");
     expect(world.id).toBeTruthy();
     expect(typeof world.currentDate).toBe("string");
-    const after = await prisma.worldState.count();
-    // A primeira leitura cria exatamente um registro global.
-    expect(after).toBe(before + 1);
+    expect(await countWorldsForUser(owner.userId)).toBe(1);
   });
 
-  it("segunda leitura retorna o MESMO WorldState (não outro registro)", async () => {
+  it("segunda leitura do mesmo universo retorna o MESMO WorldState", async () => {
     const first = await app.inject({
       method: "GET",
       url: "/api/world",
-      headers: { cookie: intruder.cookie },
+      headers: { cookie: owner.cookie },
     });
     const second = await app.inject({
       method: "GET",
@@ -129,21 +143,33 @@ describe("WorldState — singleton global", () => {
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(200);
     expect(first.json().world.id).toBe(second.json().world.id);
-    // independentemente do usuário, o estado do mundo é um só (global).
-    const count = await prisma.worldState.count();
-    expect(count).toBe(1);
+    expect(await countWorldsForUser(owner.userId)).toBe(1);
   });
 
-  it("nunca há mais de 1 WorldState após sucessivas leituras", async () => {
+  it("cada universo tem exatamente 1 WorldState após sucessivas leituras", async () => {
     await app.inject({ method: "GET", url: "/api/world", headers: { cookie: owner.cookie } });
     await app.inject({ method: "GET", url: "/api/world", headers: { cookie: intruder.cookie } });
-    const count = await prisma.worldState.count();
-    expect(count).toBe(1);
+    expect(await countWorldsForUser(owner.userId)).toBe(1);
+    expect(await countWorldsForUser(intruder.userId)).toBe(1);
+    const ownerWorld = await app.inject({
+      method: "GET",
+      url: "/api/world",
+      headers: { cookie: owner.cookie },
+    });
+    const intruderWorld = await app.inject({
+      method: "GET",
+      url: "/api/world",
+      headers: { cookie: intruder.cookie },
+    });
+    expect(ownerWorld.json().world.id).not.toBe(intruderWorld.json().world.id);
   });
 
-  it("concorrência na resolução inicial → exatamente 1 WorldState", async () => {
-    // Garante baseline sem o singleton, isoladamente, para o teste de corrida.
-    await prisma.worldState.deleteMany({});
+  it("concorrência na resolução inicial → exatamente 1 WorldState por universo", async () => {
+    const ownerUniverseId = await universeIdOf(owner.userId);
+    const intruderUniverseId = await universeIdOf(intruder.userId);
+    await prisma.worldState.deleteMany({
+      where: { universeId: { in: [ownerUniverseId, intruderUniverseId] } },
+    });
     const [r1, r2, r3, r4] = await Promise.all([
       app.inject({ method: "GET", url: "/api/world", headers: { cookie: owner.cookie } }),
       app.inject({ method: "GET", url: "/api/world", headers: { cookie: intruder.cookie } }),
@@ -154,10 +180,12 @@ describe("WorldState — singleton global", () => {
     expect(r2.statusCode).toBe(200);
     expect(r3.statusCode).toBe(200);
     expect(r4.statusCode).toBe(200);
-    const count = await prisma.worldState.count();
-    expect(count).toBe(1);
-    const ids = new Set([r1.json().world.id, r2.json().world.id, r3.json().world.id, r4.json().world.id]);
-    expect(ids.size).toBe(1);
+    expect(await countWorldsForUser(owner.userId)).toBe(1);
+    expect(await countWorldsForUser(intruder.userId)).toBe(1);
+    const ownerIds = new Set([r1.json().world.id, r3.json().world.id]);
+    const intruderIds = new Set([r2.json().world.id, r4.json().world.id]);
+    expect(ownerIds.size).toBe(1);
+    expect(intruderIds.size).toBe(1);
   });
 });
 
@@ -260,9 +288,8 @@ describe("WorldState — atualização (PATCH)", () => {
       payload: { userId: owner.userId, key: "default", currentDate: "2026-01-01T00:00:00.000Z" },
     });
     // zod strip por padrão remove desconhecidos; currentDate é atualizado,
-    // mas não pode criar um segundo registro.
+    // mas não pode criar um segundo registro no universo.
     expect(res.statusCode).toBe(200);
-    const count = await prisma.worldState.count();
-    expect(count).toBe(1);
+    expect(await countWorldsForUser(owner.userId)).toBe(1);
   });
 });

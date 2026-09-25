@@ -886,6 +886,7 @@ type DbDeps = Pick<
   | "raceResult"
   | "championshipStanding"
   | "newsItem"
+  | "universe"
 >;
 
 export async function generateGeneration(

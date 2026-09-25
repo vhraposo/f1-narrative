@@ -239,7 +239,7 @@ export function withExternalRag<C extends AssembledContext>(
 }
 
 export async function assembleContext(
-  db: Pick<PrismaClient, "conversation" | "conversationParticipant" | "message" | "memory" | "memoryCharacter" | "eventCharacter" | "event" | "relationship" | "worldState" | "character" | "driverProfile" | "team" | "season" | "race" | "raceResult" | "championshipStanding" | "newsItem">,
+  db: Pick<PrismaClient, "conversation" | "conversationParticipant" | "message" | "memory" | "memoryCharacter" | "eventCharacter" | "event" | "relationship" | "worldState" | "character" | "driverProfile" | "team" | "season" | "race" | "raceResult" | "championshipStanding" | "newsItem" | "universe">,
   input: AssemblyInput,
 ): Promise<AssembledContext> {
   const assembledAt = (input.now ?? new Date()).toISOString();
@@ -284,7 +284,15 @@ export async function assembleContext(
     }))
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : byCharacterId(a, b)));
 
-  const world = await db.worldState.findUnique({ where: { key: WORLD_KEY } });
+  const universe = await db.universe.findUnique({
+    where: { userId: input.userId },
+    select: { id: true },
+  });
+  const world = universe
+    ? await db.worldState.findUnique({
+        where: { universeId_key: { universeId: universe.id, key: WORLD_KEY } },
+      })
+    : null;
   let currentSeasonId = world?.currentSeasonId ?? null;
   let currentRaceId = world?.currentRaceId ?? null;
   if (currentSeasonId) {

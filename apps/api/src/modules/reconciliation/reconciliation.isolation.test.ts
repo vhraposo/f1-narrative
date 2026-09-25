@@ -108,7 +108,12 @@ describe("ReconciliationService — isolamento (o reconciler nunca altera o univ
   it("desvincular remove o vínculo sem tocar no universo", async () => {
     const before = await snapshotCounts();
     const row = await prisma.externalBindingDriver.findUniqueOrThrow({
-      where: { externalDriverId: ids.extLandoId },
+      where: {
+        universeId_externalDriverId: {
+          universeId: ids.universeId,
+          externalDriverId: ids.extLandoId,
+        },
+      },
     });
 
     const result = await reconciliationService.unbindBinding(actor, row.id);

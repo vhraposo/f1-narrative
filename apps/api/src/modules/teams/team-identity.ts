@@ -47,12 +47,14 @@ export function normalizeVisualIdentity(
 
 export async function buildTeamCreateInput(
   userId: string,
+  universeId: string,
   data: CreateTeamInput,
 ): Promise<Prisma.TeamUncheckedCreateInput> {
   const normalized = await sanitizeTeamPayload(data);
   const { visualIdentity, ...rest } = normalized;
   return {
     userId,
+    universeId,
     ...rest,
     ...(visualIdentity !== undefined
       ? { visualIdentity: normalizeVisualIdentity(visualIdentity) }

@@ -111,6 +111,97 @@ describe("GET /api/characters", () => {
   });
 });
 
+describe("GET /api/characters — somente personagens do usuário", () => {
+  it("A) retorna exatamente os 4 Characters próprios do usuário", async () => {
+    const u = await createUser(`proprios-${Date.now()}@f1nw.test`, "Proprios");
+    for (let i = 0; i < 4; i++) {
+      const { statusCode } = await createCharacter(u, {
+        name: `Personagem Proprio ${i}`,
+        nationality: "Brasileira",
+        birthDate: "1990-01-01",
+      });
+      expect(statusCode).toBe(201);
+    }
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/characters",
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const characters = res.json().characters as Character[];
+    expect(characters).toHaveLength(4);
+    expect(characters.map((c) => c.name).sort()).toEqual([
+      "Personagem Proprio 0",
+      "Personagem Proprio 1",
+      "Personagem Proprio 2",
+      "Personagem Proprio 3",
+    ]);
+  });
+
+  it("B) não retorna Characters de IA/pilotos do grid (userId null)", async () => {
+    const u = await createUser(`sem-ia-${Date.now()}@f1nw.test`, "SemIA");
+    for (let i = 0; i < 4; i++) {
+      await createCharacter(u, {
+        name: `Dono ${i}`,
+        nationality: "Brasileira",
+        birthDate: "1990-01-01",
+      });
+    }
+
+    const aiNames: string[] = [];
+    for (let i = 0; i < 19; i++) {
+      const name = `Piloto Grid ${Date.now()}-${i}`;
+      aiNames.push(name);
+      await prisma.character.create({
+        data: {
+          name,
+          nationality: "Brasileira",
+          birthDate: new Date("1990-01-01"),
+          controlledBy: "AI",
+          userId: null,
+        },
+      });
+    }
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/characters",
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const characters = res.json().characters as Character[];
+    expect(characters).toHaveLength(4);
+    const returned = new Set(characters.map((c) => c.name));
+    for (const name of aiNames) {
+      expect(returned.has(name)).toBe(false);
+    }
+  });
+
+  it("C) o Chat acessa os Characters de IA via /api/characters/ai", async () => {
+    const u = await createUser(`chat-ia-${Date.now()}@f1nw.test`, "ChatIA");
+    const name = `Piloto IA Chat ${Date.now()}`;
+    await prisma.character.create({
+      data: {
+        name,
+        nationality: "Brasileira",
+        birthDate: new Date("1990-01-01"),
+        controlledBy: "AI",
+        userId: null,
+      },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/characters/ai",
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const names = (res.json().characters as Character[]).map((c) => c.name);
+    expect(names).toContain(name);
+  });
+});
+
 describe("POST /api/characters", () => {
   it("cria personagem autenticado com controlledBy=USER e userId do token", async () => {
     const u = await createUser(`cria-${Date.now()}@f1nw.test`, "Cria");
@@ -323,7 +414,7 @@ describe("POST /api/characters/:id/switch-control", () => {
       where: { id: existing.json.character.id as string },
     });
     expect(releasedDb?.controlledBy).toBe("AI");
-    expect(releasedDb?.userId).toBeNull();
+    expect(releasedDb?.userId).toBe(u.userId);
 
     const targetDb = await prisma.character.findUnique({
       where: { id: target.id },
@@ -332,7 +423,7 @@ describe("POST /api/characters/:id/switch-control", () => {
     expect(targetDb?.userId).toBe(u.userId);
   });
 
-  it("libera todos os USER characters do usuário na troca", async () => {
+  it("libera o controle anterior preservando o ownership na troca", async () => {
     const u = await createUser(`sw-b-${Date.now()}@f1nw.test`, "SWB");
     const c1 = await createCharacter(u, {
       name: "Origem Um",
@@ -362,8 +453,95 @@ describe("POST /api/characters/:id/switch-control", () => {
         where: { id: c.json.character.id as string },
       });
       expect(row?.controlledBy).toBe("AI");
-      expect(row?.userId).toBeNull();
+      expect(row?.userId).toBe(u.userId);
     }
+  });
+
+  it("trocar o controle não encolhe Characters, Drivers nem Teams do universo", async () => {
+    const u = await createUser(`sw-g-${Date.now()}@f1nw.test`, "SWG");
+    const c1 = await createCharacter(u, {
+      name: "Coleção Um",
+      nationality: "Brasileira",
+      birthDate: "1990-01-01",
+    });
+    const c2 = await createCharacter(u, {
+      name: "Coleção Dois",
+      nationality: "Portuguesa",
+      birthDate: "1991-02-02",
+    });
+
+    await prisma.driverProfile.create({
+      data: { characterId: c1.json.character.id as string, number: 10 },
+    });
+    await prisma.driverProfile.create({
+      data: { characterId: c2.json.character.id as string, number: 11 },
+    });
+    const universe = await prisma.universe.upsert({
+      where: { userId: u.userId },
+      update: {},
+      create: { userId: u.userId },
+    });
+    await prisma.team.create({
+      data: {
+        userId: u.userId,
+        universeId: universe.id,
+        name: `Equipe SWG ${Date.now()}`,
+      },
+    });
+
+    await syncAiCatalog(prisma);
+    const target = await prisma.character.findFirstOrThrow({
+      where: { controlledBy: "AI", userId: null },
+    });
+
+    const driversBefore = await app.inject({
+      method: "GET",
+      url: "/api/drivers",
+      headers: { cookie: u.cookie },
+    });
+    const teamsBefore = await app.inject({
+      method: "GET",
+      url: "/api/teams",
+      headers: { cookie: u.cookie },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/characters/${target.id}/switch-control`,
+      headers: { cookie: u.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const characters = await app.inject({
+      method: "GET",
+      url: "/api/characters",
+      headers: { cookie: u.cookie },
+    });
+    expect(characters.statusCode).toBe(200);
+    const names = (characters.json().characters as Character[]).map((c) => c.name);
+    expect(names).toEqual(
+      expect.arrayContaining(["Coleção Um", "Coleção Dois", target.name]),
+    );
+
+    const driversAfter = await app.inject({
+      method: "GET",
+      url: "/api/drivers",
+      headers: { cookie: u.cookie },
+    });
+    const teamsAfter = await app.inject({
+      method: "GET",
+      url: "/api/teams",
+      headers: { cookie: u.cookie },
+    });
+    expect(driversAfter.json().drivers).toHaveLength(
+      driversBefore.json().drivers.length,
+    );
+    expect(teamsAfter.json().teams).toHaveLength(teamsBefore.json().teams.length);
+    const afterNames = (
+      driversAfter.json().drivers as Array<{ character: { name: string } }>
+    ).map((d) => d.character.name);
+    expect(afterNames).toContain("Coleção Um");
+    expect(afterNames).toContain("Coleção Dois");
   });
 
   it("retorna 409 ao tentar controlar personagem já controlado", async () => {
@@ -384,7 +562,7 @@ describe("POST /api/characters/:id/switch-control", () => {
     expect(res.json().code).toBe("ALREADY_CONTROLLED");
   });
 
-  it("retorna 409 ao tentar controlar personagem de outro usuário", async () => {
+  it("retorna 404 ao tentar controlar personagem de outro universo", async () => {
     const owner = await createUser(`sw-d1-${Date.now()}@f1nw.test`, "SWD1");
     const intruder = await createUser(`sw-d2-${Date.now()}@f1nw.test`, "SWD2");
     const created = await createCharacter(owner, {
@@ -398,8 +576,8 @@ describe("POST /api/characters/:id/switch-control", () => {
       url: `/api/characters/${created.json.character.id as string}/switch-control`,
       headers: { cookie: intruder.cookie },
     });
-    expect(res.statusCode).toBe(409);
-    expect(res.json().code).toBe("NOT_ADOPTABLE");
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("NOT_FOUND");
   });
 
   it("retorna 404 para personagem inexistente", async () => {

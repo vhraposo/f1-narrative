@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
 import {
   characterIdParamSchema,
   createCharacterSchema,
@@ -50,9 +51,13 @@ export const charactersRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/api/characters/ai",
     { preHandler: [fastify.authenticate] },
-    async (_request, reply) => {
+    async (request, reply) => {
+      const universe = await ensureUniverse(request.user!.id);
       const characters = await prisma.character.findMany({
-        where: { controlledBy: "AI", userId: null },
+        where: {
+          controlledBy: "AI",
+          OR: [{ universeId: universe.id }, { universeId: null }],
+        },
         select: aiCharacterSelect,
         orderBy: { name: "asc" },
       });
@@ -72,10 +77,12 @@ export const charactersRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
+    const universe = await ensureUniverse(userId);
     const character = await prisma.character.create({
       data: {
         ...parsed.data,
         userId,
+        universeId: universe.id,
         controlledBy: "USER",
         // 'dna' não é editável pelo cliente: inicia vazio e é preservado na edição.
         dna: {} as Prisma.InputJsonValue,
@@ -195,12 +202,13 @@ export const charactersRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const universe = await ensureUniverse(userId);
       const target = await prisma.character.findUnique({
         where: { id: params.data.id },
-        select: { id: true, controlledBy: true, userId: true },
+        select: { id: true, controlledBy: true, userId: true, universeId: true },
       });
 
-      if (!target) {
+      if (!target || (target.universeId !== null && target.universeId !== universe.id)) {
         return reply.code(404).send({
           error: "Personagem não encontrado",
           code: "NOT_FOUND",
@@ -224,12 +232,14 @@ export const charactersRoutes: FastifyPluginAsync = async (fastify) => {
       const [character, released] = await prisma.$transaction([
         prisma.character.update({
           where: { id: target.id },
-          data: { controlledBy: "USER", userId },
+          data: { controlledBy: "USER", userId, universeId: universe.id },
           select: characterSelect,
         }),
         prisma.character.updateMany({
           where: { userId, controlledBy: "USER", id: { not: target.id } },
-          data: { controlledBy: "AI", userId: null },
+          // Troca de controle é contexto de Chat: libera o controle anterior
+          // mas PRESERVA o ownership (a coleção de Characters do usuário não encolhe).
+          data: { controlledBy: "AI" },
         }),
       ]);
 

@@ -26,6 +26,7 @@ const TEAM = {
 type GridFixture = {
   ids: {
     userId: string;
+    universeId: string;
     seasonId: string;
     extSeasonId: string;
     extTeamId: string;
@@ -55,8 +56,9 @@ async function seedFixture(
       role: "ADMIN",
     },
   });
+  const universe = await prisma.universe.create({ data: { userId: user.id } });
   const season = await prisma.season.create({
-    data: { year, name: String(year), status: "PRE_SEASON" },
+    data: { universeId: universe.id, year, name: String(year), status: "PRE_SEASON" },
   });
   const extSeason = await prisma.externalSeason.create({
     data: { source, year, name: String(year), status: "ACTIVE", contentHash: "og-ext-season" },
@@ -118,6 +120,7 @@ async function seedFixture(
   return {
     ids: {
       userId: user.id,
+      universeId: universe.id,
       seasonId: season.id,
       extSeasonId: extSeason.id,
       extTeamId: extTeam.id,
@@ -316,10 +319,17 @@ describe("STEP 107.8 — Resolução do Opening Grid da Universe Season", () => 
       expect(preview.openingGrid.teams).toHaveLength(0);
 
       const team = await prisma.team.create({
-        data: { name: "Meu Time", shortName: "MYT", color: "#000000", userId: ids.userId },
+        data: {
+          name: "Meu Time",
+          shortName: "MYT",
+          color: "#000000",
+          userId: ids.userId,
+          universeId: ids.universeId,
+        },
       });
       await prisma.externalBindingTeam.create({
         data: {
+          universeId: ids.universeId,
           externalTeamId: ids.extTeamId,
           teamId: team.id,
           confidence: "CONFIRMED",
@@ -328,6 +338,7 @@ describe("STEP 107.8 — Resolução do Opening Grid da Universe Season", () => 
       });
       await prisma.externalBindingSeason.create({
         data: {
+          universeId: ids.universeId,
           externalSeasonId: ids.extSeasonId,
           seasonId: ids.seasonId,
           confidence: "CONFIRMED",

@@ -50,13 +50,11 @@ describe("UniverseInit routes — endpoints e autorização (2032)", () => {
   let userCookie: string;
   let adminId: string;
   let userId: string;
+  let adminUniverseId: string;
+  let adminSeasonId: string;
   let cleanup: (extraUserIds?: string[]) => Promise<void>;
 
   beforeAll(async () => {
-    const fixture = await seedUniverseInitFixture(2032);
-    ids = fixture.ids;
-    cleanup = fixture.cleanup;
-
     app = buildApp(undefined, undefined, makeDummyClient());
     await app.ready();
 
@@ -68,6 +66,26 @@ describe("UniverseInit routes — endpoints e autorização (2032)", () => {
     const userEmail = `universe-user-${Date.now()}@f1nw.test`;
     userCookie = await signUpGetCookie(app, userEmail, "Universe User");
     userId = (await prisma.user.findUniqueOrThrow({ where: { email: userEmail } })).id;
+
+    const fixture = await seedUniverseInitFixture(2032);
+    ids = fixture.ids;
+    cleanup = fixture.cleanup;
+
+    const adminUniverse = await prisma.universe.upsert({
+      where: { userId: adminId },
+      update: {},
+      create: { userId: adminId },
+    });
+    adminUniverseId = adminUniverse.id;
+    const adminSeason = await prisma.season.create({
+      data: {
+        universeId: adminUniverseId,
+        year: 2032,
+        name: "2032",
+        status: "PRE_SEASON",
+      },
+    });
+    adminSeasonId = adminSeason.id;
   });
 
   afterAll(async () => {
@@ -78,7 +96,7 @@ describe("UniverseInit routes — endpoints e autorização (2032)", () => {
 
   function body(scopes?: string[]) {
     return {
-      seasonId: ids.seasonId,
+      seasonId: adminSeasonId,
       externalSeasonId: ids.extSeasonId,
       ...(scopes ? { scopes } : {}),
     };
@@ -182,17 +200,26 @@ describe("UniverseInit routes — endpoints e autorização (2032)", () => {
     expect(report.conflicts).toEqual([]);
     expect(report.seasonBindingCreated).toBe(true);
 
-    expect(await prisma.team.count({ where: { userId: adminId } })).toBe(1);
-    expect(await prisma.character.count({ where: { userId: adminId } })).toBe(3);
-    expect(await prisma.race.count({ where: { seasonId: ids.seasonId } })).toBe(2);
+    expect(await prisma.team.count({ where: { universeId: adminUniverseId } })).toBe(1);
     expect(
-      await prisma.raceResult.count({ where: { race: { seasonId: ids.seasonId } } }),
+      await prisma.character.count({
+        where: { universeId: adminUniverseId, controlledBy: "AI" },
+      }),
+    ).toBe(3);
+    expect(await prisma.race.count({ where: { seasonId: adminSeasonId } })).toBe(2);
+    expect(
+      await prisma.raceResult.count({ where: { race: { seasonId: adminSeasonId } } }),
     ).toBe(4);
-    expect(await prisma.championshipStanding.count({ where: { seasonId: ids.seasonId } })).toBe(
-      2,
-    );
     expect(
-      await prisma.externalBindingSeason.count({ where: { externalSeasonId: ids.extSeasonId } }),
+      await prisma.championshipStanding.count({ where: { seasonId: adminSeasonId } }),
+    ).toBe(2);
+    expect(
+      await prisma.externalBindingSeason.count({
+        where: {
+          universeId: adminUniverseId,
+          externalSeasonId: ids.extSeasonId,
+        },
+      }),
     ).toBe(1);
   });
 
@@ -201,7 +228,7 @@ describe("UniverseInit routes — endpoints e autorização (2032)", () => {
       method: "GET",
       url: "/api/universe/initialization/status",
       headers: { cookie: adminCookie },
-      query: { seasonId: ids.seasonId, externalSeasonId: ids.extSeasonId },
+      query: { seasonId: adminSeasonId, externalSeasonId: ids.extSeasonId },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().status).toMatchObject({

@@ -98,8 +98,9 @@ async function seedSeason(
       role: "ADMIN",
     },
   });
+  const universe = await prisma.universe.create({ data: { userId: user.id } });
   const season = await prisma.season.create({
-    data: { year, name: String(year), status: "PRE_SEASON" },
+    data: { universeId: universe.id, year, name: String(year), status: "PRE_SEASON" },
   });
   const extSeason = await prisma.externalSeason.create({
     data: { source: participantSource, year, name: String(year), status: "ACTIVE", contentHash: "gc-ext-season" },
