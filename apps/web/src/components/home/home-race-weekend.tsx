@@ -4,7 +4,7 @@ import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
 import Link from "next/link";
 
 import { SectionHeading } from "@/components/home/section-heading";
-import { useRaces, useSeasons } from "@/hooks/use-championship";
+import { useNextRace } from "@/hooks/use-next-race";
 import { useWorld } from "@/hooks/use-world";
 import { RACE_SESSION_LABELS, type RaceSession } from "@/lib/world";
 import { cn } from "@/lib/utils";
@@ -27,11 +27,13 @@ function formatDate(value: string): string {
 }
 
 export function HomeRaceWeekend() {
-  const { data: world, isLoading } = useWorld();
-  const { data: seasons } = useSeasons();
-  const season = seasons?.find((s) => s.id === world?.currentSeasonId);
-  const { data: races } = useRaces(season?.id ?? "");
-  const race = races?.find((r) => r.id === world?.currentRaceId);
+  const { data, isLoading, isError } = useNextRace();
+  const { data: world } = useWorld();
+
+  const race = data?.next ?? data?.current ?? null;
+  const season = data?.season ?? null;
+  const currentSession = (world?.currentSession ?? null) as RaceSession | null;
+  const totalRounds = data?.totalRounds ?? 0;
 
   return (
     <section aria-label="Próximo fim de semana">
@@ -56,7 +58,7 @@ export function HomeRaceWeekend() {
           <p className="p-6 text-sm text-muted-foreground">
             Carregando o calendário…
           </p>
-        ) : !world || !race ? (
+        ) : isError || !race ? (
           <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -83,6 +85,7 @@ export function HomeRaceWeekend() {
                   {race.round != null ? (
                     <span className="rounded-sm border border-brand/30 bg-brand/10 px-2 py-0.5 text-xs font-bold tabular-nums tracking-wider text-brand">
                       R{race.round}
+                      {totalRounds > 0 ? `/${totalRounds}` : ""}
                     </span>
                   ) : null}
                   {season ? (
@@ -94,31 +97,47 @@ export function HomeRaceWeekend() {
                 <h3 className="mt-3 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
                   {race.name}
                 </h3>
-                {race.circuit || race.country ? (
+                {race.circuit ? (
                   <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" aria-hidden="true" />
-                    {[race.circuit, race.country].filter(Boolean).join(" — ")}
+                    {[
+                      race.circuit.name,
+                      [race.circuit.locality, race.circuit.country]
+                        .filter(Boolean)
+                        .join(", "),
+                    ]
+                      .filter(Boolean)
+                      .join(" — ")}
                   </p>
                 ) : null}
-                <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                  {formatDate(world.currentDate)}
-                </p>
+                {race.date ? (
+                  <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                    {formatDate(race.date)}
+                  </p>
+                ) : null}
+                <Link
+                  href="/app/championship"
+                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                >
+                  Ver evento
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
               </div>
-              {world.currentSession ? (
+              {currentSession ? (
                 <div className="rounded-sm border border-border bg-muted/30 px-3 py-2 text-center">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     Sessão atual
                   </p>
                   <p className="mt-0.5 text-lg font-black tracking-tight text-brand">
-                    {RACE_SESSION_LABELS[world.currentSession]}
+                    {RACE_SESSION_LABELS[currentSession]}
                   </p>
                 </div>
               ) : null}
             </div>
             <div className="grid grid-cols-3 border-t border-border">
               {SESSION_ORDER.map((session) => {
-                const active = world.currentSession === session;
+                const active = currentSession === session;
                 return (
                   <div
                     key={session}

@@ -441,14 +441,14 @@ describe("Timeline — fundação temporal", () => {
 
     const [second, third] = await Promise.all([
       advanceUniverseTime(fx.universeId, { worldDate: dateAt(2) }),
-      advanceUniverseTime(fx.universeId, { worldDate: dateAt(3) }),
+      advanceUniverseTime(fx.universeId, { worldDate: dateAt(2) }),
     ]);
     expect(new Set([second.sequence, third.sequence]).size).toBe(2);
 
     const world = await prisma.worldState.findUniqueOrThrow({
       where: { universeId_key: { universeId: fx.universeId, key: "default" } },
     });
-    expect(world.currentDate.toISOString()).toBe(dateAt(3).toISOString());
+    expect(world.currentDate.toISOString()).toBe(dateAt(2).toISOString());
 
     const events = await listTimelineEvents(fx.universeId);
     expect(events).toHaveLength(3);

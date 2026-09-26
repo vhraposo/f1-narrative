@@ -56,3 +56,19 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-013 — Um único sistema de progressão
 - **Decisão:** a agregação de standings foi extraída para `championship-progression.service.recomputeSeasonStandings` e é usada tanto pela rota `POST /api/races/:raceId/championship/apply` quanto pela timeline (eventos `RACE_RESULT_CORRECTED`).
 - **Consequência:** não existe segundo cálculo de campeonato; correções e apply produzem o mesmo resultado para os mesmos fatos.
+
+## D-014 — Eventos de calendário são auditoria estado-neutra
+- **Decisão:** `RACE_SCHEDULED` e `RACE_UPDATED` registram mudanças do calendário na timeline, mas o replay/recompute os ignora (não alteram `WorldState` nem standings). A timeline continua determinística e idempotente.
+- **Consequência:** calendário tem trilha de auditoria sem criar acoplamento com o estado derivado; `Race` permanece fato materializado.
+
+## D-015 — Override do Universe preservado por snapshot externo
+- **Decisão:** cada binding de corrida guarda `contentHash` + `externalSnapshot` (último valor externo). O sync só atualiza um campo do `Race` se ele ainda for igual ao snapshot; campos editados pelo usuário são preservados. Sem sistema completo de edição de calendário nesta fase.
+- **Consequência:** sync externo não sobrescreve silenciosamente decisões do usuário; backfill legado (snapshot nulo) atualiza uma vez e passa a guardar.
+
+## D-016 — Next Race é estado do Universe
+- **Decisão:** `GET /api/next-race` deriva previous/current/next de `WorldState` + `Race`/`Circuit` do Universe (ordem determinística `round, date, id`; classificação por `currentRaceId` e status). Nenhuma consulta à Jolpica em tempo de leitura; `totalRounds` é dinâmico.
+- **Consequência:** a UI nunca escolhe a próxima corrida pela resposta externa; sem dados inventados (campos ausentes = `null`).
+
+## D-017 — Materialização serializada por Universe
+- **Decisão:** `universeInitService.execute` toma o advisory lock do Universe **antes** de montar o plano, reutilizando o lock da timeline. Corridas com dados incompletos são materializadas com campos nulos.
+- **Consequência:** execuções concorrentes não duplicam corridas/bindings/eventos; um registro inconsistente não derruba o lote (D-006).

@@ -914,6 +914,8 @@ model ExternalBindingRace {
   confidence     BindingConfidence @default(SUGGESTED)
   boundAt        DateTime          @default(now())
   boundBy        Role?
+  contentHash    String?
+  externalSnapshot Json?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -1347,6 +1349,8 @@ enum TimelineEventKind {
   RACE_RESULT_CORRECTED
   STANDING_CORRECTED
   NUMBER_CORRECTED
+  RACE_SCHEDULED
+  RACE_UPDATED
 }
 
 /// Log append-only de mudanças temporais do Universe. Ordenação determinística

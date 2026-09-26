@@ -323,6 +323,10 @@ async function applyTimelineEvent(
       }
       return;
     }
+    case "RACE_SCHEDULED":
+    case "RACE_UPDATED": {
+      return;
+    }
   }
 }
 
