@@ -54,6 +54,7 @@ import jolpicaSyncRoutes, {
 } from "./modules/external-sync/jolpica.routes.js";
 import reconciliationRoutes from "./modules/reconciliation/reconciliation.routes.js";
 import universeRoutes from "./modules/universe/universe.routes.js";
+import timelineRoutes from "./modules/timeline/timeline.routes.js";
 import universeInitRoutes from "./modules/universe-init/universe-init.routes.js";
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
@@ -128,6 +129,7 @@ export function buildApp(
   void app.register(characterHeadshotMaterializationRoutes);
   void app.register(driversRoutes);
   void app.register(teamsRoutes);
+void app.register(timelineRoutes);
   void app.register(teamPerformanceRoutes);
   void app.register(driverAttributeRoutes);
   void app.register(simulationRoutes);

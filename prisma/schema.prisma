@@ -209,6 +209,8 @@ model Universe {
   characters  Character[]
   circuits    Circuit[]
   worldStates WorldState[]
+  timelineEvents TimelineEvent[]
+  worldSnapshots WorldSnapshot[]
 
   bindingDrivers       ExternalBindingDriver[]
   bindingTeams         ExternalBindingTeam[]
@@ -1340,6 +1342,50 @@ model ConversationRagSnapshotItem {
 /// Estado temporal atual do universo. Mantém apenas referências escalares
 /// (sem @relation) para o Season/Race/Conversation ativos, evitando
 /// circularidade. O mundo existe independentemente do chat.
+enum TimelineEventKind {
+  WORLD_ADVANCED
+  RACE_RESULT_CORRECTED
+  STANDING_CORRECTED
+  NUMBER_CORRECTED
+}
+
+/// Log append-only de mudanças temporais do Universe. Ordenação determinística
+/// por (worldDate, sequence); correções retroativas entram com worldDate passado
+/// e são aplicadas no ponto histórico correspondente durante o replay.
+model TimelineEvent {
+  id           String            @id @default(uuid()) @db.Uuid
+  universeId   String            @db.Uuid
+  universe     Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  sequence     Int
+  worldDate    DateTime
+  kind         TimelineEventKind
+  payload      Json
+  causedBy     String?
+  supersedesId String?           @db.Uuid
+  supersedes   TimelineEvent?    @relation("TimelineSupersession", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy TimelineEvent[]   @relation("TimelineSupersession")
+
+  createdAt DateTime @default(now())
+
+  @@unique([universeId, sequence])
+  @@index([universeId, worldDate, sequence])
+}
+
+/// Checkpoint materializado do estado do Universe em uma sequence da timeline.
+model WorldSnapshot {
+  id         String   @id @default(uuid()) @db.Uuid
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  sequence   Int
+  worldDate  DateTime
+  state      Json
+  createdAt  DateTime @default(now())
+
+  @@unique([universeId, sequence])
+  @@index([universeId, sequence])
+}
+
+/// Estado atual do mundo do universo (temporada/corrida/sessão correntes).
 model WorldState {
   id  String @id @default(uuid()) @db.Uuid
   key String @default("default")
