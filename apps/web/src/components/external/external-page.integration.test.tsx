@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -34,6 +34,48 @@ vi.mock("@/lib/api", async (importOriginal) => {
     remove: apiMock.remove,
   };
 });
+
+const sessionMock = vi.hoisted(() => ({
+  session: {
+    data: { user: { id: "admin-1", role: "ADMIN" as string } },
+    isPending: false,
+  },
+  refresh: vi.fn(),
+}));
+
+vi.mock("@/providers/session-provider", () => ({
+  useSession: () => sessionMock.session,
+}));
+
+const SYNC_STATUS = {
+  source: "jolpica",
+  active: [] as string[],
+  lastRun: {
+    id: "run-2",
+    scope: "STANDINGS",
+    seasonYear: 2026,
+    status: "SUCCESS",
+    startedAt: "2026-09-01T12:00:00.000Z",
+    finishedAt: "2026-09-01T12:00:02.000Z",
+    durationMs: 2000,
+    lastSyncedAt: "2026-09-01T12:00:02.000Z",
+    statistics: { created: 0, updated: 3, unchanged: 40, skipped: 0 },
+    error: null,
+  },
+  lastSuccess: null,
+  recent: [] as unknown[],
+};
+
+const REFRESH_SUCCESS = {
+  ok: true,
+  source: "jolpica",
+  year: 2026,
+  failedScope: null,
+  code: null,
+  error: null,
+  scopes: [{ scope: "SEASON", status: "SUCCESS", counts: { created: 0, updated: 0, unchanged: 1, skipped: 0 }, durationMs: 10, error: null }],
+  durationMs: 1234,
+};
 
 const SEASONS: ExternalSeason[] = [
   { id: "s1", year: 2026, name: null, status: "ACTIVE" },
@@ -433,6 +475,13 @@ beforeEach(() => {
     calledPaths.push(path);
     const year = seasonYearOfPath(path);
 
+    if (path.startsWith("/api/external-sync/status")) {
+      return {
+        ...SYNC_STATUS,
+        lastSuccess: SYNC_STATUS.lastRun,
+        recent: [SYNC_STATUS.lastRun],
+      };
+    }
     if (path.startsWith("/api/reconciliation/external/SEASON?")) {
       if (failSeasons) throw new ApiError("Falha", 500);
       if (pendingSeasons) {
@@ -474,10 +523,11 @@ beforeEach(() => {
     throw new ApiError("Não encontrado", 404);
   });
 
-  apiMock.post.mockImplementation(async () => undefined);
+  apiMock.post.mockImplementation(async () => REFRESH_SUCCESS);
   apiMock.patch.mockImplementation(async () => undefined);
   apiMock.put.mockImplementation(async () => undefined);
   apiMock.remove.mockImplementation(async () => undefined);
+  sessionMock.session.data.user.role = "ADMIN";
 });
 
 describe("F1 World Data - External World Data", () => {
@@ -758,5 +808,113 @@ describe("F1 World Data - External World Data", () => {
     expect(
       screen.queryByRole("region", { name: "Contexto do campeonato" }),
     ).toBeNull();
+  });
+
+  it("mostra o status da última sincronização", async () => {
+    renderWithClient(<F1WorldDataPage />);
+
+    expect(
+      await screen.findByText(/Última execução: STANDINGS · sucesso/),
+    ).toBeDefined();
+    expect(
+      screen.getByText(/criados 0 · atualizados 3 · inalterados 40 · ignorados 0/),
+    ).toBeDefined();
+  });
+
+  it("admin dispara o refresh, mostra sucesso e invalida o cache externo", async () => {
+    renderWithClient(<F1WorldDataPage />);
+    await screen.findByRole("button", { name: /Atualizar dados externos/ });
+
+    const statusCallsBefore = calledPaths.filter((path) =>
+      path.startsWith("/api/external-sync/status"),
+    ).length;
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: /Atualizar dados externos/ }),
+    );
+
+    await waitFor(() => {
+      expect(apiMock.post).toHaveBeenCalledWith("/api/external-sync/refresh", {
+        seasonYear: 2026,
+      });
+    });
+    const notice = await screen.findByRole("status");
+    expect(notice.textContent).toContain("Dados externos atualizados em 1234 ms");
+
+    await waitFor(() => {
+      const statusCallsAfter = calledPaths.filter((path) =>
+        path.startsWith("/api/external-sync/status"),
+      ).length;
+      expect(statusCallsAfter).toBeGreaterThan(statusCallsBefore);
+    });
+  });
+
+  it("não-admin não vê o botão de refresh e recebe orientação", async () => {
+    sessionMock.session.data.user.role = "USER";
+    renderWithClient(<F1WorldDataPage />);
+
+    expect(
+      await screen.findByText(
+        "Somente administradores podem atualizar os dados externos.",
+      ),
+    ).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: /Atualizar dados externos/ }),
+    ).toBeNull();
+  });
+
+  it("mostra erro quando o refresh falha", async () => {
+    apiMock.post.mockRejectedValueOnce(
+      new ApiError("Falha ao consultar a fonte externa", 502, "SOURCE_UNAVAILABLE"),
+    );
+    renderWithClient(<F1WorldDataPage />);
+    await screen.findByRole("button", { name: /Atualizar dados externos/ });
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: /Atualizar dados externos/ }),
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Falha ao consultar a fonte externa");
+    expect(alert.textContent).not.toContain("stack");
+  });
+
+  it("desabilita o botão e indica execução durante o refresh", async () => {
+    let resolveRefresh: (value: unknown) => void = () => undefined;
+    apiMock.post.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    renderWithClient(<F1WorldDataPage />);
+    const button = await screen.findByRole("button", {
+      name: /Atualizar dados externos/,
+    });
+
+    const user = userEvent.setup();
+    await user.click(button);
+
+    expect(await screen.findByText("Sincronização em andamento…")).toBeDefined();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: /Atualizar dados externos/,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+
+    resolveRefresh(REFRESH_SUCCESS);
+    await waitFor(() => {
+      expect(
+        (
+          screen.getByRole("button", {
+            name: /Atualizar dados externos/,
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false);
+    });
   });
 });

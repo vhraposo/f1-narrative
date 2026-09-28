@@ -10,6 +10,7 @@ import { ExternalOverview } from "@/components/external/external-overview";
 import { ExternalResults } from "@/components/external/external-results";
 import { ExternalStandings } from "@/components/external/external-standings";
 import { ExternalSourceBadge } from "@/components/external/external-source-badge";
+import { ExternalSyncPanel } from "@/components/external/external-sync-panel";
 import { ExternalTeams } from "@/components/external/external-teams";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -204,6 +205,8 @@ export default function F1WorldDataPage() {
           </div>
         }
       />
+
+      <ExternalSyncPanel year={year} />
 
       {seasonsQuery.isLoading && (
         <div className="flex justify-center py-16">

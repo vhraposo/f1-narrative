@@ -116,3 +116,15 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-028 — S3-compatible sem SDK (SigV4 mínimo) e local com key do servidor
 - **Decisão:** `S3CompatibleStorageProvider` assina requisições com SigV4 implementado sobre `fetch` (path-style default), sem adicionar SDK; `LocalStorageProvider` gera keys `user-avatars/<userId>/<uuid>.<ext>` com flag `wx`, validação de key e contenção no root configurado.
 - **Consequência:** o contrato S3 fica pronto para MinIO/S3 sem dependência nova; path traversal e sobrescrita de arquivo de outro usuário são impossíveis pela API.
+
+## D-029 — Refresh composto é Mirror-only
+- **Decisão:** `POST /api/external-sync/refresh` executa a ordem explícita `SEASON → TEAMS → DRIVERS → DRIVER_SEASONS → RACES → RESULTS → STANDINGS`, sem auto-materialização; o endpoint legado por escopo mantém o comportamento anterior (incluindo materialização) e não é usado pela UI.
+- **Consequência:** o botão de refresh nunca altera Universe (Race/Driver/Team/Character/WorldState/Timeline); a materialização continua sendo um processo explícito e separado.
+
+## D-030 — Observabilidade de sync é derivada de `ExternalSyncRun`
+- **Decisão:** `GET /api/external-sync/status` lê `ExternalSyncRun` (lastRun/lastSuccess/recent) e os locks em memória (`active`); o refresh composto não cria linha própria de "REFRESH". Erros exibidos são sanitizados (URLs → `[fonte externa]`, sem stack) e `triggeredById` é registrado por escopo.
+- **Consequência:** nenhum modelo/histórico novo; a UI mostra o que o backend registrou sem expor detalhes internos.
+
+## D-031 — Refresh admin-only; status autenticado; coalescing por lock
+- **Decisão:** executar refresh exige ADMIN (regra preservada; `401`/`403` garantidos no backend), enquanto ler o status é permitido a qualquer usuário autenticado. O refresh composto reutiliza o coalescing da Fase 1 com lock próprio `source:REFRESH:year`, mantendo escopos independentes paralelizáveis.
+- **Consequência:** cliques/requisições concorrentes compartilham a execução sem fetches ou runs duplicados; nenhum lock global bloqueia escopos independentes.

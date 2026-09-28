@@ -7,7 +7,7 @@ import {
   createExternalDataProvider,
   type ExternalDataProvider,
 } from "./external-data-provider.js";
-import { runRecordedSync } from "./external-sync-run.js";
+import { runRecordedSync, runWithSyncLock, syncLockKey } from "./external-sync-run.js";
 import {
   normalizeDriverSeasons,
   normalizeDrivers,
@@ -47,6 +47,33 @@ export const JOLPICA_SYNC_SCOPES = [
 ] as const;
 
 export type JolpicaSyncScope = (typeof JOLPICA_SYNC_SCOPES)[number];
+
+export const JOLPICA_REFRESH_SCOPES: readonly JolpicaSyncScope[] = [
+  "SEASON",
+  "TEAMS",
+  "DRIVERS",
+  "DRIVER_SEASONS",
+  "RACES",
+  "RESULTS",
+  "STANDINGS",
+] as const;
+
+export interface JolpicaRefreshScopeResult {
+  scope: JolpicaSyncScope;
+  status: "SUCCESS" | "FAILED";
+  counts: PersistResult | null;
+  durationMs: number;
+  error: unknown;
+}
+
+export interface JolpicaRefreshReport {
+  source: string;
+  year: number;
+  ok: boolean;
+  scopes: JolpicaRefreshScopeResult[];
+  failedScope: JolpicaSyncScope | null;
+  durationMs: number;
+}
 
 export interface JolpicaSyncReport {
   source: string;
@@ -104,6 +131,57 @@ export class JolpicaSyncService {
     } finally {
       this.triggeredById = null;
     }
+  }
+
+  async refreshSeason(
+    year: number,
+    options: JolpicaSyncCallOptions = {},
+  ): Promise<JolpicaRefreshReport> {
+    const triggeredById = options.triggeredById ?? null;
+    return runWithSyncLock(
+      syncLockKey(JOLPICA_SOURCE, "REFRESH", year),
+      async () => {
+        const started = Date.now();
+        const scopes: JolpicaRefreshScopeResult[] = [];
+        for (const scope of JOLPICA_REFRESH_SCOPES) {
+          const scopeStarted = Date.now();
+          try {
+            const report = await this.sync(year, scope, { triggeredById });
+            scopes.push({
+              scope,
+              status: "SUCCESS",
+              counts: report.counts,
+              durationMs: report.durationMs,
+              error: null,
+            });
+          } catch (error) {
+            scopes.push({
+              scope,
+              status: "FAILED",
+              counts: null,
+              durationMs: Date.now() - scopeStarted,
+              error,
+            });
+            return {
+              source: JOLPICA_SOURCE,
+              year,
+              ok: false,
+              scopes,
+              failedScope: scope,
+              durationMs: Date.now() - started,
+            };
+          }
+        }
+        return {
+          source: JOLPICA_SOURCE,
+          year,
+          ok: true,
+          scopes,
+          failedScope: null,
+          durationMs: Date.now() - started,
+        };
+      },
+    );
   }
 
   async syncSeason(year: number): Promise<JolpicaSyncReport> {

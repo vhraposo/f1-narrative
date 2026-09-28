@@ -19,6 +19,10 @@ export function isSyncActive(
   return activeSyncs.has(syncLockKey(source, scope, year));
 }
 
+export function getActiveSyncKeys(): string[] {
+  return [...activeSyncs.keys()];
+}
+
 export function runWithSyncLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const existing = activeSyncs.get(key) as Promise<T> | undefined;
   if (existing) return existing;
@@ -36,6 +40,11 @@ export function runWithSyncLock<T>(key: string, fn: () => Promise<T>): Promise<T
 export function sanitizeSyncError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message.replace(/\s+/g, " ").slice(0, 300);
+}
+
+export function sanitizeSyncErrorForDisplay(error: string | null): string | null {
+  if (!error) return null;
+  return error.replace(/https?:\/\/\S+/gi, "[fonte externa]").slice(0, 300);
 }
 
 export interface SyncRunInput {

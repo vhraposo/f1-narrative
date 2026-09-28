@@ -231,3 +231,64 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - Fase 6 (somente após validação desta fase).
+
+---
+
+## Fase 6 — External Data Refresh + Sync Observability
+
+- **Data:** 2026-09-28.
+- **Objetivo:** refresh manual dos dados externos pela UI (backend-driven, admin), com observabilidade da última execução e proteção absoluta do Universe — sem segundo sistema de sync e sem migration.
+
+### Fluxo
+- UI `/app/external` → `POST /api/external-sync/refresh` (autenticado + admin) → `JolpicaSyncService.refreshSeason` → `ExternalDataProvider`/`JolpicaClient` → **External Mirror** (ExternalSeason/Team/Driver/DriverSeason/Race/Circuit/Result/Standing). O refresh **não** materializa nem altera Universe (sem `tryAutoMaterialize`).
+- O endpoint legado `POST /api/external-sync/:source/:scope` permanece com o comportamento aprovado (inclusive auto-materialização), sem uso pelo botão.
+
+### Scopes e ordem (explícita e idempotente)
+- `SEASON → TEAMS → DRIVERS → DRIVER_SEASONS → RACES → RESULTS → STANDINGS` (RESULTS por último por volume; CIRCUITS global continua fora do botão).
+- Cada escopo é um `ExternalSyncRun` próprio; falha em um escopo interrompe a sequência e retorna os escopos já concluídos.
+
+### ExternalSyncRun (sem modelo novo)
+- RUNNING → SUCCESS/FAILED, `startedAt/finishedAt`, `statistics`, `lastSyncedAt` no sucesso, `error` sanitizado (300 chars) e `triggeredById` por escopo. O lock `REFRESH` é apenas em memória (não cria linha), então não há histórico duplicado.
+- `GET /api/external-sync/status?source=jolpica&limit=N` (autenticado, qualquer role): `lastRun`, `lastSuccess`, `recent` e `active` (locks em memória), com erro de exibição sanitizado (URLs → `[fonte externa]`; sem stack).
+- `GET` nunca chama a fonte externa; a UI lê o Mirror pelas rotas existentes.
+
+### Autorização
+- Refresh admin-only preservando a regra existente (`403 FORBIDDEN`; `401` sem sessão; checagem no backend, não só na UI). Status é leitura autenticada para todos. O usuário comum não vê o botão e recebe orientação; a API continua rejeitando.
+
+### Concorrência e coalescing
+- Reutilizados os locks da Fase 1: escopos independentes continuam paralelizáveis; o refresh composto tem lock próprio por `source:REFRESH:year`, então dois cliques/duas requisições concorrentes compartilham a mesma execução (sem fetches duplicados e sem runs duplicados). `active` expõe os locks em andamento.
+- Testado com `Promise.all` de dois refreshes: mesma resposta, um único conjunto de fetches e um único run por escopo.
+
+### Erros externos
+- Mapeamento no refresh: 429 → `429 SOURCE_RATE_LIMITED` (retry limitado pela infra existente), timeout → `504 SOURCE_TIMEOUT`, 404 → `404 SOURCE_NOT_FOUND`, payload inválido → `502 SOURCE_MALFORMED`, 5xx/outros → `502 SOURCE_UNAVAILABLE`, falha interna → `502 SYNC_FAILED`.
+- Erro externo nunca é sucesso: o run termina FAILED com `finishedAt` (nenhum RUNNING preso) e a resposta não inclui stack, corpo externo, URL completa nem credenciais.
+
+### UI e cache
+- `ExternalSyncPanel` no `/app/external` (sem redesign): mostra fonte, última execução, última bem-sucedida, status, estatísticas, duração e falha sanitizada; botão admin com loading (desabilita durante a execução, evita cliques duplicados) e estados initial/loading/success/failure/empty/unauthorized.
+- Após o refresh (sucesso ou falha), invalida as queries `["external"]` (inclui status, temporadas, times, pilotos, corridas, resultados, standings e candidatos) — sem reload da aplicação e sem cache global novo.
+
+### Proteção do Universe
+- Teste explícito: Universe com Team/Character/DriverProfile/SeasonDriverEntry/WorldState/Race customizados + binding com `contentHash`/`externalSnapshot`; refresh com mudança externa; nada do Universe muda e nenhum `TimelineEvent` é criado. Segundo Universe permanece intocado (isolamento).
+
+### Testes e validação
+- Focados: `src/modules/external-sync` — **7 arquivos / 71 testes — 100%** (14 novos: refresh autorizado/negado, validação, idempotência, mudança externa, concorrência/coalescing, locks ativos, 500/429/timeout/malformed/404, status, proteção do Universe e cross-Universe).
+- Suíte API completa (banco recriado): **1770/1770**; typecheck 0; lint 30 (baseline, 0 novos).
+- Web: **390/390** (5 novos do painel de sync); `tsc` 4 (baseline); lint 0; `next build` exit 0.
+- Nenhuma migration necessária (o schema existente cobre tudo).
+
+### Problemas encontrados
+1. `REFRESH` não cria linha em `ExternalSyncRun` (é só lock em memória) — asserção de teste ajustada para medir runs por escopo; documentado para não confundir com histórico.
+2. Fixture de teste criava run com `finishedAt` anterior ao `startedAt` default → duração negativa; corrigido no fixture.
+3. `deleteUniverseDataForUsers` exige `(prisma, userIds)` — cleanup ajustado.
+
+### Limitações
+- Coalescing/locks são por processo (como na Fase 1); múltiplas instâncias da API poderiam duplicar fetches.
+- Status lista runs sem paginação além de `limit` e sem filtro por escopo; sem retenção/expurgo de runs antigos.
+- Em falha, o endpoint devolve os escopos concluídos, mas a UI exibe apenas a mensagem (os detalhes ficam no status via run FAILED).
+- O botão atualiza a temporada selecionada; CIRCUITS global e sync de números com o Mirror continuam fora do escopo desta fase.
+
+### Commit
+- `feat(v3): add external data refresh`.
+
+### Próximo passo
+- Fase 7 (somente após validação desta fase).
