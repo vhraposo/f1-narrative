@@ -269,7 +269,7 @@ describe("PUT /api/drivers/:characterId", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("valida número (fora de 2-99 ou não inteiro → 400)", async () => {
+  it("valida número (fora de 1-99, #17 ou não inteiro → 400)", async () => {
     const u = await createUser(`num-${Date.now()}@f1nw.test`, "Num");
     const ch = await createCharacter(u, {
       name: "Número Inválido",
@@ -277,7 +277,7 @@ describe("PUT /api/drivers/:characterId", () => {
       birthDate: "1990-02-02",
     });
 
-    for (const bad of [1, 100, 1.5, -3, "dez"]) {
+    for (const bad of [0, 100, 1.5, -3, "dez", 17]) {
       const res = await app.inject({
         method: "PUT",
         url: `/api/drivers/${ch.id}`,
@@ -1121,7 +1121,7 @@ describe("GET/PATCH /api/drivers/:id — ficha do Driver escopada por Universe",
       method: "PATCH",
       url: `/api/drivers/${profileId}`,
       headers: { cookie: user.cookie },
-      payload: { number: 1 },
+      payload: { number: 17 },
       remoteAddress: "10.17.4.1",
     });
     expect(badNumber.statusCode).toBe(400);

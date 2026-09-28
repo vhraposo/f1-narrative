@@ -123,3 +123,45 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - Fase 4 — Números dos pilotos (somente após validação desta fase).
+
+---
+
+## Fase 4 — Driver Number Management
+
+### Escopo
+- Regras FIA (2026 F1 Regulations, Section A, Issue 02, 27/02/2026, Art. A2.4) traduzidas para gameplay com autoridade no backend.
+- Número por temporada (`SeasonDriverEntry.number` = autoridade; `DriverProfile.number` = cache de compatibilidade sincronizado quando a entry é da temporada corrente do `WorldState`).
+- Unicidade por temporada garantida por constraint `@@unique([seasonId, number])` + tratamento de `P2002` (concorrência).
+- Board de disponibilidade 1–99 (`GET /api/seasons/:seasonId/driver-numbers`) e atribuição (`PUT /api/seasons/:seasonId/drivers/:driverProfileId/number`), com `#17` reservado e `#1` exclusivo do campeão anterior.
+- Auditoria via timeline (`NUMBER_CORRECTED`, replay idempotente) e UI de seleção na página do piloto.
+
+### Arquivos
+- `apps/api/src/modules/drivers/driver-number.rules.ts` (schema zod + inspeção central).
+- `apps/api/src/modules/drivers/driver-number.service.ts` (board, atribuição, campeão, cache, timeline).
+- `apps/api/src/modules/drivers/driver-number.routes.ts` + registro em `app.ts`.
+- `apps/api/src/modules/drivers/driver-number.test.ts` (service + rotas).
+- `prisma/migrations/20260925210000_add_driver_number_unique` + `@@unique([seasonId, number])`.
+- `apps/web/src/lib/driver-numbers.ts`, `apps/web/src/hooks/use-driver-numbers.ts`, `apps/web/src/components/drivers/season-number-picker.tsx` (+ teste) e integração na página do piloto.
+
+### Regras de gameplay (D-008)
+- Range 1–99; `#17` sempre indisponível (reservado); `#1` apenas para o campeão da temporada anterior (mesmo Universe); unicidade por temporada.
+- Erros semânticos: `NUMBER_INVALID` (400), `NUMBER_RESERVED` (409), `NUMBER_ALREADY_USED` (409), `CHAMPION_ONLY` (409), `SEASON_NOT_FOUND`/`DRIVER_NOT_FOUND` (404).
+
+### Testes e validação
+- API: suíte completa **1732/1732** em banco recriado (log `v3f4-suite3.log`); lint 30 (baseline, 0 novos).
+- Web: **378/378** (inclui 3 novos do picker); `tsc` 4 (baseline).
+- Fixtures de reconciliação ajustadas (dois números 2 na mesma temporada) e teste de perfil atualizado (`#17` inválido no PATCH).
+
+### Problemas encontrados
+1. Fixtures de `reconciliation` violavam a nova unicidade (dois pilotos nº 2 na mesma temporada) → números distintos (3).
+2. Duas falhas intermitentes em execução completa (reconciliation/universe-init) passam isoladas e desaparecem em re-execução → resíduo entre arquivos, não regressão.
+
+### Limitações
+- Nenhuma sincronização de números com o espelho externo (apenas leitura/compatibilidade); sem migração automática de números legados duplicados (diagnóstico prévio: 0 no DEV).
+- UI do board é mínima (sem busca/filtros); remoção de número (null) suportada pela API, sem botão dedicado na UI.
+
+### Commit
+- `feat(v3): add driver number management`.
+
+### Próximo passo
+- Fase 5 (somente após validação desta fase).

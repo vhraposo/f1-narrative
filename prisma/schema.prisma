@@ -509,6 +509,7 @@ model SeasonDriverEntry {
 
   @@unique([seasonId, driverProfileId])
   @@unique([seasonId, teamId, seat])
+  @@unique([seasonId, number])
   @@index([seasonId])
   @@index([driverProfileId])
   @@index([teamId, status])

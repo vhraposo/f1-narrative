@@ -72,3 +72,19 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-017 — Materialização serializada por Universe
 - **Decisão:** `universeInitService.execute` toma o advisory lock do Universe **antes** de montar o plano, reutilizando o lock da timeline. Corridas com dados incompletos são materializadas com campos nulos.
 - **Consequência:** execuções concorrentes não duplicam corridas/bindings/eventos; um registro inconsistente não derruba o lote (D-006).
+
+## D-018 — Número é escopo de temporada
+- **Decisão:** a autoridade do número é `SeasonDriverEntry.number` (opção B); `DriverProfile.number` permanece como cache de compatibilidade, sincronizado apenas quando a entry pertence à temporada corrente do `WorldState`.
+- **Consequência:** trocar de temporada não herda número automaticamente; leituras legadas continuam funcionando; board/atribuição sempre por temporada.
+
+## D-019 — Regras FIA traduzidas para gameplay
+- **Decisão:** referência 2026 F1 Regulations (Section A, Issue 02, 27/02/2026, Art. A2.4). Gameplay: range 1–99, `#17` reservado, `#1` apenas para o campeão da temporada anterior do mesmo Universe, unicidade por temporada.
+- **Consequência:** divergências FIA/gameplay são intencionais e documentadas; erros semânticos (`NUMBER_RESERVED`, `CHAMPION_ONLY`, `NUMBER_ALREADY_USED`) expõem o motivo.
+
+## D-020 — Concorrência por constraint + P2002
+- **Decisão:** unicidade garantida por índice único `[seasonId, number]`, com `P2002` convertido em `NUMBER_ALREADY_USED` (409); sem lock de aplicação para atribuição.
+- **Consequência:** corrida de requisições concorrentes resulta em um vencedor e um 409 previsível.
+
+## D-021 — Auditoria de número via timeline
+- **Decisão:** reutilizar `NUMBER_CORRECTED` no `TimelineEvent` (worldDate = data corrente do world, causado por usuário), aplicado de forma idempotente no replay.
+- **Consequência:** mudanças ficam auditáveis e reproduzíveis sem schema novo de eventos.

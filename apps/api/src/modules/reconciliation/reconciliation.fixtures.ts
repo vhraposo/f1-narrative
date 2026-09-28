@@ -95,7 +95,7 @@ export async function seedReconciliationFixture(
     data: { characterId: characterLando.id, number: 2 },
   });
   const driverAlicya = await prisma.driverProfile.create({
-    data: { characterId: characterAlicya.id, number: 2 },
+    data: { characterId: characterAlicya.id, number: 3 },
   });
   const driverReserveX = await prisma.driverProfile.create({
     data: { characterId: characterReserveX.id, number: 88 },
@@ -141,7 +141,7 @@ export async function seedReconciliationFixture(
       teamId: team.id,
       role: "RACE_SEAT",
       seat: 2,
-      number: 2,
+      number: 3,
       status: "ACTIVE",
     },
   });

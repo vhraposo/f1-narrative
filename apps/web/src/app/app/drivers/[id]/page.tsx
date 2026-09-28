@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { DriverProfileForm } from "@/components/drivers/driver-profile-form";
+import { SeasonNumberPicker } from "@/components/drivers/season-number-picker";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,6 +16,7 @@ import {
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { useDriver, useUpdateDriver } from "@/hooks/use-driver-profiles";
+import { useWorld } from "@/hooks/use-world";
 import { formatBirthDate } from "@/lib/characters";
 import { formatDriverNumber } from "@/lib/driver-profiles";
 
@@ -22,6 +24,7 @@ export default function DriverDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data: driver, isLoading, isError, error } = useDriver(id);
+  const { data: world } = useWorld();
   const updateMutation = useUpdateDriver(id);
 
   const [showForm, setShowForm] = useState(false);
@@ -180,6 +183,14 @@ export default function DriverDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {world?.currentSeasonId ? (
+        <SeasonNumberPicker
+          seasonId={world.currentSeasonId}
+          driverProfileId={driver.id}
+          currentNumber={driver.number}
+        />
+      ) : null}
 
       {driver.attributes && (
         <Card>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { driverNumberSchema } from "./driver-number.rules.js";
 
 // Esquemas de validação para o PUT de DriverProfile (Gestão de Pilotos).
 // Aqui o Client controla APENAS dados de base do perfil (number);
@@ -10,13 +11,7 @@ import { z } from "zod";
 // NÃO aceita teamId no body — a presença da propriedade é rejeitada na rota.
 
 export const upsertDriverSchema = z.object({
-  number: z
-    .number()
-    .int("O número precisa ser um inteiro")
-    .min(2, "O número precisa ser entre 2 e 99")
-    .max(99, "O número precisa ser entre 2 e 99")
-    .nullable()
-    .optional(),
+  number: driverNumberSchema.nullable().optional(),
 });
 
 export type UpsertDriverInput = z.infer<typeof upsertDriverSchema>;
