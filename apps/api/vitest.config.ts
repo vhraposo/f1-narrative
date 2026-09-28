@@ -16,6 +16,8 @@ export default defineConfig({
       BETTER_AUTH_SECRET: "test-secret-for-vitest-only-0000",
       BETTER_AUTH_URL: "http://localhost:3001",
       CLIENT_ORIGIN: "http://localhost:3000",
+      STORAGE_LOCAL_ROOT: "./.storage/test",
+      STORAGE_MAX_UPLOAD_BYTES: "65536",
     },
   },
 });

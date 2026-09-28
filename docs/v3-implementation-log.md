@@ -176,3 +176,58 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Mudanças da Issue 03 (WMSC 23/06/2026):** sem impacto em numeração (heat hazard por Sprint/Corrida, boost mode em baixa aderência, ajustes de 2027/2028).
 - **Conclusão:** D-008, D-018 e D-019 permanecem semanticamente compatíveis; nenhuma alteração de código ou comportamento necessária. Referência atualizada para Issue 03 em D-019 e registrada em D-022.
 - **Limitação:** acesso direto ao PDF retornou 504 na checagem; texto conferido no conteúdo indexado do PDF oficial da FIA (api.fia.com) e na listagem oficial. Destaques de texto alterado (rosa) não são observáveis por indexação; a comparação foi feita frase a frase.
+
+---
+
+## Fase 5 — User Profile + Media Storage Foundation
+
+- **Data:** 2026-09-28.
+- **Objetivo:** perfil de usuário (favoritos + avatar) com abstração de storage isolada do domínio, upload seguro de imagem, implementação local e contrato S3-compatible, isolamento por usuário/Universe e UI funcional.
+
+### Relação com o Better Auth (fonte única de nome/imagem/email)
+- `User.name` (nome público/nick), `User.email` e `User.image` permanecem **exclusivamente no modelo do Better Auth**. Não há UI de edição de nome nesta fase (updateUser do BA já existe para isso).
+- `UserProfile` foi criado apenas para **dados de domínio que não pertencem à autenticação**: `favoriteTeamId`/`favoriteDriverId` (+ `userId` único e timestamps). Nada de displayName/avatar duplicados.
+- `User.image` guarda a URL controlada `BETTER_AUTH_URL/api/media/:id` (nunca a storageKey). A página de perfil lê a view sempre fresca de `GET /api/profile`; a sessão do BA pode continuar em cache de cookie por até 5 min (limitação documentada).
+
+### Favoritos
+- Referências por id ao `Team`/`DriverProfile` **do mesmo Universe** do usuário; validação no backend: `404 FAVORITE_NOT_FOUND` (inexistente) e `403 FAVORITE_NOT_IN_UNIVERSE` (outro Universe, inclusive entidades homônimas equivalentes).
+- FKs com `onDelete: SetNull`; `UserProfile` inicializado de forma idempotente (upsert) em qualquer leitura/escrita do perfil.
+
+### Storage
+- `StorageProvider` (infra) com operações mínimas: `upload`, `delete`, `get`, `exists`; erros semânticos (`StorageError`) sem vazar key/segredo.
+- `LocalStorageProvider`: raiz configurável (`STORAGE_LOCAL_ROOT`), keys geradas pelo servidor (`user-avatars/<userId>/<uuid>.<ext>`), flag `wx` (não sobrescreve), validação de key + contenção no root (anti path traversal), filename do cliente só como metadata sanitizada.
+- `S3CompatibleStorageProvider`: SigV4 mínimo implementado sobre `fetch` (sem SDK novo), path-style default, tolerância a 404 em delete/get/exists; preserva capacidade futura de URL assinada/objeto privado (acesso atual é rota interna autenticada).
+- `MediaAsset`: `ownerUserId`, `kind` (`USER_AVATAR`), `provider`, `storageKey` (único), `originalFilename`, `mimeType`, `byteSize`; tipos futuros (`CHARACTER_IMAGE`/`DRIVER_HEADSHOT`) não implementados.
+- Migração aditiva `20260928120000_add_user_profile_media_storage`: enum `MediaKind`, tabelas `UserProfile` e `MediaAsset` (+ índices/FKs). Aplicada em `f1_narrative_test` e `f1-narrative` (DEV), sem operações destrutivas.
+
+### Segurança e consistência
+- Upload autenticado, binário cru (sem multipart), content-types permitidos JPEG/PNG/WEBP; validação por **magic bytes** no backend (Content-Type do cliente não é confiado); SVG/HTML/PDF/executáveis rejeitados; limite configurável (`STORAGE_MAX_UPLOAD_BYTES`, 413).
+- Ownership: só o dono lê (`GET /api/media/:id` → 404 para terceiros), substitui e remove; nenhum `mediaAssetId` de outro usuário é manipulável.
+- Estratégia upload→DB (sem transação aberta durante I/O de storage): upload → `MediaAsset` (compensa com delete se o create falhar) → `User.image` (compensa asset se o update falhar) → remoção best-effort do asset anterior; delete de referência primeiro e tolerância à ausência (idempotente).
+
+### APIs
+- `GET /api/profile`, `PATCH /api/profile` (somente favoritos; zod, rejeita `{}` e ids inválidos), `POST /api/profile/avatar` (raw binário), `DELETE /api/profile/avatar`, `GET /api/media/:id`.
+
+### Web
+- Página `/app/profile` (item "Perfil" no nav), com nome/email (sessão BA), avatar com fallback de inicial, preview local antes de salvar, substituição, remoção, selects de favoritos (equipe/piloto), estados de loading/erro/sucesso/sem favoritos e invalidação via React Query; avatar também exibido no sidebar/mobile usando o `User.image` da sessão.
+
+### Testes e validação
+- API focada: 24/24 (storage local, contrato S3 com servidor HTTP local, profile/media/isolamento/compensação).
+- API completa (banco recriado): **1756/1756**; typecheck 0; lint 30 (baseline, 0 novos).
+- Web: **385/385** (7 novos do perfil); `tsc` 4 (baseline); lint 0 erros; `next build` exit 0.
+- Cobertura dos 30 cenários obrigatórios: rotas de perfil, inicialização, favoritos válidos/inexistentes/de outro Universe, upload válido/tipo inválido/tamanho/não autenticado, acesso cruzado a asset, substituição, remoção idempotente, falha de storage, compensação, key safety, path traversal, contrato S3, isolamento entre Users e entre Universes (entidades homônimas), zod, UI (página/upload/favoritos/invalidation), constraints da migration, integração auth e persistência após refetch.
+
+### Problemas encontrados
+1. `buildView` inicializava o `UserProfile` apenas em GET/PATCH → upload chamava `findUniqueOrThrow` sem perfil. Corrigido garantindo upsert idempotente em qualquer caminho de leitura.
+2. Lint acusou `no-undef` para `Buffer`/`NodeJS` nos arquivos novos (config não declara globais Node) → imports explícitos de `node:buffer` e casts `{ code?: string }` (padrão do projeto).
+
+### Limitações
+- Sem edição de nome na UI (usa o Better Auth `updateUser` que já existe, não exposto nesta fase); sessão do BA pode exibir avatar antigo por até 5 min (cache de cookie) — a página de perfil sempre reflete o banco.
+- Acesso a mídia é owner-only (sem página pública/compartilhamento); S3-compatible implementado por contrato (SigV4 mínimo) sem MinIO/S3 no ambiente local; sem varredura de órfãos de storage.
+- Sem crop/redimensionamento de imagem; sem limite por dimensão (apenas bytes/formato).
+
+### Commit
+- `feat(v3): add user profile and media storage`.
+
+### Próximo passo
+- Fase 6 (somente após validação desta fase).

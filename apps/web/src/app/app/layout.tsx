@@ -38,11 +38,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   const userName = data.user?.name ?? "Piloto";
+  const userImage = data.user?.image ?? null;
 
   return (
     <div className="min-h-screen bg-background">
-      <AppSidebar userName={userName} />
-      <MobileNav userName={userName} />
+      <AppSidebar userName={userName} userImage={userImage} />
+      <MobileNav userName={userName} userImage={userImage} />
       <div className="lg:pl-64">
         <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
           {children}

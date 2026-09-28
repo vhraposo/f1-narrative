@@ -69,3 +69,40 @@ export function put<T>(path: string, body: unknown): Promise<T> {
 export function remove<T>(path: string): Promise<T> {
   return request<T>(path, { method: "DELETE" });
 }
+
+export async function postBinary<T>(
+  path: string,
+  body: Blob,
+  filename?: string,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": body.type || "application/octet-stream",
+  };
+  if (filename) {
+    headers["X-Filename"] = filename;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body,
+  });
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!res.ok) {
+    const message =
+      typeof data?.error === "string"
+        ? data.error
+        : "Ocorreu um erro inesperado.";
+    throw new ApiError(message, res.status, data?.code);
+  }
+
+  return data as T;
+}

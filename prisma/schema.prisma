@@ -188,6 +188,9 @@ model User {
   teams           Team[]
   externalSources ExternalSource[]
 
+  profile     UserProfile?
+  mediaAssets MediaAsset[]
+
   universeEditorDecisions UniverseEditorDecision[]
 
   createdAt DateTime @default(now())
@@ -336,6 +339,8 @@ model DriverProfile {
   seasonDriverEntries   SeasonDriverEntry[]
   driverAttributes      DriverAttribute[]
 
+  favoritedByProfiles UserProfile[] @relation("UserProfileFavoriteDriver")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -361,6 +366,8 @@ model Team {
   universeEditorDecisions UniverseEditorDecision[]
 
   teamPerformances TeamPerformance[]
+
+  favoritedByProfiles UserProfile[] @relation("UserProfileFavoriteTeam")
 
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1444,4 +1451,48 @@ model CharacterSchedule {
   createdAt DateTime @default(now())
 
   @@index([characterId, startsAt])
+}
+
+/// Preferências de domínio do usuário que não pertencem ao Better Auth
+/// (nome/imagem continuam em User, fonte única do modelo de autenticação).
+model UserProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  favoriteTeamId String?        @db.Uuid
+  favoriteTeam   Team?          @relation("UserProfileFavoriteTeam", fields: [favoriteTeamId], references: [id], onDelete: SetNull)
+  favoriteDriverId String?      @db.Uuid
+  favoriteDriver   DriverProfile? @relation("UserProfileFavoriteDriver", fields: [favoriteDriverId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([favoriteTeamId])
+  @@index([favoriteDriverId])
+}
+
+/// Tipo de mídia armazenada por um StorageProvider.
+enum MediaKind {
+  USER_AVATAR
+}
+
+/// Recurso de mídia armazenado (storageKey pertence ao provider; nunca
+/// exposto ao cliente). O domínio guarda apenas a referência.
+model MediaAsset {
+  id          String    @id @default(uuid()) @db.Uuid
+  ownerUserId String    @db.Uuid
+  owner       User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  kind        MediaKind @default(USER_AVATAR)
+
+  provider         String
+  storageKey       String  @unique
+  originalFilename String?
+  mimeType         String
+  byteSize         Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
 }

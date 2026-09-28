@@ -92,3 +92,27 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-022 — Referência regulatória vigente: Section A Issue 03
 - **Decisão:** a referência normativa de números de piloto passa a ser a FIA 2026 F1 Regulations — Section A [General Provisions] — Issue 03 (documento de 25/06/2026, WMSC 23/06/2026, publicado no site da FIA em 05/08/2026). Verificação de 28/09/2026: Art. A2.4 idêntico à Issue 02 (A2.4.1 first-come/pedido de troca; A2.4.2 `#1` do campeão + reserva do número anterior; A2.4.3 forfeiture; A2.4.4 demais pilotos; A2.4.5 1–99 exceto 17).
 - **Consequência:** D-008, D-018 e D-019 permanecem válidas sem ajustes de comportamento; novas Issues devem repetir esta verificação antes de qualquer alteração de código.
+
+## D-023 — Nome/imagem/email permanecem no Better Auth
+- **Decisão:** `User.name`, `User.email` e `User.image` são a única fonte de verdade; `UserProfile` guarda apenas dados de domínio (favoritos). `User.image` armazena a URL controlada `BETTER_AUTH_URL/api/media/:id`, nunca a storageKey.
+- **Consequência:** nenhum campo duplicado entre BA e domínio; UI de nome usa a sessão (edição via `updateUser` do BA fica para quando necessária); a página de perfil sempre lê a view do banco.
+
+## D-024 — Favoritos escopados ao Universe do usuário
+- **Decisão:** `favoriteTeamId`/`favoriteDriverId` referenciam entidades do Universe do próprio usuário; o backend valida pertencimento (404 inexistente, 403 `FAVORITE_NOT_IN_UNIVERSE`), com FKs `onDelete: SetNull` e `UserProfile.userId` único.
+- **Consequência:** um usuário não referencia nem lê entidades de outro Universe, mesmo homônimas; a UI não é fonte de validação.
+
+## D-025 — MediaAsset é o recurso; acesso owner-only por rota interna
+- **Decisão:** `MediaAsset` guarda provider/storageKey/mime/byteSize/originalFilename/kind e o dono; a imagem é servida por `GET /api/media/:id` autenticado e restrito ao dono (404 para terceiros). A URL pública é derivada de `BETTER_AUTH_URL`; a storageKey nunca sai do servidor.
+- **Consequência:** trocar local→S3 não muda o domínio nem a URL; URL assinada/objeto privado permanece possível no futuro sem expor o provider.
+
+## D-026 — Upload binário cru validado por conteúdo
+- **Decisão:** sem multipart (nenhuma dependência nova): `POST /api/profile/avatar` aceita apenas `image/jpeg|png|webp` com limite `STORAGE_MAX_UPLOAD_BYTES`; o MIME é confirmado por magic bytes (sniffing próprio) e deve coincidir com o declarado. SVG/HTML/PDF/executáveis são rejeitados; o filename do cliente é apenas metadata sanitizada.
+- **Consequência:** nenhum arquivo arbitrário entra no storage; extensão da key é derivada do MIME detectado; erros semânticos (415/400/413) sem vazar key ou conteúdo.
+
+## D-027 — Consistência upload→DB com compensação (sem transação longa)
+- **Decisão:** a ordem é upload → criar `MediaAsset` (se falhar, apaga o objeto) → atualizar `User.image` (se falhar, apaga o asset) → remover o asset anterior best-effort. Delete limpa a referência primeiro e tolera ausência; `deleteMediaAsset` remove objeto e, em `finally`, a row.
+- **Consequência:** o perfil nunca aponta para arquivo inexistente; o pior caso é objeto órfão no storage (documentado), nunca referência quebrada; I/O externo não segura transação de banco.
+
+## D-028 — S3-compatible sem SDK (SigV4 mínimo) e local com key do servidor
+- **Decisão:** `S3CompatibleStorageProvider` assina requisições com SigV4 implementado sobre `fetch` (path-style default), sem adicionar SDK; `LocalStorageProvider` gera keys `user-avatars/<userId>/<uuid>.<ext>` com flag `wx`, validação de key e contenção no root configurado.
+- **Consequência:** o contrato S3 fica pronto para MinIO/S3 sem dependência nova; path traversal e sobrescrita de arquivo de outro usuário são impossíveis pela API.

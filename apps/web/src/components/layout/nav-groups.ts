@@ -8,6 +8,7 @@ import {
   Rocket,
   Shield,
   Trophy,
+  User,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -55,6 +56,10 @@ export const NAV_GROUPS: NavGroupDef[] = [
         Icon: MessagesSquare,
       },
     ],
+  },
+  {
+    label: "Conta",
+    items: [{ href: "/app/profile", label: "Perfil", Icon: User }],
   },
   {
     label: "Externo",

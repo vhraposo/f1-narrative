@@ -58,6 +58,9 @@ import timelineRoutes from "./modules/timeline/timeline.routes.js";
 import nextRaceRoutes from "./modules/calendar/next-race.routes.js";
 import driverNumberRoutes from "./modules/drivers/driver-number.routes.js";
 import universeInitRoutes from "./modules/universe-init/universe-init.routes.js";
+import { profileRoutes } from "./modules/profile/profile.routes.js";
+import { mediaRoutes } from "./modules/media/media.routes.js";
+import type { StorageProvider } from "./infrastructure/storage/storage-provider.js";
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
 import {
@@ -95,6 +98,7 @@ export function buildApp(
   jolpicaClient?: JolpicaClient,
   openingGridClient?: OpeningGridClient,
   openF1Client?: OpenF1Client,
+  storageProvider?: StorageProvider,
 ): FastifyInstance {
   const app = Fastify({
     logger: {
@@ -110,7 +114,7 @@ export function buildApp(
     origin: [env.CLIENT_ORIGIN],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Filename"],
     maxAge: 86400,
   });
 
@@ -131,9 +135,11 @@ export function buildApp(
   void app.register(characterHeadshotMaterializationRoutes);
   void app.register(driversRoutes);
   void app.register(teamsRoutes);
-void app.register(timelineRoutes);
-void app.register(nextRaceRoutes);
-void app.register(driverNumberRoutes);
+  void app.register(timelineRoutes);
+  void app.register(nextRaceRoutes);
+  void app.register(driverNumberRoutes);
+  void app.register(profileRoutes, { storageProvider });
+  void app.register(mediaRoutes, { storageProvider });
   void app.register(teamPerformanceRoutes);
   void app.register(driverAttributeRoutes);
   void app.register(simulationRoutes);

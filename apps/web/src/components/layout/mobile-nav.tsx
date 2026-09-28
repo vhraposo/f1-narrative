@@ -4,13 +4,20 @@ import { Menu, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { CharacterAvatar } from "@/components/conversations/character-avatar";
 import { AppBrand } from "@/components/layout/app-brand";
 import { NAV_GROUPS } from "@/components/layout/nav-groups";
 import { NavLink } from "@/components/layout/nav-link";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
 
-export function MobileNav({ userName }: { userName: string }) {
+export function MobileNav({
+  userName,
+  userImage,
+}: {
+  userName: string;
+  userImage: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -99,9 +106,12 @@ export function MobileNav({ userName }: { userName: string }) {
           ))}
         </nav>
         <div className="space-y-4 border-t border-border px-4 py-4">
-          <p className="truncate px-1 text-sm font-medium text-foreground">
-            {userName}
-          </p>
+          <span className="flex items-center gap-2 px-1">
+            <CharacterAvatar name={userName} imageUrl={userImage} size="sm" />
+            <span className="truncate text-sm font-medium text-foreground">
+              {userName}
+            </span>
+          </span>
           <div className="px-1">
             <SignOutButton />
           </div>
