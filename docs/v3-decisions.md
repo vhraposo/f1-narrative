@@ -78,7 +78,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Consequência:** trocar de temporada não herda número automaticamente; leituras legadas continuam funcionando; board/atribuição sempre por temporada.
 
 ## D-019 — Regras FIA traduzidas para gameplay
-- **Decisão:** referência 2026 F1 Regulations (Section A, Issue 02, 27/02/2026, Art. A2.4). Gameplay: range 1–99, `#17` reservado, `#1` apenas para o campeão da temporada anterior do mesmo Universe, unicidade por temporada.
+- **Decisão:** referência 2026 F1 Regulations (Section A, Issue 03, 25/06/2026, publicada em 05/08/2026, WMSC 23/06/2026; A2.4 idêntico à Issue 02 — verificado em 28/09/2026, Art. A2.4). Gameplay: range 1–99, `#17` reservado, `#1` apenas para o campeão da temporada anterior do mesmo Universe, unicidade por temporada.
 - **Consequência:** divergências FIA/gameplay são intencionais e documentadas; erros semânticos (`NUMBER_RESERVED`, `CHAMPION_ONLY`, `NUMBER_ALREADY_USED`) expõem o motivo.
 
 ## D-020 — Concorrência por constraint + P2002
@@ -88,3 +88,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-021 — Auditoria de número via timeline
 - **Decisão:** reutilizar `NUMBER_CORRECTED` no `TimelineEvent` (worldDate = data corrente do world, causado por usuário), aplicado de forma idempotente no replay.
 - **Consequência:** mudanças ficam auditáveis e reproduzíveis sem schema novo de eventos.
+
+## D-022 — Referência regulatória vigente: Section A Issue 03
+- **Decisão:** a referência normativa de números de piloto passa a ser a FIA 2026 F1 Regulations — Section A [General Provisions] — Issue 03 (documento de 25/06/2026, WMSC 23/06/2026, publicado no site da FIA em 05/08/2026). Verificação de 28/09/2026: Art. A2.4 idêntico à Issue 02 (A2.4.1 first-come/pedido de troca; A2.4.2 `#1` do campeão + reserva do número anterior; A2.4.3 forfeiture; A2.4.4 demais pilotos; A2.4.5 1–99 exceto 17).
+- **Consequência:** D-008, D-018 e D-019 permanecem válidas sem ajustes de comportamento; novas Issues devem repetir esta verificação antes de qualquer alteração de código.

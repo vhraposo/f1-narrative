@@ -129,7 +129,7 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 ## Fase 4 — Driver Number Management
 
 ### Escopo
-- Regras FIA (2026 F1 Regulations, Section A, Issue 02, 27/02/2026, Art. A2.4) traduzidas para gameplay com autoridade no backend.
+- Regras FIA (2026 F1 Regulations, Section A, Issue 03, 25/06/2026 — publicada em 05/08/2026; A2.4 idêntico à Issue 02 — ver "Verificação regulatória" abaixo) traduzidas para gameplay com autoridade no backend.
 - Número por temporada (`SeasonDriverEntry.number` = autoridade; `DriverProfile.number` = cache de compatibilidade sincronizado quando a entry é da temporada corrente do `WorldState`).
 - Unicidade por temporada garantida por constraint `@@unique([seasonId, number])` + tratamento de `P2002` (concorrência).
 - Board de disponibilidade 1–99 (`GET /api/seasons/:seasonId/driver-numbers`) e atribuição (`PUT /api/seasons/:seasonId/drivers/:driverProfileId/number`), com `#17` reservado e `#1` exclusivo do campeão anterior.
@@ -165,3 +165,14 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - Fase 5 (somente após validação desta fase).
+
+---
+
+## Verificação regulatória — FIA 2026 Section A (Issue 02 → Issue 03)
+
+- **Data:** 28/09/2026.
+- **Referência vigente:** FIA 2026 F1 Regulations — Section A [General Provisions] — Issue 03 (documento de 25/06/2026, aprovação WMSC 23/06/2026, publicado no site da FIA em 05/08/2026). Fontes: listagem oficial em fia.com/regulation/category/110 e PDF oficial (api.fia.com).
+- **Art. A2.4 (Competition Numbers):** texto idêntico ao da Issue 02, frase a frase — A2.4.1 (número permanente first-come, uso em toda Competição da temporada, troca só antes da entry list e com efeito na temporada seguinte), A2.4.2 (`#1` para o campeão reinante; número anterior reservado se perder o título), A2.4.3 (forfeiture por escrito ou 2 Campeonatos consecutivos sem participar), A2.4.4 (demais pilotos usam números emitidos pela FIA à equipe), A2.4.5 (1–99, exceto 17).
+- **Mudanças da Issue 03 (WMSC 23/06/2026):** sem impacto em numeração (heat hazard por Sprint/Corrida, boost mode em baixa aderência, ajustes de 2027/2028).
+- **Conclusão:** D-008, D-018 e D-019 permanecem semanticamente compatíveis; nenhuma alteração de código ou comportamento necessária. Referência atualizada para Issue 03 em D-019 e registrada em D-022.
+- **Limitação:** acesso direto ao PDF retornou 504 na checagem; texto conferido no conteúdo indexado do PDF oficial da FIA (api.fia.com) e na listagem oficial. Destaques de texto alterado (rosa) não são observáveis por indexação; a comparação foi feita frase a frase.
