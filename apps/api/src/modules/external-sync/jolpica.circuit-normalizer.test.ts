@@ -133,6 +133,7 @@ describe("normalizeRaces (campos externos ampliados)", () => {
       time: "15:00:00Z",
       url: "https://en.wikipedia.org/wiki/2026_São_Paulo_Grand_Prix",
       status: null,
+      hasSprint: null,
     });
   });
 

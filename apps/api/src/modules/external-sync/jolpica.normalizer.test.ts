@@ -141,6 +141,7 @@ describe("normalizeRaces", () => {
       time: null,
       url: null,
       status: null,
+      hasSprint: null,
     });
     expect(first.sourceRecord.locality).toBe("Buenos Aires");
   });

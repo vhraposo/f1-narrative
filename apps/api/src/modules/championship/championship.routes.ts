@@ -37,9 +37,20 @@ const raceSelect = {
   date: true,
   round: true,
   status: true,
+  sprintOverride: true,
+  sprintExternal: true,
   createdAt: true,
   updatedAt: true,
 } as const;
+
+type RaceSprintRow = {
+  sprintOverride: boolean | null;
+  sprintExternal: boolean | null;
+};
+
+function withEffectiveSprint<T extends RaceSprintRow>(race: T) {
+  return { ...race, hasSprint: race.sprintOverride ?? race.sprintExternal ?? false };
+}
 
 const resultSelect = {
   id: true,
@@ -275,7 +286,7 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
         select: raceSelect,
         orderBy: [{ round: "asc" }, { date: "asc" }],
       });
-      return reply.send({ races });
+      return reply.send({ races: races.map(withEffectiveSprint) });
     },
   );
 
@@ -313,7 +324,7 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
         data: { seasonId: season.id, ...parsed.data },
         select: raceSelect,
       });
-      return reply.code(201).send({ race });
+      return reply.code(201).send({ race: withEffectiveSprint(race) });
     },
   );
 
@@ -339,7 +350,7 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "NOT_FOUND",
         });
       }
-      return reply.send({ race });
+      return reply.send({ race: withEffectiveSprint(race) });
     },
   );
 
@@ -378,7 +389,7 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
         data: parsed.data,
         select: raceSelect,
       });
-      return reply.send({ race });
+      return reply.send({ race: withEffectiveSprint(race) });
     },
   );
 

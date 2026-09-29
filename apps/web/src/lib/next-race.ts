@@ -20,6 +20,7 @@ export type NextRaceEntry = {
   round: number | null;
   date: string | null;
   status: string;
+  hasSprint?: boolean;
   circuit: NextRaceCircuit | null;
 };
 

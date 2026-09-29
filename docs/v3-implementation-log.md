@@ -498,3 +498,45 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - Fase 11 (somente após validação desta fase).
+
+---
+
+## Race Weekend — Parte 1: determinação de Sprint Weekend
+
+- **Data:** 2026-09-28.
+- **Escopo aprovado (decisão do usuário):** resolver **somente** a determinação de Sprint Weekend (flag manual do Universe + informação externa quando existir). Sprint scoring, Practice, Qualifying, Race e o state machine do fim de semana ficam para a validação/etapa seguinte da Fase Race Weekend.
+
+### Fontes FIA consultadas e registradas
+- **Section A [General Provisions] — Issue 03 (25/06/2026, WMSC 23/06/2026, publicada em 05/08/2026):** Art. A2.2.2 — pontos de Sprint P1..P8 = 8,7,6,5,4,3,2,1, atribuídos a Drivers' e Constructors' Championship; sem pontos se o líder não completar 2 voltas consecutivas sem Safety Car/VSC; com 2 voltas mas menos de 50% da Scheduled Sprint Distance não há pontos; com ≥50% aplica-se a tabela; dead heat pela regra oficial. *(decisão de produto registrada em D-045; implementação fica para a parte de scoring)*
+- **Section B [Sporting] — vigente: Issue 08 (publicada em 05/08/2026), artigos de referência:** B2.1 Free Practice Session(s); B2.2 Sprint Qualifying Session (SQ1/Q2/Q3, 12/10/8 min conforme Issues 06+); B2.3 Sprint Session (B2.3.1 "At a each Alternative Format Competition, a sprint session will take place on the second day of track running"; B2.3.2 distância; B2.3.4 grid via Sprint Qualifying; B2.3.5 classificação); B2.4 Race Qualifying; B2.5 Race. Formato alternativo substitui duas prácticas; Sprint ~100 km sem pit stop obrigatório.
+- **Limitação de verificação:** PDFs oficiais retornaram 504 no acesso direto; texto conferido via conteúdo indexado dos PDFs oficiais da FIA (api.fia.com/fia.com) e listagem oficial de regulamentos (Section B Iss 08 na lista de 05.08.26).
+
+### Modelagem escolhida (D-044)
+- `ExternalRace.hasSprint Boolean?` — sugestão estruturada da fonte: `true` quando o payload traz `Sprint`/`SprintQualifying` preenchido; `false` quando a fonte enumera o cronograma de sessões (FirstPractice/SecondPractice/ThirdPractice/Qualifying) sem Sprint; `null` quando não há informação (nunca heurística por nome/país/round).
+- `Race.sprintOverride Boolean?` — autoridade do Universe (manual, editável pelo usuário).
+- `Race.sprintExternal Boolean?` — última sugestão externa materializada.
+- **Valor efetivo:** `hasSprint = sprintOverride ?? sprintExternal ?? false`, exposto em `GET/POST/PATCH /api/races` e no `NextRaceEntry`; refresh/materialização atualiza apenas `sprintExternal` (override nunca é tocado).
+
+### Arquivos
+- `prisma/schema.prisma` + migration `20260928150000_add_sprint_weekend_detection` (aditiva: 3 colunas Boolean?).
+- `external-sync/jolpica.client.ts` (campos crus de sessão), `jolpica.normalizer.ts` (`detectHasSprint` + `NormalizedRace.hasSprint`, sem heurística de nome), `jolpica.persist.ts` (persiste `hasSprint`; entra no `contentHash`).
+- `universe-init/universe-init.service.ts` (plan/materialize/applyExternalRaceUpdate + payload de auditoria do RACE_SCHEDULED/UPDATED).
+- `championship/championship.routes.ts` + `championship.schema.ts` (campos e `hasSprint` efetivo; PATCH aceita `sprintOverride`).
+- `calendar/next-race.service.ts` (`hasSprint` efetivo no Next Race).
+- Web: `lib/championship.ts`, `lib/next-race.ts`, `race-form.tsx` (seletor Automático/Com Sprint/Sem Sprint), `race-card.tsx` (chip "Sprint").
+
+### Testes e validação
+- Novo `calendar/sprint-weekend.test.ts`: **8/8** cobrindo os 10 cenários exigidos (external true/false/null sem heurística; override true sobre false; override false sobre true e volta para automático; refresh atualiza sugestão sem remover override; dois universos com decisões diferentes no mesmo weekend externo; espelho intacto; sync idempotente com `hasSprint` estável; materializações concorrentes preservando override e sem duplicar corrida) + unit de detecção/hash.
+- Suíte API completa em banco recriado: **1825/1825**; typecheck 0; lint 30 (baseline, 0 novos).
+- Web: **409/409** (uma falha intermitente em `external-page.integration.test.tsx` sob carga, módulo não tocado: passa isolado e a reexecução completa ficou verde — registrado como flake, não baseline); `tsc` 4 (baseline); lint 0; `next build` exit 0.
+
+### Limitações / pendências explícitas
+- **Sprint scoring ainda não implementado** (decisão registrada em D-045: tabela oficial 8–1 nos dois campeonatos, com as condições de distância); a parte de scoring/classificação exige o modelo próprio de resultado de sessão (`RaceSessionResult`) e integração com `recomputeSeasonStandings` — próximo passo.
+- Practice/Qualifying/Sprint/Race lifecycle, state machine e `WorldState.currentSession` com `SPRINT` não fazem parte desta parte (ficam para a sequência da Fase Race Weekend).
+- `ExternalRace.hasSprint` depende da fonte: Jolpica omite sessões quando não fornece o detalhe → `null` (indeterminado), nunca `false` inventado.
+
+### Commit
+- `feat(v3): add sprint weekend detection` (parte 1 da Fase Race Weekend; commit final da fase será feito após a validação da sequência).
+
+### Próximo passo
+- Retomar a Fase Race Weekend: modelo de resultado de sessão + Sprint scoring (D-045) e lifecycle Practice/Qualifying/Sprint/Race, após validação desta parte.

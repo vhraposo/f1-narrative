@@ -176,3 +176,11 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-043 — Fórmulas limitadas e explícitas por avaliação
 - **Decisão:** cada avaliação aplica deltas pequenos (teto ±3): piloto por vitórias/pódios/ganho de posições/taxa de conclusão/abandonos (speed, racecraft, consistency, aggression) e equipe por vitórias/pódios/abandonos/conclusão (carSpeed, reliability, operations). Nada de RNG nem LLM.
 - **Consequência:** evolução previsível e testável; `aggression`/`operations` passam a ter dinâmica (ainda não consumidos pela simulação atual); rodar simulações depois consome os novos valores por decisão explícita do usuário.
+
+## D-044 — Sprint Weekend: sugestão externa + override do Universe
+- **Decisão:** `ExternalRace.hasSprint` guarda a informação estruturada da fonte (`true` com `Sprint`/`SprintQualifying`; `false` somente quando a fonte enumera o cronograma de sessões sem Sprint; `null` quando não há informação — nunca heurística por nome). O `Race` do Universe guarda `sprintOverride` (autoridade manual) e `sprintExternal` (sugestão), com valor efetivo `sprintOverride ?? sprintExternal ?? false`. Materialização/refresh atualizam apenas `sprintExternal` e jamais tocam o override.
+- **Consequência:** dois universos podem decidir diferente para o mesmo weekend externo; sync repetido é idempotente; ausência de dado permanece indeterminada (`null`), sem inventar ausência.
+
+## D-045 — Pontuação de Sprint: regulamento FIA vigente (implementação pendente)
+- **Decisão (produto):** implementar Sprint conforme FIA 2026 — Section A Issue 03, Art. A2.2.2: P1..P8 = 8,7,6,5,4,3,2,1, atribuídos a Drivers' e Constructors' Championship; sem pontos se o líder não completar 2 voltas consecutivas sem SC/VSC; sem pontos com menos de 50% da Scheduled Sprint Distance; ≥50% aplica a tabela; dead heat pela regra oficial. Referências de lifecycle: Section B vigente (Iss 08, 05/08/2026) B2.1–B2.5 (FP, Sprint Qualifying, Sprint Session, Qualifying, Race).
+- **Consequência:** Sprint terá resultado próprio (`RaceSessionResult`, semanticamente distinto de Practice/Qualifying/Sprint Qualifying/Race) e a soma ao campeonato usará um mecanismo oficial de Sprint separado do Race — a implementação faz parte da sequência da Fase Race Weekend e não foi incluída na determinação de Sprint Weekend.

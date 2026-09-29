@@ -31,6 +31,9 @@ export type Race = {
   date: string | null;
   round: number | null;
   status: string;
+  sprintOverride?: boolean | null;
+  sprintExternal?: boolean | null;
+  hasSprint?: boolean;
   createdAt: string;
   updatedAt: string;
 };

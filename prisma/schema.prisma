@@ -427,6 +427,9 @@ model Race {
   round   Int?
   status  RaceStatus @default(UPCOMING)
 
+  sprintOverride Boolean?
+  sprintExternal Boolean?
+
   circuitId String?  @db.Uuid
   circuitRef Circuit? @relation(fields: [circuitId], references: [id], onDelete: SetNull)
 
@@ -799,6 +802,7 @@ model ExternalRace {
   url               String?
   date              DateTime?
   status            String?
+  hasSprint         Boolean?
   contentHash       String
   sourceRecord      Json?
   firstSyncedAt     DateTime         @default(now())

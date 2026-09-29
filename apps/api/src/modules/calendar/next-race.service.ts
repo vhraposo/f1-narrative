@@ -22,6 +22,7 @@ export interface NextRaceEntry {
   round: number | null;
   date: Date | null;
   status: string;
+  hasSprint: boolean;
   circuit: NextRaceCircuit | null;
 }
 
@@ -40,6 +41,8 @@ const raceSelect = {
   round: true,
   date: true,
   status: true,
+  sprintOverride: true,
+  sprintExternal: true,
   circuitRef: {
     select: {
       id: true,
@@ -63,6 +66,8 @@ type RaceRow = {
   round: number | null;
   date: Date | null;
   status: string;
+  sprintOverride: boolean | null;
+  sprintExternal: boolean | null;
   circuitRef: NextRaceCircuit | null;
 };
 
@@ -73,6 +78,7 @@ function toEntry(race: RaceRow): NextRaceEntry {
     round: race.round,
     date: race.date,
     status: race.status,
+    hasSprint: race.sprintOverride ?? race.sprintExternal ?? false,
     circuit: race.circuitRef,
   };
 }

@@ -79,6 +79,7 @@ export const createRaceSchema = z.object({
     .optional()
     .nullable(),
   status: raceStatusSchema.optional(),
+  sprintOverride: z.boolean().nullable().optional(),
 });
 
 export type CreateRaceInput = z.infer<typeof createRaceSchema>;

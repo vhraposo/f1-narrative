@@ -41,6 +41,12 @@ export interface JolpicaRaceRaw {
   Circuit?: JolpicaCircuitRaw;
   date?: string;
   time?: string;
+  FirstPractice?: string;
+  SecondPractice?: string;
+  ThirdPractice?: string;
+  Qualifying?: string;
+  Sprint?: string;
+  SprintQualifying?: string;
 }
 
 export interface JolpicaFastestLapRaw {

@@ -54,6 +54,7 @@ export interface NormalizedRace {
   time: string | null;
   url: string | null;
   status: string | null;
+  hasSprint: boolean | null;
 }
 
 export interface NormalizedCircuit {
@@ -223,6 +224,25 @@ export function normalizeRaceResults(
   return { results, drivers: normalizeDrivers(drivers) };
 }
 
+const SPRINT_SESSION_KEYS = ["Sprint", "SprintQualifying"] as const;
+const SCHEDULE_SESSION_KEYS = [
+  "FirstPractice",
+  "SecondPractice",
+  "ThirdPractice",
+  "Qualifying",
+] as const;
+
+export function detectHasSprint(race: JolpicaRaceRaw): boolean | null {
+  const hasSprintSession = SPRINT_SESSION_KEYS.some(
+    (key) => emptyToNull(race[key]) !== null,
+  );
+  if (hasSprintSession) return true;
+  const hasExplicitSchedule = SCHEDULE_SESSION_KEYS.some(
+    (key) => emptyToNull(race[key]) !== null,
+  );
+  return hasExplicitSchedule ? false : null;
+}
+
 export function normalizeRaces(
   races: JolpicaRaceRaw[],
   seasonYear: number,
@@ -249,6 +269,7 @@ export function normalizeRaces(
         time: emptyToNull(race.time),
         url: emptyToNull(race.url),
         status: null,
+        hasSprint: detectHasSprint(race),
       },
       sourceRecord: {
         season: emptyToNull(race.season),

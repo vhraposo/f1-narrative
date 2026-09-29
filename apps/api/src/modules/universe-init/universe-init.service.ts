@@ -94,6 +94,7 @@ export interface PlannedRace {
   country?: string | null;
   contentHash?: string;
   change?: "CREATED" | "UPDATED" | "UNCHANGED";
+  hasSprint?: boolean | null;
 }
 
 export interface PlannedResult {
@@ -1118,6 +1119,7 @@ export class UniverseInitService {
         locality: true,
         country: true,
         contentHash: true,
+        hasSprint: true,
         _count: { select: { results: true } },
       },
     });
@@ -1134,6 +1136,7 @@ export class UniverseInitService {
         locality: ext.locality,
         country: ext.country,
         contentHash: ext.contentHash,
+        hasSprint: ext.hasSprint ?? null,
       };
       const binding = await db.externalBindingRace.findUnique({
         where: {
@@ -1610,6 +1613,7 @@ export class UniverseInitService {
             round: race.round,
             status: race.status,
             provenance: "IMPORTED",
+            sprintExternal: race.hasSprint ?? null,
           },
         });
         await tx.externalBindingRace.create({
@@ -1825,6 +1829,7 @@ export class UniverseInitService {
       circuitExternalId: race.circuitExternalId ?? null,
       circuitName: race.circuitName ?? null,
       country: race.country ?? null,
+      hasSprint: race.hasSprint ?? null,
     } as Prisma.InputJsonValue;
   }
 
@@ -1879,6 +1884,7 @@ export class UniverseInitService {
       const circuitId = await this.resolveCircuitId(tx, universeId, race);
       if (circuitId) data.circuitId = circuitId;
     }
+    data.sprintExternal = race.hasSprint ?? null;
     if (Object.keys(data).length > 0) {
       await tx.race.update({ where: { id: binding.raceId }, data });
     }
