@@ -6,6 +6,7 @@ import {
   evaluateCharacterBehavior,
   executeCharacterDecision,
   listCharacterDecisions,
+  recoverStaleExecutions,
 } from "./ai-behavior.service.js";
 import { AiBehaviorError } from "./ai-behavior.policy.js";
 
@@ -89,6 +90,15 @@ export const aiBehaviorRoutes: FastifyPluginAsync<AiBehaviorRoutesOptions> =
         } catch (error) {
           return sendBehaviorError(reply, error);
         }
+      },
+    );
+
+    fastify.post(
+      "/api/ai-behavior/recover",
+      { preHandler: [fastify.authenticate] },
+      async (request, reply) => {
+        const result = await recoverStaleExecutions(request.user!.id);
+        return reply.send(result);
       },
     );
 

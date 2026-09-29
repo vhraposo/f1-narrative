@@ -644,3 +644,15 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `feat(v3): add race session results ui`.
+
+---
+
+## AI Behavior — Recovery de EXECUTING preso (Subfase D)
+
+- **Data:** 2026-09-28.
+- **Objetivo:** resolver a limitação da Fase 9 ("sem retomada de EXECUTING preso após crash") com solução conservadora.
+- **Implementação:** `recoverStaleExecutions(userId)` + `POST /api/ai-behavior/recover` (autenticado, Universe do usuário). Marca como `FAILED`/`policyCode=EXECUTION_STALE` apenas decisões `EXECUTING` com `updatedAt` anterior ao threshold `AI_EXECUTING_STALE_MS` (15 min); nada é reexecutado automaticamente, `EXECUTED`/`DECIDED`/`FAILED` e execuções recentes não são tocados. Idempotente e seguro sob concorrência (updateMany atômico); sem scheduler, sem fila.
+- **Testes:** `ai-behavior-recovery.test.ts` (3) cobrindo recuperação apenas de stale, preservação dos demais estados, ausência de nova mensagem, execução pós-recovery bloqueada (`409`), concorrência idempotente (soma = nº de stale, segunda rodada = 0), isolamento entre universos e 401. Focados 15/15; suíte API completa em banco recriado **1853/1853**; typecheck 0; lint 30 (baseline). Web não afetado.
+
+### Commit
+- `fix(v3): recover stale ai decisions`.

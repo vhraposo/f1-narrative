@@ -26,6 +26,8 @@ const WORLD_KEY = "default";
 export const AI_BEHAVIOR_INSTRUCTION =
   "Continue a conversa de forma coerente com o contexto narrativo. Não invente fatos, resultados ou declarações de terceiros.";
 
+export const AI_EXECUTING_STALE_MS = 15 * 60_000;
+
 type ExecutableActionType = "SEND_MESSAGE" | "CREATE_EVENT";
 
 export async function evaluateCharacterBehavior(
@@ -59,6 +61,21 @@ export async function evaluateCharacterBehavior(
   });
 
   return toDecisionView(row);
+}
+
+export async function recoverStaleExecutions(
+  userId: string,
+): Promise<{ recovered: number }> {
+  const universe = await ensureUniverse(userId);
+  const result = await prisma.aiDecision.updateMany({
+    where: {
+      universeId: universe.id,
+      status: "EXECUTING",
+      updatedAt: { lt: new Date(Date.now() - AI_EXECUTING_STALE_MS) },
+    },
+    data: { status: "FAILED", policyCode: "EXECUTION_STALE" },
+  });
+  return { recovered: result.count };
 }
 
 export async function listCharacterDecisions(
