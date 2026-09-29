@@ -5,6 +5,7 @@ import { HomeMetrics } from "@/components/home/home-metrics";
 import { HomeRaceWeekend } from "@/components/home/home-race-weekend";
 import { HomeTiles } from "@/components/home/home-tiles";
 import { SectionHeading } from "@/components/home/section-heading";
+import { SeasonNewsFeed } from "@/components/news/season-news-feed";
 import { WorldStateCard } from "@/components/world/world-state-card";
 import { useCharacters } from "@/hooks/use-characters";
 import { useSeasons } from "@/hooks/use-championship";
@@ -13,6 +14,7 @@ import { useDrivers } from "@/hooks/use-driver-profiles";
 import { useEvents } from "@/hooks/use-events";
 import { useRelationships } from "@/hooks/use-relationships";
 import { useTeams } from "@/hooks/use-teams";
+import { useWorld } from "@/hooks/use-world";
 import { useSession } from "@/providers/session-provider";
 
 export default function AppPage() {
@@ -24,6 +26,7 @@ export default function AppPage() {
   const { data: seasons } = useSeasons();
   const { data: events } = useEvents();
   const { data: conversations } = useConversations();
+  const { data: world } = useWorld();
 
   const counts = {
     characters: characters?.length,
@@ -57,7 +60,10 @@ export default function AppPage() {
       <HomeTiles counts={counts} />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        <HomeFeed />
+        <div className="space-y-10">
+          <HomeFeed />
+          <SeasonNewsFeed seasonId={world?.currentSeasonId ?? null} />
+        </div>
         <section aria-label="Estado do mundo">
           <SectionHeading kicker="Agora" title="Estado do mundo" />
           <div className="mt-5 rounded-md border border-border bg-card p-5">

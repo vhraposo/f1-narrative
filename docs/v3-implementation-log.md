@@ -292,3 +292,53 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - Fase 7 (somente após validação desta fase).
+
+---
+
+## Fase 7 — News × Temporada
+
+- **Data:** 2026-09-28.
+- **Objetivo:** contextualizar notícias por temporada/corrida do Universe, expor feed filtrado (Home/Championship) e conectar eventos de corrida à cobertura jornalística — preservando Event como origem, NewsItem como derivada e sem segundo sistema de eventos/notícias.
+
+### Modelagem (sem migration)
+- Nenhuma coluna nova: o contexto já vive em `Event.payload.seasonId`/`payload.raceId` (eventos gerados pela narrativa de corrida sempre incluem ambos). NewsItem continua 1:1 por Event (materialização transacional com advisory lock e `findFirst`+update/create existentes).
+- `NewsItem` sem vínculo determinável permanece sem contexto e fora dos feeds de temporada/corrida (continua acessível em `GET /api/events/:id/news`).
+
+### Event → NewsItem
+- Eventos gerados por `processRaceNarrative` agora chamam `syncNewsForEvent` na mesma transação (antes só `applyEventEvolution`), reutilizando a deduplicação existente: reprocessar a corrida não duplica eventos nem notícias.
+
+### API
+- `GET /api/news?seasonId=&raceId=&limit=&offset=` (autenticado): sem filtro usa a temporada corrente do `WorldState`; `seasonId`/`raceId` validados no Universe do usuário (`404 SEASON_NOT_FOUND`/`RACE_NOT_FOUND`, `403 SEASON_NOT_IN_UNIVERSE`/`RACE_NOT_IN_UNIVERSE`); resposta `{ news, context, hasMore, nextOffset }` com `context.season`/`context.race` por item.
+- Ordenação determinística: `worldDate desc (nulls last)`, `createdAt desc`, `id desc`; paginação por `limit` (1–50, default 20) + `offset`, sem quebrar consumidores (rota nova).
+- Eventos (POST/PATCH) validam `payload.seasonId`/`payload.raceId` contra o Universe do usuário (`404`/`403`/`400 INVALID_EVENT_CONTEXT`), impedindo associação cruzada entre universos.
+
+### Isolamento e princípios
+- Feeds sempre resolvem Season/Race dentro do Universe; itens de outro Universe nunca aparecem (defesa extra no mapeamento de contexto).
+- Timeline continua estado/replay (nenhum evento de timeline criado por notícia); external refresh não cria Event/NewsItem.
+- Nenhuma automação social nova: apenas cobertura dos acontecimentos existentes.
+
+### UI
+- `SeasonNewsFeed` (componente reutilizável) no Home (temporada corrente) e no Championship (temporada selecionada): loading, erro com retry, vazio, lista com contexto (`R{round} · corrida` ou `Temporada {ano}`) e link para o Event existente.
+- Invalidação: mutações de Event passaram a invalidar `["news"]` (além de events/news por evento).
+
+### Testes e validação
+- API focada: `src/modules/news` — **12/12**; relacionadas (events/narrative/context): 206/206.
+- Suíte API completa (banco recriado): **1782/1782**; typecheck 0; lint 30 (baseline, 0 novos).
+- Web: **397/397** (7 novos do feed); `tsc` 4 (baseline); lint 0; `next build` exit 0.
+- Sem migration (schema atual cobre o requisito).
+
+### Problemas encontrados
+1. `payload.path.raceId in [...]` não é suportado pelo filtro JSON do Prisma → feed por temporada usa `payload.seasonId` (sempre presente nos eventos de corrida) e por corrida usa `raceId` único; sem consulta indisponível.
+2. Teste do feed esperava notícia sem link com `eventId` preenchido → fixture ajustada para `eventId: null` (caso real de notícia sem contexto).
+
+### Limitações
+- Filtro por JSON path não usa índice; volume atual é pequeno (sem necessidade de índice GIN nesta fase).
+- Feeds de temporada/corrida não incluem notícias legadas sem `payload.seasonId` (eventos antigos permanecem visíveis apenas no detalhe do Event).
+- UI sem seletor de corrida e sem paginação ("mostrar mais"); API já suporta ambos.
+- Um NewsItem por Event (sem 1:N de cobertura) — semântica existente preservada.
+
+### Commit
+- `feat(v3): add season-aware news`.
+
+### Próximo passo
+- Fase 8 (somente após validação desta fase).

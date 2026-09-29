@@ -15,6 +15,7 @@ import {
 import { z } from "zod";
 import { syncNewsForEvent } from "./news.js";
 import { applyEventEvolution } from "./event-evolution.js";
+import { validateEventPayloadContext } from "./event-context.js";
 
 const eventSelect = {
   id: true,
@@ -102,6 +103,16 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const contextError = await validateEventPayloadContext(
+        request.user!.id,
+        parsed.data.payload,
+      );
+      if (contextError) {
+        return reply
+          .code(contextError.statusCode)
+          .send({ error: contextError.error, code: contextError.code });
+      }
+
       const event = await prisma.$transaction(async (tx) => {
         const created = await tx.event.create({
           data: {
@@ -172,6 +183,18 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
           code: "VALIDATION_ERROR",
           issues: parsed.error.issues,
         });
+      }
+
+      if (parsed.data.payload !== undefined) {
+        const contextError = await validateEventPayloadContext(
+          request.user!.id,
+          parsed.data.payload,
+        );
+        if (contextError) {
+          return reply
+            .code(contextError.statusCode)
+            .send({ error: contextError.error, code: contextError.code });
+        }
       }
 
       const existing = await prisma.event.findUnique({

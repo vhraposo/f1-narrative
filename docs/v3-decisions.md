@@ -128,3 +128,15 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-031 — Refresh admin-only; status autenticado; coalescing por lock
 - **Decisão:** executar refresh exige ADMIN (regra preservada; `401`/`403` garantidos no backend), enquanto ler o status é permitido a qualquer usuário autenticado. O refresh composto reutiliza o coalescing da Fase 1 com lock próprio `source:REFRESH:year`, mantendo escopos independentes paralelizáveis.
 - **Consequência:** cliques/requisições concorrentes compartilham a execução sem fetches ou runs duplicados; nenhum lock global bloqueia escopos independentes.
+
+## D-032 — Contexto de notícia derivado do Event (sem novas colunas)
+- **Decisão:** Season/Race de uma notícia vêm de `Event.payload.seasonId`/`payload.raceId` (eventos de corrida sempre carregam ambos); não criar colunas nem inferir por timestamp. Eventos sem contexto determinável permanecem sem vínculo e fora dos feeds de temporada/corrida.
+- **Consequência:** zero migration; a integridade depende de validação no backend na criação/edição do Event (`404`/`403`/`400 INVALID_EVENT_CONTEXT`), impedindo referência cruzada entre universos.
+
+## D-033 — Feed de notícias escopado ao Universe com temporada corrente por padrão
+- **Decisão:** `GET /api/news` resolve `seasonId`/`raceId` dentro do Universe do usuário (403/404 semânticos) e, sem filtro, usa `WorldState.currentSeasonId`; ordenação determinística `worldDate desc (nulls last) → createdAt desc → id desc`; paginação `limit`/`offset` com `hasMore`.
+- **Consequência:** nenhum feed atravessa universos; a Home não precisa escolher temporada e o Championship filtra explicitamente; consultas determinísticas mesmo com empates de data.
+
+## D-034 — Cobertura de corrida reutiliza a materialização existente
+- **Decisão:** `processRaceNarrative` passa a chamar `syncNewsForEvent` na mesma transação da criação do Event (mesma dedup/advisory lock); mutações de Event seguem regenerando a notícia. Timeline e external refresh continuam sem criar Event/NewsItem.
+- **Consequência:** cada acontecimento de corrida ganha cobertura 1:1 sem duplicação em reprocessamento; notícia nunca vira fonte de verdade nem item de timeline.

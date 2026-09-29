@@ -11,6 +11,7 @@ import { SeasonCard } from "@/components/championship/season-card";
 import { SeasonForm } from "@/components/championship/season-form";
 import { StandingsPanel } from "@/components/championship/standings-panel";
 import { SectionHeading } from "@/components/home/section-heading";
+import { SeasonNewsFeed } from "@/components/news/season-news-feed";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -434,6 +435,13 @@ export default function ChampionshipPage() {
                 );
               })()}
           </section>
+
+          <SeasonNewsFeed
+            seasonId={activeSeasonId || null}
+            kicker="Cobertura"
+            title="Notícias da temporada"
+            emptyDescription="As notícias aparecem quando as corridas desta temporada forem processadas na narrativa."
+          />
         </>
       )}
     </div>
