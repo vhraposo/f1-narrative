@@ -324,7 +324,8 @@ async function applyTimelineEvent(
       return;
     }
     case "RACE_SCHEDULED":
-    case "RACE_UPDATED": {
+    case "RACE_UPDATED":
+    case "ATTRIBUTE_EVOLVED": {
       return;
     }
   }

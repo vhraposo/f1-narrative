@@ -445,3 +445,56 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - Fase 10 (somente após validação desta fase).
+
+---
+
+## Fase 10 — Driver / Team Evolution
+
+- **Data:** 2026-09-28.
+- **Objetivo:** evolução contextual de atributos de pilotos e performance de equipes por temporada, derivada de resultados reais do Universe, determinística, auditável e idempotente — reutilizando `DriverAttribute`/`TeamPerformance` e sem novo sistema de atributos.
+
+### Fonte de verdade e modelagem
+- `DriverAttribute` (speed/consistency/racecraft/aggression) e `TeamPerformance` (carSpeed/reliability/operations) continuam **season-scoped** via `Season.universeId`; nada de coluna nova. Rows são materializadas no primeiro `apply` (antes disso valem os defaults efetivos 50, como na simulação).
+- External Mirror permanece factual: nenhum `External*` participa da evolução e external refresh não toca atributos (testado). Um Universe pode ter valores próprios por temporada sem interferência de outro.
+
+### Evolution engine (determinístico)
+- `evaluateSeasonEvolution` (puro) calcula métricas por piloto/equipe a partir de `RaceResult` de corridas com `status = FINISHED`, na ordem determinística por `raceId:driverProfileId`.
+- Deltas por avaliação, limitados a ±3 e com clamp final 0..100: piloto (speed: vitórias/pódios/ganho de posições; consistency: taxa de conclusão; racecraft: posições ganhas+pódios; aggression: abandonos) e equipe (carSpeed: vitórias/pódios; reliability: −abandonos; operations: taxa de conclusão). Sem RNG: mesma entrada → mesmo change set.
+- `fingerprint` SHA-256 canônico de (raceId, driverProfileId, position, grid, status, points) dos resultados considerados.
+
+### Fluxo Context → Evaluation → Change Set → Validation → Apply → Audit
+- `POST /api/evolution/seasons/:seasonId/evaluate` (dry-run): retorna `changeSet` (before/after, racesConsidered, fingerprint, `changed`, `alreadyApplied`); nunca escreve.
+- `POST /api/evolution/seasons/:seasonId/apply`: valida ownership do Universe/temporada, recalcula o change set, abre transação com `lockUniverseTimeline`, verifica idempotência pelo fingerprint já registrado (→ `409 ALREADY_APPLIED`), faz upsert dos atributos/performance e grava `TimelineEvent` `ATTRIBUTE_EVOLVED` (auditoria; replay state-neutral, como `RACE_SCHEDULED`). Sem mudanças → `409 NO_CHANGES`.
+- `GET /api/evolution/seasons/:seasonId`: última execução (mundo/aplicado em, fingerprint, corridas consideradas, contagens).
+- Erros semânticos: `SEASON_NOT_FOUND` 404, `SEASON_NOT_IN_UNIVERSE` 403, `ALREADY_APPLIED`/`NO_CHANGES` 409; 401 sem sessão.
+
+### Integração e isolamento
+- Resultados de corrida/campeonato: apenas corridas finalizadas contam; corridas em andamento não alteram fingerprint nem propõem mudanças. USER e AI evoluem igualmente (atributo pertence ao DriverProfile).
+- Timeline permanece estado/replay (kind novo documentado como auditoria); nada de histórico paralelo. Simulações existentes passam a consumir os valores evoluídos quando o usuário rodar qualifying/race novamente (comportamento explícito, sem automação).
+
+### Testes e validação
+- API: `evolution.test.ts` — **10/10** (dry-run determinístico sem escrita, apply materializando rows + timeline + status, idempotência por fingerprint, nova corrida finalizada gera novo fingerprint/aplicação, NO_CHANGES, corridas não finalizadas ignoradas, isolamento entre universos, ownership/401, clamp 0..100, external refresh/recompute sem reescrever atributos).
+- Relacionadas (timeline/simulation/performance/championship/events): 137/137.
+- Suíte API completa (banco recriado): **1817/1817**; typecheck 0; lint 30 (baseline, 0 novos).
+- Web: **409/409**; `tsc` 4 (baseline); lint 0; `next build` exit 0 (sem mudanças de Web nesta fase).
+
+### Migration
+- `20260928140000_add_attribute_evolution_kind` — aditiva (`ALTER TYPE TimelineEventKind ADD VALUE 'ATTRIBUTE_EVOLVED'`), aplicada em `f1_narrative_test` e `f1-narrative` (DEV).
+
+### Problemas encontrados
+1. Helper interno `clamp` era chamado com bounds extras (deltas) → separado em `clamp` (0..100) e `bound` (faixa de delta).
+2. Testes assumiam ordem do array de drivers; deltas agora localizados por `driverProfileId` (ordenação por id é estável, mas o vencedor não é o índice 0).
+3. `evaluate` após `apply` propunha deltas novamente (deltas relativos) → respondido com `alreadyApplied` (fingerprint do último evento), mantendo `apply` bloqueado por 409.
+4. Cleanup de teste esbarrava em FKs `Restrict` de `SeasonDriverEntry` → uso do `deleteUniverseDataForUsers` padrão.
+
+### Limitações
+- Sem rolagem automática entre temporadas (carry-over fica para fase futura); evolução é sempre explícita via API (sem scheduler).
+- `aggression` e `operations` evoluem mas ainda não são consumidos pela simulação atual (campos permanecem preparados); `racecraft` só afeta a corrida (não o qualifying).
+- Sem UI dedicada nesta fase (operável por API; painéis podem ser adicionados depois).
+- Rodar simulações com atributos evoluídos pode alterar resultados anteriores se re-simulados (a simulação continua explícita e determinística por entrada).
+
+### Commit
+- `feat(v3): add driver/team evolution`.
+
+### Próximo passo
+- Fase 11 (somente após validação desta fase).

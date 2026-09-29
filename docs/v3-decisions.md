@@ -164,3 +164,15 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-040 — Execução reusa Event/News/Memory/Relationship e nunca confia em IDs do modelo
 - **Decisão:** SEND_MESSAGE reusa `assembleGenerationBundle` + `persistGeneratedMessage` (instrução interna não persistida); CREATE_EVENT reusa o helper `createEventWithDerivations` (extraído do POST /api/events) com participantes criados antes das derivações, produzindo Event + NewsItem + Memory/Relationship pelo fluxo existente. Toda referência (conversa, corrida, participantes) é revalidada no banco no momento da execução; metadata não é fonte confiável.
 - **Consequência:** nenhuma escrita paralela de News/Memory/Timeline; falha de provider vira FAILED sem estado parcial; violação de policy vira REJECTED com `policyCode` auditável.
+
+## D-041 — Evolução season-scoped sobre os atributos existentes
+- **Decisão:** evolução de pilotos/equipes opera sobre `DriverAttribute`/`TeamPerformance` (season-scoped via `Season.universeId`), com deltas determinísticos calculados de `RaceResult` de corridas FINISHED e clamp 0..100. Sem modelo novo de atributos nem histórico paralelo; External Mirror nunca é fonte de evolução e refresh externo não reescreve valores.
+- **Consequência:** um Universe evolui sem interferir em outro; rows são materializadas no primeiro apply (defaults efetivos 50 antes disso); USER e AI seguem o mesmo caminho.
+
+## D-042 — Idempotência por fingerprint com auditoria na Timeline
+- **Decisão:** o change set carrega um fingerprint SHA-256 canônico dos resultados considerados; `apply` verifica o último `TimelineEvent` `ATTRIBUTE_EVOLVED` da temporada e recusa repetição (`409 ALREADY_APPLIED`). O evento é auditoria state-neutral (replay ignora), sem criar outro sistema temporal. `evaluate` sinaliza `alreadyApplied` quando o fingerprint atual já foi aplicado.
+- **Consequência:** aplicar duas vezes não duplica deltas; nova corrida finalizada muda o fingerprint e permite nova evolução; a Timeline segue responsável pelo histórico.
+
+## D-043 — Fórmulas limitadas e explícitas por avaliação
+- **Decisão:** cada avaliação aplica deltas pequenos (teto ±3): piloto por vitórias/pódios/ganho de posições/taxa de conclusão/abandonos (speed, racecraft, consistency, aggression) e equipe por vitórias/pódios/abandonos/conclusão (carSpeed, reliability, operations). Nada de RNG nem LLM.
+- **Consequência:** evolução previsível e testável; `aggression`/`operations` passam a ter dinâmica (ainda não consumidos pela simulação atual); rodar simulações depois consome os novos valores por decisão explícita do usuário.

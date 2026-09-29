@@ -1361,6 +1361,7 @@ enum TimelineEventKind {
   NUMBER_CORRECTED
   RACE_SCHEDULED
   RACE_UPDATED
+  ATTRIBUTE_EVOLVED
 }
 
 /// Log append-only de mudanças temporais do Universe. Ordenação determinística
