@@ -632,3 +632,15 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `fix(v3): harden worldstate progression`.
+
+---
+
+## Race Weekend — Session Results UI (Subfase C)
+
+- **Data:** 2026-09-28.
+- **Objetivo:** resolver a limitação "sem tela dedicada de resultados por sessão no campeonato", integrando ao Race Weekend existente sem backend novo.
+- **Implementação:** `RaceWeekendDialog` (componente do campeonato) consome `GET /api/races/:raceId/weekend` via `useRaceWeekend` e mostra cada sessão (Practice/Sprint Qualifying/Sprint/Qualifying/Race) com estado (Concluída/Disponível/Bloqueada) e classificação (posição, piloto, equipe, pontos quando aplicável, status/time quando houver), respeitando weekend padrão/Sprint, loading, erro, vazio de classificação e finalizado. O `RaceCard` ganhou o botão "Fim de semana" (prop opcional) e a página do campeonato abre o diálogo — nenhum editor manual, nenhuma alteração de simuladores.
+- **Testes:** `race-weekend-dialog.integration.test.tsx` (6) cobrindo weekend padrão, Sprint com 8/7, sessão concluída vazia, loading, erro e isolamento (apenas o endpoint do weekend é chamado); `race-card.test.tsx` ganhou o caso do novo botão. Web **418/418**; `tsc` 4 (baseline); lint 0; `next build` exit 0. API não alterada.
+
+### Commit
+- `feat(v3): add race session results ui`.
