@@ -41,7 +41,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/hooks/use-conversations", () => ({
   useConversationParticipants: () => mocks.participants,
   useCreateMessage: () => mocks.create,
-  useTurnMessage: () => mocks.turn,
+  useStreamingTurn: () => mocks.turn,
 }));
 
 import { MessageComposer } from "./message-composer";

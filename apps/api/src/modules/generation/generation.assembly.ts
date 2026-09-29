@@ -75,12 +75,31 @@ export interface ContextGenerationRequest {
   targetCharacterId?: string;
   ragFrameId?: string;
   turnContext?: TurnContext;
+  stream?: {
+    onDelta?: (delta: string) => void;
+    signal?: ProviderAbortSignal;
+  };
 }
 
 export interface GenerationProvider {
   readonly name: string;
   run(input: ProviderInput): Promise<ProviderOutput>;
+  runStream?(
+    input: ProviderInput,
+    handlers: ProviderStreamHandlers,
+  ): Promise<ProviderOutput>;
 }
+
+export interface ProviderStreamHandlers {
+  onDelta: (delta: string) => void;
+  signal?: ProviderAbortSignal;
+}
+
+export type ProviderAbortSignal = {
+  readonly aborted: boolean;
+  addEventListener(type: "abort", listener: () => void): void;
+  removeEventListener(type: "abort", listener: () => void): void;
+};
 
 export interface ProviderInput {
   context: AssembledContext;
@@ -787,7 +806,7 @@ export async function assembleGenerationBundle(
     ...(providerUserPrompt !== undefined ? { userPrompt: providerUserPrompt } : {}),
   };
 
-  const output = await provider.run(providerInput);
+  const output = await runProvider(provider, providerInput, request.stream);
 
   const meta: GenerationResult["meta"] = {
     provider: output.provider,
@@ -819,6 +838,24 @@ export async function assembleGenerationBundle(
     ...(output.mode === "generated" ? { text: output.text } : {}),
     ...(speakerCharacterId !== undefined ? { speakerCharacterId } : {}),
   };
+}
+
+async function runProvider(
+  provider: GenerationProvider,
+  input: ProviderInput,
+  stream: ContextGenerationRequest["stream"],
+): Promise<ProviderOutput> {
+  if (stream?.onDelta && typeof provider.runStream === "function") {
+    return provider.runStream(input, {
+      onDelta: stream.onDelta,
+      ...(stream.signal !== undefined ? { signal: stream.signal } : {}),
+    });
+  }
+  const output = await provider.run(input);
+  if (stream?.onDelta && output.mode === "generated" && output.text.length > 0) {
+    stream.onDelta(output.text);
+  }
+  return output;
 }
 
 async function resolveGenerationSpeaker(

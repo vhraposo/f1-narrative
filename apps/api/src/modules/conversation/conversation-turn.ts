@@ -6,6 +6,7 @@ import {
   GenerationSpeakerTargetError,
   GenerationUserInputError,
   type GenerationProvider,
+  type ProviderAbortSignal,
 } from "../generation/generation.assembly.js";
 import {
   type GenerationMessage,
@@ -139,8 +140,16 @@ function describeTurnFailure(err: unknown): string {
   return "generation-error";
 }
 
+export interface TurnStreamOptions {
+  onStarted?: (speakerCharacterIds: string[]) => void;
+  onDelta?: (characterId: string, delta: string) => void;
+  signal?: ProviderAbortSignal;
+  failFast?: boolean;
+}
+
 export interface ExecuteTurnOptions {
   ragProvider?: EmbeddingProviderWithInputType;
+  stream?: TurnStreamOptions;
 }
 
 function toTriggerInternalContext(signals: AssembledContext): ResearchTriggerInternalContext {
@@ -260,6 +269,8 @@ export async function executeTurn(
     })),
   });
 
+  options?.stream?.onStarted?.(selection.selected);
+
   const userMessage = await persistUserMessage(
     db,
     input.conversationId,
@@ -301,6 +312,7 @@ export async function executeTurn(
   const failedSpeakers: TurnFailedSpeaker[] = [];
 
   for (const speakerId of selection.selected) {
+    if (options?.stream?.signal?.aborted) break;
     try {
       const speakerName = characterNameBy.get(speakerId) ?? speakerId;
       const projection = projectUserPromptForSpeaker(
@@ -321,6 +333,21 @@ export async function executeTurn(
           turnContext,
           ...(effectiveRagFrameId !== undefined
             ? { ragFrameId: effectiveRagFrameId }
+            : {}),
+          ...(options?.stream !== undefined
+            ? {
+                stream: {
+                  ...(options.stream.onDelta !== undefined
+                    ? {
+                        onDelta: (delta: string) =>
+                          options.stream!.onDelta!(speakerId, delta),
+                      }
+                    : {}),
+                  ...(options.stream.signal !== undefined
+                    ? { signal: options.stream.signal }
+                    : {}),
+                },
+              }
             : {}),
         },
         provider,
@@ -348,6 +375,8 @@ export async function executeTurn(
         characterId: speakerId,
         error: describeTurnFailure(err),
       });
+      if (options?.stream?.signal?.aborted) break;
+      if (options?.stream?.failFast) throw err;
     }
   }
 

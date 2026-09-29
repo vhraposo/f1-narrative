@@ -342,3 +342,54 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - Fase 8 (somente após validação desta fase).
+
+---
+
+## Fase 8 — Real-time / SSE Foundation
+
+- **Data:** 2026-09-28.
+- **Objetivo:** fundação de SSE seguro sobre o pipeline de geração existente, com deltas incrementais, contrato de eventos tipado, fallback tradicional, autenticação por conexão e isolamento por conversa — sem segundo motor de geração e sem migration.
+
+### Arquitetura
+- **Provider capability opcional:** `GenerationProvider.runStream?(input, { onDelta, signal })` com `ProviderOutput` idêntico ao `run()`; `ProviderAbortSignal` estrutural evita acoplamento ao DOM/Node. Providers sem streaming continuam válidos (`run` apenas).
+- **Reuso do pipeline:** `assembleGenerationBundle` ganhou `stream?: { onDelta, signal }` e `runProvider` decide entre `runStream` (quando existir) e `run` + delta único (fallback server-side). `executeTurn` ganhou hooks `onStarted`/`onDelta`, `signal` e `failFast` no modo stream; o `/turn` tradicional segue sem hooks.
+- **Ollama:** `OllamaProvider.runStream` faz `stream: true` com `Accept: text/event-stream`, lê o corpo incrementalmente, parseia `data:`/`[DONE]` e acumula o texto; abort externo/timeout usam a mesma infra de `AbortController`; erros mantêm as categorias existentes e não vazam prompts/URLs.
+
+### Endpoint e contrato SSE
+- `POST /api/conversations/:id/turn/stream` (cookie auth; mesmos schemas do `/turn`): 401/400/404 em JSON antes do streaming; depois, `reply.hijack()` + `text/event-stream` com heartbeat `: ping` a cada 15s.
+- Eventos fixos e tipados (zod no cliente): `generation.started` (`requestId`, `conversationId`, `speakers`), `generation.delta` (`characterId`, `delta`), `generation.completed` (`userMessage`, `messages`, `failedSpeakers` — mesmo resultado do `/turn` 201), `generation.error` (`code`, `message` sanitizado: `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`, `TURN_USER_MISSING`, `RAG_FRAME_NOT_FOUND`, `TURN_FAILED`).
+- Deltas contêm apenas texto incremental; nada de systemPrompt/contexto/RAG/stack. `generation.completed` só é emitido após a persistência normal de cada mensagem (mesmo pipeline do `/turn`).
+
+### Desconexão, concorrência e cleanup
+- `request.raw`/`reply.raw` `close` aborta a geração via `AbortSignal` (propagado até o provider); nada parcial é persistido e nenhum evento é escrito após a desconexão.
+- Backpressure via `drain` com fila serializada de frames (sem buffer infinito); heartbeat encerrado no `finally`; `activeStreams` contém apenas o `requestId` e é limpo em todos os caminhos (testado).
+- Sem broadcast: cada conexão carrega seu próprio writer/estado; gerações concorrentes em conversas diferentes ficam isoladas.
+
+### Web
+- `streamTurnMessage` (fetch + reader + parse SSE validado por zod) em `lib/conversations.ts`; `useStreamingTurn` no lugar do mutation tradicional no composer: placeholder de IA por speaker, deltas incrementais na cache (`setQueryData`), consolidação no `completed` (merge por id, sem duplicar), invalidação apenas de conversa/lista, abort no unmount e bloqueio de segundo envio enquanto pendente.
+- **Fallback determinístico único:** se o SSE falhar antes de qualquer delta, o hook chama `POST /turn` uma única vez; se falhar depois de deltas, remove placeholders, mostra erro e refaz o fetch das mensagens. Sem loops.
+- `/generate` e `/turn` permanecem inalterados para consumidores existentes.
+
+### Testes e validação
+- API: `conversation-turn-stream.test.ts` (8, servidor real + fetch streaming: auth/ownership, started/delta/completed, persistência, equivalência com `/turn`, fallback sem streaming, erro/timeout/malformed, desconexão+abort+cleanup, concorrência e isolamento, cookie inválido, ausência de vazamento de contexto/memória) + `ollama-provider-stream.test.ts` (5: ordem/`stream:true`, chunk inválido, vazio, HTTP, abort/timeout).
+- Suíte API completa (banco recriado): **1795/1795**; typecheck 0; lint 30 (baseline, 0 novos).
+- Web: **403/403** (6 novos de streaming + ajustes de mocks); `tsc` 4 (baseline); lint 0; `next build` exit 0.
+- Sem migration (schema atual cobre).
+
+### Problemas encontrados
+1. `writeRaw` respeitava o flag `closed` também para frames já enfileirados → `generation.completed`/`error` perdidos. Corrigido com fila serializada que só verifica `writableEnded`.
+2. Falha do provider era absorvida por speaker (comportamento do `/turn`), impedindo `generation.error` no SSE → `failFast` explícito no modo stream re-lança o erro (abort continua silencioso).
+3. Teste de concorrência mapeava deltas por ordem de chamada (flaky sob carga) → marcador derivado do próprio prompt.
+4. `no-undef` de ESLint para `setInterval`/`TextDecoder`/tipos `AbortSignal` → `globalThis` e tipo estrutural (0 novos).
+
+### Limitações
+- SSE é por instância/processo (sem pub/sub); retomada de stream interrompido não existe (o cliente refaz o fetch e usa fallback).
+- Sem persistência incremental: a mensagem final só existe ao terminar (deltas são efêmeros no cliente).
+- Cookie cache do Better Auth pode manter sessão válida por até ~5 min após expiração no banco (sem impacto no fluxo testado com cookie inválido/ausente).
+- Texto sem formatação incremental (sem markdown/cursor no bubble); heartbeat fixo de 15s sem configuração por env.
+
+### Commit
+- `feat(v3): add generation sse foundation`.
+
+### Próximo passo
+- Fase 9 (somente após validação desta fase).

@@ -37,6 +37,16 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/conversations", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/conversations")>();
+  return {
+    ...actual,
+    streamTurnMessage: vi
+      .fn()
+      .mockRejectedValue(new Error("streaming indisponível no teste")),
+  };
+});
+
 function participant(
   id: string,
   controlledBy: "USER" | "AI",

@@ -28,6 +28,7 @@ import scheduleRoutes from "./modules/schedule/schedule.routes.js";
 import memoryRoutes from "./modules/memory/memory.routes.js";
 import conversationRoutes from "./modules/conversation/conversation.routes.js";
 import conversationTurnRoutes from "./modules/conversation/conversation-turn.routes.js";
+import conversationTurnStreamRoutes from "./modules/conversation/conversation-turn-stream.routes.js";
 import contextRoutes from "./modules/context/context.routes.js";
 import conversationRagRoutes from "./modules/context/conversation-rag.routes.js";
 import conversationRagMaterializeRoutes, {
@@ -158,6 +159,10 @@ export function buildApp(
   void app.register(memoryRoutes);
   void app.register(conversationRoutes);
   void app.register(conversationTurnRoutes, {
+    provider: generationProvider ?? nullProvider,
+    ragProvider: ragProvider ?? defaultRagProvider(),
+  });
+  void app.register(conversationTurnStreamRoutes, {
     provider: generationProvider ?? nullProvider,
     ragProvider: ragProvider ?? defaultRagProvider(),
   });

@@ -140,3 +140,15 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-034 — Cobertura de corrida reutiliza a materialização existente
 - **Decisão:** `processRaceNarrative` passa a chamar `syncNewsForEvent` na mesma transação da criação do Event (mesma dedup/advisory lock); mutações de Event seguem regenerando a notícia. Timeline e external refresh continuam sem criar Event/NewsItem.
 - **Consequência:** cada acontecimento de corrida ganha cobertura 1:1 sem duplicação em reprocessamento; notícia nunca vira fonte de verdade nem item de timeline.
+
+## D-035 — SSE em rota dedicada com streaming opcional no provider
+- **Decisão:** `POST /api/conversations/:id/turn/stream` reutiliza `executeTurn`; streaming é uma capability opcional (`runStream`) do `GenerationProvider`. Providers sem streaming usam `run()` + delta único no servidor; o cliente cai uma única vez para `POST /turn` quando o SSE falha antes de produzir conteúdo. `/turn` e `/generate` permanecem inalterados.
+- **Consequência:** nenhum segundo motor de geração; Ollama real ganha streaming incremental, NullProvider e providers legados continuam funcionando.
+
+## D-036 — Contrato SSE fixo com payload mínimo e persistência só no final
+- **Decisão:** quatro eventos (`generation.started|delta|completed|error`), validados por zod no cliente; deltas carregam apenas texto incremental; `completed` replica o resultado do `/turn` (userMessage/messages/failedSpeakers) após a persistência normal; erros são mapeados para códigos semânticos e sanitizados. `failFast` no modo stream re-lança falha de provider para virar `generation.error`.
+- **Consequência:** o cliente nunca precisa interpretar texto livre; systemPrompt/contexto/RAG/stack não trafegam; a mensagem final é a mesma do fluxo tradicional.
+
+## D-037 — Desconexão aborta geração; cleanup por conexão
+- **Decisão:** `close` da conexão aciona `AbortSignal` propagado até o provider (nada parcial é persistido); frames usam fila serializada com `drain` (backpressure) e heartbeat de 15s; cada conexão tem writer/estado próprios, com contador de ativos para observabilidade e limpeza em completed/error/abort. Auth por sessão (cookie) em toda conexão e ownership por participação da Conversation.
+- **Consequência:** sem vazamento entre clientes nem listeners acumulados; streams abandonados não ficam pendurados; sem broadcast global.
