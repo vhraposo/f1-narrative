@@ -29,7 +29,8 @@ const worldSelect = {
 export type WorldTransitionType =
   | "RACE_SELECTED"
   | "SESSION_ADVANCED"
-  | "WEEKEND_FINALIZED";
+  | "WEEKEND_FINALIZED"
+  | "STALE_POINTER_CLEARED";
 
 export type WorldTransition = {
   type: WorldTransitionType;
@@ -76,6 +77,33 @@ export async function progressWorldState(
 
     if (!world.currentRaceId) {
       if (!world.currentSeasonId) return noChange();
+      const season = await tx.season.findFirst({
+        where: { id: world.currentSeasonId, universeId: universe.id },
+        select: { id: true },
+      });
+      if (!season) {
+        const updated = await tx.worldState.update({
+          where: { id: world.id },
+          data: { currentSeasonId: null, currentSession: null },
+          select: worldSelect,
+        });
+        await appendWorldAdvancedEvent(tx, universe.id, {
+          currentDate: world.currentDate,
+          currentSeasonId: null,
+          currentRaceId: null,
+          currentSession: null,
+        });
+        return {
+          world: updated,
+          changed: true,
+          transition: {
+            type: "STALE_POINTER_CLEARED",
+            raceId: "",
+            fromSession: world.currentSession,
+            toSession: null,
+          },
+        };
+      }
       const firstRace = await tx.race.findFirst({
         where: { seasonId: world.currentSeasonId, status: { not: "FINISHED" } },
         orderBy: [{ round: "asc" }, { date: "asc" }, { id: "asc" }],
@@ -133,7 +161,28 @@ export async function progressWorldState(
       },
     });
     if (!race || race.season.universeId !== universe.id) {
-      return noChange();
+      const danglingRaceId = world.currentRaceId;
+      const updated = await tx.worldState.update({
+        where: { id: world.id },
+        data: { currentRaceId: null, currentSession: null },
+        select: worldSelect,
+      });
+      await appendWorldAdvancedEvent(tx, universe.id, {
+        currentDate: world.currentDate,
+        currentSeasonId: world.currentSeasonId,
+        currentRaceId: null,
+        currentSession: null,
+      });
+      return {
+        world: updated,
+        changed: true,
+        transition: {
+          type: "STALE_POINTER_CLEARED",
+          raceId: danglingRaceId,
+          fromSession: world.currentSession,
+          toSession: null,
+        },
+      };
     }
 
     const sequence = weekendSequenceFor(effectiveSprintValue(race));

@@ -619,3 +619,16 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `feat(v3): add worldstate progression`.
+
+---
+
+## V3.12 Hardening — Recovery de ponteiros do WorldState (Subfase B)
+
+- **Data:** 2026-09-28.
+- **Auditoria:** transições duplicadas já são cobertas pelo lock + NO_CHANGE (D-049); RACE sem classificação já retorna NO_CHANGE; replay após progressão já é determinístico (testado na Subfase A). O gap real era ponteiro obsoleto: `currentRaceId`/`currentSeasonId` apontando para corrida inexistente, corrida de outro Universe ou temporada inexistente — antes a progressão apenas retornava NO_CHANGE e deixava o estado inválido persistido.
+- **Implementação (baixo risco, direta):** nova transição `STALE_POINTER_CLEARED` que limpa os campos inválidos (`currentRaceId`/`currentSession` para corrida inexistente/estrangeira; `currentSeasonId`/`currentSession` para temporada inexistente) com auditoria `WORLD_ADVANCED` e retorno `changed:true`. Sessão fora da sequência do weekend (ex.: `SPRINT` em weekend padrão) já é normalizada para a sessão inicial.
+- **Testes:** 4 novos cenários em `world-progression.test.ts` (corrida inexistente, corrida de outro Universe com isolamento preservado, temporada inexistente, normalização de sessão). Focados 29/29; suíte API completa em banco recriado **1850/1850**; typecheck 0; lint 30 (baseline).
+- **Limitações:** corrida `FINISHED` permanece como `currentRaceId` (comportamento intencional; Next Race deriva a próxima); nenhuma recuperação de outros campos.
+
+### Commit
+- `fix(v3): harden worldstate progression`.

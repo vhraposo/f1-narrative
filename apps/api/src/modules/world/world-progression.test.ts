@@ -570,4 +570,92 @@ describe("WorldState Progression (V3.12)", () => {
     expect(unauthenticated.statusCode).toBe(401);
     await app.close();
   });
+
+  it("limpa ponteiro para corrida inexistente", async () => {
+    const app = buildApp();
+    await app.ready();
+    const user = await createDbUser("stale-race");
+    const fixture = await createFixture(user, { withWorldRace: true });
+    await prisma.race.delete({ where: { id: fixture.raceId } });
+
+    const response = await progress(app, user);
+    expect(response.json().changed).toBe(true);
+    expect(response.json().transition.type).toBe("STALE_POINTER_CLEARED");
+
+    const world = await loadWorld(fixture.universeId);
+    expect(world.currentRaceId).toBeNull();
+    expect(world.currentSession).toBeNull();
+    expect(await worldEvents(fixture.universeId)).toHaveLength(1);
+
+    await app.close();
+  });
+
+  it("limpa ponteiro para corrida de outro Universe", async () => {
+    const app = buildApp();
+    await app.ready();
+    const userA = await createDbUser("stale-foreign-a");
+    const userB = await createDbUser("stale-foreign-b");
+    const fixtureA = await createFixture(userA, { withSecondRace: false });
+    const fixtureB = await createFixture(userB, { withSecondRace: false });
+    await prisma.worldState.update({
+      where: {
+        universeId_key: { universeId: fixtureA.universeId, key: "default" },
+      },
+      data: { currentRaceId: fixtureB.raceId, currentSession: "PRACTICE" },
+    });
+
+    const response = await progress(app, userA);
+    expect(response.json().transition.type).toBe("STALE_POINTER_CLEARED");
+    const worldA = await loadWorld(fixtureA.universeId);
+    expect(worldA.currentRaceId).toBeNull();
+    const worldB = await loadWorld(fixtureB.universeId);
+    expect(worldB.currentRaceId).toBeNull();
+
+    await app.close();
+  });
+
+  it("limpa temporada inexistente", async () => {
+    const app = buildApp();
+    await app.ready();
+    const user = await createDbUser("stale-season");
+    const fixture = await createFixture(user, { withSecondRace: false });
+    await prisma.worldState.update({
+      where: {
+        universeId_key: { universeId: fixture.universeId, key: "default" },
+      },
+      data: {
+        currentSeasonId: "00000000-0000-4000-8000-000000000000",
+        currentSession: "PRACTICE",
+      },
+    });
+
+    const response = await progress(app, user);
+    expect(response.json().transition.type).toBe("STALE_POINTER_CLEARED");
+    const world = await loadWorld(fixture.universeId);
+    expect(world.currentSeasonId).toBeNull();
+    expect(world.currentSession).toBeNull();
+
+    await app.close();
+  });
+
+  it("normaliza sessão fora da sequência do weekend", async () => {
+    const app = buildApp();
+    await app.ready();
+    const user = await createDbUser("normalize");
+    const fixture = await createFixture(user, { withWorldRace: true });
+    await prisma.worldState.update({
+      where: {
+        universeId_key: { universeId: fixture.universeId, key: "default" },
+      },
+      data: { currentSession: "SPRINT" },
+    });
+
+    const response = await progress(app, user);
+    expect(response.json().transition.type).toBe("SESSION_ADVANCED");
+    expect(response.json().transition.toSession).toBe("PRACTICE");
+    const world = await loadWorld(fixture.universeId);
+    expect(world.currentSession).toBe("PRACTICE");
+
+    await app.close();
+  });
 });
