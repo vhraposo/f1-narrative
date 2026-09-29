@@ -4,7 +4,7 @@ import {
   raceIdPathParamsSchema,
   seasonIdPathParamsSchema,
 } from "./championship.schema.js";
-import { recomputeSeasonStandings } from "./championship-progression.service.js";
+import { finalizeRaceInTx } from "./championship-progression.service.js";
 
 export const championshipProgressionRoutes: FastifyPluginAsync = async (
   fastify,
@@ -42,31 +42,14 @@ export const championshipProgressionRoutes: FastifyPluginAsync = async (
         });
       }
 
-      const seasonRaces = await prisma.race.findMany({
-        where: { seasonId: season.id },
-        select: { id: true, status: true },
-      });
-
-      const otherRacesFinished = seasonRaces
-        .filter((scheduled) => scheduled.id !== race.id)
-        .every((scheduled) => scheduled.status === "FINISHED");
-      const nextSeasonStatus = otherRacesFinished ? "FINISHED" : "ACTIVE";
-
-      await prisma.$transaction(async (tx) => {
-        await recomputeSeasonStandings(tx, season.id);
-        await tx.race.update({
-          where: { id: race.id },
-          data: { status: "FINISHED" },
-        });
-        await tx.season.update({
-          where: { id: season.id },
-          data: { status: nextSeasonStatus },
-        });
-        await tx.worldState.updateMany({
-          where: { universeId: season.universeId, currentRaceId: race.id },
-          data: { currentSession: null },
-        });
-      });
+      const { seasonStatus: nextSeasonStatus } = await prisma.$transaction(
+        (tx) =>
+          finalizeRaceInTx(tx, {
+            raceId: race.id,
+            seasonId: season.id,
+            universeId: season.universeId,
+          }),
+      );
 
       const saved = await prisma.championshipStanding.findMany({
         where: { seasonId: season.id },

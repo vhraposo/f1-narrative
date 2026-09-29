@@ -3,6 +3,7 @@ import { prisma } from "../../infrastructure/database/prisma.js";
 import { ensureUniverse } from "../universe/universe.service.js";
 import { rosterService } from "../roster/roster.service.js";
 import { updateWorldSchema } from "./world.schema.js";
+import { progressWorldState } from "./world-progression.service.js";
 
 const WORLD_KEY = "default";
 
@@ -66,6 +67,19 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const world = await resolveWorld(request.user!.id);
       return { world };
+    },
+  );
+
+  fastify.post(
+    "/api/world/progress",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const result = await progressWorldState(request.user!.id);
+      return reply.send({
+        world: result.world,
+        changed: result.changed,
+        transition: result.transition,
+      });
     },
   );
 

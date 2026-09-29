@@ -8,6 +8,34 @@ import {
 
 type Tx = Prisma.TransactionClient;
 
+export async function finalizeRaceInTx(
+  tx: Tx,
+  input: { raceId: string; seasonId: string; universeId: string },
+): Promise<{ seasonStatus: "FINISHED" | "ACTIVE" }> {
+  await recomputeSeasonStandings(tx, input.seasonId);
+  await tx.race.update({
+    where: { id: input.raceId },
+    data: { status: "FINISHED" },
+  });
+  const seasonRaces = await tx.race.findMany({
+    where: { seasonId: input.seasonId },
+    select: { id: true, status: true },
+  });
+  const otherRacesFinished = seasonRaces
+    .filter((race) => race.id !== input.raceId)
+    .every((race) => race.status === "FINISHED");
+  const seasonStatus = otherRacesFinished ? "FINISHED" : "ACTIVE";
+  await tx.season.update({
+    where: { id: input.seasonId },
+    data: { status: seasonStatus },
+  });
+  await tx.worldState.updateMany({
+    where: { universeId: input.universeId, currentRaceId: input.raceId },
+    data: { currentSession: null },
+  });
+  return { seasonStatus };
+}
+
 function readEligibility(metadata: unknown): SprintEligibility | null {
   if (metadata === null || typeof metadata !== "object" || Array.isArray(metadata)) {
     return null;

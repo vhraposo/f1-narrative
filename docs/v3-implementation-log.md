@@ -593,3 +593,29 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - WorldState Progression Auto (fase futura; não iniciada nesta execução).
+
+---
+
+## V3.12 — WorldState Progression Auto (Subfase A)
+
+- **Data:** 2026-09-28.
+- **Objetivo:** transformar o lifecycle do Race Weekend em progressão de WorldState controlada pelo domínio, sem cron/scheduler e sem inventar política de relógio.
+
+### Implementação (D-049)
+- Novo serviço explícito `progressWorldState(userId)` em `apps/api/src/modules/world/world-progression.service.ts` e rota `POST /api/world/progress` (autenticada, Universe do usuário), retornando `{ world, changed, transition }`; sem transição válida → `NO_CHANGE` sem escrever nada.
+- Transições determinísticas ancoradas na state machine existente (helpers do Race Weekend exportados e reutilizados): `RACE_SELECTED` (world sem `currentRaceId` + temporada → primeira corrida não finalizada abre a sessão inicial), `SESSION_ADVANCED` (status concluído → próxima sessão válida da sequência padrão/Sprint), `WEEKEND_FINALIZED` (status `RACE` com classificação → `finalizeRaceInTx`; status `FINISHED` legado → limpa `currentSession`).
+- `finalizeRaceInTx` extraído para `championship-progression.service` e reutilizado pelo apply do campeonato (uma única autoridade de pontos/status/sessão).
+- Tempo: `currentDate` nunca é alterado pela progressão — não há regra temporal confiável por sessão (decisão registrada); a data só muda por `PATCH /api/world`/timeline.
+- Auditoria: cada transição grava `WORLD_ADVANCED` (payload com data/sessão/corrida), reutilizando o replay existente; concorrência pelo advisory lock da timeline (uma transição efetiva por vez).
+
+### Testes e validação
+- `world-progression.test.ts` — **14/14** (seleção de corrida, avanço padrão/Sprint, finalização com pontos e Next Race, NO_CHANGE em corrida FINISHED/sem temporada/sem classificação, idempotência/auditoria única, concorrência, lifecycle completo via Race Weekend, replay + snapshot, isolamento de universos, ausência de Evolution/AI automáticos, 401).
+- Suíte API completa em banco recriado: **1846/1846**; typecheck 0; lint 30 (baseline, 0 novos). Sem migration.
+- Web não afetado nesta subfase.
+
+### Limitações
+- Sem política de relógio real (datas oficiais por sessão dependem de decisão de produto e de dados completos da fonte).
+- Após `FINISHED`, o ponteiro `currentRaceId` permanece na corrida encerrada; a próxima corrida é determinável pelo Next Race (avanço automático de ponteiro não foi adotado por ser política de produto).
+
+### Commit
+- `feat(v3): add worldstate progression`.

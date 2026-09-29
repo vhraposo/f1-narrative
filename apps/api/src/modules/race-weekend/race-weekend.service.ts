@@ -112,18 +112,21 @@ async function loadRace(
   return race;
 }
 
-function effectiveSprint(race: {
+export function effectiveSprintValue(race: {
   sprintOverride: boolean | null;
   sprintExternal: boolean | null;
 }): boolean {
   return race.sprintOverride ?? race.sprintExternal ?? false;
 }
 
-function sequenceFor(effective: boolean): RaceSession[] {
+export function weekendSequenceFor(effective: boolean): RaceSession[] {
   return effective ? SPRINT_SEQUENCE : STANDARD_SEQUENCE;
 }
 
-function statusPosition(status: string, sequence: RaceSession[]): number {
+export function weekendStatusPosition(
+  status: string,
+  sequence: RaceSession[],
+): number {
   if (status === "UPCOMING") return -1;
   if (status === "FINISHED") return sequence.length;
   const index = sequence.indexOf(status as RaceSession);
@@ -160,9 +163,9 @@ export async function getRaceWeekend(
   raceId: string,
 ): Promise<WeekendView> {
   const race = await loadRace(prisma, userId, raceId);
-  const effective = effectiveSprint(race);
-  const sequence = sequenceFor(effective);
-  const statusPos = statusPosition(race.status, sequence);
+  const effective = effectiveSprintValue(race);
+  const sequence = weekendSequenceFor(effective);
+  const statusPos = weekendStatusPosition(race.status, sequence);
   const completedSessions = sequence.slice(
     0,
     Math.max(0, Math.min(sequence.length, statusPos + 1)),
@@ -511,8 +514,8 @@ export async function runWeekendSession(
   options: { rerun?: boolean } = {},
 ): Promise<WeekendView> {
   const race = await loadRace(prisma, userId, raceId);
-  const effective = effectiveSprint(race);
-  const sequence = sequenceFor(effective);
+  const effective = effectiveSprintValue(race);
+  const sequence = weekendSequenceFor(effective);
   const sessionIndex = sequence.indexOf(session);
   if (sessionIndex < 0) {
     throw new RaceWeekendError(
