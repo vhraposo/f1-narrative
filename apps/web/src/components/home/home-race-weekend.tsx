@@ -1,20 +1,16 @@
 "use client";
 
-import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
+import { ArrowRight, CalendarDays, Loader2, MapPin, Play } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 import { SectionHeading } from "@/components/home/section-heading";
+import { Button } from "@/components/ui/button";
 import { useNextRace } from "@/hooks/use-next-race";
-import { useWorld } from "@/hooks/use-world";
+import { useRaceWeekend, useRunWeekendSession } from "@/hooks/use-race-weekend";
 import { RACE_SESSION_LABELS, type RaceSession } from "@/lib/world";
+import type { WeekendSessionView } from "@/lib/weekend";
 import { cn } from "@/lib/utils";
-
-const SESSION_ORDER: RaceSession[] = ["PRACTICE", "QUALIFYING", "RACE"];
-const SESSION_SHORT: Record<RaceSession, string> = {
-  PRACTICE: "Treino",
-  QUALIFYING: "Classificação",
-  RACE: "Corrida",
-};
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -26,14 +22,55 @@ function formatDate(value: string): string {
   });
 }
 
+function resultSummary(session: WeekendSessionView): string | null {
+  const classified = session.results
+    .filter((row) => row.position !== null)
+    .sort((a, b) => (a.position as number) - (b.position as number))
+    .slice(0, 3);
+  if (classified.length === 0) return null;
+  return classified
+    .map((row) => {
+      const points = row.points > 0 ? ` (${row.points} pts)` : "";
+      return `P${row.position} ${row.driverName}${points}`;
+    })
+    .join(" · ");
+}
+
 export function HomeRaceWeekend() {
   const { data, isLoading, isError } = useNextRace();
-  const { data: world } = useWorld();
-
   const race = data?.next ?? data?.current ?? null;
   const season = data?.season ?? null;
-  const currentSession = (world?.currentSession ?? null) as RaceSession | null;
   const totalRounds = data?.totalRounds ?? 0;
+
+  const weekendQuery = useRaceWeekend(race?.raceId);
+  const runMutation = useRunWeekendSession(race?.raceId ?? "");
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const weekend = weekendQuery.data ?? null;
+  const sessions = weekend?.sessions ?? [];
+  const availableSession = sessions.find((item) => item.state === "AVAILABLE");
+  const completedWithResults = [...sessions]
+    .reverse()
+    .find((item) => item.state === "COMPLETED" && item.results.length > 0);
+  const currentSession =
+    weekend?.currentSession ??
+    ((weekend?.status ?? null) as RaceSession | null);
+  const isBusy = runMutation.isPending;
+
+  function handleRun(session: WeekendSessionView["session"]) {
+    setActionError(null);
+    runMutation.mutate(
+      { session },
+      {
+        onError: (error) =>
+          setActionError(
+            error instanceof Error
+              ? error.message
+              : "Falha ao executar a sessão",
+          ),
+      },
+    );
+  }
 
   return (
     <section aria-label="Próximo fim de semana">
@@ -88,6 +125,11 @@ export function HomeRaceWeekend() {
                       {totalRounds > 0 ? `/${totalRounds}` : ""}
                     </span>
                   ) : null}
+                  {weekend?.effectiveSprint ? (
+                    <span className="rounded-sm border border-border bg-muted/40 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground">
+                      Sprint
+                    </span>
+                  ) : null}
                   {season ? (
                     <span className="rounded-sm border border-border bg-muted/40 px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
                       {season.year}
@@ -135,32 +177,104 @@ export function HomeRaceWeekend() {
                 </div>
               ) : null}
             </div>
-            <div className="grid grid-cols-3 border-t border-border">
-              {SESSION_ORDER.map((session) => {
-                const active = currentSession === session;
-                return (
-                  <div
-                    key={session}
-                    className={cn(
-                      "px-4 py-3 text-center transition-colors motion-safe:transition-colors",
-                      "border-r border-border last:border-r-0",
-                      active
-                        ? "bg-brand text-brand-foreground"
-                        : "bg-muted/20 text-muted-foreground",
-                    )}
-                  >
-                    <p
+
+            {weekendQuery.isLoading ? (
+              <p className="border-t border-border p-4 text-sm text-muted-foreground">
+                Carregando o fim de semana…
+              </p>
+            ) : null}
+
+            {weekendQuery.isError ? (
+              <p
+                className="border-t border-border p-4 text-sm text-destructive"
+                role="alert"
+              >
+                Não foi possível carregar as sessões do fim de semana.
+              </p>
+            ) : null}
+
+            {sessions.length > 0 ? (
+              <>
+                <div
+                  className="grid border-t border-border"
+                  style={{
+                    gridTemplateColumns: `repeat(${sessions.length}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {sessions.map((item) => (
+                    <div
+                      key={item.session}
                       className={cn(
-                        "truncate text-[10px] font-semibold uppercase tracking-[0.2em]",
-                        active ? "opacity-80" : "opacity-60",
+                        "border-r border-border px-2 py-3 text-center last:border-r-0",
+                        item.state === "COMPLETED"
+                          ? "bg-brand text-brand-foreground"
+                          : item.state === "AVAILABLE"
+                            ? "bg-brand/5 text-brand"
+                            : "bg-muted/20 text-muted-foreground",
                       )}
                     >
-                      {SESSION_SHORT[session]}
+                      <p
+                        className={cn(
+                          "truncate text-[10px] font-semibold uppercase tracking-[0.16em]",
+                          item.state === "COMPLETED"
+                            ? "opacity-80"
+                            : "opacity-70",
+                        )}
+                      >
+                        {RACE_SESSION_LABELS[item.session]}
+                      </p>
+                      <p className="mt-0.5 text-[10px] font-semibold">
+                        {item.state === "COMPLETED"
+                          ? "Concluída"
+                          : item.state === "AVAILABLE"
+                            ? "Disponível"
+                            : "Bloqueada"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3">
+                  {availableSession ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isBusy}
+                      onClick={() => handleRun(availableSession.session)}
+                    >
+                      {isBusy ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Play className="mr-2 h-4 w-4" />
+                      )}
+                      Executar {RACE_SESSION_LABELS[availableSession.session]}
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {weekend?.status === "FINISHED"
+                        ? "Fim de semana concluído."
+                        : "Nenhuma sessão disponível."}
                     </p>
-                  </div>
-                );
-              })}
-            </div>
+                  )}
+                  {completedWithResults ? (
+                    <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                      {RACE_SESSION_LABELS[completedWithResults.session]}:{" "}
+                      {resultSummary(completedWithResults) ??
+                        "sem classificação"}
+                    </p>
+                  ) : null}
+                </div>
+
+                {actionError ? (
+                  <p
+                    className="px-4 pb-4 text-sm text-destructive"
+                    role="alert"
+                  >
+                    {actionError}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
           </>
         )}
       </div>

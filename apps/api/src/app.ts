@@ -64,6 +64,7 @@ import { mediaRoutes } from "./modules/media/media.routes.js";
 import newsRoutes from "./modules/news/news.routes.js";
 import aiBehaviorRoutes from "./modules/ai-behavior/ai-behavior.routes.js";
 import evolutionRoutes from "./modules/evolution/evolution.routes.js";
+import raceWeekendRoutes from "./modules/race-weekend/race-weekend.routes.js";
 import type { StorageProvider } from "./infrastructure/storage/storage-provider.js";
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
@@ -149,6 +150,7 @@ export function buildApp(
     provider: generationProvider ?? nullProvider,
   });
   void app.register(evolutionRoutes);
+  void app.register(raceWeekendRoutes);
   void app.register(teamPerformanceRoutes);
   void app.register(driverAttributeRoutes);
   void app.register(simulationRoutes);

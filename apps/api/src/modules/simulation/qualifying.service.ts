@@ -12,17 +12,17 @@ export type QualifyingRunEntry = QualifyingResult & {
   teamName: string | null;
 };
 
-export async function simulateQualifyingForRace(
-  db: PrismaClient,
-  raceId: string,
-): Promise<QualifyingRunEntry[] | null> {
-  const race = await db.race.findUnique({
-    where: { id: raceId },
-    select: { id: true, seasonId: true, status: true },
-  });
+type QualifyingDb = {
+  seasonDriverEntry: PrismaClient["seasonDriverEntry"];
+  driverAttribute: PrismaClient["driverAttribute"];
+  teamPerformance: PrismaClient["teamPerformance"];
+};
 
-  if (!race) return null;
-
+export async function computeQualifyingRun(
+  db: QualifyingDb,
+  race: { id: string; seasonId: string },
+  options: { seedSuffix?: string } = {},
+): Promise<QualifyingRunEntry[]> {
   const entries = await db.seasonDriverEntry.findMany({
     where: {
       seasonId: race.seasonId,
@@ -87,14 +87,30 @@ export async function simulateQualifyingForRace(
     };
   });
 
-  const seed = hashString(`${race.id}:${race.seasonId}`);
+  const seed = hashString(
+    `${race.id}:${race.seasonId}${options.seedSuffix ?? ""}`,
+  );
   const grid = simulateQualifying(contenders, seed);
 
-  const run: QualifyingRunEntry[] = grid.map((row) => ({
+  return grid.map((row) => ({
     ...row,
     driverName: nameByDriver.get(row.driverProfileId) ?? "Desconhecido",
     teamName: teamByName.get(row.driverProfileId) ?? null,
   }));
+}
+
+export async function simulateQualifyingForRace(
+  db: PrismaClient,
+  raceId: string,
+): Promise<QualifyingRunEntry[] | null> {
+  const race = await db.race.findUnique({
+    where: { id: raceId },
+    select: { id: true, seasonId: true, status: true },
+  });
+
+  if (!race) return null;
+
+  const run = await computeQualifyingRun(db, race);
 
   for (const row of run) {
     await db.raceResult.upsert({

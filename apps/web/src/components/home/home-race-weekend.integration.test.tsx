@@ -1,8 +1,10 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api";
 import type { NextRaceResult } from "@/lib/next-race";
+import type { RaceWeekend } from "@/lib/weekend";
 import type { WorldState } from "@/lib/world";
 import { renderWithClient } from "@/test/render-with-client";
 import { HomeRaceWeekend } from "@/components/home/home-race-weekend";
@@ -66,13 +68,82 @@ const NEXT_RACE: NextRaceResult = {
   reason: null,
 };
 
+const WEEKEND: RaceWeekend = {
+  raceId: "r5",
+  name: "São Paulo Grand Prix",
+  round: 5,
+  date: "2096-05-01T00:00:00.000Z",
+  status: "UPCOMING",
+  effectiveSprint: false,
+  sprintOverride: null,
+  sprintExternal: null,
+  currentSession: null,
+  nextSession: "PRACTICE",
+  sessions: [
+    { session: "PRACTICE", state: "AVAILABLE", results: [] },
+    { session: "QUALIFYING", state: "LOCKED", results: [] },
+    { session: "RACE", state: "LOCKED", results: [] },
+  ],
+};
+
+const SPRINT_WEEKEND: RaceWeekend = {
+  ...WEEKEND,
+  status: "SPRINT",
+  effectiveSprint: true,
+  sprintOverride: true,
+  currentSession: "SPRINT",
+  nextSession: "QUALIFYING",
+  sessions: [
+    {
+      session: "PRACTICE",
+      state: "COMPLETED",
+      results: [
+        {
+          driverProfileId: "d1",
+          driverName: "Piloto Um",
+          teamName: "Equipe A",
+          position: 1,
+          status: "Finished",
+          points: 0,
+        },
+      ],
+    },
+    { session: "SPRINT_QUALIFYING", state: "COMPLETED", results: [] },
+    {
+      session: "SPRINT",
+      state: "COMPLETED",
+      results: [
+        {
+          driverProfileId: "d1",
+          driverName: "Piloto Um",
+          teamName: "Equipe A",
+          position: 1,
+          status: "Finished",
+          points: 8,
+        },
+        {
+          driverProfileId: "d2",
+          driverName: "Piloto Dois",
+          teamName: "Equipe B",
+          position: 2,
+          status: "Finished",
+          points: 7,
+        },
+      ],
+    },
+    { session: "QUALIFYING", state: "AVAILABLE", results: [] },
+    { session: "RACE", state: "LOCKED", results: [] },
+  ],
+};
+
 beforeEach(() => {
   apiMock.get.mockImplementation(async (path: string) => {
     if (path === "/api/next-race") return { nextRace: NEXT_RACE };
     if (path === "/api/world") return { world: WORLD };
+    if (path === "/api/races/r5/weekend") return { weekend: WEEKEND };
     throw new ApiError("Não encontrado", 404);
   });
-  apiMock.post.mockImplementation(async () => undefined);
+  apiMock.post.mockImplementation(async () => ({ weekend: WEEKEND }));
   apiMock.patch.mockImplementation(async () => undefined);
   apiMock.put.mockImplementation(async () => undefined);
   apiMock.remove.mockImplementation(async () => undefined);
@@ -120,5 +191,66 @@ describe("HomeRaceWeekend — Next Race do Universe", () => {
     renderWithClient(<HomeRaceWeekend />);
 
     expect(await screen.findByText("Sem corrida definida")).toBeDefined();
+  });
+
+  it("mostra as sessões do weekend e executa a sessão disponível", async () => {
+    renderWithClient(<HomeRaceWeekend />);
+    await screen.findByText("São Paulo Grand Prix");
+
+    expect(await screen.findByText("Treino")).toBeDefined();
+    expect(screen.getAllByText("Disponível").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bloqueada").length).toBeGreaterThan(0);
+
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: /Executar Treino/ }),
+    );
+
+    await waitFor(() => {
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/races/r5/weekend/sessions/PRACTICE/run",
+        {},
+      );
+    });
+    const calls = apiMock.get.mock.calls.map((call) => String(call[0]));
+    expect(calls).toContain("/api/races/r5/weekend");
+  });
+
+  it("mostra Sprint, estados concluídos e resumo com pontos", async () => {
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/next-race") return { nextRace: NEXT_RACE };
+      if (path === "/api/world") return { world: WORLD };
+      if (path === "/api/races/r5/weekend") {
+        return { weekend: SPRINT_WEEKEND };
+      }
+      throw new ApiError("Não encontrado", 404);
+    });
+    renderWithClient(<HomeRaceWeekend />);
+
+    expect(await screen.findByText("São Paulo Grand Prix")).toBeDefined();
+    expect((await screen.findAllByText("Sprint")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Classificação Sprint")).toBeDefined();
+    expect(
+      screen.getByText(/Sprint: P1 Piloto Um \(8 pts\) · P2 Piloto Dois \(7 pts\)/),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: /Executar Classificação/ }),
+    ).toBeDefined();
+  });
+
+  it("mostra erro quando a execução da sessão falha", async () => {
+    apiMock.post.mockRejectedValueOnce(
+      new ApiError("Sessão fora da ordem do fim de semana", 409, "SESSION_NOT_AVAILABLE"),
+    );
+    renderWithClient(<HomeRaceWeekend />);
+    await screen.findByText("São Paulo Grand Prix");
+
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", { name: /Executar Treino/ }),
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Sessão fora da ordem do fim de semana");
   });
 });

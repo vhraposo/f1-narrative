@@ -41,6 +41,9 @@ enum SeasonStatus {
 
 enum RaceStatus {
   UPCOMING
+  PRACTICE
+  SPRINT_QUALIFYING
+  SPRINT
   QUALIFYING
   RACE
   FINISHED
@@ -49,6 +52,8 @@ enum RaceStatus {
 /// Sessão ativa do fim de semana de corrida.
 enum RaceSession {
   PRACTICE
+  SPRINT_QUALIFYING
+  SPRINT
   QUALIFYING
   RACE
 }
@@ -340,6 +345,7 @@ model DriverProfile {
   championshipStandings ChampionshipStanding[]
   seasonDriverEntries   SeasonDriverEntry[]
   driverAttributes      DriverAttribute[]
+  sessionResults        RaceSessionResult[]
 
   favoritedByProfiles UserProfile[] @relation("UserProfileFavoriteDriver")
 
@@ -361,6 +367,8 @@ model Team {
   // temporal completo: representa a identidade atual da equipe.
   visualIdentity Json?
   driverProfiles DriverProfile[]
+
+  sessionResults RaceSessionResult[]
 
   seasonDriverEntries  SeasonDriverEntry[]
   externalTeamBindings ExternalBindingTeam[]
@@ -436,6 +444,7 @@ model Race {
   provenance Provenance @default(CANONICAL)
 
   results              RaceResult[]
+  sessionResults       RaceSessionResult[]
   externalRaceBindings ExternalBindingRace[]
 
   createdAt DateTime @default(now())
@@ -470,6 +479,37 @@ model RaceResult {
 
   @@unique([raceId, driverProfileId])
   @@index([raceId])
+  @@index([driverProfileId])
+}
+
+/// Resultado de sessão do fim de semana (Practice/Sprint Qualifying/Sprint/
+/// Qualifying). Race continua exclusivamente em RaceResult.
+model RaceSessionResult {
+  id      String @id @default(uuid()) @db.Uuid
+  raceId  String @db.Uuid
+  race    Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+
+  driverProfileId String        @db.Uuid
+  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  teamId          String?       @db.Uuid
+  team            Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  session RaceSession
+
+  position Int?
+  laps     Int?
+  status   String?
+  timeMs   Int?
+  points   Float      @default(0)
+  metadata Json?
+  provenance Provenance @default(CANONICAL)
+  sourceHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([raceId, driverProfileId, session])
+  @@index([raceId, session])
   @@index([driverProfileId])
 }
 
@@ -1366,6 +1406,7 @@ enum TimelineEventKind {
   RACE_SCHEDULED
   RACE_UPDATED
   ATTRIBUTE_EVOLVED
+  SESSION_COMPLETED
 }
 
 /// Log append-only de mudanças temporais do Universe. Ordenação determinística

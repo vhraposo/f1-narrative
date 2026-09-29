@@ -33,7 +33,7 @@ export const championshipProgressionRoutes: FastifyPluginAsync = async (
       }
       const season = await prisma.season.findUnique({
         where: { id: race.seasonId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, universeId: true },
       });
       if (!season) {
         return reply.code(404).send({
@@ -61,6 +61,10 @@ export const championshipProgressionRoutes: FastifyPluginAsync = async (
         await tx.season.update({
           where: { id: season.id },
           data: { status: nextSeasonStatus },
+        });
+        await tx.worldState.updateMany({
+          where: { universeId: season.universeId, currentRaceId: race.id },
+          data: { currentSession: null },
         });
       });
 

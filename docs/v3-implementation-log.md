@@ -536,7 +536,60 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - `ExternalRace.hasSprint` depende da fonte: Jolpica omite sessões quando não fornece o detalhe → `null` (indeterminado), nunca `false` inventado.
 
 ### Commit
-- `feat(v3): add sprint weekend detection` (parte 1 da Fase Race Weekend; commit final da fase será feito após a validação da sequência).
+- `feat(v3): add sprint weekend detection` (parte 1 da Fase Race Weekend).
+
+---
+
+## Race Weekend / Sessions — Parte 2: sessões, lifecycle e Sprint scoring
+
+- **Data:** 2026-09-28.
+- **Objetivo:** concluir a Fase Race Weekend — modelo próprio de resultado de sessão, Practice/Sprint Qualifying/Sprint/Qualifying/Race, state machine, WorldState, scoring oficial de Sprint e UI mínima — reutilizando os simuladores existentes.
+
+### Modelo de resultado de sessão (D-046)
+- Novo `RaceSessionResult` (migration aditiva `20260928160000_add_race_session_results`): `raceId`, `driverProfileId`, `teamId?`, `session` (RaceSession), `position`, `laps?`, `status`, `timeMs?`, `points`, `metadata`, `provenance/sourceHash`; unique `[raceId, driverProfileId, session]`.
+- `RaceResult` continua exclusivo da Race (grid e classificação). Practice, Sprint Qualifying, Sprint e Qualifying persistem em `RaceSessionResult`; a Qualifying também mantém o grid em `RaceResult.grid` (semântica existente preservada).
+- Enums ampliados: `RaceStatus`/`RaceSession` ganham `PRACTICE`, `SPRINT_QUALIFYING` e `SPRINT`; `TimelineEventKind` ganha `SESSION_COMPLETED` (auditoria state-neutral no replay).
+
+### Lifecycle e state machine (D-047)
+- Sequência por configuração do weekend: padrão `PRACTICE → QUALIFYING → RACE`; com Sprint `PRACTICE → SPRINT_QUALIFYING → SPRINT → QUALIFYING → RACE`. `effectiveSprint` vem da determinação da parte 1 (override > externo > false).
+- `GET /api/races/:raceId/weekend` expõe configuração, sessão atual/próxima e cada sessão como `COMPLETED/AVAILABLE/LOCKED` com resultados.
+- `POST /api/races/:raceId/weekend/sessions/:session/run` valida a ordem (predecessor obrigatório), bloqueia Sprint em weekend sem Sprint (`409 SPRINT_NOT_CONFIGURED`), duplicatas e weekend finalizado (`409 SESSION_NOT_AVAILABLE`); `rerun:true` é permitido apenas para Practice enquanto ela é a sessão corrente (substitui o resultado, sem duplicar auditoria).
+- Concorrência: transação com `pg_advisory_xact_lock(hashtext('race-weekend:<raceId>'))` + lock da timeline, revalidando o status dentro do lock; duas chamadas simultâneas → uma executa, a outra recebe 409. Falhas fazem rollback (nada parcial).
+- WorldState: cada sessão concluída atualiza `currentRaceId`/`currentSeasonId` e `currentSession`; o apply do campeonato marca a corrida `FINISHED` e limpa `currentSession` do Universe.
+- Timeline: um `SESSION_COMPLETED` por sessão (payload raceId/session/resultCount + elegibilidade do Sprint), ignorado no replay; recompute determinístico não altera resultados.
+
+### Simulações reutilizadas
+- Practice e Sprint Qualifying reutilizam o motor de qualifying com seeds dedicados (`:practice`, `:sprint-qualifying`); Qualifying reutiliza o seed oficial e persiste grid; Race reutiliza o motor de corrida (seed oficial).
+- Sprint usa o motor de corrida com grid vindo do Sprint Qualifying e seed `:sprint`.
+- Refatoração mínima: `computeQualifyingRun`/`computeRaceRun` exportados (com `seedSuffix`/`grid` opcionais) e usados pelo runner dentro da mesma transação; endpoints tradicionais mantêm o comportamento.
+
+### Sprint scoring (D-048)
+- `sprintPointsForPosition` (8..1, sem fastest lap) separado de `pointsForPosition` (25..1); elegibilidade explícita (`neutralizedStart`, `distancePct >= 50`) com dead heat compartilhando a soma das posições empatadas.
+- `recomputeSeasonStandings` continua a única autoridade: lê `RaceResult` + `RaceSessionResult(SPRINT)`, regrava os pontos de Sprint e agrega Drivers' (soma) — Constructors derivam da soma por equipe via `teamId`. Simulador v1 assume distância completa e sem neutralização (registrado no metadata; seam para SC/VSC/voltas futuras).
+
+### UI
+- `HomeRaceWeekend` agora consome `/api/races/:id/weekend`: badge "Sprint", faixa de sessões com estados (Concluída/Disponível/Bloqueada), botão "Executar {sessão}" com loading e erro, resumo do último resultado com pontos, e `Sprint` nos labels de sessão. Invalidação de weekend/next-race/world após execução; sem alterações arquiteturais de UI.
+
+### Testes e validação
+- `race-weekend.test.ts` — **11/11** cobrindo os 33 cenários exigidos (lifecycle padrão e com Sprint, SQ sem tocar grid, scoring 8–1, elegibilidade zerada, dead heat, duplicata, rerun controlado, concorrência (Practice/Qualifying/Race), WorldState, Next Race, Timeline determinística, isolamento de universos/espelho, ausência de Evolution/AI automáticos, contrato/erros e regressão do lifecycle).
+- Suíte API completa em banco recriado: **1836/1836**; typecheck 0; lint 30 (baseline, 0 novos).
+- Web: **412/412** (novos testes de sessões/Sprint/erro); `tsc` 4 (baseline); lint 0; `next build` exit 0.
+- Migration aplicada em `f1_narrative_test` e `f1-narrative` (DEV), aditiva.
+
+### Problemas encontrados
+1. Seed único do espelho externo nos fixtures colidia (`[source, seasonYear, round]`) → rounds dedicados por fixture.
+2. Asserções assumiam que o vencedor da Race seria o mesmo do Sprint e que `RaceResult.points` já estaria preenchido antes do apply → passaram a calcular o esperado por posição/`pointsForPosition` e reconsultar após o apply.
+3. `let resultCount = 0` gerava lint `no-useless-assignment` → declaração sem valor inicial.
+4. Cleanup de teste esbarrava em FKs `Restrict` de `SeasonDriverEntry` → `deleteUniverseDataForUsers` padrão.
+
+### Limitações
+- Simulador v1 não modela voltas nem SC/VSC; a elegibilidade do Sprint é avaliada com distância completa e sem neutralização (mecanismo pronto para receber esses dados quando a simulação evoluir).
+- `RaceSessionResult.laps/timeMs` existem, mas permanecem nulos na v1 (não inventados).
+- Sem scheduler/WorldState automático: toda progressão é explícita; Evolution continua acionada manualmente; AI Behavior não avança o weekend.
+- Sem UI dedicada de resultados por sessão no campeonato (o card do Home mostra o resumo; a API expõe os resultados completos).
+
+### Commit
+- `feat(v3): add race weekend sessions`.
 
 ### Próximo passo
-- Retomar a Fase Race Weekend: modelo de resultado de sessão + Sprint scoring (D-045) e lifecycle Practice/Qualifying/Sprint/Race, após validação desta parte.
+- WorldState Progression Auto (fase futura; não iniciada nesta execução).

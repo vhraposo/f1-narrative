@@ -19,7 +19,7 @@ const advanceBodySchema = z
     currentSeasonId: z.string().uuid().nullable().optional(),
     currentRaceId: z.string().uuid().nullable().optional(),
     currentSession: z
-      .enum(["PRACTICE", "QUALIFYING", "RACE"])
+      .enum(["PRACTICE", "SPRINT_QUALIFYING", "SPRINT", "QUALIFYING", "RACE"])
       .nullable()
       .optional(),
   })

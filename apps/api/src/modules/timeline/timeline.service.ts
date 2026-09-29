@@ -22,7 +22,13 @@ export interface WorldAdvancedPayload {
   currentDate: string;
   currentSeasonId: string | null;
   currentRaceId: string | null;
-  currentSession: "PRACTICE" | "QUALIFYING" | "RACE" | null;
+  currentSession:
+    | "PRACTICE"
+    | "SPRINT_QUALIFYING"
+    | "SPRINT"
+    | "QUALIFYING"
+    | "RACE"
+    | null;
 }
 
 export interface RaceResultCorrectionPayload {
@@ -187,6 +193,8 @@ async function restoreSnapshotState(
         currentSession:
           snapshot.world.currentSession as
             | "PRACTICE"
+            | "SPRINT_QUALIFYING"
+            | "SPRINT"
             | "QUALIFYING"
             | "RACE"
             | null,
@@ -198,6 +206,8 @@ async function restoreSnapshotState(
         currentSession:
           snapshot.world.currentSession as
             | "PRACTICE"
+            | "SPRINT_QUALIFYING"
+            | "SPRINT"
             | "QUALIFYING"
             | "RACE"
             | null,
@@ -325,7 +335,8 @@ async function applyTimelineEvent(
     }
     case "RACE_SCHEDULED":
     case "RACE_UPDATED":
-    case "ATTRIBUTE_EVOLVED": {
+    case "ATTRIBUTE_EVOLVED":
+    case "SESSION_COMPLETED": {
       return;
     }
   }
@@ -419,7 +430,13 @@ export interface AdvanceInput {
   worldDate: Date;
   currentSeasonId?: string | null;
   currentRaceId?: string | null;
-  currentSession?: "PRACTICE" | "QUALIFYING" | "RACE" | null;
+  currentSession?:
+    | "PRACTICE"
+    | "SPRINT_QUALIFYING"
+    | "SPRINT"
+    | "QUALIFYING"
+    | "RACE"
+    | null;
 }
 
 export async function advanceUniverseTime(

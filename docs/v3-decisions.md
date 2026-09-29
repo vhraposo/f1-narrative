@@ -184,3 +184,15 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-045 — Pontuação de Sprint: regulamento FIA vigente (implementação pendente)
 - **Decisão (produto):** implementar Sprint conforme FIA 2026 — Section A Issue 03, Art. A2.2.2: P1..P8 = 8,7,6,5,4,3,2,1, atribuídos a Drivers' e Constructors' Championship; sem pontos se o líder não completar 2 voltas consecutivas sem SC/VSC; sem pontos com menos de 50% da Scheduled Sprint Distance; ≥50% aplica a tabela; dead heat pela regra oficial. Referências de lifecycle: Section B vigente (Iss 08, 05/08/2026) B2.1–B2.5 (FP, Sprint Qualifying, Sprint Session, Qualifying, Race).
 - **Consequência:** Sprint terá resultado próprio (`RaceSessionResult`, semanticamente distinto de Practice/Qualifying/Sprint Qualifying/Race) e a soma ao campeonato usará um mecanismo oficial de Sprint separado do Race — a implementação faz parte da sequência da Fase Race Weekend e não foi incluída na determinação de Sprint Weekend.
+
+## D-046 — `RaceSessionResult` próprio; Race continua em `RaceResult`
+- **Decisão:** Practice, Sprint Qualifying, Sprint e Qualifying gravam em `RaceSessionResult` (unique por `[raceId, driverProfileId, session]`); a Race permanece exclusivamente em `RaceResult`. Qualifying também grava o grid em `RaceResult.grid` (semântica existente). `RaceStatus`/`RaceSession` ganham `PRACTICE/SPRINT_QUALIFYING/SPRINT`; a Timeline ganha `SESSION_COMPLETED` (state-neutral no replay).
+- **Consequência:** categorias de resultado nunca se sobrescrevem; nenhum histórico paralelo; replay/recompute não depende de sessões.
+
+## D-047 — State machine por configuração do weekend com lock por corrida
+- **Decisão:** a sequência é derivada de `effectiveSprint` (padrão 3 sessões; com Sprint, 5). O runner exige o predecessor, bloqueia Sprint não configurado, duplicatas e weekend finalizado; `rerun:true` só para Practice corrente. Execução em transação com advisory lock `race-weekend:<raceId>` + lock da timeline e revalidação de status; WorldState (`currentRaceId/currentSeasonId/currentSession`) atualizado a cada sessão e limpo no FINISHED via apply.
+- **Consequência:** exatamente uma execução efetiva sob concorrência; rollback total em falha; progressão sempre explícita (sem scheduler/IA).
+
+## D-048 — Sprint scoring oficial no recompute único, com elegibilidade explícita
+- **Decisão:** `sprintPointsForPosition` (8..1, sem fastest lap) é separado de `pointsForPosition`; `recomputeSeasonStandings` segue como única autoridade, reagrega Race + Sprint (dead heat compartilha a soma das posições empatadas) e os Constructors derivam da soma por equipe. A elegibilidade oficial é representada explicitamente (`neutralizedStart`, `distancePct >= 50`) no metadata do Sprint; o simulador v1 assume distância completa e sem neutralização, documentado como premissa, sem inventar SC/VSC.
+- **Consequência:** Sprint nunca usa a tabela da Race; pontos de Sprint aparecem imediatamente no campeonato; quando a simulação passar a modelar voltas/SC/VSC, os inputs de elegibilidade já existem no contrato.
