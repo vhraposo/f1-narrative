@@ -152,3 +152,15 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-037 — Desconexão aborta geração; cleanup por conexão
 - **Decisão:** `close` da conexão aciona `AbortSignal` propagado até o provider (nada parcial é persistido); frames usam fila serializada com `drain` (backpressure) e heartbeat de 15s; cada conexão tem writer/estado próprios, com contador de ativos para observabilidade e limpeza em completed/error/abort. Auth por sessão (cookie) em toda conexão e ownership por participação da Conversation.
 - **Consequência:** sem vazamento entre clientes nem listeners acumulados; streams abandonados não ficam pendurados; sem broadcast global.
+
+## D-038 — Decisão comportamental determinística; LLM só compõe conteúdo
+- **Decisão:** a camada Context → Decision → Policy → Action → Execution → Audit decide por heurística server-side (CREATE_EVENT se corrida corrente sem cobertura do personagem; senão SEND_MESSAGE se há conversa válida; senão NO_ACTION). O provider LLM não decide nem executa banco: é usado apenas para compor o texto de SEND_MESSAGE pelo pipeline existente.
+- **Consequência:** decisões auditáveis e baratas (sem chamada LLM para decidir); NO_ACTION é resultado de primeira classe; gancho para decisão via LLM fica para fase futura sem mudar o contrato.
+
+## D-039 — AiDecision Universe-scoped com claim atômico e cooldown na própria auditoria
+- **Decisão:** nova tabela `AiDecision` (migration aditiva) guarda status/actionType/alvo/motivo/contextVersion/policyCode/referências de resultado e metadata mínimo — sem prompts. Execução faz claim `DECIDED → EXECUTING` em transação com advisory lock por personagem; cooldown por actionType e limite por hora derivam de linhas EXECUTING/EXECUTED; duplicidade concorrente → 409.
+- **Consequência:** uma decisão executa no máximo uma vez; duas avaliações concorrentes não geram duas ações incompatíveis; nada de infraestrutura distribuída.
+
+## D-040 — Execução reusa Event/News/Memory/Relationship e nunca confia em IDs do modelo
+- **Decisão:** SEND_MESSAGE reusa `assembleGenerationBundle` + `persistGeneratedMessage` (instrução interna não persistida); CREATE_EVENT reusa o helper `createEventWithDerivations` (extraído do POST /api/events) com participantes criados antes das derivações, produzindo Event + NewsItem + Memory/Relationship pelo fluxo existente. Toda referência (conversa, corrida, participantes) é revalidada no banco no momento da execução; metadata não é fonte confiável.
+- **Consequência:** nenhuma escrita paralela de News/Memory/Timeline; falha de provider vira FAILED sem estado parcial; violação de policy vira REJECTED com `policyCode` auditável.

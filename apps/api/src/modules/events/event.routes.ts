@@ -16,6 +16,7 @@ import { z } from "zod";
 import { syncNewsForEvent } from "./news.js";
 import { applyEventEvolution } from "./event-evolution.js";
 import { validateEventPayloadContext } from "./event-context.js";
+import { createEventWithDerivations } from "./event-create.js";
 
 const eventSelect = {
   id: true,
@@ -114,22 +115,19 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const event = await prisma.$transaction(async (tx) => {
-        const created = await tx.event.create({
-          data: {
-            ...parsed.data,
-            payload:
-              parsed.data.payload === null || parsed.data.payload === undefined
-                ? Prisma.DbNull
-                : (parsed.data.payload as Prisma.InputJsonValue),
-          },
+        const created = await createEventWithDerivations(tx, {
+          type: parsed.data.type,
+          title: parsed.data.title,
+          description: parsed.data.description ?? null,
+          importance: parsed.data.importance,
+          source: parsed.data.source,
+          worldDate: parsed.data.worldDate ?? null,
+          payload: parsed.data.payload as Prisma.InputJsonValue | null | undefined,
+        });
+        return tx.event.findUniqueOrThrow({
+          where: { id: created.id },
           select: eventSelect,
         });
-
-        await syncNewsForEvent(tx, created.id);
-
-        await applyEventEvolution(tx, created.id);
-
-        return created;
       });
 
       return reply.code(201).send({ event });

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { AvailabilityCard } from "@/components/availability/availability-card";
+import { AiBehaviorPanel } from "@/components/ai-behavior/ai-behavior-panel";
 import { CharacterIdentity } from "@/components/characters/character-identity";
 import { DriverProfileForm } from "@/components/drivers/driver-profile-form";
 import { MemorySection } from "@/components/memory/memory-section";
@@ -314,6 +315,13 @@ export default function CharacterDetailPage() {
           </ul>
         )}
       </section>
+
+      {character.controlledBy === "AI" ? (
+        <AiBehaviorPanel
+          characterId={character.id}
+          characterName={character.name}
+        />
+      ) : null}
 
       <MemorySection characterId={character.id} characterName={character.name} />
 

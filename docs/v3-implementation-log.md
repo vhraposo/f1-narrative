@@ -393,3 +393,55 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Próximo passo
 - Fase 9 (somente após validação desta fase).
+
+---
+
+## Fase 9 — AI Behavior / Decision Engine Foundation
+
+- **Data:** 2026-09-28.
+- **Objetivo:** camada de decisão comportamental para Characters AI com policy auditável, execução explícita por trigger e reuso total do domínio existente (geração, Event/News, Memory/Relationship) — sem scheduler, sem autonomia irrestrita e sem LLM decidindo operações de banco.
+
+### Arquitetura (Context → Decision → Policy → Action → Execution → Audit)
+- **Decision engine determinístico:** heurística server-side decide a intenção (`CREATE_EVENT` se há corrida corrente sem acontecimento do personagem; senão `SEND_MESSAGE` se há conversa com personagem do usuário; senão `NO_ACTION`). O LLM não decide nem executa: é usado apenas pelo pipeline de geração para compor o conteúdo de `SEND_MESSAGE`.
+- **Decision model:** `AiDecision` registra `status` (NO_ACTION/DECIDED/EXECUTING/EXECUTED/REJECTED/FAILED), `actionType` (NO_ACTION/SEND_MESSAGE/CREATE_EVENT), alvo (`conversationId`), `reason`, `contextVersion` (`ai-behavior.v1`), `policyCode`, referências de resultado (`executedMessageId`/`executedEventId`) e `metadata` mínimo (trigger, season/race, participantIds). Sem prompts/contexto completo.
+- **Policy:** só `controlledBy = AI` age; personagem precisa ser do usuário e do Universe (`404`/`403` semânticos); target revalidado sempre no banco (metadata não é confiável): conversa com o personagem AI, usuário presente como personagem USER, nenhum participante de outro Universe; evento exige corrida/participantes do mesmo Universe e reutiliza o helper de criação.
+- **Auditabilidade:** cada avaliação cria uma linha; execução só ocorre via `POST /execute` por `decisionId`; `NO_ACTION` é resultado de primeira classe (não é erro) e não executa.
+
+### Ações
+- `SEND_MESSAGE`: `assembleGenerationBundle` + `persistGeneratedMessage` (mesmo pipeline do `/turn`), com instrução interna fixa passada como `userPrompt` (não persistida como mensagem), speaker = Character AI.
+- `CREATE_EVENT`: `createEventWithDerivations` (helper extraído do POST /api/events e reutilizado pela rota) → Event `SOCIAL` + `syncNewsForEvent` + `applyEventEvolution`, com participantes criados antes das derivações → NewsItem, Memory e Relationship pelo fluxo existente. Dedup: nova avaliação não recria evento para a mesma corrida/personagem (fallback para `SEND_MESSAGE`).
+- Nenhuma escrita direta em Timeline; nenhuma criação manual de News/NewsItem.
+
+### Concorrência e cooldown
+- Claim atômico `DECIDED → EXECUTING` dentro de transação com `pg_advisory_xact_lock(hashtext('ai-behavior:<characterId>'))`; segunda execução concorrente recebe `409 DECISION_NOT_EXECUTABLE` (ou `COOLDOWN` quando é outra decisão do mesmo personagem).
+- Cooldown por `actionType` (SEND_MESSAGE 5 min; CREATE_EVENT 30 min) e limite de 5 ações/hora por personagem, derivados da própria auditoria (sem tabela nova). Rate-limit local à API (single-process documentado).
+
+### API
+- `POST /api/ai-behavior/evaluate` (`{ characterId, trigger? }`), `POST /api/ai-behavior/execute` (`{ decisionId }`), `GET /api/ai-behavior/decisions` (auditoria por personagem, limit 1–50). Autenticado; ownership/universe em todas; erros semânticos; falha de provider vira `FAILED` (sem estado parcial), violação de policy vira `REJECTED`.
+
+### Web
+- `AiBehaviorPanel` na página do Character (somente `controlledBy = AI`): última decisão (ação + status + motivo + policyCode + referência de resultado), botão "Avaliar comportamento" e "Executar decisão" quando `DECIDED`, estados loading/success/failure/no action e invalidação da auditoria após cada mutação. Sem redesign e sem UI de scheduler.
+
+### Testes e validação
+- API: `ai-behavior.test.ts` — **12/12** cobrindo os 25 cenários (evaluate/execute, USER proibido, outro usuário/Universe, NO_ACTION, SEND_MESSAGE com pipeline+persistência, cooldown/frequência, concorrência de avaliação/execução, provider indisponível/timeout/malformed sem estado parcial, CREATE_EVENT com Event/News/Memory/Relationship, dedup, metadata não confiável, isolamento de universos/conversas, revalidação de estado, segredo/stack ausentes).
+- Suíte API completa (banco recriado): **1807/1807**; reexecução confirmou flake de resíduo pré-existente em `universe-init` (passa isolado e na segunda execução — mesmo comportamento registrado na Fase 4). Typecheck 0; lint 30 (baseline, 0 novos).
+- Web: **409/409** (6 novos do painel); `tsc` 4 (baseline); lint 0; `next build` exit 0.
+
+### Migration
+- `20260928130000_add_ai_decision` — aditiva (enums `AiDecisionStatus`/`AiActionType`, tabela `AiDecision` com FKs cascade e índices); aplicada em `f1_narrative_test` e `f1-narrative` (DEV), sem operações destrutivas.
+
+### Problemas encontrados
+1. Cooldown acusava a própria decisão recém-marcada como `EXECUTING` (self-match) → ordem ajustada: dentro do lock, validar pendência → checar cooldown → só então claim.
+2. Fixtures de teste usavam um Universe por usuário (unique `userId`), impedindo segunda fixture no mesmo usuário → cenários passaram a criar pares extras dentro do mesmo Universe.
+3. Teste de malformed reutilizava o app/provider de timeout → segundo app dedicado em vez de novo Universe.
+
+### Limitações
+- Decisão é 100% heurística nesta fase (gancho para decisão via LLM fica para fase futura); triggers são manuais/explícitos (sem scheduler, sem cron); `Event` permanece global por design (payload carrega `universeId`/`raceId` para auditoria e feeds), com isolamento garantido por validação de participantes/conversa.
+- Cooldown/limite são por processo + banco advisory (multi-instância continua suportado pelo advisory lock, mas a contagem é no banco — consistente).
+- Sem retomada de decisões presas em `EXECUTING` após crash (auditoria explícita, sem scheduler).
+
+### Commit
+- `feat(v3): add ai behavior foundation`.
+
+### Próximo passo
+- Fase 10 (somente após validação desta fase).

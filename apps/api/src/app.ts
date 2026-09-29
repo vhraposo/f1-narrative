@@ -62,6 +62,7 @@ import universeInitRoutes from "./modules/universe-init/universe-init.routes.js"
 import { profileRoutes } from "./modules/profile/profile.routes.js";
 import { mediaRoutes } from "./modules/media/media.routes.js";
 import newsRoutes from "./modules/news/news.routes.js";
+import aiBehaviorRoutes from "./modules/ai-behavior/ai-behavior.routes.js";
 import type { StorageProvider } from "./infrastructure/storage/storage-provider.js";
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
@@ -143,6 +144,9 @@ export function buildApp(
   void app.register(profileRoutes, { storageProvider });
   void app.register(mediaRoutes, { storageProvider });
   void app.register(newsRoutes);
+  void app.register(aiBehaviorRoutes, {
+    provider: generationProvider ?? nullProvider,
+  });
   void app.register(teamPerformanceRoutes);
   void app.register(driverAttributeRoutes);
   void app.register(simulationRoutes);

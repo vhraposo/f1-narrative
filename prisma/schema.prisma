@@ -220,6 +220,7 @@ model Universe {
   bindingSeasons       ExternalBindingSeason[]
   bindingRaces         ExternalBindingRace[]
   bindingCircuits      ExternalBindingCircuit[]
+  aiDecisions          AiDecision[]
   bindingDriverSeasons ExternalBindingDriverSeason[]
   bindingResults       ExternalBindingResult[]
   bindingStandings     ExternalBindingStanding[]
@@ -314,6 +315,7 @@ model Character {
   messages                 Message[]
   memoryMemberships        MemoryCharacter[]
   eventMemberships         EventCharacter[]
+  aiDecisions              AiDecision[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1451,6 +1453,47 @@ model CharacterSchedule {
   createdAt DateTime @default(now())
 
   @@index([characterId, startsAt])
+}
+
+enum AiDecisionStatus {
+  NO_ACTION
+  DECIDED
+  EXECUTING
+  EXECUTED
+  REJECTED
+  FAILED
+}
+
+enum AiActionType {
+  NO_ACTION
+  SEND_MESSAGE
+  CREATE_EVENT
+}
+
+/// Auditoria de decisão comportamental de um Character AI (Universe-scoped).
+/// Sem prompts/contexto completo: apenas referência mínima e resultado.
+model AiDecision {
+  id          String    @id @default(uuid()) @db.Uuid
+  universeId  String    @db.Uuid
+  universe    Universe  @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  characterId String    @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  status      AiDecisionStatus
+  actionType  AiActionType     @default(NO_ACTION)
+  conversationId     String?   @db.Uuid
+  reason             String?
+  contextVersion     String
+  policyCode         String?
+  executedMessageId  String?   @db.Uuid
+  executedEventId    String?   @db.Uuid
+  metadata           Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([universeId, characterId, createdAt])
+  @@index([characterId, status, actionType, createdAt])
 }
 
 /// Preferências de domínio do usuário que não pertencem ao Better Auth

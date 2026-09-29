@@ -136,6 +136,9 @@ beforeEach(() => {
       };
     }
     if (path === "/api/characters/c1/schedule") return { schedules: [] };
+    if (path.startsWith("/api/ai-behavior/decisions")) {
+      return { decisions: [] };
+    }
     throw new ApiError("Não encontrado", 404);
   });
 
