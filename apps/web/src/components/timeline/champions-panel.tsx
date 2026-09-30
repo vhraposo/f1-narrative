@@ -30,7 +30,9 @@ import {
   usePreviewChampionChange,
 } from "@/hooks/use-timeline";
 import {
+  CHAMPION_BLOCKED_REASONS,
   CHAMPION_STATE_LABELS,
+  type ChampionBlockedReason,
   type ChampionChangePreview,
   type ChampionEntry,
   type ChampionState,
@@ -95,7 +97,7 @@ function EditChampionDialog({
   entry,
   onClose,
 }: {
-  entry: ChampionEntry;
+  entry: ChampionEntry & { seasonId: string };
   onClose: () => void;
 }) {
   const driversQuery = useDrivers();
@@ -238,7 +240,7 @@ function RestoreChampionDialog({
   entry,
   onClose,
 }: {
-  entry: ChampionEntry;
+  entry: ChampionEntry & { seasonId: string };
   onClose: () => void;
 }) {
   const previewMutation = usePreviewChampionChange();
@@ -344,6 +346,64 @@ function RestoreChampionDialog({
   );
 }
 
+function BlockedChampionDialog({
+  entry,
+  onClose,
+  onOpenTimeline,
+}: {
+  entry: ChampionEntry;
+  onClose: () => void;
+  onOpenTimeline?: (seasonId: string) => void;
+}) {
+  const reason: ChampionBlockedReason =
+    entry.blockedReason ?? "SEASON_NOT_IN_UNIVERSE";
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Campeão não editável</DialogTitle>
+          <DialogDescription>
+            Temporada {entry.year} · somente leitura neste Universe
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">Campeão da fonte</span>
+            <span className="font-medium">{championName(entry.externalChampion)}</span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">Campeão do Universe</span>
+            <span className="font-medium">{championName(entry.universeChampion)}</span>
+          </div>
+          <p className="text-sm text-foreground">{CHAMPION_BLOCKED_REASONS[reason]}</p>
+          {reason === "DERIVED_CHAMPION" && (
+            <p className="text-xs text-muted-foreground">
+              Corrija a origem esportiva (resultados/classificação) pela Linha do
+              Tempo; um override independente deixaria standings e campeão
+              inconsistentes.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Fechar
+          </Button>
+          {reason === "DERIVED_CHAMPION" && entry.seasonId && onOpenTimeline && (
+            <Button
+              onClick={() => {
+                onOpenTimeline(entry.seasonId as string);
+                onClose();
+              }}
+            >
+              Editar resultados na Linha do Tempo
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ChampionDetailSection({
   seasonId,
   onClose,
@@ -419,13 +479,18 @@ function ChampionDetailSection({
   );
 }
 
-export function ChampionsPanel() {
+export function ChampionsPanel({
+  onOpenTimeline,
+}: {
+  onOpenTimeline?: (seasonId: string) => void;
+}) {
   const championsQuery = useChampions();
   const [yearFilter, setYearFilter] = useState("");
   const [onlyDivergent, setOnlyDivergent] = useState(false);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
   const [editEntry, setEditEntry] = useState<ChampionEntry | null>(null);
   const [restoreEntry, setRestoreEntry] = useState<ChampionEntry | null>(null);
+  const [blockedEntry, setBlockedEntry] = useState<ChampionEntry | null>(null);
 
   const entries = championsQuery.data ?? [];
   const yearOptions = useMemo(
@@ -526,9 +591,13 @@ export function ChampionsPanel() {
               <tbody className="divide-y divide-border">
                 {filtered.map((entry) => (
                   <tr
-                    key={entry.seasonId}
-                    className="cursor-pointer hover:bg-accent/30"
-                    onClick={() => setSelectedSeasonId(entry.seasonId)}
+                    key={entry.seasonId ?? `year-${entry.year}`}
+                    className={
+                      entry.seasonId ? "cursor-pointer hover:bg-accent/30" : ""
+                    }
+                    onClick={() =>
+                      entry.seasonId && setSelectedSeasonId(entry.seasonId)
+                    }
                   >
                     <td className="px-4 py-3 font-semibold tabular-nums text-foreground">
                       {entry.year}
@@ -537,7 +606,15 @@ export function ChampionsPanel() {
                       {championName(entry.externalChampion)}
                     </td>
                     <td className="px-4 py-3 text-foreground/90">
-                      {championName(entry.universeChampion)}
+                      {entry.universeChampion ? (
+                        championName(entry.universeChampion)
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {entry.blockedReason
+                            ? CHAMPION_BLOCKED_REASONS[entry.blockedReason]
+                            : "—"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <Badge tone={stateTone(entry.state)}>
@@ -549,18 +626,18 @@ export function ChampionsPanel() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          disabled={!entry.canEdit}
                           aria-label={`Editar campeão de ${entry.year}`}
                           title={
                             entry.canEdit
                               ? `Editar campeão de ${entry.year}`
-                              : entry.blockedReason === "DERIVED_CHAMPION"
-                                ? "O campeão desta temporada é derivado dos resultados; corrija os resultados pela Linha do Tempo."
+                              : entry.blockedReason
+                                ? CHAMPION_BLOCKED_REASONS[entry.blockedReason]
                                 : "Edição não disponível para esta temporada."
                           }
                           onClick={(event) => {
                             event.stopPropagation();
-                            setEditEntry(entry);
+                            if (entry.canEdit) setEditEntry(entry);
+                            else setBlockedEntry(entry);
                           }}
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -596,16 +673,23 @@ export function ChampionsPanel() {
         />
       )}
 
-      {editEntry && (
+      {editEntry && editEntry.seasonId && (
         <EditChampionDialog
-          entry={editEntry}
+          entry={{ ...editEntry, seasonId: editEntry.seasonId }}
           onClose={() => setEditEntry(null)}
         />
       )}
-      {restoreEntry && (
+      {restoreEntry && restoreEntry.seasonId && (
         <RestoreChampionDialog
-          entry={restoreEntry}
+          entry={{ ...restoreEntry, seasonId: restoreEntry.seasonId }}
           onClose={() => setRestoreEntry(null)}
+        />
+      )}
+      {blockedEntry && (
+        <BlockedChampionDialog
+          entry={blockedEntry}
+          onClose={() => setBlockedEntry(null)}
+          onOpenTimeline={onOpenTimeline}
         />
       )}
     </div>

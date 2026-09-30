@@ -11,6 +11,7 @@ type TimelineTab = "history" | "champions";
 
 export default function TimelinePage() {
   const [tab, setTab] = useState<TimelineTab>("history");
+  const [historySeasonId, setHistorySeasonId] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -43,7 +44,19 @@ export default function TimelinePage() {
           Campeões
         </Button>
       </div>
-      {tab === "history" ? <TimelineView /> : <ChampionsPanel />}
+      {tab === "history" ? (
+        <TimelineView
+          key={historySeasonId ?? "all"}
+          initialSeasonId={historySeasonId ?? undefined}
+        />
+      ) : (
+        <ChampionsPanel
+          onOpenTimeline={(seasonId) => {
+            setHistorySeasonId(seasonId);
+            setTab("history");
+          }}
+        />
+      )}
     </div>
   );
 }

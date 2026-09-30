@@ -11,10 +11,10 @@ let userA: { id: string; cookie: string };
 let userB: { id: string; cookie: string };
 let universeAId: string;
 let universeBId: string;
-let season2110Id: string;
-let season2111Id: string;
-let season2113Id: string;
-let season2114Id: string;
+let season2010Id: string;
+let season2011Id: string;
+let season2013Id: string;
+let season2014Id: string;
 let landoProfileId: string;
 let alicyaProfileId: string;
 
@@ -100,34 +100,34 @@ beforeAll(async () => {
   await prisma.externalStanding.create({
     data: {
       source: SOURCE,
-      seasonYear: 2110,
+      seasonYear: 2010,
       externalDriverId: extLando.id,
       position: 1,
       points: 300,
       wins: 8,
-      contentHash: "s2110",
+      contentHash: "s2010",
     },
   });
   await prisma.externalStanding.create({
     data: {
       source: SOURCE,
-      seasonYear: 2111,
+      seasonYear: 2011,
       externalDriverId: extLando.id,
       position: 1,
       points: 320,
       wins: 9,
-      contentHash: "s2111",
+      contentHash: "s2011",
     },
   });
   await prisma.externalStanding.create({
     data: {
       source: SOURCE,
-      seasonYear: 2113,
+      seasonYear: 2013,
       externalDriverId: extAlicya.id,
       position: 1,
       points: 200,
       wins: 5,
-      contentHash: "s2113",
+      contentHash: "s2013",
     },
   });
   await prisma.externalBindingDriver.create({
@@ -147,40 +147,40 @@ beforeAll(async () => {
     },
   });
 
-  season2110Id = (
+  season2010Id = (
     await prisma.season.create({
-      data: { universeId: universeAId, year: 2110, name: "2110", status: "FINISHED" },
+      data: { universeId: universeAId, year: 2010, name: "2010", status: "FINISHED" },
     })
   ).id;
-  season2111Id = (
+  season2011Id = (
     await prisma.season.create({
-      data: { universeId: universeAId, year: 2111, name: "2111", status: "FINISHED" },
+      data: { universeId: universeAId, year: 2011, name: "2011", status: "FINISHED" },
     })
   ).id;
-  season2113Id = (
+  season2013Id = (
     await prisma.season.create({
-      data: { universeId: universeAId, year: 2113, name: "2113", status: "PRE_SEASON" },
+      data: { universeId: universeAId, year: 2013, name: "2013", status: "PRE_SEASON" },
     })
   ).id;
-  season2114Id = (
+  season2014Id = (
     await prisma.season.create({
-      data: { universeId: universeAId, year: 2114, name: "2114", status: "PRE_SEASON" },
+      data: { universeId: universeAId, year: 2014, name: "2014", status: "PRE_SEASON" },
     })
   ).id;
 
   await prisma.championshipStanding.create({
-    data: { seasonId: season2110Id, driverProfileId: landoProfileId, position: 1, points: 300, wins: 8, podiums: 12 },
+    data: { seasonId: season2010Id, driverProfileId: landoProfileId, position: 1, points: 300, wins: 8, podiums: 12 },
   });
   await prisma.championshipStanding.create({
-    data: { seasonId: season2110Id, driverProfileId: alicyaProfileId, position: 2, points: 250, wins: 5, podiums: 10 },
+    data: { seasonId: season2010Id, driverProfileId: alicyaProfileId, position: 2, points: 250, wins: 5, podiums: 10 },
   });
 
   const race = await prisma.race.create({
     data: {
-      seasonId: season2111Id,
-      name: "GP Champ 2111",
+      seasonId: season2011Id,
+      name: "GP Champ 2011",
       round: 1,
-      date: new Date("2111-03-01T00:00:00.000Z"),
+      date: new Date("2011-03-01T00:00:00.000Z"),
       status: "FINISHED",
     },
   });
@@ -188,12 +188,12 @@ beforeAll(async () => {
     data: { raceId: race.id, driverProfileId: landoProfileId, position: 1, grid: 1, points: 25, status: "Finished" },
   });
   await prisma.championshipStanding.create({
-    data: { seasonId: season2111Id, driverProfileId: landoProfileId, position: 1, points: 25, wins: 1, podiums: 1 },
+    data: { seasonId: season2011Id, driverProfileId: landoProfileId, position: 1, points: 25, wins: 1, podiums: 1 },
   });
 
-  const worldDate = new Date("2113-01-01T00:00:00.000Z");
+  const worldDate = new Date("2013-01-01T00:00:00.000Z");
   await prisma.worldState.create({
-    data: { universeId: universeAId, key: "default", currentDate: worldDate, currentSeasonId: season2113Id },
+    data: { universeId: universeAId, key: "default", currentDate: worldDate, currentSeasonId: season2013Id },
   });
   await prisma.timelineEvent.create({
     data: {
@@ -203,7 +203,7 @@ beforeAll(async () => {
       kind: "WORLD_ADVANCED",
       payload: {
         currentDate: worldDate.toISOString(),
-        currentSeasonId: season2113Id,
+        currentSeasonId: season2013Id,
         currentRaceId: null,
         currentSession: null,
       },
@@ -246,46 +246,57 @@ describe("campeões — leitura", () => {
       origin: string;
       canEdit: boolean;
       blockedReason: string | null;
+      seasonId: string | null;
       externalChampion: { name: string } | null;
       universeChampion: { name: string } | null;
     }>;
-    expect(champions.map((entry) => entry.year)).toEqual([2114, 2113, 2111, 2110]);
+    expect(champions).toHaveLength(26);
+    expect(champions[0]?.year).toBe(2025);
+    expect(champions[champions.length - 1]?.year).toBe(2000);
+    expect(champions.map((entry) => entry.year)).not.toContain(2026);
+    expect(champions.map((entry) => entry.year)).not.toContain(1999);
 
-    const match = champions.find((entry) => entry.year === 2110)!;
+    const match = champions.find((entry) => entry.year === 2010)!;
     expect(match.state).toBe("MATCH");
     expect(match.origin).toBe("STANDING");
     expect(match.canEdit).toBe(true);
     expect(match.externalChampion!.name).toContain("Lando");
     expect(match.universeChampion!.name).toContain("Lando");
 
-    const derived = champions.find((entry) => entry.year === 2111)!;
+    const derived = champions.find((entry) => entry.year === 2011)!;
     expect(derived.origin).toBe("DERIVED");
     expect(derived.canEdit).toBe(false);
     expect(derived.blockedReason).toBe("DERIVED_CHAMPION");
 
-    const externalOnly = champions.find((entry) => entry.year === 2113)!;
+    const externalOnly = champions.find((entry) => entry.year === 2013)!;
     expect(externalOnly.state).toBe("EXTERNAL_ONLY");
     expect(externalOnly.universeChampion).toBeNull();
     expect(externalOnly.canEdit).toBe(false);
+    expect(externalOnly.blockedReason).toBe("SEASON_IN_PROGRESS");
 
-    const none = champions.find((entry) => entry.year === 2114)!;
+    const none = champions.find((entry) => entry.year === 2014)!;
     expect(none.state).toBe("NONE");
     expect(none.externalChampion).toBeNull();
     expect(none.universeChampion).toBeNull();
+    expect(none.blockedReason).toBe("SEASON_IN_PROGRESS");
+
+    const noSeason = champions.find((entry) => entry.year === 2005)!;
+    expect(noSeason.seasonId).toBeNull();
+    expect(noSeason.blockedReason).toBe("SEASON_NOT_IN_UNIVERSE");
   });
 
   it("2) detalhe retorna histórico e 404 leak-safe", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/timeline/champions/${season2110Id}`,
+      url: `/api/timeline/champions/${season2010Id}`,
       headers: auth(userA.cookie),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().champion.year).toBe(2110);
+    expect(res.json().champion.year).toBe(2010);
 
     const foreign = await app.inject({
       method: "GET",
-      url: `/api/timeline/champions/${season2110Id}`,
+      url: `/api/timeline/champions/${season2010Id}`,
       headers: auth(userB.cookie),
     });
     expect(foreign.statusCode).toBe(404);
@@ -304,11 +315,20 @@ describe("campeões — leitura", () => {
       headers: auth(userB.cookie),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().champions).toEqual([]);
+    const champions = res.json().champions as Array<{
+      year: number;
+      universeChampion: unknown;
+      origin: string;
+      seasonId: string | null;
+    }>;
+    expect(champions).toHaveLength(26);
+    expect(champions.every((entry) => entry.universeChampion === null)).toBe(true);
+    expect(champions.every((entry) => entry.seasonId === null)).toBe(true);
+    expect(champions.every((entry) => entry.origin === "NONE")).toBe(true);
 
     const preview = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/preview`,
+      url: `/api/timeline/champions/${season2010Id}/preview`,
       headers: auth(userB.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId },
     });
@@ -320,13 +340,13 @@ describe("campeões — edição", () => {
   it("4) preview é zero-write e determinístico", async () => {
     const eventsBefore = await prisma.timelineEvent.count({ where: { universeId: universeAId } });
     const standingsBefore = await prisma.championshipStanding.findMany({
-      where: { seasonId: season2110Id },
+      where: { seasonId: season2010Id },
       orderBy: { driverProfileId: "asc" },
     });
 
     const first = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/preview`,
+      url: `/api/timeline/champions/${season2010Id}/preview`,
       headers: auth(userA.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId },
     });
@@ -338,7 +358,7 @@ describe("campeões — edição", () => {
 
     const second = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/preview`,
+      url: `/api/timeline/champions/${season2010Id}/preview`,
       headers: auth(userA.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId },
     });
@@ -347,7 +367,7 @@ describe("campeões — edição", () => {
     expect(await prisma.timelineEvent.count({ where: { universeId: universeAId } })).toBe(eventsBefore);
     expect(
       await prisma.championshipStanding.findMany({
-        where: { seasonId: season2110Id },
+        where: { seasonId: season2010Id },
         orderBy: { driverProfileId: "asc" },
       }),
     ).toEqual(standingsBefore);
@@ -356,7 +376,7 @@ describe("campeões — edição", () => {
   it("5) edit aplica STANDING_CORRECTED atomicamente e mantém histórico", async () => {
     const preview = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/preview`,
+      url: `/api/timeline/champions/${season2010Id}/preview`,
       headers: auth(userA.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId },
     });
@@ -364,7 +384,7 @@ describe("campeões — edição", () => {
 
     const apply = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/apply`,
+      url: `/api/timeline/champions/${season2010Id}/apply`,
       headers: auth(userA.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId, previewToken: token },
     });
@@ -380,14 +400,14 @@ describe("campeões — edição", () => {
       headers: auth(userA.cookie),
     });
     const entry = (list.json().champions as Array<{ year: number; state: string; canRestore: boolean }>).find(
-      (champion) => champion.year === 2110,
+      (champion) => champion.year === 2010,
     )!;
     expect(entry.state).toBe("DIVERGENT");
     expect(entry.canRestore).toBe(true);
 
     const detail = await app.inject({
       method: "GET",
-      url: `/api/timeline/champions/${season2110Id}`,
+      url: `/api/timeline/champions/${season2010Id}`,
       headers: auth(userA.cookie),
     });
     expect(detail.json().history).toHaveLength(2);
@@ -396,7 +416,7 @@ describe("campeões — edição", () => {
   it("6) edição em temporada DERIVED é bloqueada", async () => {
     const preview = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2111Id}/preview`,
+      url: `/api/timeline/champions/${season2011Id}/preview`,
       headers: auth(userA.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId },
     });
@@ -407,7 +427,7 @@ describe("campeões — edição", () => {
   it("7) restore volta a coincidir com a fonte sem apagar histórico", async () => {
     const preview = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/preview`,
+      url: `/api/timeline/champions/${season2010Id}/preview`,
       headers: auth(userA.cookie),
       payload: { mode: "RESTORE" },
     });
@@ -418,7 +438,7 @@ describe("campeões — edição", () => {
 
     const apply = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/apply`,
+      url: `/api/timeline/champions/${season2010Id}/apply`,
       headers: auth(userA.cookie),
       payload: { mode: "RESTORE", previewToken: token },
     });
@@ -431,14 +451,14 @@ describe("campeões — edição", () => {
       headers: auth(userA.cookie),
     });
     const entry = (list.json().champions as Array<{ year: number; state: string; canRestore: boolean }>).find(
-      (champion) => champion.year === 2110,
+      (champion) => champion.year === 2010,
     )!;
     expect(entry.state).toBe("MATCH");
     expect(entry.canRestore).toBe(false);
 
     const detail = await app.inject({
       method: "GET",
-      url: `/api/timeline/champions/${season2110Id}`,
+      url: `/api/timeline/champions/${season2010Id}`,
       headers: auth(userA.cookie),
     });
     expect(detail.json().history).toHaveLength(4);
@@ -447,7 +467,7 @@ describe("campeões — edição", () => {
   it("8) preview stale é rejeitado sem aplicação parcial", async () => {
     const preview = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/preview`,
+      url: `/api/timeline/champions/${season2010Id}/preview`,
       headers: auth(userA.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId },
     });
@@ -455,13 +475,13 @@ describe("campeões — edição", () => {
 
     const freshPreview = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/preview`,
+      url: `/api/timeline/champions/${season2010Id}/preview`,
       headers: auth(userA.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId },
     });
     const applied = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/apply`,
+      url: `/api/timeline/champions/${season2010Id}/apply`,
       headers: auth(userA.cookie),
       payload: {
         mode: "EDIT",
@@ -473,7 +493,7 @@ describe("campeões — edição", () => {
 
     const stale = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2110Id}/apply`,
+      url: `/api/timeline/champions/${season2010Id}/apply`,
       headers: auth(userA.cookie),
       payload: { mode: "EDIT", driverProfileId: alicyaProfileId, previewToken: staleToken },
     });
@@ -497,26 +517,52 @@ describe("campeões — integridade", () => {
     expect(bindings).toBe(2);
   });
 
-  it("10) UNIVERSE_ONLY aparece quando a fonte não tem campeão para o ano", async () => {
-    await prisma.championshipStanding.create({
-      data: { seasonId: season2114Id, driverProfileId: landoProfileId, position: 1, points: 10, wins: 0, podiums: 0 },
+  it("10) in-progress não vira campeão; UNIVERSE_ONLY sem fonte; 2026 fora da lista", async () => {
+    const season2012 = await prisma.season.create({
+      data: { universeId: universeAId, year: 2012, name: "2012", status: "FINISHED" },
     });
+    await prisma.championshipStanding.create({
+      data: { seasonId: season2012.id, driverProfileId: landoProfileId, position: 1, points: 240, wins: 6, podiums: 9 },
+    });
+    await prisma.championshipStanding.create({
+      data: { seasonId: season2014Id, driverProfileId: landoProfileId, position: 1, points: 10, wins: 0, podiums: 0 },
+    });
+    const season2026 = await prisma.season.create({
+      data: { universeId: universeAId, year: 2026, name: "2026", status: "PRE_SEASON" },
+    });
+    await prisma.championshipStanding.create({
+      data: { seasonId: season2026.id, driverProfileId: alicyaProfileId, position: 1, points: 5, wins: 0, podiums: 0 },
+    });
+
     const res = await app.inject({
       method: "GET",
       url: "/api/timeline/champions",
       headers: auth(userA.cookie),
     });
-    const entry = (res.json().champions as Array<{ year: number; state: string; origin: string }>).find(
-      (champion) => champion.year === 2114,
-    )!;
-    expect(entry.state).toBe("UNIVERSE_ONLY");
-    expect(entry.origin).toBe("STANDING");
+    const champions = res.json().champions as Array<{
+      year: number;
+      state: string;
+      origin: string;
+      universeChampion: unknown;
+      blockedReason: string | null;
+    }>;
+    expect(champions).toHaveLength(26);
+    expect(champions.map((entry) => entry.year)).not.toContain(2026);
+
+    const universeOnly = champions.find((champion) => champion.year === 2012)!;
+    expect(universeOnly.state).toBe("UNIVERSE_ONLY");
+    expect(universeOnly.origin).toBe("STANDING");
+
+    const inProgress = champions.find((champion) => champion.year === 2014)!;
+    expect(inProgress.universeChampion).toBeNull();
+    expect(inProgress.state).toBe("NONE");
+    expect(inProgress.blockedReason).toBe("SEASON_IN_PROGRESS");
   });
 
   it("11) FONTE externa ausente bloqueia restore com erro determinístico", async () => {
     const res = await app.inject({
       method: "POST",
-      url: `/api/timeline/champions/${season2114Id}/preview`,
+      url: `/api/timeline/champions/${season2014Id}/preview`,
       headers: auth(userA.cookie),
       payload: { mode: "RESTORE" },
     });

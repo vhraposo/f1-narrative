@@ -12,6 +12,9 @@ import { lockUniverseTimeline, TimelineError, type Tx } from "./timeline.service
 
 const WORLD_KEY = "default";
 
+export const HISTORICAL_CHAMPIONS_MIN_SEASON = 2000;
+export const HISTORICAL_CHAMPIONS_MAX_SEASON = 2025;
+
 export type ChampionsState =
   | "MATCH"
   | "DIVERGENT"
@@ -34,8 +37,13 @@ export type UniverseChampionDescriptor = {
   externalDriverId: string | null;
 };
 
+export type ChampionBlockedReason =
+  | "DERIVED_CHAMPION"
+  | "SEASON_IN_PROGRESS"
+  | "SEASON_NOT_IN_UNIVERSE";
+
 export type ChampionEntry = {
-  seasonId: string;
+  seasonId: string | null;
   year: number;
   externalChampion: ExternalChampionDescriptor | null;
   universeChampion: UniverseChampionDescriptor | null;
@@ -43,7 +51,7 @@ export type ChampionEntry = {
   origin: ChampionOrigin;
   canEdit: boolean;
   canRestore: boolean;
-  blockedReason: "DERIVED_CHAMPION" | null;
+  blockedReason: ChampionBlockedReason | null;
   restoreDriverProfileId: string | null;
 };
 
@@ -125,15 +133,28 @@ function pickChampion(
 export async function listUniverseChampions(
   universeId: string,
 ): Promise<ChampionEntry[]> {
-  const seasons = await prisma.season.findMany({
-    where: { universeId },
-    select: { id: true, year: true },
-    orderBy: [{ year: "desc" }],
-  });
-  if (seasons.length === 0) return [];
-  const years = seasons.map((season) => season.year);
+  const [seasons, worldState] = await Promise.all([
+    prisma.season.findMany({
+      where: { universeId },
+      select: { id: true, year: true, status: true },
+    }),
+    prisma.worldState.findUnique({
+      where: { universeId_key: { universeId, key: WORLD_KEY } },
+      select: { currentDate: true },
+    }),
+  ]);
+  const worldYear = worldState?.currentDate.getUTCFullYear() ?? null;
+  const seasonByYear = new Map(seasons.map((season) => [season.year, season]));
+  const years: number[] = [];
+  for (
+    let year = HISTORICAL_CHAMPIONS_MAX_SEASON;
+    year >= HISTORICAL_CHAMPIONS_MIN_SEASON;
+    year -= 1
+  ) {
+    years.push(year);
+  }
 
-  const [standings, results, externalStandings, seasonBindings, driverBindings, profiles] =
+  const [standings, results, externalStandings, driverBindings, profiles] =
     await Promise.all([
       prisma.championshipStanding.findMany({
         where: { season: { universeId } },
@@ -159,10 +180,6 @@ export async function listUniverseChampions(
           externalDriver: { select: { name: true } },
         },
         orderBy: [{ source: "asc" }],
-      }),
-      prisma.externalBindingSeason.findMany({
-        where: { universeId },
-        select: { seasonId: true, externalSeason: { select: { source: true } } },
       }),
       prisma.externalBindingDriver.findMany({
         where: { universeId },
@@ -212,9 +229,6 @@ export async function listUniverseChampions(
     }
   }
 
-  const sourceBySeason = new Map(
-    seasonBindings.map((binding) => [binding.seasonId, binding.externalSeason.source]),
-  );
   const externalIdByCharacter = new Map(
     driverBindings.map((binding) => [binding.characterId, binding.externalDriverId]),
   );
@@ -227,9 +241,15 @@ export async function listUniverseChampions(
     if (profileId) profileByExternalDriver.set(binding.externalDriverId, profileId);
   }
 
-  return seasons.map((season) => {
-    const rows = standingsBySeason.get(season.id) ?? [];
-    const leader = pickChampion(rows);
+  return years.map((year) => {
+    const season = seasonByYear.get(year) ?? null;
+    const seasonId = season?.id ?? null;
+    const seasonCompleted =
+      season !== null &&
+      (season.status === "FINISHED" || (worldYear !== null && year < worldYear));
+
+    const rows = season ? (standingsBySeason.get(season.id) ?? []) : [];
+    const leader = seasonCompleted ? pickChampion(rows) : null;
     const universeChampion: UniverseChampionDescriptor | null = leader
       ? {
           driverProfileId: leader.driverProfileId,
@@ -239,28 +259,22 @@ export async function listUniverseChampions(
         }
       : null;
 
-    const preferredSource = sourceBySeason.get(season.id);
-    const candidates = externalStandings.filter(
-      (standing) => standing.seasonYear === season.year,
-    );
-    const externalRow =
-      candidates.find((standing) => standing.source === preferredSource) ??
-      candidates[0] ??
-      null;
+    const externalRow = externalByYear.get(String(year)) ?? null;
     const externalChampion: ExternalChampionDescriptor | null = externalRow
       ? {
           externalDriverId: externalRow.externalDriverId,
-          name: externalRow.externalDriver.name,
+          name: externalRow.name,
           source: externalRow.source,
         }
       : null;
 
-    const hasResults = (resultsBySeason.get(season.id) ?? 0) > 0;
-    const origin: ChampionOrigin = hasResults
-      ? "DERIVED"
-      : universeChampion
-        ? "STANDING"
-        : "NONE";
+    const hasResults = season ? (resultsBySeason.get(season.id) ?? 0) > 0 : false;
+    const origin: ChampionOrigin =
+      seasonCompleted && hasResults
+        ? "DERIVED"
+        : universeChampion
+          ? "STANDING"
+          : "NONE";
 
     let state: ChampionsState;
     if (externalChampion && universeChampion) {
@@ -276,21 +290,29 @@ export async function listUniverseChampions(
       state = "NONE";
     }
 
-    const canEdit = origin === "STANDING";
+    const blockedReason: ChampionBlockedReason | null =
+      season === null
+        ? "SEASON_NOT_IN_UNIVERSE"
+        : !seasonCompleted
+          ? "SEASON_IN_PROGRESS"
+          : origin === "DERIVED"
+            ? "DERIVED_CHAMPION"
+            : null;
+    const canEdit = season !== null && seasonCompleted && origin === "STANDING";
     const restoreDriverProfileId = externalChampion
       ? (profileByExternalDriver.get(externalChampion.externalDriverId) ?? null)
       : null;
 
     return {
-      seasonId: season.id,
-      year: season.year,
+      seasonId,
+      year,
       externalChampion,
       universeChampion,
       state,
       origin,
       canEdit,
       canRestore: canEdit && state === "DIVERGENT" && restoreDriverProfileId !== null,
-      blockedReason: origin === "DERIVED" ? "DERIVED_CHAMPION" : null,
+      blockedReason,
       restoreDriverProfileId,
     } satisfies ChampionEntry;
   });

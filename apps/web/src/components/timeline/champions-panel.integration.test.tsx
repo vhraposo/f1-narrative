@@ -61,7 +61,7 @@ const DIVERGENT = makeEntry({
   restoreDriverProfileId: "d1",
 });
 const DERIVED = makeEntry({
-  seasonId: "s3",
+  seasonId: "s-2097",
   year: 2097,
   origin: "DERIVED",
   canEdit: false,
@@ -159,20 +159,33 @@ describe("ChampionsPanel", () => {
     expect(await screen.findByText("Nenhum campeão encontrado")).toBeDefined();
   });
 
-  it("3) lista anos com estados e desabilita edição derivada", async () => {
-    renderWithClient(<ChampionsPanel />);
+  it("3) lista anos com estados; derivado abre explicação e editável abre modal", async () => {
+    const user = userEvent.setup();
+    const onOpenTimeline = vi.fn();
+    renderWithClient(<ChampionsPanel onOpenTimeline={onOpenTimeline} />);
     expect(await screen.findByText("2099")).toBeDefined();
     expect(screen.getByText("2098")).toBeDefined();
     expect(screen.getByText("2097")).toBeDefined();
     expect(screen.getAllByText("Original").length).toBeGreaterThan(0);
     expect(screen.getByText("Divergente")).toBeDefined();
-    const disabledEdit = screen.getByRole("button", { name: "Editar campeão de 2097" });
-    expect((disabledEdit as HTMLButtonElement).disabled).toBe(true);
-    const enabledEdit = screen.getByRole("button", { name: "Editar campeão de 2099" });
-    expect((enabledEdit as HTMLButtonElement).disabled).toBe(false);
     expect(
       screen.getByRole("button", { name: "Restaurar campeão de 2098 da fonte" }),
     ).toBeDefined();
+
+    const derivedEdit = screen.getByRole("button", { name: "Editar campeão de 2097" });
+    expect((derivedEdit as HTMLButtonElement).disabled).toBe(false);
+    await user.click(derivedEdit);
+    expect(await screen.findByText("Campeão não editável")).toBeDefined();
+    expect(
+      screen.getByText(/derivado dos resultados e da classificação/),
+    ).toBeDefined();
+    await user.click(
+      screen.getByRole("button", { name: "Editar resultados na Linha do Tempo" }),
+    );
+    expect(onOpenTimeline).toHaveBeenCalledWith("s-2097");
+
+    await user.click(screen.getByRole("button", { name: "Editar campeão de 2099" }));
+    expect(await screen.findByText("Editar campeão mundial")).toBeDefined();
   });
 
   it("4) filtra por temporada e somente divergentes", async () => {

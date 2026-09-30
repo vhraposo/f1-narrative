@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -157,7 +157,34 @@ beforeEach(() => {
     }
     if (path === "/api/drivers") return { drivers: [] };
     if (path === "/api/teams") return { teams: [] };
-    if (path === "/api/seasons/s1/races") return { races: [] };
+    if (path === "/api/seasons/s1/races") {
+      return {
+        races: [
+          {
+            id: "r1",
+            seasonId: "s1",
+            round: 1,
+            name: "GP Sintético 1",
+            date: "2087-03-01T00:00:00.000Z",
+            status: "FINISHED",
+            sprintOverride: null,
+            sprintExternal: null,
+            circuit: null,
+          },
+          {
+            id: "r2",
+            seasonId: "s1",
+            round: 2,
+            name: "GP Sintético 2",
+            date: "2087-11-21T00:00:00.000Z",
+            status: "UPCOMING",
+            sprintOverride: null,
+            sprintExternal: null,
+            circuit: null,
+          },
+        ],
+      };
+    }
     if (path.startsWith("/api/timeline/events/")) return DETAIL;
     if (path.startsWith("/api/timeline/divergence")) {
       return { divergence: DIVERGENCE };
@@ -292,5 +319,63 @@ describe("TimelineView", () => {
     await screen.findByText("Resultado corrigido em GP Sintético 1: Piloto Um");
     expect(container.querySelector("pre")).toBeNull();
     expect(container.textContent).not.toContain("supersedesId");
+  });
+
+  it("9) filtros têm a opção Todas/Todos e restaurar remove o filtro", async () => {
+    const user = userEvent.setup();
+    renderWithClient(<TimelineView />);
+    await screen.findByText("Resultado corrigido em GP Sintético 1: Piloto Um");
+
+    await user.click(screen.getByRole("button", { name: "Temporada" }));
+    expect(await screen.findByRole("option", { name: "Todas" })).toBeDefined();
+    await user.click(await screen.findByRole("option", { name: "2087" }));
+    await waitFor(() => {
+      expect(
+        apiMock.get.mock.calls.some((call) => String(call[0]).includes("seasonId=s1")),
+      ).toBe(true);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Temporada" }));
+    await user.click(await screen.findByRole("option", { name: "Todas" }));
+    await waitFor(() => {
+      const lastTimelineCall = [...apiMock.get.mock.calls]
+        .map((call) => String(call[0]))
+        .filter((path) => path.startsWith("/api/timeline?"))
+        .pop();
+      expect(lastTimelineCall ?? "").not.toContain("seasonId=");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Tipo" }));
+    expect(await screen.findByRole("option", { name: "Todos" })).toBeDefined();
+  });
+
+  it("10) range de datas é derivado do calendário da temporada (sem hardcode)", async () => {
+    const user = userEvent.setup();
+    renderWithClient(<TimelineView />);
+    await screen.findByText("Resultado corrigido em GP Sintético 1: Piloto Um");
+
+    await user.click(screen.getByRole("button", { name: "Temporada" }));
+    await user.click(await screen.findByRole("option", { name: "2087" }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("De") as HTMLInputElement).value).toBe("2087-03-01");
+      expect((screen.getByLabelText("Até") as HTMLInputElement).value).toBe("2087-11-21");
+    });
+    await waitFor(() => {
+      expect(
+        apiMock.get.mock.calls.some(
+          (call) =>
+            String(call[0]).includes("from=2087-03-01") &&
+            String(call[0]).includes("to=2087-11-21"),
+        ),
+      ).toBe(true);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Temporada" }));
+    await user.click(await screen.findByRole("option", { name: "Todas" }));
+    await waitFor(() => {
+      expect((screen.getByLabelText("De") as HTMLInputElement).value).toBe("");
+      expect((screen.getByLabelText("Até") as HTMLInputElement).value).toBe("");
+    });
   });
 });

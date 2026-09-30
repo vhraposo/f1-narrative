@@ -320,8 +320,13 @@ export type UniverseChampionDescriptor = {
   externalDriverId: string | null;
 };
 
+export type ChampionBlockedReason =
+  | "DERIVED_CHAMPION"
+  | "SEASON_IN_PROGRESS"
+  | "SEASON_NOT_IN_UNIVERSE";
+
 export type ChampionEntry = {
-  seasonId: string;
+  seasonId: string | null;
   year: number;
   externalChampion: ExternalChampionDescriptor | null;
   universeChampion: UniverseChampionDescriptor | null;
@@ -329,8 +334,17 @@ export type ChampionEntry = {
   origin: "DERIVED" | "STANDING" | "NONE";
   canEdit: boolean;
   canRestore: boolean;
-  blockedReason: "DERIVED_CHAMPION" | null;
+  blockedReason: ChampionBlockedReason | null;
   restoreDriverProfileId: string | null;
+};
+
+export const CHAMPION_BLOCKED_REASONS: Record<ChampionBlockedReason, string> = {
+  DERIVED_CHAMPION:
+    "Este campeão é derivado dos resultados e da classificação desta temporada.",
+  SEASON_IN_PROGRESS:
+    "Temporada em andamento: o campeão só é definido ao final da temporada.",
+  SEASON_NOT_IN_UNIVERSE:
+    "Esta temporada ainda não existe no seu Universe.",
 };
 
 export type ChampionChangeMode = "EDIT" | "RESTORE";

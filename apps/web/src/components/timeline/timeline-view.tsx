@@ -1,7 +1,7 @@
 "use client";
 
 import { History, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { SectionHeading } from "@/components/home/section-heading";
 import { TimelineEventPanel } from "@/components/timeline/timeline-event-panel";
@@ -223,12 +223,16 @@ function DivergencePanel({ seasonId }: { seasonId: string }) {
   );
 }
 
-export function TimelineView() {
+export function TimelineView({
+  initialSeasonId,
+}: {
+  initialSeasonId?: string;
+} = {}) {
   const seasonsQuery = useSeasons();
   const teamsQuery = useTeams();
   const driversQuery = useDrivers();
 
-  const [seasonId, setSeasonId] = useState("");
+  const [seasonId, setSeasonId] = useState(initialSeasonId ?? "");
   const [raceId, setRaceId] = useState("");
   const [driverProfileId, setDriverProfileId] = useState("");
   const [teamId, setTeamId] = useState("");
@@ -238,13 +242,31 @@ export function TimelineView() {
   const [correctionsOnly, setCorrectionsOnly] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [divergenceOn, setDivergenceOn] = useState(false);
+  const autoRangeSeasonRef = useRef("");
 
   const racesQuery = useRaces(seasonId);
 
   useEffect(() => {
     setRaceId("");
     setDivergenceOn(false);
+    setFrom("");
+    setTo("");
   }, [seasonId]);
+
+  useEffect(() => {
+    if (!seasonId) return;
+    if (autoRangeSeasonRef.current === seasonId) return;
+    const dates = (racesQuery.data ?? [])
+      .map((race) => race.date)
+      .filter((date): date is string => typeof date === "string" && date.length >= 10)
+      .sort();
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    if (!first || !last) return;
+    autoRangeSeasonRef.current = seasonId;
+    setFrom(first.slice(0, 10));
+    setTo(last.slice(0, 10));
+  }, [seasonId, racesQuery.data]);
 
   const filters = useMemo<TimelineListFilters>(
     () => ({
@@ -263,25 +285,41 @@ export function TimelineView() {
 
   const timelineQuery = useTimeline(filters);
 
-  const seasonOptions = (seasonsQuery.data ?? []).map((season) => ({
-    value: season.id,
-    label: String(season.year),
-  }));
-  const raceOptions = (racesQuery.data ?? []).map((race) => ({
-    value: race.id,
-    label: race.round != null ? `R${race.round} · ${race.name}` : race.name,
-  }));
-  const driverOptions = (driversQuery.data ?? []).map((driver) => ({
-    value: driver.id,
-    label: driver.character.name,
-  }));
-  const teamOptions = (teamsQuery.data ?? []).map((team) => ({
-    value: team.id,
-    label: team.name,
-  }));
-  const kindOptions = Object.entries(TIMELINE_KIND_LABELS).map(
-    ([value, label]) => ({ value, label }),
-  );
+  const seasonOptions = [
+    { value: "", label: "Todas" },
+    ...(seasonsQuery.data ?? []).map((season) => ({
+      value: season.id,
+      label: String(season.year),
+    })),
+  ];
+  const raceOptions = [
+    { value: "", label: "Todas" },
+    ...(racesQuery.data ?? []).map((race) => ({
+      value: race.id,
+      label: race.round != null ? `R${race.round} · ${race.name}` : race.name,
+    })),
+  ];
+  const driverOptions = [
+    { value: "", label: "Todos" },
+    ...(driversQuery.data ?? []).map((driver) => ({
+      value: driver.id,
+      label: driver.character.name,
+    })),
+  ];
+  const teamOptions = [
+    { value: "", label: "Todas" },
+    ...(teamsQuery.data ?? []).map((team) => ({
+      value: team.id,
+      label: team.name,
+    })),
+  ];
+  const kindOptions = [
+    { value: "", label: "Todos" },
+    ...Object.entries(TIMELINE_KIND_LABELS).map(([value, label]) => ({
+      value,
+      label,
+    })),
+  ];
 
   const events = timelineQuery.data?.events ?? [];
 
