@@ -216,3 +216,23 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-053 — Evolução de persona apenas por ação explícita via `persona.service`, com auditoria na Timeline
 - **Decisão (design V3.14):** mudanças de persona no futuro passam exclusivamente pelo `persona.service` (único writer) e são auditadas por `TimelineEvent` `PERSONA_UPDATED` (state-neutral, payload mínimo), sem `PersonaSnapshot`, sem versionamento paralelo e sem escrita automática por Evolution engine ou AI Behavior. A Timeline histórica (V3.15) não reescreve persona diretamente: correções passam pelo serviço como ação de domínio.
 - **Consequência:** um único sistema temporal permanece (Timeline); persona é estado corrente do Character, não estado temporal reconstruído; V3.14 e V3.15 ficam desacopladas.
+
+## D-054 — `PersonaEvidence` é proposta humana de trait (`traitKey` + `proposedValue` obrigatórios)
+- **Decisão (V3.14.1):** a evidência carrega `traitKey` obrigatório e `proposedValue` obrigatório (≤200 chars); nenhum trait é derivado de `excerpt`, de LLM ou de transformação automática — a aprovação materializa o valor explicitamente proposto por humano.
+- **Consequência:** a transição `EVIDENCE → TRAIT` é sempre rastreável e nunca inventa valor; `excerpt` permanece contexto humano da fonte, nunca fonte de valor.
+
+## D-055 — Evidência autoritativa com ordenação determinística
+- **Decisão (V3.14.1):** `PersonaTrait.evidenceId` (opcional) aponta a evidência autoritativa quando `sourceKind = EVIDENCE`, com `ON DELETE SET NULL`. Autoridade entre evidências `APPROVED` do mesmo `traitKey`: `confidence DESC → publishedAt DESC (NULLS LAST) → createdAt DESC → id ASC`; ordem de aprovação não é critério. Múltiplas evidências `APPROVED` coexistem (a não autoritativa permanece como suporte).
+- **Consequência:** o valor aplicado e sua linhagem são determinísticos e independentes da ordem de aprovação/concorrência; a perda da evidência autoritativa não invalida o trait (SetNull) e permite reconciliação futura no service.
+
+## D-056 — Precedência `MANUAL > EVIDENCE`
+- **Decisão (V3.14.1):** editar manualmente um trait `EVIDENCE` converte a linha para `MANUAL` (value manual, `sourceKind = MANUAL`, `confidence = 1.0`, `evidenceId = null`). Aprovar evidência enquanto existir trait `MANUAL` no mesmo `traitKey` não altera o trait; a evidência permanece `APPROVED`, sem sobrescrita silenciosa.
+- **Consequência:** autoria humana sempre vence; evidências permanecem como suporte/auditoria e nunca reescrevem valor manual.
+
+## D-057 — Auditoria de revisão e aprovação ADMIN-only no v1
+- **Decisão (V3.14.1):** `PersonaEvidence` registra `reviewedById?`/`reviewedAt?` na revisão; aprovação/rejeição é ADMIN-only no v1 (o dono propõe, o ADMIN decide).
+- **Consequência:** curadoria auditável com o papel ADMIN existente; nenhum privilégio novo é introduzido.
+
+## D-058 — Sem `PERSONA_UPDATED` neste corte
+- **Decisão (V3.14.1):** nenhum evento novo de Timeline para Persona nesta fase; a Timeline permanece sem kind de Persona até a fase de evolução da Persona.
+- **Consequência:** a fundação persistente (D-050..D-057) permanece pura, sem sistema temporal de Persona; a auditoria temporal fica para a evolução futura via `persona.service` (D-053).

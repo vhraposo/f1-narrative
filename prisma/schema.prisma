@@ -198,6 +198,10 @@ model User {
 
   universeEditorDecisions UniverseEditorDecision[]
 
+  createdPersonas         CharacterPersona[] @relation("PersonaCreatedBy")
+  createdPersonaEvidence  PersonaEvidence[]  @relation("PersonaEvidenceCreatedBy")
+  reviewedPersonaEvidence PersonaEvidence[]  @relation("PersonaEvidenceReviewedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -309,6 +313,7 @@ model Character {
 
   // Perfil esportivo opcional (caso seja piloto)
   driverProfile DriverProfile?
+  persona       CharacterPersona?
 
   externalDriverBindings ExternalBindingDriver[]
 
@@ -1584,4 +1589,100 @@ model MediaAsset {
   updatedAt DateTime @updatedAt
 
   @@index([ownerUserId])
+}
+
+enum PersonaOrigin {
+  ORIGINAL
+  REAL_DRIVER
+  AI_CHARACTER
+}
+
+enum PersonaTraitSource {
+  MANUAL
+  EVIDENCE
+}
+
+enum PersonaEvidenceType {
+  OFFICIAL_PROFILE
+  INTERVIEW
+  BIOGRAPHY
+  PUBLIC_STATEMENT
+  OTHER_APPROVED
+}
+
+enum PersonaEvidenceStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+}
+
+model CharacterPersona {
+  id          String    @id @default(uuid()) @db.Uuid
+  characterId String    @unique @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  origin        PersonaOrigin
+  summary       String?
+  schemaVersion String        @default("persona.v1")
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("PersonaCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  traits    PersonaTrait[]
+  evidences PersonaEvidence[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PersonaTrait {
+  id        String           @id @default(uuid()) @db.Uuid
+  personaId String           @db.Uuid
+  persona   CharacterPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  key        String
+  value      String
+  confidence Float
+  sourceKind PersonaTraitSource
+
+  evidenceId String?          @db.Uuid
+  evidence   PersonaEvidence? @relation("TraitAuthoritativeEvidence", fields: [evidenceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([personaId, key])
+  @@index([personaId])
+  @@index([evidenceId])
+}
+
+model PersonaEvidence {
+  id        String           @id @default(uuid()) @db.Uuid
+  personaId String           @db.Uuid
+  persona   CharacterPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  traitKey      String
+  proposedValue String
+
+  sourceType  PersonaEvidenceType
+  title       String
+  url         String?
+  publishedAt DateTime?
+  excerpt     String
+  confidence  Float
+  status      PersonaEvidenceStatus @default(PROPOSED)
+
+  createdById  String?   @db.Uuid
+  createdBy    User?     @relation("PersonaEvidenceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  reviewedById String?   @db.Uuid
+  reviewedBy   User?     @relation("PersonaEvidenceReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+
+  authoritativeTraits PersonaTrait[] @relation("TraitAuthoritativeEvidence")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personaId, status])
+  @@index([personaId, traitKey])
 }
