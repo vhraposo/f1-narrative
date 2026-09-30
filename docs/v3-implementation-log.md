@@ -852,3 +852,34 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Decisões:** D-066 (campeão derivado; edição = par atômico `STANDING_CORRECTED`; restore como correção; `NONE` no read model).
 - **Limitações:** troca de campeão exige piloto com perfil no Universe; temporadas `DERIVED` direcionam para correção de resultado; sem criação de pilotos novos pela aba.
 - **Commit:** `feat(v3): add historical champions timeline`.
+
+### V3.16.1 — Edit model no detalhe do evento
+- **Objetivo:** expor editabilidade estruturada do evento (o que pode ser editado, valores atuais, data do mundo, supersedes sugerido, bloqueios) sem criar motor novo.
+- **Arquivos:** `apps/api/src/modules/timeline/timeline.editor.ts` (`buildTimelineEventEditModel` → `editorKind RACE_RESULT|SPRINT|NUMBER|STANDING|RACE|null`, `canEdit`, `blockedReason`, `defaultWorldDate`, `suggestedSupersedesId`, `values/currentValues`, `narrativeStaleEventIds`; SPRINT lê `metadata.eligibility` → `neutralizedStart` 1/0/null + `distancePct`); `GET /api/timeline/events/:eventId` passa a retornar `edit` (aditivo).
+- **Migrations:** nenhuma.
+- **Testes:** `timeline.editor.test.ts` 9/9 (editabilidade por kind, `EVOLUTION_STALE`, `DERIVED_STANDING`, cadeia `76→77`, `RESULT_NOT_FOUND`, 401/404 leak-safe); módulo timeline 92/92.
+- **Typecheck:** 0. **Lint:** 0.
+- **Problemas:** nenhum.
+- **Decisões:** nenhuma nova (contrato congelado da V3.15; `RACE_UPDATED` supersede o evento de calendário).
+- **Limitações:** edit model não valida o comando (validação permanece no preview/apply da V3.15).
+- **Commit:** `feat(v3.16): add timeline event edit model`.
+
+### V3.16.2 — Editor visual da Linha do Tempo
+- **Objetivo:** UI de correção histórica sobre o correction framework (preview obrigatório, confirmação em dois passos, `PREVIEW_STALE` sem reuso de token).
+- **Arquivos:** `apps/web/src/lib/timeline.ts` (tipos+fetchers `previewCorrection`/`applyCorrection`), `hooks/use-timeline.ts` (`usePreviewCorrection`, `useApplyCorrection` com invalidação `timeline/seasons/races`), `components/timeline/timeline-event-panel.tsx` (abas Detalhes/Impacto/Histórico, formulários por kind com prefill, preview ANTES/DEPOIS + IMPACTOS com nomes de piloto resolvidos, confirmação, bloqueios explicados, cadeia de supersession com badge `Atual`), `timeline-view.tsx` integra o painel (substitui o detalhe antigo).
+- **Migrations:** nenhuma.
+- **Testes:** Web `timeline-editor.integration.test.tsx` 6/6 (abas/estado atual/formulário; preview+impactos+confirmação+apply com invalidação; `PREVIEW_STALE` exige novo preview e usa token novo; bloqueio `DERIVED_STANDING` com botão desabilitado; `NUMBER` vazio ⇒ `null`; SPRINT com `eligibility`). Suíte Web 462/462.
+- **Typecheck:** 0. **Lint:** 0 (0 novos).
+- **Problemas:** `aria-label` redundante no botão Editar escondia o nome acessível exato (removido); clique duplo de "Aplicar correção" no stale resolvido resetando a confirmação (`setConfirming(false)`) — token antigo nunca reutilizado.
+- **Decisões:** nenhuma nova.
+- **Limitações:** kinds informativos seguem `NO_VISUAL_EDITOR`; evolução aplicada exige intervenção antes (`EVOLUTION_STALE`); narrativa apenas avisada.
+- **Commit:** `feat(v3.16): add timeline correction editor`.
+
+### V3.16.3 — Final QA / Docs
+- **Objetivo:** provar o editor integrado e documentar a V3.16.
+- **Regressão completa:** API **2269/2269** (133 arquivos) em **duas execuções consecutivas no mesmo TEST**; Web **462/462** (60 arquivos) ×2. Typecheck API/Web 0; lint API/Web 0; `next build` exit 0.
+- **Banco:** TEST 29 migrations, 63 tabelas; 0 `TimelineEvent`/0 `WorldSnapshot` residuais ao final; resíduo pré-existente de `User`/`Universe` de testes alheios quantificado (módulo `performance` sozinho: +17 users/+17 universes; `team-performance.test.ts` e `driver-attribute.test.ts` sem cleanup de users) e TEST limpo ao final (0/0), conforme prática de banco descartável. DEV intacto (27 migrations, 60 tabelas, 17 usuários, 2 `NUMBER_CORRECTED` pré-existentes). External Mirror intocado.
+- **Docs:** `docs/v3.16-timeline-editor.md` criado (edit model, formulários por kind, preview/apply, `PREVIEW_STALE`, supersession, impacto, segurança, concorrência, limitações, QA).
+- **Decisões:** nenhuma nova (V3.16 é camada de UI sobre D-061..D-066).
+- **Limitações:** sem migration/tabela nova; sem novos kinds; sem PATCH/DELETE de evento.
+- **Commit:** `feat(v3.16): complete timeline editor`.
