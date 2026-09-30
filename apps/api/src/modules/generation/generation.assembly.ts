@@ -17,6 +17,10 @@ import {
   formatDnaLines,
   normalizeCharacterDna,
 } from "../context/dna-contract.js";
+import {
+  composePersonaPromptBlock,
+  type SpeakerPersonaPromptInput,
+} from "../persona/persona.prompt.js";
 import { readConversationRag } from "../context/conversation-rag-read.js";
 import {
   resolveGenerationRagContext,
@@ -297,7 +301,11 @@ function formatDimensions(dimensions: Prisma.JsonValue | undefined): string {
 function sectionCharacterDna(
   context: AssembledContext,
   speakerCharacterId: string,
+  speakerPersonaText?: string,
 ): string {
+  if (speakerPersonaText !== undefined && speakerPersonaText.length > 0) {
+    return speakerPersonaText;
+  }
   const speaker = context.participants.find(
     (p) => p.characterId === speakerCharacterId,
   );
@@ -670,6 +678,7 @@ export function composeSystemPrompt(
   context: AssembledContext,
   speakerCharacterId?: string,
   turnContext?: TurnContext,
+  speakerPersonaText?: string,
 ): string {
   const blocks: Array<[SectionId, string]> = [
     ["GLOBAL_RULES", sectionGlobalRules()],
@@ -684,7 +693,11 @@ export function composeSystemPrompt(
   }
 
   if (speakerCharacterId !== undefined) {
-    const dnaSection = sectionCharacterDna(context, speakerCharacterId);
+    const dnaSection = sectionCharacterDna(
+      context,
+      speakerCharacterId,
+      speakerPersonaText,
+    );
     if (dnaSection.length > 0) {
       blocks.push(["CHARACTER_DNA", dnaSection]);
     }
@@ -787,10 +800,23 @@ export async function assembleGenerationBundle(
     rag = resolveGenerationRagContext(readResult, request.ragFrameId);
   }
   const contextWithRag = rag === null ? context : withExternalRag(context, rag);
+
+  const speakerPersona = await loadSpeakerPersona(db, speakerCharacterId);
+  const personaBlock =
+    speakerPersona === null ? null : composePersonaPromptBlock(speakerPersona);
+  if (personaBlock !== null && personaBlock.omittedReasons.length > 0) {
+    contextWithRag.omitted.reasons.push(...personaBlock.omittedReasons);
+  }
+  const speakerPersonaText =
+    personaBlock !== null && personaBlock.text.length > 0
+      ? personaBlock.text
+      : undefined;
+
   const systemPrompt = composeSystemPrompt(
     contextWithRag,
     speakerCharacterId,
     request.turnContext,
+    speakerPersonaText,
   );
 
   const providerUserPrompt = request.providerUserPrompt ?? request.userPrompt;
@@ -856,6 +882,22 @@ async function runProvider(
     stream.onDelta(output.text);
   }
   return output;
+}
+
+async function loadSpeakerPersona(
+  db: DbDeps,
+  speakerCharacterId: string | undefined,
+): Promise<SpeakerPersonaPromptInput | null> {
+  if (speakerCharacterId === undefined) return null;
+  const persona = await db.characterPersona.findUnique({
+    where: { characterId: speakerCharacterId },
+    select: {
+      summary: true,
+      traits: { select: { key: true, value: true, confidence: true } },
+    },
+  });
+  if (!persona) return null;
+  return { summary: persona.summary, traits: persona.traits };
 }
 
 async function resolveGenerationSpeaker(
@@ -924,6 +966,7 @@ type DbDeps = Pick<
   | "championshipStanding"
   | "newsItem"
   | "universe"
+  | "characterPersona"
 >;
 
 export async function generateGeneration(
