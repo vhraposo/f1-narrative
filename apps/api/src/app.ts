@@ -119,6 +119,7 @@ export function buildApp(
 
   void app.register(helmet, {
     contentSecurityPolicy: false,
+    crossOriginResourcePolicy: false,
   });
 
   void app.register(cors, {

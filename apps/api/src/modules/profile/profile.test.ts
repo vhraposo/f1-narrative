@@ -316,6 +316,13 @@ describe("Profile + Media (Fase 5)", () => {
     const image = upload.json().profile.image as string;
     const assetId = mediaIdFromUrl(image);
 
+    const uploadCookies = (upload.cookies ?? []).map((cookie) => cookie.name);
+    expect(uploadCookies).toContain("f1nw.session_data");
+    const clearedCookie = (upload.cookies ?? []).find(
+      (cookie) => cookie.name === "f1nw.session_data",
+    );
+    expect(clearedCookie?.value).toBe("");
+
     const asset = await prisma.mediaAsset.findUniqueOrThrow({
       where: { id: assetId },
     });
@@ -338,6 +345,7 @@ describe("Profile + Media (Fase 5)", () => {
     });
     expect(media.statusCode).toBe(200);
     expect(media.headers["content-type"]).toContain("image/png");
+    expect(media.headers["cross-origin-resource-policy"]).toBe("cross-origin");
     expect(media.rawPayload.equals(PNG)).toBe(true);
 
     const foreign = await app.inject({

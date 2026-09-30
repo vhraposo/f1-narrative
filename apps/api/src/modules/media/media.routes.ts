@@ -36,6 +36,7 @@ export const mediaRoutes: FastifyPluginAsync<MediaRoutesOptions> = async (
         return reply
           .header("Content-Type", asset.mimeType)
           .header("Cache-Control", "private, max-age=300")
+          .header("Cross-Origin-Resource-Policy", "cross-origin")
           .header("Content-Length", String(body.byteLength))
           .send(body);
       } catch (error) {

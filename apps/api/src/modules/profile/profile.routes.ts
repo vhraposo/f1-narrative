@@ -21,6 +21,19 @@ import {
 
 type ProfileRoutesOptions = { storageProvider?: StorageProvider };
 
+// Cookie cache de sessão do better-auth (prefixo f1nw): após mudar o avatar é
+// preciso descartá-lo para que /api/auth/get-session releia o User.image do banco.
+const SESSION_CACHE_COOKIE = "f1nw.session_data";
+
+function clearSessionCache(reply: FastifyReply) {
+  reply.header(
+    "set-cookie",
+    `${SESSION_CACHE_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${
+      env.NODE_ENV === "production" ? "; Secure" : ""
+    }`,
+  );
+}
+
 function sendProfileError(reply: FastifyReply, error: unknown) {
   if (
     error instanceof ProfileError ||
@@ -102,6 +115,7 @@ export const profileRoutes: FastifyPluginAsync<ProfileRoutesOptions> = async (
           contentType,
           filename,
         });
+        clearSessionCache(reply);
         return reply.send({ profile });
       } catch (error) {
         return sendProfileError(reply, error);
@@ -114,6 +128,7 @@ export const profileRoutes: FastifyPluginAsync<ProfileRoutesOptions> = async (
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
       await clearProfileAvatar(request.user!.id, storage);
+      clearSessionCache(reply);
       return reply.code(204).send();
     },
   );
