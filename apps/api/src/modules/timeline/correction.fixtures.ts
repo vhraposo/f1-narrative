@@ -89,6 +89,15 @@ export async function seedCorrectionFixture(
       status: "ACTIVE",
     },
   });
+  await prisma.seasonDriverEntry.create({
+    data: {
+      seasonId: nextSeason.id,
+      driverProfileId: driver1Id,
+      number: null,
+      role: "RACE_SEAT",
+      status: "ACTIVE",
+    },
+  });
 
   const race = await prisma.race.create({
     data: {

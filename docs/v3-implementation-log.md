@@ -810,3 +810,14 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Decisões:** nenhuma nova.
 - **Limitações:** correção não cria pontos de fastest-lap/meio-ponto (inexistentes no motor); elegibilidade apenas no Sprint.
 - **Commit:** `feat(v3): add race and sprint historical corrections`.
+
+### V3.15.6 — Historical Champion and Number Impact
+- **Objetivo:** consequência histórica de campeão derivada + impacto de `#1` sem cascata automática.
+- **Arquivos:** `correction.fixtures.ts` (entry `#null` do próximo ano para o piloto), `correction.champion-impact.test.ts`.
+- **Migrations:** nenhuma.
+- **Testes:** `correction.champion-impact.test.ts` 5/5 (preview campeão antes/depois + `requiresAction`; apply muda campeão mas não reescreve `SeasonDriverEntry.number`; reatribuição explícita respeita a regra do campeão e unicidade; eventos `NUMBER_CORRECTED` apenas das ações explícitas; isolamento entre universos).
+- **Typecheck:** 0. **Lint:** 0.
+- **Problemas:** dois eventos `NUMBER_CORRECTED` legítimos na reatribuição (release + assignment) — expectativa ajustada.
+- **Decisões:** nenhuma nova (D-064 aplicado).
+- **Limitações:** reatribuição de `#1` exige liberar o número atual antes (unicidade por temporada), como no fluxo existente.
+- **Commit:** `feat(v3): add historical champion and number impact`.
