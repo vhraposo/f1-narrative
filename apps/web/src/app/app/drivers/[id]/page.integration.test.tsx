@@ -88,6 +88,9 @@ beforeEach(() => {
   apiMock.get.mockImplementation(async (path: string) => {
     if (path === "/api/drivers/d1") return { driver: DRIVER };
     if (path === "/api/characters/c1/persona") return { persona: EMPTY_PERSONA };
+    if (path.startsWith("/api/pilot-knowledge/drivers/")) {
+      return { pilot: { available: false, reason: "NO_EXTERNAL_BINDING" } };
+    }
     throw new ApiError("Não encontrado", 404);
   });
   apiMock.patch.mockImplementation(async () => ({ driver: DRIVER }));
@@ -149,9 +152,16 @@ describe("Driver detail page", () => {
   });
 
   it("sem foto: usa o placeholder com a inicial, sem quebrar", async () => {
-    apiMock.get.mockImplementation(async () => ({
-      driver: { ...DRIVER, headshotUrl: null, displayHeadshotUrl: null },
-    }));
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/drivers/d1") {
+        return { driver: { ...DRIVER, headshotUrl: null, displayHeadshotUrl: null } };
+      }
+      if (path === "/api/characters/c1/persona") return { persona: EMPTY_PERSONA };
+      if (path.startsWith("/api/pilot-knowledge/drivers/")) {
+        return { pilot: { available: false, reason: "NO_EXTERNAL_BINDING" } };
+      }
+      throw new ApiError("Não encontrado", 404);
+    });
     renderWithClient(<DriverDetailPage />);
 
     await screen.findByRole("heading", { level: 1, name: "Sergio Pérez" });
@@ -181,13 +191,22 @@ describe("Driver detail page", () => {
   });
 
   it("limpar o campo de imagem remove o override (null)", async () => {
-    apiMock.get.mockImplementation(async () => ({
-      driver: {
-        ...DRIVER,
-        customHeadshotUrl: "https://img.example/custom.jpg",
-        displayHeadshotUrl: "https://img.example/custom.jpg",
-      },
-    }));
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/drivers/d1") {
+        return {
+          driver: {
+            ...DRIVER,
+            customHeadshotUrl: "https://img.example/custom.jpg",
+            displayHeadshotUrl: "https://img.example/custom.jpg",
+          },
+        };
+      }
+      if (path === "/api/characters/c1/persona") return { persona: EMPTY_PERSONA };
+      if (path.startsWith("/api/pilot-knowledge/drivers/")) {
+        return { pilot: { available: false, reason: "NO_EXTERNAL_BINDING" } };
+      }
+      throw new ApiError("Não encontrado", 404);
+    });
     const user = userEvent.setup();
     renderWithClient(<DriverDetailPage />);
     await screen.findByRole("heading", { level: 1, name: "Sergio Pérez" });
@@ -214,15 +233,16 @@ describe("Driver detail page", () => {
   });
 
   it("mostra a seção Persona com superfície de evidências do piloto", async () => {
+    const user = userEvent.setup();
     renderWithClient(<DriverDetailPage />);
+    await screen.findByRole("heading", { level: 1, name: "Sergio Pérez" });
 
+    await user.click(screen.getByRole("tab", { name: "Persona" }));
     expect(
       await screen.findByRole("region", { name: "Persona de Sergio Pérez" }),
     ).toBeDefined();
     expect(await screen.findByText("Nenhuma persona registrada")).toBeDefined();
-    await userEvent.setup().click(
-      screen.getByRole("button", { name: /Criar persona/ }),
-    );
+    await user.click(screen.getByRole("button", { name: /Criar persona/ }));
     expect(screen.getByLabelText("Resumo da persona")).toBeDefined();
   });
 });

@@ -4,6 +4,7 @@ import {
   createPersonaEvidence,
   deletePersonaTrait,
   getPersonaView,
+  isPersonaSchemaUnavailable,
   reviewPersonaEvidence,
   updatePersonaManually,
 } from "./persona.service.js";
@@ -37,6 +38,13 @@ function sendPersonaError(reply: FastifyReply, error: unknown): boolean {
       error: error.message,
       code: error.code,
       ...(error.issues.length > 0 ? { issues: error.issues } : {}),
+    });
+    return true;
+  }
+  if (isPersonaSchemaUnavailable(error)) {
+    reply.code(503).send({
+      error: "Persona indisponível neste ambiente (migração pendente).",
+      code: "UNAVAILABLE",
     });
     return true;
   }

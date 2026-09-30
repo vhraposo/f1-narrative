@@ -24,7 +24,8 @@ export type PersonaServiceErrorCode =
   | "EVIDENCE_NOT_FOUND"
   | "FORBIDDEN"
   | "VALIDATION_ERROR"
-  | "INVALID_TRANSITION";
+  | "INVALID_TRANSITION"
+  | "UNAVAILABLE";
 
 export class PersonaServiceError extends Error {
   constructor(
@@ -295,11 +296,33 @@ function buildEmptyPersonaView(
   };
 }
 
+export function isPersonaSchemaUnavailable(error: unknown): boolean {
+  const code = (error as { code?: string }).code;
+  return code === "P2021" || code === "P2022";
+}
+
+export async function withPersonaAvailability<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (isPersonaSchemaUnavailable(error)) {
+      throw new PersonaServiceError(
+        "UNAVAILABLE",
+        "Persona indisponível neste ambiente (migração pendente).",
+        503,
+      );
+    }
+    throw error;
+  }
+}
+
 async function loadPersona(characterId: string): Promise<PersonaWithRelations | null> {
-  return prisma.characterPersona.findUnique({
-    where: { characterId },
-    include: personaInclude,
-  });
+  return withPersonaAvailability(() =>
+    prisma.characterPersona.findUnique({
+      where: { characterId },
+      include: personaInclude,
+    }),
+  );
 }
 
 export async function getPersonaView(
