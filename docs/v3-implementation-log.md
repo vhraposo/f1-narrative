@@ -1009,3 +1009,13 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Higiene de testes (V3.19 FASE 21):** `relationship.test.ts` com cleanup explícito (fim do maior ofensor, ~11 users/run); `vitest.global-setup.ts` (TEST-only) remove users/universes `@f1nw.test`/`@test.dev`, dados de universo e memórias órfãs ao fim da suíte; teste do provider Cohere ficou hermético (não depende de `COHERE_API_KEY` do `.env` de DEV). Suíte completa passa a terminar com **0 users / 0 universes / 0 órfãos**.
 - **QA final:** API **2434/2434** (155 arquivos) ×2 consecutivas; Web **477/477** ×2; typecheck/lint/build 0 em API e Web; flake `external-page` revalidado (isolado 21/21, execuções completas limpas); DEV íntegro; External intocado; `docs/v3-final-status.md` criado com matriz e classificação de limitações.
 - **Commit:** `feat(v3.20): complete v3 stabilization`.
+
+### V3.20.1 — Product Fixpack
+- **Biography/Pilot Knowledge:** provisionamento lazy idempotente do espelho interno (`pilot-knowledge.provision.ts` + rota GET): identidade, biografia determinística, equipes/títulos e marcos; `sync` no payload (providers/provisioned/lastStatus) e estados claros na UI.
+- **Avatar:** causa raiz era o cookie cache de 5 min da sessão; `getSession` agora ignora o cache — avatar persiste na sessão imediatamente após o upload.
+- **Timeline:** opção explícita `Todas/Todos` em todos os filtros (voltar a "sem filtro"); range de datas derivado do calendário da temporada (primeira/última corrida), sem hardcode.
+- **Campeões:** range de produto 2000..2025 (2026 nunca aparece; temporada em andamento não vira campeã); campeão externo de `ExternalStanding` P1; botão Editar abre modal real (STANDING) ou explicação com navegação para a Linha do Tempo (DERIVED).
+- **Sync externa:** toasts top-right sem biblioteca nova (`ToastProvider`), loading persistente + sucesso/erro com auto-dismiss 3,5s.
+- **QA:** API **2438/2438** (156 arquivos) ×2; Web **482/482** (63 arquivos) ×2; typecheck/lint/build 0/0; TEST zero resíduos; DEV smoke real (provisionamento do Albon + champions 2025..2000 sem 2026; dados intactos).
+- **Docs:** `v3.20.1-product-fixpack.md`.
+- **Commit:** `docs(v3.20.1): record product corrections`.
