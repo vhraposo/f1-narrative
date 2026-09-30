@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
-import { appendTimelineEvent } from "../timeline/timeline.service.js";
+import {
+  appendTimelineEvent,
+  lockUniverseTimeline,
+} from "../timeline/timeline.service.js";
 import {
   DRIVER_NUMBER_MAX,
   DRIVER_NUMBER_MIN,
@@ -56,7 +59,7 @@ async function assertSeasonInUniverse(
   return season;
 }
 
-async function findPreviousSeasonChampion(
+export async function findPreviousSeasonChampion(
   tx: Tx,
   universeId: string,
   seasonYear: number,
@@ -171,6 +174,7 @@ export async function setDriverNumber(
   number: number | null,
 ): Promise<SetDriverNumberResult> {
   return prisma.$transaction(async (tx) => {
+    await lockUniverseTimeline(tx, universeId);
     const season = await assertSeasonInUniverse(tx, universeId, seasonId);
 
     const entry = await tx.seasonDriverEntry.findUnique({

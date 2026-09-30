@@ -5,7 +5,7 @@ import { recomputeSeasonStandings } from "../championship/championship-progressi
 const WORLD_KEY = "default";
 const CHECKPOINT_INTERVAL = 20;
 
-type Tx = Prisma.TransactionClient;
+export type Tx = Prisma.TransactionClient;
 
 export class TimelineError extends Error {
   constructor(

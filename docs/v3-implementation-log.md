@@ -763,3 +763,15 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Limitações:** UI mostra primeira página (50) com aviso de `hasMore`; scans limitados a 1000 eventos por universo com flag `beyondScanLimit`.
 - **Commit:** `feat(v3): add timeline read model and ui`.
 - **Próximo passo:** V3.15.2 — correction command foundation + number lock.
+
+### V3.15.2 — Correction Command Foundation + Number Lock
+- **Objetivo:** fundação tipada de comandos de correção (sem preview/UI) + lock no fluxo de números.
+- **Arquivos:** `apps/api/src/modules/timeline/correction.service.ts` (tipos dos 5 kinds, validação semântica por kind, payload absoluto, supersession, checkpoint pré-correção, `submitCorrection`/`applyCorrectionWithinTransaction`), `timeline.service.ts` (`Tx` exportado), `driver-number.service.ts` (`lockUniverseTimeline` no setDriverNumber + export de `findPreviousSeasonChampion`).
+- **Migrations:** nenhuma.
+- **Testes:** `correction.foundation.test.ts` 10/10 (validação race/sprint/standing/número/calendário, supersession encadeada, snapshot pré-correção, replay efetivo, EVOLUTION_STALE, isolamento, lock concorrente de número); regressão drivers+timeline 88/88.
+- **Typecheck:** 0. **Lint:** 0.
+- **Problemas:** conflito de posição removido da validação — o domínio já permite posições repetidas (dead heat da simulação) e o cenário primário (P3→P1) ficaria bloqueado; coerência de classificação é do editor.
+- **Decisões:** nenhuma nova (D-061..D-065).
+- **Limitações:** número #1 continua validado pelo campeão derivado; códigos de domínio `EMPTY_CORRECTION`/`INVALID_POSITION`/`INVALID_ELIGIBILITY`/`INVALID_ROUND`/`INVALID_DATE`/`DERIVED_STANDING`/`NUMBER_*`/`CHAMPION_ONLY`/`EVOLUTION_STALE`/`SCHEDULE_ORDER_UNSAFE`.
+- **Commit:** `feat(v3): add timeline correction foundation`.
+- **Próximo passo:** V3.15.3 — preview engine (transação com rollback + token).
