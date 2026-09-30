@@ -17,6 +17,7 @@ import {
 } from "@/hooks/use-external-sync";
 import { formatExternalDateTime } from "@/lib/external-world";
 import type { ExternalSyncCounts, ExternalSyncRunView } from "@/lib/external-sync";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/providers/session-provider";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -41,6 +42,7 @@ export function ExternalSyncPanel({ year }: { year: number | null }) {
   const isAdmin = session.user?.role === "ADMIN";
   const statusQuery = useExternalSyncStatus();
   const refreshMutation = useRefreshExternalData();
+  const toast = useToast();
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -48,23 +50,38 @@ export function ExternalSyncPanel({ year }: { year: number | null }) {
   const lastRun = status?.lastRun ?? null;
   const lastSuccess = status?.lastSuccess ?? null;
   const running =
-    refreshMutation.isPending || (status?.active.length ?? 0) > 0;
+    refreshMutation.isPending || (status?.active?.length ?? 0) > 0;
 
   function handleRefresh() {
     if (year == null || running) return;
     setNotice(null);
     setActionError(null);
+    const toastId = toast.show({
+      message: "Sincronização em andamento…",
+      tone: "info",
+      persistent: true,
+    });
     refreshMutation.mutate(year, {
-      onSuccess: (result) =>
+      onSuccess: (result) => {
         setNotice(
           `Dados externos atualizados em ${result.durationMs} ms (${result.scopes.length} escopos).`,
-        ),
-      onError: (error) =>
+        );
+        toast.update(toastId, {
+          message: "Sincronização realizada com sucesso.",
+          tone: "success",
+        });
+      },
+      onError: (error) => {
         setActionError(
           error instanceof Error
             ? error.message
             : "Falha ao atualizar os dados externos",
-        ),
+        );
+        toast.update(toastId, {
+          message: "Não foi possível realizar a sincronização.",
+          tone: "error",
+        });
+      },
     });
   }
 
