@@ -11,6 +11,7 @@ export type CreateEventData = {
   source?: CanonSource;
   worldDate?: Date | string | null;
   payload?: Prisma.InputJsonValue | null | undefined;
+  createdById?: string | null;
 };
 
 export async function createEventWithDerivations(
@@ -30,6 +31,7 @@ export async function createEventWithDerivations(
         data.payload === undefined || data.payload === null
           ? Prisma.DbNull
           : data.payload,
+      createdById: data.createdById ?? null,
     },
     select: { id: true },
   });
