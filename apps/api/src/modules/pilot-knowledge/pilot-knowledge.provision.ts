@@ -7,13 +7,24 @@ import {
   getF1dbDriverStats,
   resolveF1dbDriver,
 } from "../f1db/f1db.drivers.js";
+import {
+  BIOGRAPHY_COMPOSER_VERSION,
+  biographyClaimsFromFacts,
+  deterministicBiographyContext,
+  type BiographyComposer,
+} from "./biography.composer.js";
 import { deriveMilestonesFromExternalData } from "./pilot-knowledge.events.js";
 import {
   readDriverSourceIdentity,
   upsertDriverProfileFromProvider,
+  type BiographyFacts,
   type StructuredDriverProfileInput,
 } from "./pilot-knowledge.profile.js";
 import { recordKnowledgeSource } from "./pilot-knowledge.sources.js";
+
+export type ProvisionOptions = {
+  readonly biographyComposer?: BiographyComposer;
+};
 
 export type ProvisionOutcome =
   | "PROVISIONED"
@@ -74,6 +85,7 @@ async function buildMirrorProfileInput(
   driver: MirrorDriver,
   sourceId: string | null,
   now: Date,
+  options: ProvisionOptions = {},
 ): Promise<StructuredDriverProfileInput> {
   const [career, milestones] = await Promise.all([
     collectMirrorCareer(externalDriverId),
@@ -102,6 +114,66 @@ async function buildMirrorProfileInput(
     : null);
   const driverCode = sourceIdentity.driverCode ?? f1dbDriver?.abbreviation ?? null;
 
+  const biographyFacts: BiographyFacts = {
+    publicName: driver.name,
+    fullName: driver.fullName,
+    dateOfBirth,
+    placeOfBirth: f1dbDriver?.placeOfBirth ?? null,
+    nationality: driver.nationality,
+    debutYear: debutYears.length > 0 ? Math.min(...debutYears) : null,
+    teams: career.teams,
+    championships,
+    milestoneTitles: topMilestoneTitles(milestones),
+    career: f1dbStats
+      ? {
+          wins: f1dbStats.wins,
+          podiums: f1dbStats.podiums,
+          poles: f1dbStats.poles,
+          fastestLaps: f1dbStats.fastestLaps,
+          titles: f1dbStats.titles,
+          starts: f1dbStats.starts,
+        }
+      : null,
+  };
+
+  let biographyContent: StructuredDriverProfileInput["biographyContent"] = null;
+  if (options.biographyComposer) {
+    try {
+      const claims = biographyClaimsFromFacts(biographyFacts);
+      const composed = await options.biographyComposer({
+        subject: driver.fullName ?? driver.name,
+        claims,
+      });
+      if (composed) {
+        const source = await recordKnowledgeSource(
+          {
+            provider: "CURATED",
+            sourceKind: "BIOGRAPHY_PAGE",
+            url: null,
+            title: `Biografia composta por IA (${BIOGRAPHY_COMPOSER_VERSION})`,
+            license: "UNKNOWN",
+            attributionRequirement: null,
+            attributionText:
+              "Síntese original gerada a partir de claims estruturados do espelho/F1DB; não copiada de fonte.",
+            metadata: {
+              generator: "biography-composer",
+              generatorVersion: BIOGRAPHY_COMPOSER_VERSION,
+              claimsCount: claims.length,
+            },
+          },
+          now,
+        );
+        biographyContent = {
+          display: composed,
+          context: deterministicBiographyContext(biographyFacts),
+          sourceId: source.id,
+        };
+      }
+    } catch {
+      biographyContent = null;
+    }
+  }
+
   return {
     fullName: driver.fullName,
     publicName: driver.name,
@@ -112,33 +184,15 @@ async function buildMirrorProfileInput(
     driverNumber: career.driverNumber ?? driver.number ?? null,
     currentTeamName: career.currentTeamName,
     sourceId,
-    biographyFacts: {
-      publicName: driver.name,
-      fullName: driver.fullName,
-      dateOfBirth,
-      placeOfBirth: f1dbDriver?.placeOfBirth ?? null,
-      nationality: driver.nationality,
-      debutYear: debutYears.length > 0 ? Math.min(...debutYears) : null,
-      teams: career.teams,
-      championships,
-      milestoneTitles: topMilestoneTitles(milestones),
-      career: f1dbStats
-        ? {
-            wins: f1dbStats.wins,
-            podiums: f1dbStats.podiums,
-            poles: f1dbStats.poles,
-            fastestLaps: f1dbStats.fastestLaps,
-            titles: f1dbStats.titles,
-            starts: f1dbStats.starts,
-          }
-        : null,
-    },
+    biographyFacts,
+    biographyContent,
   };
 }
 
 export async function ensurePilotKnowledgeProvisioned(
   characterId: string,
   now: Date = new Date(),
+  options: ProvisionOptions = {},
 ): Promise<ProvisionResult> {
   const binding = await prisma.externalBindingDriver.findFirst({
     where: { characterId },
@@ -170,16 +224,20 @@ export async function ensurePilotKnowledgeProvisioned(
     const biographySource = existingProfile.biographySourceId
       ? await prisma.externalKnowledgeSource.findUnique({
           where: { id: existingProfile.biographySourceId },
-          select: { provider: true },
+          select: { provider: true, sourceKind: true },
         })
       : null;
-    const ownedByMirror = biographySource === null || biographySource.provider === "CURATED";
+    const ownedByMirror =
+      biographySource === null ||
+      (biographySource.provider === "CURATED" &&
+        biographySource.sourceKind !== "BIOGRAPHY_PAGE");
     if (ownedByMirror) {
       const input = await buildMirrorProfileInput(
         externalDriverId,
         driver,
         existingProfile.biographySourceId ?? existingProfile.sourceId ?? null,
         now,
+        options,
       );
       await upsertDriverProfileFromProvider(externalDriverId, input, now);
     } else {
@@ -202,7 +260,13 @@ export async function ensurePilotKnowledgeProvisioned(
     now,
   );
 
-  const input = await buildMirrorProfileInput(externalDriverId, driver, source.id, now);
+  const input = await buildMirrorProfileInput(
+    externalDriverId,
+    driver,
+    source.id,
+    now,
+    options,
+  );
   await upsertDriverProfileFromProvider(externalDriverId, input, now);
 
   return { outcome: "PROVISIONED", externalDriverId };

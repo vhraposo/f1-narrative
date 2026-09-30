@@ -158,6 +158,11 @@ export type StructuredDriverProfileInput = {
   readonly f1dbDriverId?: string | null;
   readonly sourceId?: string | null;
   readonly biographyFacts?: BiographyFacts | null;
+  readonly biographyContent?: {
+    readonly display: string;
+    readonly context: string | null;
+    readonly sourceId: string;
+  } | null;
 };
 
 export async function upsertDriverProfileFromProvider(
@@ -174,13 +179,19 @@ export async function upsertDriverProfileFromProvider(
   }
 
   const biography =
-    input.biographyFacts === undefined || input.biographyFacts === null
-      ? null
-      : {
-          biographyDisplay: composeBiographyDisplay(input.biographyFacts),
-          biographyContext: composeBiographyContext(input.biographyFacts),
-          biographySourceId: input.sourceId ?? null,
-        };
+    input.biographyContent !== undefined && input.biographyContent !== null
+      ? {
+          biographyDisplay: input.biographyContent.display,
+          biographyContext: input.biographyContent.context,
+          biographySourceId: input.biographyContent.sourceId,
+        }
+      : input.biographyFacts === undefined || input.biographyFacts === null
+        ? null
+        : {
+            biographyDisplay: composeBiographyDisplay(input.biographyFacts),
+            biographyContext: composeBiographyContext(input.biographyFacts),
+            biographySourceId: input.sourceId ?? null,
+          };
 
   const data: Prisma.ExternalDriverProfileUncheckedCreateInput = {
     externalDriverId,

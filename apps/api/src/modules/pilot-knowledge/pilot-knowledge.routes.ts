@@ -16,6 +16,7 @@ import {
 } from "./pilot-knowledge.refresh.js";
 import { PROFILE_BIOGRAPHY_DISPLAY_CAP } from "./pilot-knowledge.policy.js";
 import { getPilotKnowledgeView } from "./pilot-knowledge.read.js";
+import { createLlmBiographyComposer } from "./biography.composer.js";
 import { ensurePilotKnowledgeProvisioned } from "./pilot-knowledge.provision.js";
 import {
   createUniverseDriverRelationship,
@@ -23,9 +24,11 @@ import {
   updateUniverseDriverRelationship,
 } from "./pilot-knowledge.relationships.js";
 import type { ExternalDriverKnowledgeProvider } from "./providers/provider.types.js";
+import type { GenerationProvider } from "../generation/generation.assembly.js";
 
 export type PilotKnowledgeRoutesOptions = {
   readonly providers?: readonly ExternalDriverKnowledgeProvider[];
+  readonly biographyProvider?: GenerationProvider;
 };
 
 const characterParamsSchema = z.object({ characterId: z.string().uuid() }).strict();
@@ -126,7 +129,11 @@ export const pilotKnowledgeRoutes: FastifyPluginAsync<PilotKnowledgeRoutesOption
         const access = await resolvePilotKnowledgeAccess(request.user!.id, params.data.characterId);
         const character = requireOwnedAccess(access);
         const provision = await withPilotKnowledgeAvailability(() =>
-          ensurePilotKnowledgeProvisioned(character.id),
+          ensurePilotKnowledgeProvisioned(character.id, new Date(), {
+            ...(options.biographyProvider
+              ? { biographyComposer: createLlmBiographyComposer(options.biographyProvider) }
+              : {}),
+          }),
         );
         const pilot = await withPilotKnowledgeAvailability(() =>
           getPilotKnowledgeView(params.data.characterId, { topic: query.data.topic ?? null }),

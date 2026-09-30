@@ -234,7 +234,11 @@ export function buildApp(
   void app.register(universeInitRoutes);
   void app.register(playerEntryRoutes);
   void app.register(universeEditorRoutes);
-  void app.register(pilotKnowledgeRoutes, pilotKnowledgeOptions ?? {});
+  void app.register(pilotKnowledgeRoutes, {
+    ...(pilotKnowledgeOptions ?? {}),
+    biographyProvider:
+      pilotKnowledgeOptions?.biographyProvider ?? generationProvider ?? undefined,
+  });
   void app.register(pilotExperienceRoutes);
 
   return app;
