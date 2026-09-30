@@ -38,6 +38,13 @@ export type EvolutionPreview = {
   readonly evolutionRevision: number;
   readonly pendingFingerprint: string;
   readonly pendingCount: number;
+  readonly revertedEffects: readonly {
+    readonly id: string;
+    readonly ruleCode: string;
+    readonly traitKey: string;
+    readonly experienceId: string | null;
+    readonly reason: string;
+  }[];
   readonly traits: readonly EvolutionPreviewTrait[];
   readonly skipped: readonly {
     readonly ruleCode: string;
@@ -45,6 +52,36 @@ export type EvolutionPreview = {
     readonly reason: string;
   }[];
 };
+
+type EvolutionRow = {
+  readonly id: string;
+  readonly traitKey: string;
+  readonly ruleCode: string;
+  readonly rulePriority: number;
+  readonly value: string | null;
+  readonly confidenceDelta: number;
+  readonly reason: string;
+  readonly sourceExperienceId: string | null;
+  readonly fingerprint: string;
+  readonly status: "ACTIVE" | "SUPERSEDED";
+  readonly sourceExperience?: { readonly status: string } | null;
+};
+
+function partitionEvolutionRows(rows: readonly EvolutionRow[]): {
+  readonly active: EvolutionRow[];
+  readonly reverted: EvolutionRow[];
+} {
+  const active: EvolutionRow[] = [];
+  const reverted: EvolutionRow[] = [];
+  for (const row of rows) {
+    if (row.status === "SUPERSEDED") continue;
+    const sourceInvalidated =
+      row.sourceExperienceId !== null && row.sourceExperience?.status !== "ACTIVE";
+    if (sourceInvalidated) reverted.push(row);
+    else active.push(row);
+  }
+  return { active, reverted };
+}
 
 type PendingEffect = EvolutionCandidate & { readonly fingerprint: string };
 
@@ -56,7 +93,14 @@ async function loadContext(universeId: string, characterId: string) {
       universeId: true,
       userId: true,
       driverProfile: { select: { id: true } },
-      persona: { include: { traits: true, traitEvolutions: true } },
+      persona: {
+        include: {
+          traits: true,
+          traitEvolutions: {
+            include: { sourceExperience: { select: { status: true } } },
+          },
+        },
+      },
     },
   });
   if (!character || character.universeId !== universeId || !character.driverProfile) {
@@ -176,6 +220,7 @@ export async function previewPersonaEvolution(
       evolutionRevision: 0,
       pendingFingerprint: "",
       pendingCount: 0,
+      revertedEffects: [],
       traits: [],
       skipped: [],
     };
@@ -185,7 +230,10 @@ export async function previewPersonaEvolution(
     (character.persona?.traitEvolutions ?? []).map((effect) => effect.fingerprint),
   );
   const pending = await planPendingEffects(universeId, characterId, experiences, existingFingerprints);
-  const existingEffects = (character.persona?.traitEvolutions ?? []).map((row) =>
+  const { active, reverted } = partitionEvolutionRows(
+    (character.persona?.traitEvolutions ?? []) as EvolutionRow[],
+  );
+  const existingEffects = active.map((row) =>
     toAppliedEffect({
       ruleCode: row.ruleCode,
       traitKey: row.traitKey,
@@ -195,6 +243,7 @@ export async function previewPersonaEvolution(
       value: row.value,
       rulePriority: row.rulePriority,
       experienceTitle: null,
+      status: row.status,
     }),
   );
   const { traits, skipped } = buildPreviewTraits(baseTraitsOf(character), existingEffects, pending);
@@ -202,8 +251,18 @@ export async function previewPersonaEvolution(
   return {
     available: true,
     evolutionRevision: character.persona?.evolutionRevision ?? 0,
-    pendingFingerprint: pendingEvolutionFingerprint(pending.map((effect) => effect.fingerprint)),
+    pendingFingerprint: pendingEvolutionFingerprint([
+      ...pending.map((effect) => effect.fingerprint),
+      ...reverted.map((row) => `reverted:${row.id}`),
+    ]),
     pendingCount: pending.length,
+    revertedEffects: reverted.map((row) => ({
+      id: row.id,
+      ruleCode: row.ruleCode,
+      traitKey: row.traitKey,
+      experienceId: row.sourceExperienceId,
+      reason: row.reason,
+    })),
     traits,
     skipped,
   };
@@ -214,6 +273,7 @@ export type EvolutionApplyResult =
       readonly applied: true;
       readonly evolutionRevision: number;
       readonly effectsApplied: number;
+      readonly effectsReverted: number;
       readonly timelineEventId: string | null;
     }
   | {
@@ -244,7 +304,10 @@ export async function applyPersonaEvolution(
           origin: character.userId !== null ? "ORIGINAL" : "AI_CHARACTER",
           schemaVersion: "persona.v1",
         },
-        include: { traits: true, traitEvolutions: true },
+        include: {
+          traits: true,
+          traitEvolutions: { include: { sourceExperience: { select: { status: true } } } },
+        },
       }));
 
     if (persona.evolutionRevision !== expected.expectedRevision) {
@@ -255,9 +318,15 @@ export async function applyPersonaEvolution(
       );
     }
 
+    const { active: activeRows, reverted } = partitionEvolutionRows(
+      persona.traitEvolutions as EvolutionRow[],
+    );
     const existingFingerprints = new Set(persona.traitEvolutions.map((effect) => effect.fingerprint));
     const pending = await planPendingEffects(universeId, characterId, experiences, existingFingerprints);
-    const pendingFingerprint = pendingEvolutionFingerprint(pending.map((effect) => effect.fingerprint));
+    const pendingFingerprint = pendingEvolutionFingerprint([
+      ...pending.map((effect) => effect.fingerprint),
+      ...reverted.map((row) => `reverted:${row.id}`),
+    ]);
     if (pendingFingerprint !== expected.expectedPendingFingerprint) {
       throw new PilotKnowledgeError(
         "EVOLUTION_STALE",
@@ -265,11 +334,11 @@ export async function applyPersonaEvolution(
         409,
       );
     }
-    if (pending.length === 0) {
+    if (pending.length === 0 && reverted.length === 0) {
       return { applied: false, evolutionRevision: persona.evolutionRevision, reason: "NO_PENDING_EFFECTS" as const };
     }
 
-    const existingEffects = persona.traitEvolutions.map((row) =>
+    const existingEffects = activeRows.map((row) =>
       toAppliedEffect({
         ruleCode: row.ruleCode,
         traitKey: row.traitKey,
@@ -279,10 +348,18 @@ export async function applyPersonaEvolution(
         value: row.value,
         rulePriority: row.rulePriority,
         experienceTitle: null,
+        status: row.status,
       }),
     );
     const beforeTraits = computeEffectiveTraits(baseTraitsOf(character), existingEffects);
     const beforeByKey = new Map(beforeTraits.map((trait) => [trait.key, trait]));
+
+    if (reverted.length > 0) {
+      await tx.personaTraitEvolution.updateMany({
+        where: { id: { in: reverted.map((row) => row.id) } },
+        data: { status: "SUPERSEDED" },
+      });
+    }
 
     for (const effect of pending) {
       await tx.personaTraitEvolution.create({
@@ -340,6 +417,12 @@ export async function applyPersonaEvolution(
           delta: effect.confidenceDelta,
         };
       }),
+      reverted: reverted.map((row) => ({
+        ruleCode: row.ruleCode,
+        traitKey: row.traitKey,
+        experienceId: row.sourceExperienceId,
+        reason: row.reason,
+      })),
     } satisfies Prisma.InputJsonValue;
 
     const event = await appendTimelineEvent(tx, universeId, {
@@ -353,6 +436,7 @@ export async function applyPersonaEvolution(
       applied: true,
       evolutionRevision: nextRevision,
       effectsApplied: pending.length,
+      effectsReverted: reverted.length,
       timelineEventId: event.id,
     };
   });
@@ -370,7 +454,14 @@ async function loadContextWithin(
       universeId: true,
       userId: true,
       driverProfile: { select: { id: true } },
-      persona: { include: { traits: true, traitEvolutions: true } },
+      persona: {
+        include: {
+          traits: true,
+          traitEvolutions: {
+            include: { sourceExperience: { select: { status: true } } },
+          },
+        },
+      },
     },
   });
   if (!character || character.universeId !== universeId || !character.driverProfile) {

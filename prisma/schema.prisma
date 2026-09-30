@@ -2123,6 +2123,11 @@ enum PilotMemoryStatus {
   INVALIDATED
 }
 
+enum PilotEvolutionStatus {
+  ACTIVE
+  SUPERSEDED
+}
+
 /// Acontecimento vivenciado pelo piloto, derivado deterministicamente de fatos
 /// do Universe. Nunca substitui RaceResult/Event/TimelineEvent; é resumo/marco.
 model PilotExperience {
@@ -2187,7 +2192,9 @@ model PersonaTraitEvolution {
 
   fingerprint String @unique
   appliedAt   DateTime @default(now())
+  status      PilotEvolutionStatus @default(ACTIVE)
 
   @@index([personaId, traitKey])
+  @@index([personaId, status])
   @@index([sourceExperienceId])
 }

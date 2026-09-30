@@ -69,6 +69,7 @@ const PREVIEW = {
     evolutionRevision: 0,
     pendingFingerprint: "fp-1",
     pendingCount: 1,
+    revertedEffects: [],
     traits: [
       {
         key: "confidence",
@@ -222,5 +223,45 @@ describe("pilot experience panels", () => {
       "O conjunto de efeitos pendentes mudou; gere um novo preview.",
     );
     expect(screen.queryByText(/Evolução aplicada/)).toBeNull();
+  });
+
+  it("8) revogação de efeito habilita apply mesmo sem pendências", async () => {
+    const user = userEvent.setup();
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path.endsWith("/evolution/preview")) {
+        return {
+          preview: {
+            ...PREVIEW.preview,
+            pendingCount: 0,
+            traits: [],
+            revertedEffects: [
+              {
+                id: "eff-1",
+                ruleCode: "FIRST_WORLD_CHAMPIONSHIP",
+                traitKey: "confidence",
+                experienceId: "x1",
+                reason: "Primeiro campeonato mundial neste Universe",
+              },
+            ],
+          },
+        };
+      }
+      if (path.endsWith("/evolution/apply")) {
+        return { evolution: { applied: true, evolutionRevision: 2, effectsApplied: 0, effectsReverted: 1, timelineEventId: "t2" } };
+      }
+      throw new Error(`unexpected POST ${path}`);
+    });
+    renderWithClient(<PilotEvolutionCard characterId="c1" />);
+    await user.click(screen.getByRole("button", { name: "Pré-visualizar evolução" }));
+    expect(await screen.findByText(/Revoga ajuste: Primeiro campeonato mundial/)).toBeDefined();
+    const applyButton = screen.getByRole("button", { name: "Aplicar evolução" });
+    expect(applyButton).toHaveProperty("disabled", false);
+    await user.click(applyButton);
+    await waitFor(() => {
+      expect(apiMock.post).toHaveBeenCalledWith("/api/pilot-context/c1/evolution/apply", {
+        expectedRevision: 0,
+        expectedPendingFingerprint: "fp-1",
+      });
+    });
   });
 });

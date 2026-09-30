@@ -60,6 +60,13 @@ export type EvolutionPreview = {
   evolutionRevision: number;
   pendingFingerprint: string;
   pendingCount: number;
+  revertedEffects: Array<{
+    id: string;
+    ruleCode: string;
+    traitKey: string;
+    experienceId: string | null;
+    reason: string;
+  }>;
   traits: Array<{
     key: string;
     label: string;

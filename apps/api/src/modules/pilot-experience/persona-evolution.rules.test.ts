@@ -120,4 +120,15 @@ describe("effective persona computation", () => {
     expect(forward[0]?.effectiveConfidence).toBe(1);
     expect(backward[0]?.effectiveConfidence).toBe(1);
   });
+
+  it("8) efeitos SUPERSEDED não somam ao efetivo", () => {
+    const traits = computeEffectiveTraits(
+      [{ key: "confidence", value: "x", confidence: 0.6, sourceKind: "EVIDENCE" }],
+      [
+        effect({ ruleCode: "R1", traitKey: "confidence", confidenceDelta: 0.06, status: "ACTIVE" }),
+        effect({ ruleCode: "R2", traitKey: "confidence", confidenceDelta: 0.03, status: "SUPERSEDED" }),
+      ],
+    );
+    expect(traits[0]?.effectiveConfidence).toBeCloseTo(0.66, 5);
+  });
 });

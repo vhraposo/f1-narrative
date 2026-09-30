@@ -131,7 +131,14 @@ export async function resolvePilotContext(
       universeId: true,
       biography: true,
       driverProfile: { select: { id: true } },
-      persona: { include: { traits: true, traitEvolutions: true } },
+      persona: {
+        include: {
+          traits: true,
+          traitEvolutions: {
+            include: { sourceExperience: { select: { status: true } } },
+          },
+        },
+      },
     },
   });
   if (!character) return null;
@@ -200,18 +207,25 @@ export async function resolvePilotContext(
           evolutionNotes: [] as string[],
         }))
       : [];
-  const evolutionEffects = (character.persona?.traitEvolutions ?? []).map((row) =>
-    toAppliedEffect({
-      ruleCode: row.ruleCode,
-      traitKey: row.traitKey,
-      confidenceDelta: row.confidenceDelta,
-      reason: row.reason,
-      sourceExperienceId: row.sourceExperienceId,
-      value: row.value,
-      rulePriority: row.rulePriority,
-      experienceTitle: null,
-    }),
-  );
+  const evolutionEffects = (character.persona?.traitEvolutions ?? [])
+    .filter(
+      (row) =>
+        row.status === "ACTIVE" &&
+        (row.sourceExperienceId === null || row.sourceExperience?.status === "ACTIVE"),
+    )
+    .map((row) =>
+      toAppliedEffect({
+        ruleCode: row.ruleCode,
+        traitKey: row.traitKey,
+        confidenceDelta: row.confidenceDelta,
+        reason: row.reason,
+        sourceExperienceId: row.sourceExperienceId,
+        value: row.value,
+        rulePriority: row.rulePriority,
+        experienceTitle: null,
+        status: row.status,
+      }),
+    );
   const baseTraits = (character.persona?.traits ?? []).map((trait) => ({
     key: trait.key,
     value: trait.value,

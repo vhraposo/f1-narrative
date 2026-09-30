@@ -189,6 +189,7 @@ export type AppliedEvolutionEffect = {
   readonly experienceTitle: string | null;
   readonly value: string | null;
   readonly priority: number;
+  readonly status?: "ACTIVE" | "SUPERSEDED";
 };
 
 export type EffectiveTrait = {
@@ -210,8 +211,9 @@ export function computeEffectiveTraits(
   baseTraits: readonly BaseTrait[],
   effects: readonly AppliedEvolutionEffect[],
 ): EffectiveTrait[] {
+  const activeEffects = effects.filter((effect) => effect.status !== "SUPERSEDED");
   const effectsByKey = new Map<string, AppliedEvolutionEffect[]>();
-  for (const effect of effects) {
+  for (const effect of activeEffects) {
     const list = effectsByKey.get(effect.traitKey) ?? [];
     list.push(effect);
     effectsByKey.set(effect.traitKey, list);
@@ -286,6 +288,7 @@ export type EvolutionEffectRow = {
   readonly value: string | null;
   readonly rulePriority: number;
   readonly experienceTitle: string | null;
+  readonly status?: "ACTIVE" | "SUPERSEDED";
 };
 
 export function toAppliedEffect(row: EvolutionEffectRow): AppliedEvolutionEffect {
@@ -298,5 +301,6 @@ export function toAppliedEffect(row: EvolutionEffectRow): AppliedEvolutionEffect
     experienceTitle: row.experienceTitle,
     value: row.value,
     priority: row.rulePriority,
+    ...(row.status !== undefined ? { status: row.status } : {}),
   };
 }

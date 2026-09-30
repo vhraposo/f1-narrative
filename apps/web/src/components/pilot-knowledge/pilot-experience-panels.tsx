@@ -389,7 +389,7 @@ export function PilotEvolutionCard({ characterId }: { characterId: string }) {
         )}
         {preview && (
           <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
-            {preview.pendingCount === 0 ? (
+            {preview.pendingCount === 0 && (preview.revertedEffects?.length ?? 0) === 0 ? (
               <p className="text-muted-foreground">Sem mudanças pendentes.</p>
             ) : (
               <ul className="space-y-2">
@@ -410,10 +410,22 @@ export function PilotEvolutionCard({ characterId }: { characterId: string }) {
                     )}
                   </li>
                 ))}
+                {(preview.revertedEffects ?? []).map((effect) => (
+                  <li key={effect.id} className="text-xs text-muted-foreground">
+                    Revoga ajuste: {effect.reason} ({effect.ruleCode})
+                  </li>
+                ))}
               </ul>
             )}
             <div className="flex gap-2 pt-1">
-              <Button size="sm" disabled={applyMutation.isPending || preview.pendingCount === 0} onClick={apply}>
+              <Button
+                size="sm"
+                disabled={
+                  applyMutation.isPending ||
+                  (preview.pendingCount === 0 && (preview.revertedEffects?.length ?? 0) === 0)
+                }
+                onClick={apply}
+              >
                 {applyMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Aplicar evolução
               </Button>

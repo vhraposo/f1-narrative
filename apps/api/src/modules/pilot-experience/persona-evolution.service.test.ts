@@ -219,4 +219,98 @@ describe("persona evolution service", () => {
     expect(after.fingerprint).not.toBe(before.fingerprint);
     expect(afterBlock.text).not.toBe(beforeBlock.text);
   });
+
+  it("6) baseline + deltas: invalidação da experiência revoga o efeito sem double-count", async () => {
+    const fixture = await createFixture("baseline", { evidenceTrait: true });
+    await prisma.personaTrait.updateMany({
+      where: { persona: { characterId: fixture.character.id }, key: "confidence" },
+      data: { confidence: 0.6 },
+    });
+    const e1 = await addChampionship(fixture.universe.id, fixture.character.id, 2025, "Título 2025");
+
+    const preview1 = await previewPersonaEvolution(fixture.universe.id, fixture.character.id);
+    expect(preview1.traits.find((trait) => trait.key === "confidence")?.afterConfidence).toBeCloseTo(0.66, 5);
+    const apply1 = await applyPersonaEvolution(fixture.universe.id, fixture.character.id, {
+      expectedRevision: preview1.evolutionRevision,
+      expectedPendingFingerprint: preview1.pendingFingerprint,
+    });
+    expect(apply1).toMatchObject({ applied: true, evolutionRevision: 1, effectsApplied: 1, effectsReverted: 0 });
+
+    const afterApply1 = await resolvePilotContext({ speakerCharacterId: fixture.character.id });
+    expect(
+      afterApply1?.effectivePersona.find((trait) => trait.key === "confidence")?.effectiveConfidence,
+    ).toBeCloseTo(0.66, 5);
+
+    const applyAgain = await applyPersonaEvolution(fixture.universe.id, fixture.character.id, {
+      expectedRevision: preview1.evolutionRevision + 1,
+      expectedPendingFingerprint: (await previewPersonaEvolution(fixture.universe.id, fixture.character.id))
+        .pendingFingerprint,
+    });
+    expect(applyAgain.applied).toBe(false);
+
+    const teamChange = await prisma.pilotExperience.create({
+      data: {
+        universeId: fixture.universe.id,
+        characterId: fixture.character.id,
+        experienceType: "TEAM_CHANGE",
+        source: "RACE_RESULT",
+        sourceKey: "team-change:scale:1",
+        salience: "MEDIUM",
+        title: "Mudança de equipe",
+      },
+    });
+    const preview2 = await previewPersonaEvolution(fixture.universe.id, fixture.character.id);
+    expect(preview2.pendingCount).toBe(1);
+    expect(
+      preview2.traits.find((trait) => trait.key === "behavioralTendencies")?.afterConfidence,
+    ).toBeCloseTo(0.52, 5);
+    const applied2 = await applyPersonaEvolution(fixture.universe.id, fixture.character.id, {
+      expectedRevision: preview2.evolutionRevision,
+      expectedPendingFingerprint: preview2.pendingFingerprint,
+    });
+    expect(applied2).toMatchObject({ applied: true, evolutionRevision: 2, effectsApplied: 1 });
+
+    const afterApply2 = await resolvePilotContext({ speakerCharacterId: fixture.character.id });
+    expect(
+      afterApply2?.effectivePersona.find((trait) => trait.key === "behavioralTendencies")?.effectiveConfidence,
+    ).toBeCloseTo(0.52, 5);
+
+    await prisma.pilotExperience.update({
+      where: { id: e1.id },
+      data: { status: "INVALIDATED", invalidationReason: "corrigido" },
+    });
+
+    const reverted = await resolvePilotContext({ speakerCharacterId: fixture.character.id });
+    expect(
+      reverted?.effectivePersona.find((trait) => trait.key === "confidence")?.effectiveConfidence,
+    ).toBeCloseTo(0.6, 5);
+
+    const preview3 = await previewPersonaEvolution(fixture.universe.id, fixture.character.id);
+    expect(preview3.pendingCount).toBe(0);
+    expect(preview3.revertedEffects).toHaveLength(1);
+    expect(preview3.revertedEffects[0]?.ruleCode).toBe("FIRST_WORLD_CHAMPIONSHIP");
+
+    const applied3 = await applyPersonaEvolution(fixture.universe.id, fixture.character.id, {
+      expectedRevision: preview3.evolutionRevision,
+      expectedPendingFingerprint: preview3.pendingFingerprint,
+    });
+    expect(applied3).toMatchObject({ applied: true, evolutionRevision: 3, effectsApplied: 0, effectsReverted: 1 });
+
+    const effectRows = await prisma.personaTraitEvolution.findMany({
+      where: { persona: { characterId: fixture.character.id } },
+      orderBy: [{ appliedAt: "asc" }],
+    });
+    const championship = effectRows.find((row) => row.ruleCode === "FIRST_WORLD_CHAMPIONSHIP");
+    expect(championship?.status).toBe("SUPERSEDED");
+    const teamRow = effectRows.find((row) => row.ruleCode === "TEAM_CHANGE_STABILITY");
+    expect(teamRow?.status).toBe("ACTIVE");
+
+    const finalView = await resolvePilotContext({ speakerCharacterId: fixture.character.id });
+    expect(
+      finalView?.effectivePersona.find((trait) => trait.key === "confidence")?.effectiveConfidence,
+    ).toBeCloseTo(0.6, 5);
+    expect(finalView?.evolution.revision).toBe(3);
+    expect(finalView?.evolution.notes ?? []).not.toContain("Primeiro campeonato mundial neste Universe");
+    void teamChange;
+  });
 });
