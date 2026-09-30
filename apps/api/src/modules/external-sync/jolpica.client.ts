@@ -52,6 +52,8 @@ export interface JolpicaRaceRaw {
 export interface JolpicaFastestLapRaw {
   rank?: string;
   lap?: string;
+  Time?: { time?: string };
+  AverageSpeed?: { units?: string; speed?: string };
 }
 
 export interface JolpicaResultRaw {

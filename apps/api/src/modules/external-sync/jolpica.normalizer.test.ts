@@ -169,7 +169,12 @@ describe("normalizeRaceResults", () => {
             status: "Finished",
             Driver: LAUDA,
             Constructor: FERRARI,
-            FastestLap: { rank: "1", lap: "53" },
+            FastestLap: {
+              rank: "1",
+              lap: "53",
+              Time: { time: "1:26.879" },
+              AverageSpeed: { units: "kph", speed: "171.831" },
+            },
           },
           {
             number: "11",
@@ -203,14 +208,18 @@ describe("normalizeRaceResults", () => {
       points: 9,
       grid: 1,
       fastestLap: true,
+      fastestLapTime: "1:26.879",
       status: "Finished",
     });
+    expect(lauda.sourceRecord.fastestLapTime).toBe("1:26.879");
     const hunt = results.find((r) => r.data.driverExternalId === "hunt")!;
     expect(hunt.data.fastestLap).toBe(false);
+    expect(hunt.data.fastestLapTime).toBeNull();
     const donnelly = results.find((r) => r.data.driverExternalId === "donnelly")!;
     expect(donnelly.data.position).toBe(30);
     expect(donnelly.data.grid).toBeNull();
     expect(donnelly.data.fastestLap).toBeNull();
+    expect(donnelly.data.fastestLapTime).toBeNull();
     expect(drivers).toHaveLength(3);
   });
 });

@@ -14,6 +14,7 @@ export const EVENT_CATEGORY_LABELS: Record<ExternalDriverEventCategory, string> 
   FIRST_PODIUM: "Primeiro pódio",
   FIRST_POLE: "Primeira pole",
   FIRST_WIN: "Primeira vitória",
+  FIRST_FASTEST_LAP: "Primeira volta mais rápida",
   FIRST_CHAMPIONSHIP: "Primeiro campeonato",
   CHAMPIONSHIP: "Campeonato mundial",
   TEAM_CHANGE: "Mudança de equipe",
@@ -149,6 +150,26 @@ export async function deriveMilestonesFromExternalData(
       summary: `Primeira vitória (${firstWin.externalRace.name ?? "corrida"}).`,
       importance: 5,
       dedupeKey: resultKey("FIRST_WIN", firstWin.externalRace.round, firstWin.externalRace.seasonYear),
+    });
+  }
+
+  const firstFastestLap = results.find((result) => result.fastestLap === true);
+  if (firstFastestLap) {
+    derived.push({
+      category: "FIRST_FASTEST_LAP",
+      title: `Primeira volta mais rápida em ${firstFastestLap.externalRace.seasonYear}`,
+      eventDate: firstFastestLap.externalRace.date,
+      seasonYear: firstFastestLap.externalRace.seasonYear,
+      externalRaceId: firstFastestLap.externalRaceId,
+      summary: firstFastestLap.fastestLapTime
+        ? `Primeira volta mais rápida (${firstFastestLap.fastestLapTime}).`
+        : `Primeira volta mais rápida registrada (${firstFastestLap.externalRace.name ?? "corrida"}).`,
+      importance: 4,
+      dedupeKey: resultKey(
+        "FIRST_FASTEST_LAP",
+        firstFastestLap.externalRace.round,
+        firstFastestLap.externalRace.seasonYear,
+      ),
     });
   }
 

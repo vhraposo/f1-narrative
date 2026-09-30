@@ -245,6 +245,49 @@ describe("pilot knowledge provisioning", () => {
     expect(profile.biographyDisplay).toBe("Biografia do provider.");
     expect(profile.biographySourceId).toBe(providerSource.id);
   });
+
+  it("6) atualização da temporada corrente não reescreve temporadas históricas", async () => {
+    const fixture = await createFixture("temporal", { withData: true, withIdentity: true, round: 13 });
+    await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    const seasonsBefore = await prisma.externalDriverSeason.findMany({
+      where: { externalDriverId: fixture.driver.id },
+      orderBy: { seasonYear: "asc" },
+    });
+    expect(seasonsBefore.map((season) => season.teamNameSnapshot)).toEqual([
+      "Equipe A",
+      "Equipe B",
+    ]);
+
+    await prisma.externalDriverSeason.create({
+      data: {
+        source: "jolpica",
+        externalDriverId: fixture.driver.id,
+        seasonYear: 2017,
+        teamNameSnapshot: "Equipe C",
+        number: 44,
+        contentHash: "s3-temporal",
+      },
+    });
+    const second = await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    expect(second.outcome).toBe("ALREADY_PROVISIONED");
+
+    const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    expect(profile.currentTeamName).toBe("Equipe C");
+    expect(profile.driverNumber).toBe(44);
+    expect(profile.biographyDisplay).toContain("Equipe C");
+    expect(profile.biographyDisplay).toContain("Equipe A");
+
+    const seasonsAfter = await prisma.externalDriverSeason.findMany({
+      where: { externalDriverId: fixture.driver.id, seasonYear: { in: [2015, 2016] } },
+      orderBy: { seasonYear: "asc" },
+    });
+    expect(seasonsAfter.map((season) => season.teamNameSnapshot)).toEqual([
+      "Equipe A",
+      "Equipe B",
+    ]);
+  });
 });
 
 

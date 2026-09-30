@@ -86,6 +86,8 @@ async function seedCareer(
     grid?: number | null;
     points?: number | null;
     date?: string;
+    fastestLap?: boolean;
+    fastestLapTime?: string;
   }>,
   options?: { readonly seasons?: ReadonlyArray<{ year: number; team: string }>; readonly titles?: readonly number[] },
 ) {
@@ -110,6 +112,8 @@ async function seedCareer(
         position: entry.position,
         grid: entry.grid ?? null,
         points: entry.points ?? null,
+        fastestLap: entry.fastestLap ?? null,
+        fastestLapTime: entry.fastestLapTime ?? null,
         status: "Finished",
         contentHash: `result-${driverId}-${entry.year}-${entry.round}`,
       },
@@ -160,7 +164,7 @@ describe("pilot historical events", () => {
         { year: 2015, round: 1, name: "GP A", position: 12, grid: 8, points: 0, date: "2015-03-15" },
         { year: 2015, round: 5, name: "GP B", position: 8, grid: 6, points: 4, date: "2015-05-10" },
         { year: 2016, round: 2, name: "GP C", position: 3, grid: 1, points: 15, date: "2016-04-03" },
-        { year: 2016, round: 8, name: "GP D", position: 1, grid: 2, points: 25, date: "2016-06-12" },
+        { year: 2016, round: 8, name: "GP D", position: 1, grid: 2, points: 25, date: "2016-06-12", fastestLap: true, fastestLapTime: "1:24.567" },
       ],
       { seasons: [{ year: 2015, team: "Toro Rosso" }, { year: 2016, team: "Red Bull" }], titles: [2021] },
     );
@@ -172,6 +176,7 @@ describe("pilot historical events", () => {
     expect(categories).toContain("FIRST_PODIUM");
     expect(categories).toContain("FIRST_POLE");
     expect(categories).toContain("FIRST_WIN");
+    expect(categories).toContain("FIRST_FASTEST_LAP");
     expect(categories).toContain("CHAMPIONSHIP");
     expect(categories).toContain("FIRST_CHAMPIONSHIP");
     expect(categories).toContain("TEAM_CHANGE");
@@ -180,6 +185,9 @@ describe("pilot historical events", () => {
     expect(debut?.seasonYear).toBe(2015);
     expect(debut?.externalRaceId).not.toBeNull();
     expect(first.find((event) => event.category === "CHAMPIONSHIP")?.seasonYear).toBe(2021);
+    const fastestLap = first.find((event) => event.category === "FIRST_FASTEST_LAP");
+    expect(fastestLap?.seasonYear).toBe(2016);
+    expect(fastestLap?.summary).toContain("1:24.567");
 
     const countAfterFirst = await prisma.externalDriverEvent.count({
       where: { externalDriverId: driver.id },

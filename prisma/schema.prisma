@@ -891,15 +891,16 @@ model ExternalResult {
   externalDriverId String         @db.Uuid
   externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Restrict)
 
-  position      Int?
-  points        Float?
-  grid          Int?
-  fastestLap    Boolean?
-  status        String?
-  contentHash   String
-  sourceRecord  Json?
-  firstSyncedAt DateTime @default(now())
-  lastSyncedAt  DateTime @default(now())
+  position       Int?
+  points         Float?
+  grid           Int?
+  fastestLap     Boolean?
+  fastestLapTime String?
+  status         String?
+  contentHash    String
+  sourceRecord   Json?
+  firstSyncedAt  DateTime @default(now())
+  lastSyncedAt   DateTime @default(now())
 
   bindings ExternalBindingResult[]
 
@@ -1836,6 +1837,7 @@ enum ExternalDriverEventCategory {
   FIRST_PODIUM
   FIRST_POLE
   FIRST_WIN
+  FIRST_FASTEST_LAP
   FIRST_CHAMPIONSHIP
   CHAMPIONSHIP
   TEAM_CHANGE

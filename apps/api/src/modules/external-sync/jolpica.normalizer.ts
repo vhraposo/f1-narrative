@@ -75,6 +75,7 @@ export interface NormalizedResult {
   points: number | null;
   grid: number | null;
   fastestLap: boolean | null;
+  fastestLapTime: string | null;
   status: string | null;
 }
 
@@ -198,6 +199,7 @@ export function normalizeRaceResults(
           points: toFloat(item.points),
           grid: toInt(item.grid),
           fastestLap: toFastestLap(item.FastestLap?.rank),
+          fastestLapTime: emptyToNull(item.FastestLap?.Time?.time),
           status: emptyToNull(item.status),
         },
         sourceRecord: {
@@ -211,6 +213,7 @@ export function normalizeRaceResults(
           grid: emptyToNull(item.grid),
           status: emptyToNull(item.status),
           fastestLapRank: emptyToNull(item.FastestLap?.rank),
+          fastestLapTime: emptyToNull(item.FastestLap?.Time?.time),
         },
       });
     }
