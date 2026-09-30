@@ -236,3 +236,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-058 — Sem `PERSONA_UPDATED` neste corte
 - **Decisão (V3.14.1):** nenhum evento novo de Timeline para Persona nesta fase; a Timeline permanece sem kind de Persona até a fase de evolução da Persona.
 - **Consequência:** a fundação persistente (D-050..D-057) permanece pura, sem sistema temporal de Persona; a auditoria temporal fica para a evolução futura via `persona.service` (D-053).
+
+## D-059 — Resolução de rules: ausência sem invenção, conflito classificado, mesmo status inválido
+- **Decisão (V3.14.2):** a resolução de confidence não inventa valor na ausência de evidência `APPROVED` (retorna `NONE`); o plano de reconcile remove trait `EVIDENCE` sem autoridade e nunca altera trait `MANUAL`. Conflito entre evidências `APPROVED` do mesmo `traitKey` não é erro: a autoritativa vem do comparator de D-055 e as demais são classificadas como suporte (mesmo `proposedValue`) ou conflitantes (valor diferente), sempre preservadas. Transição de status para o mesmo estado é explicitamente inválida (`SAME_STATUS`, distinta de `INVALID_TRANSITION`).
+- **Consequência:** service/API/UI apenas consomem decisões determinísticas já resolvidas; nenhuma média/peso/LLM e nenhuma exceção para conflito; regras testáveis em memória, sem banco.
