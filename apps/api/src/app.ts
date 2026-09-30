@@ -69,6 +69,10 @@ import type { StorageProvider } from "./infrastructure/storage/storage-provider.
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
 import {
+  pilotKnowledgeRoutes,
+  type PilotKnowledgeRoutesOptions,
+} from "./modules/pilot-knowledge/pilot-knowledge.routes.js";
+import {
   OpeningGridClient,
 } from "./modules/opening-grid/opening-grid.client.js";
 import { OpeningGridTransport } from "./modules/opening-grid/opening-grid.transport.js";
@@ -104,6 +108,7 @@ export function buildApp(
   openingGridClient?: OpeningGridClient,
   openF1Client?: OpenF1Client,
   storageProvider?: StorageProvider,
+  pilotKnowledgeOptions?: PilotKnowledgeRoutesOptions,
 ): FastifyInstance {
   const app = Fastify({
     logger: {
@@ -225,6 +230,7 @@ export function buildApp(
   void app.register(universeInitRoutes);
   void app.register(playerEntryRoutes);
   void app.register(universeEditorRoutes);
+  void app.register(pilotKnowledgeRoutes, pilotKnowledgeOptions ?? {});
 
   return app;
 }
