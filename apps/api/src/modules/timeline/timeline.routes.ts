@@ -17,6 +17,7 @@ import {
   queryTimelineItems,
 } from "./timeline.read.js";
 import { buildDivergenceReport } from "./divergence.service.js";
+import { buildTimelineEventEditModel } from "./timeline.editor.js";
 import {
   applyChampionChange,
   getChampionDetail,
@@ -300,7 +301,11 @@ export const timelineRoutes: FastifyPluginAsync = async (fastify) => {
           universe.id,
           params.data.eventId,
         );
-        return reply.send(detail);
+        const edit = await buildTimelineEventEditModel(
+          universe.id,
+          detail.item,
+        );
+        return reply.send({ ...detail, edit });
       } catch (error) {
         if (sendTimelineError(reply, error)) return;
         throw error;
