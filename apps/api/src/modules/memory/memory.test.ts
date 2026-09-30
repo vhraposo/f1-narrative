@@ -449,6 +449,60 @@ describe("Memory - ownership vs participação (Characters USER e AI)", () => {
     });
     expect(addParticipant.statusCode).toBe(404);
   });
+
+  it("F) outsider não consegue anexar Character USER de outro usuário (404 leak-safe)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      headers: { cookie: outsider.cookie },
+      payload: {
+        content: "Tentativa de sequestrar personagem alheio",
+        characterIds: [aiB.id, charA.id],
+        importance: "LOW",
+        source: "USER_DEFINED",
+      },
+      remoteAddress: "10.77.1.1",
+    });
+    expect(res.statusCode).toBe(404);
+
+    const ownerMemories = await app.inject({
+      method: "GET",
+      url: "/api/memories",
+      headers: { cookie: owner.cookie },
+      remoteAddress: "10.77.1.2",
+    });
+    const contents = (ownerMemories.json().memories as Memory[]).map((m) => m.content);
+    expect(contents).not.toContain("Tentativa de sequestrar personagem alheio");
+  });
+
+  it("G) participantes não expõem userId interno", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      headers: { cookie: owner.cookie },
+      payload: {
+        content: "Memória sem leak de userId",
+        characterIds: [charA.id],
+        importance: "LOW",
+        source: "USER_DEFINED",
+      },
+      remoteAddress: "10.77.1.3",
+    });
+    expect(res.statusCode).toBe(201);
+    const memoryId = (res.json().memory as Memory).id;
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/memories/${memoryId}`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: "10.77.1.4",
+    });
+    const participants = detail.json().memory.participants as Array<Record<string, unknown>>;
+    expect(participants.length).toBeGreaterThan(0);
+    for (const participant of participants) {
+      expect(participant).not.toHaveProperty("userId");
+      expect(participant).toHaveProperty("controlledBy");
+    }
+  });
 });
 
 describe("Memory - CRUD", () => {

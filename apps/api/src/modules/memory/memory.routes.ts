@@ -12,15 +12,14 @@ import {
 } from "./memory.schema.js";
 
 // select mínimo de Character reutilizado para os participantes de uma Memory.
-// controlledBy/userId permitem à UI distinguir Characters USER de AI (entidade
-// central do domínio); não altera schema, apenas expõe campos já existentes.
+// controlledBy permite à UI distinguir Characters USER de AI (entidade central
+// do domínio); userId interno nunca é exposto.
 const characterMinSelect = {
   id: true,
   name: true,
   nationality: true,
   imageUrl: true,
   controlledBy: true,
-  userId: true,
 } as const;
 
 const memorySelect = {
@@ -74,6 +73,10 @@ function isConflict(error: unknown): boolean {
   );
 }
 
+function isMissing(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
+}
+
 // Indica se um Character pertence ao usuário autenticado (ownership direta).
 async function isOwnedByUser(characterId: string, userId: string): Promise<boolean> {
   const character = await prisma.character.findFirst({
@@ -83,10 +86,23 @@ async function isOwnedByUser(characterId: string, userId: string): Promise<boole
   return character !== null;
 }
 
-// Verifica apenas se um Character existe (USER ou AI), sem exigir propriedade.
-async function characterExists(characterId: string): Promise<boolean> {
-  const character = await prisma.character.findUnique({
-    where: { id: characterId },
+// Indica se um Character pode ser associado pelo usuário: personagem próprio,
+// personagem AI do próprio Universe ou catálogo global de AI. Characters de
+// outro usuário/Universe não são alcançáveis (404, sem vazar existência).
+async function characterAccessible(characterId: string, userId: string): Promise<boolean> {
+  const universe = await prisma.universe.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  const character = await prisma.character.findFirst({
+    where: {
+      id: characterId,
+      OR: [
+        { userId },
+        ...(universe ? [{ universeId: universe.id }] : []),
+        { userId: null, universeId: null },
+      ],
+    },
     select: { id: true },
   });
   return character !== null;
@@ -188,15 +204,15 @@ export const memoryRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      // Participantes iniciais: todos precisam EXISTIR (404 se algum não existir).
-      // Não é exigido que todos pertençam ao usuário: a Memory pode envolver
-      // Characters USER e AI. Exige-se que AO MENOS um pertença ao usuário
-      // (ownership da Memory ancorada na participação de um Character próprio).
+      // Participantes iniciais: todos precisam ser alcançáveis pelo usuário
+      // (próprios, AI do próprio Universe ou catálogo global). Exige-se que AO
+      // MENOS um pertença ao usuário (ownership da Memory ancorada na
+      // participação de um Character próprio); 404 preserva o não vazamento.
       const characterIds = parsed.data.characterIds;
       let ownsAny = false;
       for (const characterId of characterIds) {
-        const exists = await characterExists(characterId);
-        if (!exists) {
+        const accessible = await characterAccessible(characterId, userId);
+        if (!accessible) {
           return reply.code(404).send({
             error: "Personagem não encontrado",
             code: "NOT_FOUND",
@@ -337,33 +353,44 @@ export const memoryRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      const memory = await prisma.memory.update({
-        where: { id: accessible },
-        data: {
-          ...(parsed.data.content !== undefined
-            ? { content: parsed.data.content }
-            : {}),
-          ...(parsed.data.summary !== undefined
-            ? { summary: parsed.data.summary }
-            : {}),
-          ...(parsed.data.context !== undefined
-            ? { context: normalizeContext(parsed.data.context) }
-            : {}),
-          ...(parsed.data.importance !== undefined
-            ? { importance: parsed.data.importance }
-            : {}),
-          ...(parsed.data.source !== undefined
-            ? { source: parsed.data.source }
-            : {}),
-          ...(parsed.data.emotionalImpact !== undefined
-            ? { emotionalImpact: parsed.data.emotionalImpact }
-            : {}),
-          ...(parsed.data.eventId !== undefined
-            ? { eventId: parsed.data.eventId }
-            : {}),
-        },
-        select: memoryWithParticipantsSelect,
-      });
+      let memory;
+      try {
+        memory = await prisma.memory.update({
+          where: { id: accessible },
+          data: {
+            ...(parsed.data.content !== undefined
+              ? { content: parsed.data.content }
+              : {}),
+            ...(parsed.data.summary !== undefined
+              ? { summary: parsed.data.summary }
+              : {}),
+            ...(parsed.data.context !== undefined
+              ? { context: normalizeContext(parsed.data.context) }
+              : {}),
+            ...(parsed.data.importance !== undefined
+              ? { importance: parsed.data.importance }
+              : {}),
+            ...(parsed.data.source !== undefined
+              ? { source: parsed.data.source }
+              : {}),
+            ...(parsed.data.emotionalImpact !== undefined
+              ? { emotionalImpact: parsed.data.emotionalImpact }
+              : {}),
+            ...(parsed.data.eventId !== undefined
+              ? { eventId: parsed.data.eventId }
+              : {}),
+          },
+          select: memoryWithParticipantsSelect,
+        });
+      } catch (error) {
+        if (isMissing(error)) {
+          return reply.code(404).send({
+            error: "Memória não encontrada",
+            code: "NOT_FOUND",
+          });
+        }
+        throw error;
+      }
 
       return reply.send({ memory: flattenMemory(memory) });
     },
@@ -477,10 +504,10 @@ export const memoryRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Valida que o Character EXISTE (USER ou AI). Caracteres AI podem ser
-      // associados livremente; a autorização sobre a Memory já foi garantida
-      // pelo gate accessibleMemoryId acima.
-      if (!(await characterExists(parsed.data.characterId))) {
+      // Valida que o Character é alcançável pelo usuário (próprio, AI do
+      // próprio Universe ou catálogo global); a autorização sobre a Memory já
+      // foi garantida pelo gate accessibleMemoryId acima.
+      if (!(await characterAccessible(parsed.data.characterId, userId))) {
         return reply.code(404).send({
           error: "Personagem não encontrado",
           code: "NOT_FOUND",
