@@ -339,7 +339,7 @@ describe("pilot relationships", () => {
         displayName: "Colega",
         state: "ACTIVE",
       }),
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 });
 
     const created = await createUniverseDriverRelationship(owner.user.id, owner.character.id, {
       kind: "TEAMMATE",

@@ -200,12 +200,42 @@ export type RelationshipEntryView = {
   }>;
 };
 
+export type UniverseDriverRelationshipView = {
+  readonly id: string;
+  readonly kind: DriverRelationshipKind;
+  readonly targetType: DriverRelationshipTarget;
+  readonly targetCharacterId: string | null;
+  readonly targetWikidataQid: string | null;
+  readonly displayName: string;
+  readonly state: DriverRelationshipState;
+  readonly validFrom: Date | null;
+  readonly validTo: Date | null;
+  readonly updatedAt: Date;
+};
+
+function toUniverseDriverRelationshipView(
+  row: UniverseDriverRelationship,
+): UniverseDriverRelationshipView {
+  return {
+    id: row.id,
+    kind: row.kind,
+    targetType: row.targetType,
+    targetCharacterId: row.targetCharacterId,
+    targetWikidataQid: row.targetWikidataQid,
+    displayName: row.displayName,
+    state: row.state,
+    validFrom: row.validFrom,
+    validTo: row.validTo,
+    updatedAt: row.updatedAt,
+  };
+}
+
 export type PilotRelationshipsView =
   | { readonly available: false; readonly reason: "CHARACTER_NOT_FOUND" | "NO_EXTERNAL_BINDING" }
   | {
       readonly available: true;
       readonly entries: readonly RelationshipEntryView[];
-      readonly universeOverrides: readonly UniverseDriverRelationship[];
+      readonly universeOverrides: readonly UniverseDriverRelationshipView[];
     };
 
 function compareOverrideRows(a: UniverseDriverRelationship, b: UniverseDriverRelationship): number {
@@ -343,7 +373,11 @@ export async function getPilotRelationshipsView(
 
   const order = Object.keys(RELATIONSHIP_KIND_LABELS) as DriverRelationshipKind[];
   entries.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || a.kind.localeCompare(b.kind));
-  return { available: true, entries, universeOverrides: overrides };
+  return {
+    available: true,
+    entries,
+    universeOverrides: overrides.map(toUniverseDriverRelationshipView),
+  };
 }
 
 export type UniverseRelationshipInput = {
@@ -372,7 +406,7 @@ export async function createUniverseDriverRelationship(
   userId: string,
   characterId: string,
   input: UniverseRelationshipInput,
-): Promise<UniverseDriverRelationship> {
+): Promise<UniverseDriverRelationshipView> {
   const character = await loadOwnedCharacter(userId, characterId);
   if (input.displayName.trim().length === 0) {
     throw new PilotKnowledgeError("VALIDATION_ERROR", "displayName obrigatório", 400);
@@ -386,10 +420,10 @@ export async function createUniverseDriverRelationship(
       select: { id: true },
     });
     if (!target) {
-      throw new PilotKnowledgeError("VALIDATION_ERROR", "Personagem alvo fora deste Universe", 400);
+      throw new PilotKnowledgeError("NOT_FOUND", "Personagem alvo não encontrado", 404);
     }
   }
-  return prisma.universeDriverRelationship.create({
+  const created = await prisma.universeDriverRelationship.create({
     data: {
       universeId: character.universeId as string,
       characterId,
@@ -404,6 +438,7 @@ export async function createUniverseDriverRelationship(
       createdById: userId,
     },
   });
+  return toUniverseDriverRelationshipView(created);
 }
 
 async function loadOwnedRelationship(userId: string, id: string) {
@@ -421,25 +456,40 @@ export async function updateUniverseDriverRelationship(
   userId: string,
   id: string,
   input: Partial<UniverseRelationshipInput>,
-): Promise<UniverseDriverRelationship> {
+): Promise<UniverseDriverRelationshipView> {
   await loadOwnedRelationship(userId, id);
   if (input.displayName !== undefined && input.displayName.trim().length === 0) {
     throw new PilotKnowledgeError("VALIDATION_ERROR", "displayName obrigatório", 400);
   }
-  return prisma.universeDriverRelationship.update({
-    where: { id },
-    data: {
-      ...(input.kind !== undefined ? { kind: input.kind } : {}),
-      ...(input.state !== undefined ? { state: input.state } : {}),
-      ...(input.displayName !== undefined ? { displayName: input.displayName.trim() } : {}),
-      ...(input.validFrom !== undefined ? { validFrom: input.validFrom } : {}),
-      ...(input.validTo !== undefined ? { validTo: input.validTo } : {}),
-      ...(input.targetWikidataQid !== undefined ? { targetWikidataQid: input.targetWikidataQid } : {}),
-    },
-  });
+  try {
+    const updated = await prisma.universeDriverRelationship.update({
+      where: { id },
+      data: {
+        ...(input.kind !== undefined ? { kind: input.kind } : {}),
+        ...(input.state !== undefined ? { state: input.state } : {}),
+        ...(input.displayName !== undefined ? { displayName: input.displayName.trim() } : {}),
+        ...(input.validFrom !== undefined ? { validFrom: input.validFrom } : {}),
+        ...(input.validTo !== undefined ? { validTo: input.validTo } : {}),
+        ...(input.targetWikidataQid !== undefined ? { targetWikidataQid: input.targetWikidataQid } : {}),
+      },
+    });
+    return toUniverseDriverRelationshipView(updated);
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2025") {
+      throw new PilotKnowledgeError("RELATIONSHIP_NOT_FOUND", "Relacionamento não encontrado", 404);
+    }
+    throw error;
+  }
 }
 
 export async function deleteUniverseDriverRelationship(userId: string, id: string): Promise<void> {
   await loadOwnedRelationship(userId, id);
-  await prisma.universeDriverRelationship.delete({ where: { id } });
+  try {
+    await prisma.universeDriverRelationship.delete({ where: { id } });
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2025") {
+      throw new PilotKnowledgeError("RELATIONSHIP_NOT_FOUND", "Relacionamento não encontrado", 404);
+    }
+    throw error;
+  }
 }
