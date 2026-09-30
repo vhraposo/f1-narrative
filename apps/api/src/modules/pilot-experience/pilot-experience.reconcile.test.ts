@@ -368,4 +368,77 @@ describe("pilot experience reconciliation", () => {
     });
     expect(crossUniverse).toBe(0);
   });
+
+  it("7) reconciliações concorrentes não duplicam experiences nem memories ACTIVE", async () => {
+    const fixture = await createFixture("concurrent");
+    await Promise.all([
+      reconcilePilotExperiences({
+        universeId: fixture.universe.id,
+        characterId: fixture.character.id,
+      }),
+      reconcilePilotExperiences({
+        universeId: fixture.universe.id,
+        characterId: fixture.character.id,
+      }),
+    ]);
+
+    const experiences = await prisma.pilotExperience.findMany({
+      where: { characterId: fixture.character.id },
+    });
+    const naturalKeys = experiences.map((row) => `${row.source}:${row.sourceKey}`);
+    expect(new Set(naturalKeys).size).toBe(naturalKeys.length);
+
+    const activeMemories = await prisma.memory.findMany({
+      where: {
+        universeId: fixture.universe.id,
+        derivation: { not: "MANUAL" },
+        status: "ACTIVE",
+      },
+    });
+    const activeKeys = activeMemories.map((row) => row.derivedKey);
+    expect(new Set(activeKeys).size).toBe(activeKeys.length);
+  });
+
+  it("8) reconciliação concorrente com correção mantém estado consistente (sem híbrido)", async () => {
+    const fixture = await createFixture("race-race");
+    await reconcilePilotExperiences({
+      universeId: fixture.universe.id,
+      characterId: fixture.character.id,
+    });
+
+    const command = {
+      kind: "RACE_RESULT_CORRECTED" as const,
+      worldDate: new Date("2026-03-02T00:00:00.000Z"),
+      raceId: fixture.race.id,
+      driverProfileId: fixture.driverProfileId,
+      position: 5,
+      supersedesId: null,
+    };
+    const preview = await previewCorrection(fixture.universe.id, command);
+
+    const [applied, reconciled] = await Promise.all([
+      applyCorrection(fixture.universe.id, command, preview.previewToken),
+      reconcilePilotExperiences({
+        universeId: fixture.universe.id,
+        characterId: fixture.character.id,
+      }),
+    ]);
+    expect(applied.kind).toBe("RACE_RESULT_CORRECTED");
+    expect(reconciled.experiences.invalidated).toBeGreaterThanOrEqual(0);
+
+    const activeWinMemory = await prisma.memory.findFirst({
+      where: {
+        universeId: fixture.universe.id,
+        derivedKey: `race:${fixture.race.id}:win:first-win-memory`,
+        status: "ACTIVE",
+      },
+    });
+    expect(activeWinMemory).toBeNull();
+    const experiences = await prisma.pilotExperience.findMany({
+      where: { characterId: fixture.character.id, raceId: fixture.race.id },
+    });
+    const winExperience = experiences.find((row) => row.sourceKey === `race:${fixture.race.id}:win`);
+    expect(winExperience?.status).toBe("INVALIDATED");
+    expect(winExperience?.revision).toBeGreaterThan(1);
+  });
 });

@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { lockUniverseTimeline } from "../timeline/timeline.service.js";
 import {
   deriveExperiences,
   filterApplicableExperiences,
@@ -42,7 +43,16 @@ export type ReconcileInput = {
 
 export async function reconcilePilotExperiences(
   input: ReconcileInput,
-  db: Db = prisma,
+): Promise<ReconcileReport> {
+  return prisma.$transaction(async (tx) => {
+    await lockUniverseTimeline(tx, input.universeId);
+    return reconcilePilotExperiencesWithin(tx, input);
+  });
+}
+
+async function reconcilePilotExperiencesWithin(
+  db: Db,
+  input: ReconcileInput,
 ): Promise<ReconcileReport> {
   const now = input.now ?? new Date();
   const character = await db.character.findUnique({
@@ -393,7 +403,11 @@ export async function invalidatePilotExperienceForCorrection(
 
   await tx.pilotExperience.updateMany({
     where: { id: { in: affected.map((row) => row.id) } },
-    data: { status: "INVALIDATED", invalidationReason: reason },
+    data: {
+      status: "INVALIDATED",
+      invalidationReason: reason,
+      revision: { increment: 1 },
+    },
   });
 
   const derivedMemories = await tx.memory.findMany({
