@@ -533,6 +533,13 @@ describe("JolpicaSync routes — endpoint admin-only", () => {
     await prisma.externalDriverSeason.deleteMany({ where: { source: JOLPICA_SOURCE, externalDriver: { externalId: { in: syncDriverIds } } } });
     await prisma.externalDriverSeason.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: { in: syncYears } } });
     await prisma.externalRace.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: { in: syncYears } } });
+    await prisma.externalCircuit.deleteMany({
+      where: {
+        source: JOLPICA_SOURCE,
+        externalId: { in: ["buenos_aires", "interlagos"] },
+        races: { none: {} },
+      },
+    });
     await prisma.externalDriver.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: syncDriverIds } } });
     await prisma.externalTeam.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: ["mclaren", "ferrari"] } } });
     await prisma.externalSeason.deleteMany({ where: { source: JOLPICA_SOURCE, year: { in: syncYears } } });
