@@ -723,3 +723,27 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `feat(v3): add persona api`.
+
+### STEP 7 — Generation Context / Prompt Integration
+- **Implementação:** `persona.prompt.ts` (renderer puro) + integração em `generation.assembly.ts`: a Persona do speaker é carregada com 1 query (`characterPersona.findUnique`, sem evidence) e renderizada no slot existente `CHARACTER_DNA` com preâmbulo de tendência (D-060); precedência Persona → dna legado → biography → omissão; caps 600/12/200/2000 com reasons `persona-summary-truncated`/`persona-traits-truncated`/`persona-block-truncated`; `SECTION_IDS`/numeração/`contextVersion`/SSE/projeção inalterados; nenhuma seção nova, nenhum pipeline novo.
+- **Testes:** `generation-persona.test.ts` **33/33** (renderer/caps/confiança ausente, slot, precedência, multi-speaker, generationKey A–D, evidence ausente do prompt, memory/relationship/current-turn/RAG preservados, NullProvider, projeção). Módulos generation+persona **716/716**; ai-behavior **15/15**. Typecheck 0; lint 0.
+
+### Commit
+- `feat(v3): integrate persona with generation` (862f8c4).
+
+### STEP 8 — Persona UI
+- **Implementação:** `lib/persona.ts` + `hooks/use-persona.ts` (React Query, invalidação por personagem) + `components/persona/persona-section.tsx`: summary editável/limpável, traits com labels do registry, badges Manual/Baseada em evidência, formulário de evidência, lista com status (Pendente/Aprovada/Rejeitada), papéis (Aplicada/Suporte/Conflito), “Manual prevalece”, confiança qualitativa (nunca decimal), revisão ADMIN (Aprovar/Rejeitar), estados loading/empty/erro/saving/validation. Seções integradas nas páginas de Character (sem evidências) e Driver (com evidências); Chat/seletores intactos; nenhuma regra de domínio no frontend.
+- **Testes:** `persona-section.integration.test.tsx` **20/20** + 2 testes de página (Character/Driver) + mocks de sessão nos testes existentes. Suíte Web **440/440** (antes 418); typecheck Web 0; lint Web 0 (warnings pré-existentes de `<img>`/unused); `next build` exit 0.
+
+### Commit
+- `feat(v3): add persona ui` (520c7cc).
+
+### STEP 9 — End-to-End / Hardening / QA / Documentation
+- **E2E:** `persona.e2e.test.ts` **17/17**: fluxo A–T completo (persona manual → view → prompt → mudança de GenerationKey → evidence PROPOSED → approve ADMIN → reconcile EVIDENCE → prompt → override MANUAL → reject → DELETE sem ressurreição com evidence preservada), origins (ORIGINAL/REAL_DRIVER/AI_CHARACTER + catálogo global), DNA fallback (dna/bio/omissão/persona vence), multi-speaker/isolamento por Universe (mesmo piloto factual), prompt injection confinada ao bloco (seções estáveis, GLOBAL_RULES intacta) e performance (1 query de persona, 0 de evidence).
+- **Regressão completa:** API **2186/2186** (123 arquivos) em **duas execuções seguidas no mesmo TEST DB** sem flakiness; Web **440/440**; typecheck API/Web 0; lint API/Web 0; build Web exit 0.
+- **Banco:** TEST com 28 migrations, personas/traits/evidences **0 resíduos**, FKs/índices corretos; DEV intacto (27 migrations, 60 tabelas, 17 usuários, sem tabelas de Persona).
+- **Docs:** architecture com status final; OQ-1..OQ-8 resolvidas com defaults; D-060 registrada; `docs/v3.14-final-report.md` criado (arquitetura, testes, segurança, limitações e checklist).
+- **Limitações registradas:** revisão ADMIN global (D-057); `PERSONA_UPDATED` fora da V3.14 (D-058); `Character.dna` mantido como fallback (OQ-6); AI Behavior não lê Persona (OQ-4).
+
+### Commit
+- `feat(v3): complete driver persona`.
