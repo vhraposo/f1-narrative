@@ -49,6 +49,15 @@ export interface StandingCorrectionPayload {
   position?: number | null;
 }
 
+export interface SessionResultCorrectionPayload {
+  raceId: string;
+  driverProfileId: string;
+  session?: "SPRINT";
+  position?: number | null;
+  status?: string | null;
+  eligibility?: { neutralizedStart: boolean; distancePct: number } | null;
+}
+
 export interface NumberCorrectionPayload {
   seasonId: string;
   driverProfileId: string;
@@ -271,6 +280,43 @@ async function applyTimelineEvent(
         where: {
           raceId: payload.raceId,
           driverProfileId: payload.driverProfileId,
+        },
+        data,
+      });
+      const race = await tx.race.findFirst({
+        where: { id: payload.raceId, season: { universeId } },
+        select: { seasonId: true },
+      });
+      if (race) {
+        await recomputeSeasonStandings(tx, race.seasonId);
+      }
+      return;
+    }
+    case "RACE_SESSION_RESULT_CORRECTED": {
+      const payload = event.payload as unknown as SessionResultCorrectionPayload;
+      const data: Prisma.RaceSessionResultUpdateManyMutationInput = {};
+      if (payload.position !== undefined) data.position = payload.position;
+      if (payload.status !== undefined) data.status = payload.status;
+      if (payload.eligibility !== undefined && payload.eligibility !== null) {
+        const existing = await tx.raceSessionResult.findFirst({
+          where: {
+            raceId: payload.raceId,
+            driverProfileId: payload.driverProfileId,
+            session: "SPRINT",
+          },
+          select: { metadata: true },
+        });
+        const metadata = (existing?.metadata ?? {}) as Record<string, unknown>;
+        data.metadata = {
+          ...metadata,
+          eligibility: payload.eligibility,
+        } as Prisma.InputJsonValue;
+      }
+      await tx.raceSessionResult.updateMany({
+        where: {
+          raceId: payload.raceId,
+          driverProfileId: payload.driverProfileId,
+          session: "SPRINT",
         },
         data,
       });

@@ -799,3 +799,14 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Limitações:** apply repetido com token novo gera nova correção redundante (auditável); UI ainda não expõe preview/apply (V3.15.6/8).
 - **Commit:** `feat(v3): add timeline correction apply and recompute`.
 - **Próximo passo:** V3.15.5 — correções de RaceResult e Sprint (enum + applyTimelineEvent).
+
+### V3.15.5 — Race and Sprint Historical Corrections
+- **Objetivo:** suporte de produção aos kinds `RACE_RESULT_CORRECTED` (position/status/grid; points derivados) e `RACE_SESSION_RESULT_CORRECTED` (position/status/elegibilidade; pontos derivados).
+- **Migrations:** `20260930130000_add_session_result_correction_kind` (aditiva: `ALTER TYPE "TimelineEventKind" ADD VALUE`), aplicada apenas no TEST; enum também adicionado ao `schema.prisma` com generate seguro (`--no-engine` → normal). DEV permanece em 27 migrations.
+- **Arquivos:** `timeline.service.ts` (payload de sessão + case no replay: update RaceSessionResult, merge de `metadata.eligibility`, recompute de standings), `correction.service.ts` (cast removido), `timeline.read.ts` (filtro de correções inclui o novo kind), `correction.race-sprint.test.ts`.
+- **Testes:** `correction.race-sprint.test.ts` 5/5 (P→pontos derivados + standings + supersession; sprint posição→tabela 8..1; elegibilidade 40% → 0 pontos; leitura expõe kind/valores); módulo timeline 49/49.
+- **Typecheck:** 0. **Lint:** 0.
+- **Problemas:** enum precisava constar no schema Prisma além do SQL (client exigia); resíduo legado de fixtures falhas limpo no TEST.
+- **Decisões:** nenhuma nova.
+- **Limitações:** correção não cria pontos de fastest-lap/meio-ponto (inexistentes no motor); elegibilidade apenas no Sprint.
+- **Commit:** `feat(v3): add race and sprint historical corrections`.

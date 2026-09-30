@@ -378,6 +378,7 @@ export async function queryTimelineItems(
     where.kind = {
       in: [
         "RACE_RESULT_CORRECTED",
+        "RACE_SESSION_RESULT_CORRECTED",
         "STANDING_CORRECTED",
         "NUMBER_CORRECTED",
       ] as TimelineEvent["kind"][],

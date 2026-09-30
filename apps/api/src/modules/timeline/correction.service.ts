@@ -535,7 +535,7 @@ export async function applyCorrectionWithinTransaction(
   await createPreCorrectionCheckpoint(tx, universeId, command.worldDate);
 
   const event = await appendTimelineEvent(tx, universeId, {
-    kind: command.kind as TimelineEvent["kind"],
+    kind: command.kind,
     worldDate: command.worldDate,
     payload: correctionPayload(command),
     causedBy: "USER",
