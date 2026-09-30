@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
@@ -251,7 +252,7 @@ describe("Memory - validação e ownership da criação", () => {
   it("character inexistente -> 404", async () => {
     const res = await createMemory(owner, {
       content: "X",
-      characterIds: [crypto.randomUUID()],
+      characterIds: [randomUUID()],
     });
     expect(res.statusCode).toBe(404);
   });
@@ -277,7 +278,7 @@ describe("Memory - validação e ownership da criação", () => {
   it("GET /api/characters/:id/memories em character inexistente -> 404", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/characters/${crypto.randomUUID()}/memories`,
+      url: `/api/characters/${randomUUID()}/memories`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);
@@ -503,7 +504,7 @@ describe("Memory - CRUD", () => {
     const res = await createMemory(owner, {
       content: "X",
       characterIds: [charA.id],
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
     });
     expect(res.statusCode).toBe(404);
   });
@@ -553,7 +554,7 @@ describe("Memory - CRUD", () => {
   it("GET /api/memories/:id inexistente -> 404", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/memories/${crypto.randomUUID()}`,
+      url: `/api/memories/${randomUUID()}`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);
@@ -607,7 +608,7 @@ describe("Memory - CRUD", () => {
       method: "PATCH",
       url: `/api/memories/${memoryId}`,
       headers: { cookie: owner.cookie },
-      payload: { eventId: crypto.randomUUID() },
+      payload: { eventId: randomUUID() },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -693,12 +694,12 @@ describe("Memory - participants (MemoryCharacter)", () => {
   });
 
   it("Character inexistente -> 404", async () => {
-    const res = await addMemoryCharacter(owner, memozinhaId, crypto.randomUUID());
+    const res = await addMemoryCharacter(owner, memozinhaId, randomUUID());
     expect(res.statusCode).toBe(404);
   });
 
   it("Memory inexistente -> 404", async () => {
-    const res = await addMemoryCharacter(owner, crypto.randomUUID(), charA.id);
+    const res = await addMemoryCharacter(owner, randomUUID(), charA.id);
     expect(res.statusCode).toBe(404);
   });
 

@@ -656,3 +656,24 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `fix(v3): recover stale ai decisions`.
+
+---
+
+## V3.13 — Tech Debt / QA Hardening
+
+### Subfase A — Baseline de testes
+- Suíte API completa em banco recriado: **1853/1853 (100%)**, repetida no mesmo DB (resíduo): **1853/1853**. As 3 falhas históricas do baseline V3.00 (`1659/1662` do roadmap) **não existem mais** — foram resolvidas incidentalmente ao longo das fases da V3 (fixtures de reconciliação/universo e flaky de resíduo tratados nas Fases 3/4/7). Não houve alteração de código nem commit nesta subfase.
+- Web completo: **418/418**.
+
+### Subfase B — Typecheck / lint debt
+- **API lint: 30 → 0** (todas correções mecânicas e seguras, sem mudança semântica):
+  - imports não usados removidos (`OpenF1Transport` em `app.ts`, `prisma` em `events/news.ts`, `Role` em `jolpica.materialize.ts`, `ReconFixtureIds` em `reconciliation/universe-editor.source-matching.test.ts`);
+  - variáveis não usadas removidas (`lauda` em `jolpica.materialization-flow.test.ts`, `cleanup` em source-matching, função `fixtureWithoutSeason` em `universe-init.bootstrap.test.ts`);
+  - `crypto.randomUUID()` substituído por `randomUUID()` importado de `node:crypto` (availability, conversation, memory, schedule — 21 ocorrências);
+  - `Buffer` importado de `node:buffer` em `driver-profile.test.ts`;
+  - `any` do helper `assertSeat` (universe-editor.test) tipado estruturalmente.
+- **Web tsc: 4 → 0** (fixtures de `drivers-page` com `headshotUrl`; helper `seat` tipado como `UniverseSeat` em `universe-divergence`).
+- API typecheck 0; web lint 0 erros/0 warnings; web build exit 0; API/Web suítes completas verdes (1853/1853 e 418/418).
+
+### Commit
+- `chore(v3): reduce typecheck and lint debt`.

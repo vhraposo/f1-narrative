@@ -76,7 +76,6 @@ import openingGridRoutes, {
   type OpeningGridRoutesOptions,
 } from "./modules/opening-grid/opening-grid.routes.js";
 import { OpenF1Client } from "./modules/external-openf1/openf1.client.js";
-import { OpenF1Transport } from "./modules/external-openf1/openf1.transport.js";
 import openF1EnrichmentRoutes, {
   type OpenF1EnrichmentRoutesOptions,
 } from "./modules/external-openf1/openf1.routes.js";

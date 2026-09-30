@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
@@ -140,7 +141,7 @@ describe("Schedule - ownership e validação de character", () => {
   it("Character inexistente -> 404", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/characters/${crypto.randomUUID()}/schedule`,
+      url: `/api/characters/${randomUUID()}/schedule`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);
@@ -408,7 +409,7 @@ describe("Schedule - PATCH, DELETE, ownership indireto", () => {
   it("Schedule inexistente -> 404", async () => {
     const res = await app.inject({
       method: "PATCH",
-      url: `/api/characters/${character.id}/schedule/${crypto.randomUUID()}`,
+      url: `/api/characters/${character.id}/schedule/${randomUUID()}`,
       headers: { cookie: owner.cookie },
       payload: { activity: "X" },
     });
@@ -449,7 +450,7 @@ describe("Schedule - PATCH, DELETE, ownership indireto", () => {
   it("DELETE inexistente -> 404", async () => {
     const res = await app.inject({
       method: "DELETE",
-      url: `/api/characters/${character.id}/schedule/${crypto.randomUUID()}`,
+      url: `/api/characters/${character.id}/schedule/${randomUUID()}`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);

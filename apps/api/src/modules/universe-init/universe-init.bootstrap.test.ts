@@ -72,12 +72,6 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     seasonIds.push(report.season.universeSeasonId);
   }
 
-  async function fixtureWithoutSeason(year: number) {
-    const fixture = await seedUniverseInitFixture(year);
-    await prisma.season.delete({ where: { id: fixture.ids.seasonId } });
-    return fixture;
-  }
-
   afterEach(async () => {
     if (seasonIds.length > 0) {
       await prisma.worldState.updateMany({

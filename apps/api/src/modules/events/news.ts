@@ -1,6 +1,5 @@
 import type { Prisma } from "@prisma/client";
 import type { CanonSource, EventImportance, EventType } from "@prisma/client";
-import { prisma } from "../../infrastructure/database/prisma.js";
 
 
 const eventTypeLabels: Record<EventType, string> = {

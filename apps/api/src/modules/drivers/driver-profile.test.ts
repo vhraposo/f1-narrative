@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import type { DriverRole, DriverStatus } from "@prisma/client";

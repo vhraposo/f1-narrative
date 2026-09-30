@@ -4,7 +4,7 @@ import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { JOLPICA_SOURCE } from "../external-sync/jolpica.service.js";
 import { reconciliationService } from "./reconciliation.service.js";
-import { seedReconciliationFixture, type ReconFixtureIds } from "./reconciliation.fixtures.js";
+import { seedReconciliationFixture } from "./reconciliation.fixtures.js";
 
 let app: FastifyInstance;
 const activeCleanups: Array<() => Promise<void>> = [];
@@ -41,7 +41,7 @@ describe("Universe Editor API — invariantes de vínculo de piloto (source matc
   it("candidates listing retorna candidatos não vinculados para um driver externo", async () => {
     const fixture = await seedReconciliationFixture(2026);
     activeCleanups.push(fixture.cleanup);
-    const { ids, cleanup } = fixture;
+    const { ids } = fixture;
 
     const ze = await prisma.character.create({
       data: { name: "Zé da Silva", nationality: "Brasileira", birthDate: new Date("2002-01-01"), userId: ids.userId, universeId: ids.universeId },

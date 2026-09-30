@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
@@ -248,7 +249,7 @@ describe("Conversation - criação, ownership e DM/GROUP", () => {
   it("participante inexistente -> 404", async () => {
     const res = await createConversation(owner, {
       title: "X",
-      participantIds: [crypto.randomUUID()],
+      participantIds: [randomUUID()],
     });
     expect(res.statusCode).toBe(404);
   });
@@ -367,7 +368,7 @@ describe("Conversation - CRUD", () => {
   it("GET /api/conversations/:id inexistente -> 404", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/conversations/${crypto.randomUUID()}`,
+      url: `/api/conversations/${randomUUID()}`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);
@@ -449,7 +450,7 @@ describe("Conversation - CRUD", () => {
   it("DELETE em Conversation inexistente -> 404", async () => {
     const res = await app.inject({
       method: "DELETE",
-      url: `/api/conversations/${crypto.randomUUID()}`,
+      url: `/api/conversations/${randomUUID()}`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);
@@ -520,7 +521,7 @@ describe("Conversation - participants", () => {
       method: "POST",
       url: `/api/conversations/${convId}/participants`,
       headers: { cookie: owner.cookie },
-      payload: { characterId: crypto.randomUUID() },
+      payload: { characterId: randomUUID() },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -528,7 +529,7 @@ describe("Conversation - participants", () => {
   it("Conversation inexistente -> 404", async () => {
     const res = await app.inject({
       method: "POST",
-      url: `/api/conversations/${crypto.randomUUID()}/participants`,
+      url: `/api/conversations/${randomUUID()}/participants`,
       headers: { cookie: owner.cookie },
       payload: { characterId: charA.id },
     });
@@ -761,7 +762,7 @@ describe("Conversation - Message sender (USER_CHARACTER / AI_CHARACTER / SYSTEM)
   it("AI_CHARACTER com characterId inexistente -> 404", async () => {
     const res = await postMessage(owner, convId, {
       senderType: "AI_CHARACTER",
-      characterId: crypto.randomUUID(),
+      characterId: randomUUID(),
       content: "Fantasma",
     });
     expect(res.statusCode).toBe(404);
@@ -810,7 +811,7 @@ describe("Conversation - Message sender (USER_CHARACTER / AI_CHARACTER / SYSTEM)
   });
 
   it("Message em Conversation inexistente -> 404", async () => {
-    const res = await postMessage(owner, crypto.randomUUID(), {
+    const res = await postMessage(owner, randomUUID(), {
       senderType: "SYSTEM",
       content: "X",
     });
@@ -894,7 +895,7 @@ describe("Conversation - ordering (createdAt ASC) e integridade", () => {
   it("GET messages de Conversation inexistente -> 404", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/conversations/${crypto.randomUUID()}/messages`,
+      url: `/api/conversations/${randomUUID()}/messages`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);
