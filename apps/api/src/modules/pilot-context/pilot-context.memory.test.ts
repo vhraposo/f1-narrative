@@ -9,6 +9,9 @@ const createdUserIds: string[] = [];
 const createdUniverseIds: string[] = [];
 
 afterAll(async () => {
+  await prisma.memory.deleteMany({
+    where: { participants: { some: { character: { name: { startsWith: PREFIX } } } } },
+  });
   await prisma.memoryCharacter.deleteMany({
     where: { character: { name: { startsWith: PREFIX } } },
   });

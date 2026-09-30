@@ -19,6 +19,11 @@ const createdExternalRaceIds: string[] = [];
 
 afterAll(async () => {
   await deleteKnowledgeSourcesForDrivers(prisma, createdDriverIds);
+  if (createdCharacterIds.length > 0) {
+    await prisma.memory.deleteMany({
+      where: { participants: { some: { characterId: { in: createdCharacterIds } } } },
+    });
+  }
   if (createdDriverIds.length > 0) {
     await prisma.externalResult.deleteMany({ where: { externalDriverId: { in: createdDriverIds } } });
     await prisma.externalStanding.deleteMany({ where: { externalDriverId: { in: createdDriverIds } } });

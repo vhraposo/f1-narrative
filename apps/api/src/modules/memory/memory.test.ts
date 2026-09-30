@@ -137,6 +137,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.memory.deleteMany({
+    where: { participants: { some: { characterId: { in: createdCharacterIds } } } },
+  });
   await prisma.memoryCharacter.deleteMany({
     where: { memoryId: { in: createdMemoryIds } },
   });

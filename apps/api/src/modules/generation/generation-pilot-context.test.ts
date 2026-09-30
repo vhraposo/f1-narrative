@@ -183,6 +183,13 @@ afterAll(async () => {
   if (memoryId) {
     await prisma.memory.deleteMany({ where: { id: memoryId } });
   }
+  await prisma.memory.deleteMany({
+    where: {
+      participants: {
+        some: { character: { name: { in: ["GP-Alice", "GP-Bob", "GP-Plain"] } } },
+      },
+    },
+  });
   if (createdConversationIds.length > 0) {
     await prisma.conversationParticipant.deleteMany({ where: { conversationId: { in: createdConversationIds } } });
     await prisma.conversation.deleteMany({ where: { id: { in: createdConversationIds } } });
