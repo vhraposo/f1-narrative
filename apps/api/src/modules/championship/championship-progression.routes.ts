@@ -1,5 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
+import { lockUniverseTimeline } from "../timeline/timeline.service.js";
 import {
   raceIdPathParamsSchema,
   seasonIdPathParamsSchema,
@@ -42,13 +44,23 @@ export const championshipProgressionRoutes: FastifyPluginAsync = async (
         });
       }
 
+      const universe = await ensureUniverse(request.user!.id);
+      if (season.universeId !== universe.id) {
+        return reply.code(404).send({
+          error: "Corrida não encontrada",
+          code: "NOT_FOUND",
+        });
+      }
+
       const { seasonStatus: nextSeasonStatus } = await prisma.$transaction(
-        (tx) =>
-          finalizeRaceInTx(tx, {
+        async (tx) => {
+          await lockUniverseTimeline(tx, universe.id);
+          return finalizeRaceInTx(tx, {
             raceId: race.id,
             seasonId: season.id,
             universeId: season.universeId,
-          }),
+          });
+        },
       );
 
       const saved = await prisma.championshipStanding.findMany({

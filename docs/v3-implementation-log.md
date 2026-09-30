@@ -821,3 +821,15 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Decisões:** nenhuma nova (D-064 aplicado).
 - **Limitações:** reatribuição de `#1` exige liberar o número atual antes (unicidade por temporada), como no fluxo existente.
 - **Commit:** `feat(v3): add historical champion and number impact`.
+
+### V3.15.7 — Hardening dos Writers Legados
+- **Objetivo:** eliminar bypasses de edição histórica por endpoints públicos sem quebrar lifecycle.
+- **Classificação:** simuladores/weekend/finalize/world progression/progressão de número = lifecycle (preservados, com lock onde aplicável); CRUD público de resultados/standings/corridas = mutável (endurecido).
+- **Arquivos/regras:** `championship.routes.ts` (PATCH/DELETE de resultado e de corrida `FINISHED` → `409 USE_TIMELINE_CORRECTION`; POST de resultado em corrida `FINISHED` bloqueado, permitido em corrida aberta; CREATE/PATCH/DELETE de standing com resultados na temporada → `409 DERIVED_STANDING`, importado sem resultados segue editável), `world.routes.ts` (`PATCH /api/world` em transação com `lockUniverseTimeline`), `championship-progression.routes.ts` (ownership leak-safe do Universe + lock no finalize normal, sem correction event).
+- **Migrations:** nenhuma.
+- **Testes:** `timeline.hardening.test.ts` 10/10 (401; bloqueio PATCH/DELETE/POST histórico; corrida aberta editável; standing derivado vs importado; world lifecycle; finalização normal sob lock; finalize de outro universo 404; correção + world concorrentes; ownership). Regressão afetada: championship 37/37; módulos world/drivers/race-weekend/timeline/simulation/narrative/roster/player-entry 221/221. Suíte legada de championship ajustada ao novo contrato (status QUALIFYING no CRUD; standings em temporadas sem resultados).
+- **Typecheck:** 0. **Lint:** 0.
+- **Problemas:** três testes legados assumiam edição direta de histórico (corrida FINISHED, standings com resultados) — atualizados ao contrato congelado, sem enfraquecer cobertura de ownership.
+- **Decisões:** nenhuma nova (a classificação segue a arquitetura §31 item 7).
+- **Limitações:** criação retroativa de resultado ausente em corrida finalizada não é suportada v1; `points` continua aceito no CRUD de corrida aberta (pré-finalização) como sempre.
+- **Commit:** `feat(v3): harden timeline legacy writers`.

@@ -343,10 +343,10 @@ describe("Races (globais, vinculadas a Season)", () => {
       method: "PATCH",
       url: `/api/races/${created.id}`,
       headers: { cookie: owner.cookie },
-      payload: { status: "FINISHED" },
+      payload: { status: "QUALIFYING" },
     });
     expect(patch.statusCode).toBe(200);
-    expect(patch.json().race.status).toBe("FINISHED");
+    expect(patch.json().race.status).toBe("QUALIFYING");
 
     const del = await app.inject({
       method: "DELETE",
@@ -512,9 +512,10 @@ describe("RaceResults (ownership indireta via DriverProfile)", () => {
 
 describe("ChampionshipStandings (ownership indireta via DriverProfile)", () => {
   it("cria classificação para piloto próprio", async () => {
+    const standingsSeason = await createSeason(owner, { year: 2036 });
     const res = await app.inject({
       method: "POST",
-      url: `/api/seasons/${season.id}/standings`,
+      url: `/api/seasons/${standingsSeason.id}/standings`,
       headers: { cookie: owner.cookie },
       payload: { driverProfileId: driver.id, points: 25, position: 1, wins: 1 },
     });
@@ -535,9 +536,18 @@ describe("ChampionshipStandings (ownership indireta via DriverProfile)", () => {
   });
 
   it("retorna 409 para classificação duplicada", async () => {
+    const standingsSeason = await createSeason(owner, { year: 2037 });
+    const first = await app.inject({
+      method: "POST",
+      url: `/api/seasons/${standingsSeason.id}/standings`,
+      headers: { cookie: owner.cookie },
+      payload: { driverProfileId: driver.id, points: 10 },
+    });
+    expect(first.statusCode).toBe(201);
+
     const res = await app.inject({
       method: "POST",
-      url: `/api/seasons/${season.id}/standings`,
+      url: `/api/seasons/${standingsSeason.id}/standings`,
       headers: { cookie: owner.cookie },
       payload: { driverProfileId: driver.id, points: 99 },
     });
@@ -545,9 +555,10 @@ describe("ChampionshipStandings (ownership indireta via DriverProfile)", () => {
   });
 
   it("lista, atualiza e exclui classificação própria", async () => {
+    const standingsSeason = await createSeason(intruder, { year: 2038 });
     const res = await app.inject({
       method: "POST",
-      url: `/api/seasons/${intruderSeason.id}/standings`,
+      url: `/api/seasons/${standingsSeason.id}/standings`,
       headers: { cookie: intruder.cookie },
       payload: { driverProfileId: intruderDriver.id, points: 18, position: 2 },
     });
@@ -556,7 +567,7 @@ describe("ChampionshipStandings (ownership indireta via DriverProfile)", () => {
 
     const list = await app.inject({
       method: "GET",
-      url: `/api/seasons/${intruderSeason.id}/standings`,
+      url: `/api/seasons/${standingsSeason.id}/standings`,
       headers: { cookie: intruder.cookie },
     });
     expect(list.statusCode).toBe(200);
@@ -567,7 +578,7 @@ describe("ChampionshipStandings (ownership indireta via DriverProfile)", () => {
     // Ownership: outro usuário não acessa a temporada do intruder
     const listOwner = await app.inject({
       method: "GET",
-      url: `/api/seasons/${intruderSeason.id}/standings`,
+      url: `/api/seasons/${standingsSeason.id}/standings`,
       headers: { cookie: owner.cookie },
     });
     expect(listOwner.statusCode).toBe(404);

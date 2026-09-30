@@ -376,12 +376,19 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
       const universe = await ensureUniverse(request.user!.id);
       const existing = await prisma.race.findFirst({
         where: { id: params.data.id, season: { universeId: universe.id } },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!existing) {
         return reply.code(404).send({
           error: "Corrida não encontrada",
           code: "NOT_FOUND",
+        });
+      }
+      if (existing.status === "FINISHED") {
+        return reply.code(409).send({
+          error:
+            "Corrida finalizada: alterações históricas só pela correção da Linha do Tempo.",
+          code: "USE_TIMELINE_CORRECTION",
         });
       }
       const race = await prisma.race.update({
@@ -407,12 +414,19 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
       const universe = await ensureUniverse(request.user!.id);
       const existing = await prisma.race.findFirst({
         where: { id: params.data.id, season: { universeId: universe.id } },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!existing) {
         return reply.code(404).send({
           error: "Corrida não encontrada",
           code: "NOT_FOUND",
+        });
+      }
+      if (existing.status === "FINISHED") {
+        return reply.code(409).send({
+          error:
+            "Corrida finalizada: remoção histórica não é suportada pela v1.",
+          code: "USE_TIMELINE_CORRECTION",
         });
       }
       // Results são excluídos em cascata (onDelete: Cascade).
@@ -482,12 +496,19 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
       const universe = await ensureUniverse(request.user!.id);
       const race = await prisma.race.findFirst({
         where: { id: params.data.raceId, season: { universeId: universe.id } },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!race) {
         return reply.code(404).send({
           error: "Corrida não encontrada",
           code: "NOT_FOUND",
+        });
+      }
+      if (race.status === "FINISHED") {
+        return reply.code(409).send({
+          error:
+            "Corrida finalizada: resultados históricos só mudam pela correção da Linha do Tempo.",
+          code: "USE_TIMELINE_CORRECTION",
         });
       }
       if (!(await isOwnedDriver(parsed.data.driverProfileId, request.user!.id))) {
@@ -576,6 +597,17 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "NOT_FOUND",
         });
       }
+      const raceStatus = await prisma.raceResult.findUnique({
+        where: { id: existing.id },
+        select: { race: { select: { status: true } } },
+      });
+      if (raceStatus?.race.status === "FINISHED") {
+        return reply.code(409).send({
+          error:
+            "Resultado de corrida finalizada: use a correção da Linha do Tempo.",
+          code: "USE_TIMELINE_CORRECTION",
+        });
+      }
       const result = await prisma.raceResult.update({
         where: { id: existing.id },
         data: parsed.data,
@@ -601,6 +633,17 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({
           error: "Resultado não encontrado",
           code: "NOT_FOUND",
+        });
+      }
+      const raceStatus = await prisma.raceResult.findUnique({
+        where: { id: existing.id },
+        select: { race: { select: { status: true } } },
+      });
+      if (raceStatus?.race.status === "FINISHED") {
+        return reply.code(409).send({
+          error:
+            "Resultado de corrida finalizada: use a correção da Linha do Tempo.",
+          code: "USE_TIMELINE_CORRECTION",
         });
       }
       await prisma.raceResult.delete({ where: { id: existing.id } });
@@ -682,6 +725,17 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "NOT_FOUND",
         });
       }
+      if (
+        (await prisma.raceResult.count({
+          where: { race: { seasonId: season.id } },
+        })) > 0
+      ) {
+        return reply.code(409).send({
+          error:
+            "Standing é derivado dos resultados desta temporada; corrija a causa pela Linha do Tempo.",
+          code: "DERIVED_STANDING",
+        });
+      }
       try {
         const standing = await prisma.championshipStanding.create({
           data: { seasonId: season.id, ...parsed.data },
@@ -759,6 +813,22 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
           code: "NOT_FOUND",
         });
       }
+      const standingSeason = await prisma.championshipStanding.findUnique({
+        where: { id: existing.id },
+        select: { seasonId: true },
+      });
+      if (
+        standingSeason &&
+        (await prisma.raceResult.count({
+          where: { race: { seasonId: standingSeason.seasonId } },
+        })) > 0
+      ) {
+        return reply.code(409).send({
+          error:
+            "Standing é derivado dos resultados desta temporada; corrija a causa pela Linha do Tempo.",
+          code: "DERIVED_STANDING",
+        });
+      }
       const standing = await prisma.championshipStanding.update({
         where: { id: existing.id },
         data: parsed.data,
@@ -784,6 +854,22 @@ export const championshipRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({
           error: "Classificação não encontrada",
           code: "NOT_FOUND",
+        });
+      }
+      const standingSeason = await prisma.championshipStanding.findUnique({
+        where: { id: existing.id },
+        select: { seasonId: true },
+      });
+      if (
+        standingSeason &&
+        (await prisma.raceResult.count({
+          where: { race: { seasonId: standingSeason.seasonId } },
+        })) > 0
+      ) {
+        return reply.code(409).send({
+          error:
+            "Standing é derivado dos resultados desta temporada; corrija a causa pela Linha do Tempo.",
+          code: "DERIVED_STANDING",
         });
       }
       await prisma.championshipStanding.delete({ where: { id: existing.id } });
