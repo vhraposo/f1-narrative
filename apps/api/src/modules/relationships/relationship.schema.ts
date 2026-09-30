@@ -24,6 +24,7 @@ export const createRelationshipSchema = z
     characterBId: z.string().uuid("Identificador de personagem B inválido"),
     dimensions: dimensionsSchema.optional(),
   })
+  .strict()
   .refine((value) => value.characterAId !== value.characterBId, {
     message: "Os personagens A e B devem ser diferentes",
     path: ["characterBId"],
@@ -32,9 +33,11 @@ export const createRelationshipSchema = z
 export type CreateRelationshipInput = z.infer<typeof createRelationshipSchema>;
 
 // PATCH: somente dimensions é editável.
-export const updateRelationshipSchema = z.object({
-  dimensions: dimensionsSchema,
-});
+export const updateRelationshipSchema = z
+  .object({
+    dimensions: dimensionsSchema,
+  })
+  .strict();
 
 export type UpdateRelationshipInput = z.infer<typeof updateRelationshipSchema>;
 

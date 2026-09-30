@@ -506,6 +506,35 @@ describe("Memory - ownership vs participação (Characters USER e AI)", () => {
       expect(participant).toHaveProperty("controlledBy");
     }
   });
+
+  it("H) rejeita campos desconhecidos no POST e no PATCH (strict)", async () => {
+    const post = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { content: "X", characterIds: [charA.id], ownerId: "hack" },
+      remoteAddress: "10.77.2.1",
+    });
+    expect(post.statusCode).toBe(400);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { content: "Base strict", characterIds: [charA.id] },
+      remoteAddress: "10.77.2.2",
+    });
+    expect(created.statusCode).toBe(201);
+    const memoryId = (created.json().memory as Memory).id;
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/api/memories/${memoryId}`,
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { content: "Editado", importance: "HIGH", universeId: "00000000-0000-4000-8000-000000000000" },
+      remoteAddress: "10.77.2.3",
+    });
+    expect(patch.statusCode).toBe(400);
+  });
 });
 
 describe("Memory - CRUD", () => {

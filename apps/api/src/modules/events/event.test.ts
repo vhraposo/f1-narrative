@@ -448,6 +448,28 @@ describe("GET /api/events/:id, PATCH, DELETE", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it("rejeita campos desconhecidos no POST e no PATCH (strict)", async () => {
+    const post = await app.inject({
+      method: "POST",
+      url: "/api/events",
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { type: "SOCIAL", title: "Strict", ownerId: "hack" },
+      remoteAddress: "10.99.9.1",
+    });
+    expect(post.statusCode).toBe(400);
+
+    const { json } = await createEvent(owner, { type: "SOCIAL", title: "Strict ok" });
+    const id = (json.event as EventRecord).id;
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/api/events/${id}`,
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { title: "Strict editado", createdById: "00000000-0000-4000-8000-000000000000" },
+      remoteAddress: "10.99.9.2",
+    });
+    expect(patch.statusCode).toBe(400);
+  });
 });
 
 describe("POST /api/events/:eventId/participants", () => {

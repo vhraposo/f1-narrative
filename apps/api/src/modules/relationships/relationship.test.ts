@@ -148,6 +148,30 @@ describe("POST /api/relationships", () => {
     expect((json.relationship as Relationship).dimensions).toEqual({});
   });
 
+  it("rejeita campos desconhecidos no POST e no PATCH (strict)", async () => {
+    const post = await app.inject({
+      method: "POST",
+      url: "/api/relationships",
+      headers: { cookie: u.cookie, "content-type": "application/json" },
+      payload: { characterAId: a.id, characterBId: b.id, ownerId: "00000000-0000-4000-8000-000000000000" },
+      remoteAddress: "10.99.0.1",
+    });
+    expect(post.statusCode).toBe(400);
+
+    const s1 = await createCharacter(u, { name: "S1", nationality: "Brasileira", birthDate: "1995-06-01" });
+    const s2 = await createCharacter(u, { name: "S2", nationality: "Brasileira", birthDate: "1995-07-01" });
+    const created = await createRelationship(u, { characterAId: s1.id, characterBId: s2.id });
+    const relationshipId = (created.json.relationship as Relationship).id;
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/api/relationships/${relationshipId}`,
+      headers: { cookie: u.cookie, "content-type": "application/json" },
+      payload: { dimensions: { affinity: 1 }, characterAId: b.id },
+      remoteAddress: "10.99.0.2",
+    });
+    expect(patch.statusCode).toBe(400);
+  });
+
   it("aceita dimensions como objeto JSON", async () => {
     const extra = await createCharacter(u, { name: "C", nationality: "Portuguesa", birthDate: "1997-01-01" });
     const { statusCode, json } = await createRelationship(u, {

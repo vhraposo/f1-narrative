@@ -54,65 +54,69 @@ const contextSchema = z
     message: "Contexto deve ser um objeto JSON",
   });
 
-export const createMemorySchema = z.object({
-  content: z
-    .string()
-    .trim()
-    .min(1, "Informe o conteúdo da memória")
-    .max(5000, "Conteúdo muito longo (máx. 5000 caracteres)"),
-  summary: z
-    .string()
-    .trim()
-    .max(1000, "Resumo muito longo (máx. 1000 caracteres)")
-    .optional()
-    .nullable(),
-  context: contextSchema.optional().nullable(),
-  importance: memoryImportanceSchema.optional(),
-  source: memorySourceSchema.optional(),
-  emotionalImpact: z
-    .number()
-    .int("Deve ser um número inteiro")
-    .min(-10, "Impacto emocional mínimo -10")
-    .max(10, "Impacto emocional máximo 10")
-    .optional()
-    .nullable(),
-  eventId: z.string().uuid("Identificador de evento inválido").optional().nullable(),
-  // Participantes iniciais obrigatórios: ao menos um precisa pertencer ao usuário
-  // para ancorar a ownership da Memory (toda Memory é alcançável pelo seu criador).
-  characterIds: z
-    .array(z.string().uuid("Identificador de personagem inválido"))
-    .min(1, "Informe ao menos um personagem participante"),
-});
+export const createMemorySchema = z
+  .object({
+    content: z
+      .string()
+      .trim()
+      .min(1, "Informe o conteúdo da memória")
+      .max(5000, "Conteúdo muito longo (máx. 5000 caracteres)"),
+    summary: z
+      .string()
+      .trim()
+      .max(1000, "Resumo muito longo (máx. 1000 caracteres)")
+      .optional()
+      .nullable(),
+    context: contextSchema.optional().nullable(),
+    importance: memoryImportanceSchema.optional(),
+    source: memorySourceSchema.optional(),
+    emotionalImpact: z
+      .number()
+      .int("Deve ser um número inteiro")
+      .min(-10, "Impacto emocional mínimo -10")
+      .max(10, "Impacto emocional máximo 10")
+      .optional()
+      .nullable(),
+    eventId: z.string().uuid("Identificador de evento inválido").optional().nullable(),
+    // Participantes iniciais obrigatórios: ao menos um precisa pertencer ao usuário
+    // para ancorar a ownership da Memory (toda Memory é alcançável pelo seu criador).
+    characterIds: z
+      .array(z.string().uuid("Identificador de personagem inválido"))
+      .min(1, "Informe ao menos um personagem participante"),
+  })
+  .strict();
 
 export type CreateMemoryInput = z.infer<typeof createMemorySchema>;
 
 // PATCH: campos parciais opcionais. numberOf characterIds não é editado aqui;
 // participantes são gerenciados pelos endpoints dedicados.
-export const updateMemorySchema = z.object({
-  content: z
-    .string()
-    .trim()
-    .min(1, "Informe o conteúdo da memória")
-    .max(5000, "Conteúdo muito longo (máx. 5000 caracteres)")
-    .optional(),
-  summary: z
-    .string()
-    .trim()
-    .max(1000, "Resumo muito longo (máx. 1000 caracteres)")
-    .optional()
-    .nullable(),
-  context: contextSchema.optional().nullable(),
-  importance: memoryImportanceSchema.optional(),
-  source: memorySourceSchema.optional(),
-  emotionalImpact: z
-    .number()
-    .int("Deve ser um número inteiro")
-    .min(-10, "Impacto emocional mínimo -10")
-    .max(10, "Impacto emocional máximo 10")
-    .optional()
-    .nullable(),
-  eventId: z.string().uuid("Identificador de evento inválido").optional().nullable(),
-});
+export const updateMemorySchema = z
+  .object({
+    content: z
+      .string()
+      .trim()
+      .min(1, "Informe o conteúdo da memória")
+      .max(5000, "Conteúdo muito longo (máx. 5000 caracteres)")
+      .optional(),
+    summary: z
+      .string()
+      .trim()
+      .max(1000, "Resumo muito longo (máx. 1000 caracteres)")
+      .optional()
+      .nullable(),
+    context: contextSchema.optional().nullable(),
+    importance: memoryImportanceSchema.optional(),
+    source: memorySourceSchema.optional(),
+    emotionalImpact: z
+      .number()
+      .int("Deve ser um número inteiro")
+      .min(-10, "Impacto emocional mínimo -10")
+      .max(10, "Impacto emocional máximo 10")
+      .optional()
+      .nullable(),
+    eventId: z.string().uuid("Identificador de evento inválido").optional().nullable(),
+  })
+  .strict();
 
 export type UpdateMemoryInput = z.infer<typeof updateMemorySchema>;
 
@@ -137,8 +141,10 @@ export const memoryParticipantCharacterIdParamSchema = z.object({
   characterId: z.string().uuid("Identificador de personagem inválido"),
 });
 
-export const memoryAddParticipantSchema = z.object({
-  characterId: z.string().uuid("Identificador de personagem inválido"),
-});
+export const memoryAddParticipantSchema = z
+  .object({
+    characterId: z.string().uuid("Identificador de personagem inválido"),
+  })
+  .strict();
 
 export type AddMemoryParticipantInput = z.infer<typeof memoryAddParticipantSchema>;
