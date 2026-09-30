@@ -11,7 +11,6 @@ import {
   toAppliedEffect,
   type AppliedEvolutionEffect,
   type BaseTrait,
-  type EffectiveTrait,
   type EvolutionCandidate,
   type EvolutionExperienceLike,
 } from "./persona-evolution.rules.js";
