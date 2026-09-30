@@ -354,7 +354,7 @@ export async function assembleContext(
   const memoryIds = [...new Set(memoryLinks.map((l) => l.memoryId))];
   const memories = memoryIds.length
     ? await db.memory.findMany({
-        where: { id: { in: memoryIds } },
+        where: { id: { in: memoryIds }, status: "ACTIVE" },
         select: {
           id: true,
           content: true,

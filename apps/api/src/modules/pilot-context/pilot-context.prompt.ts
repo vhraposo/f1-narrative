@@ -86,7 +86,10 @@ export function composePilotContextPromptBlock(view: PilotContextView): PilotCon
   }
 
   if (view.memories.length > 0) {
-    const lines = view.memories.map((memory) => `- ${memory.content} (importância: ${memory.importance})`);
+    const lines = view.memories.map((memory) => {
+      const type = memory.memoryType ? `[${memory.memoryType}] ` : "";
+      return `- ${type}${memory.content} (importância: ${memory.importance})`;
+    });
     const { lines: kept, truncated } = truncateLines(lines, Math.floor(PILOT_CONTEXT_PROMPT_CAP / 4));
     if (truncated) omittedReasons.add("pilot-context-prompt-truncated");
     sections.push(["Memórias no Universe:", ...kept].join("\n"));

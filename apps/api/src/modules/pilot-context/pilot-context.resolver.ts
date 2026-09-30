@@ -10,6 +10,7 @@ import {
   getPilotRelationshipsView,
   type RelationshipEntryView,
 } from "../pilot-knowledge/pilot-knowledge.relationships.js";
+import { selectRelevantMemories } from "../pilot-experience/pilot-experience.relevance.js";
 import {
   PILOT_CONTEXT_BIOGRAPHY_CAP,
   PILOT_CONTEXT_EVENTS_MAX,
@@ -56,9 +57,12 @@ export type PilotContextRelationship = {
 
 export type PilotContextMemory = {
   readonly id: string;
+  readonly revision: number;
+  readonly memoryType: string | null;
   readonly content: string;
   readonly summary: string | null;
   readonly importance: MemoryImportance;
+  readonly occurredAt: Date | null;
 };
 
 export type PilotContextCurrentState = {
@@ -95,12 +99,8 @@ export type PilotContextView = {
   readonly fingerprint: string;
 };
 
-function memoryRelevance(memory: { content: string; summary: string | null; importance: MemoryImportance; createdAt: Date }, topic: string | null): number {
-  const rank = memory.importance === "CRITICAL" ? 4 : memory.importance === "HIGH" ? 3 : memory.importance === "MEDIUM" ? 2 : 1;
-  if (!topic || topic.trim().length === 0) return rank;
-  const normalized = topic.trim().toLowerCase();
-  const haystack = `${memory.content} ${memory.summary ?? ""}`.toLowerCase();
-  return haystack.includes(normalized) ? rank + 8 : rank;
+function fingerprintMemory(memory: PilotContextMemory): [string, number, string | null] {
+  return [memory.id, memory.revision, memory.memoryType];
 }
 
 export async function resolvePilotContext(
@@ -134,10 +134,24 @@ export async function resolvePilotContext(
     getPilotRelationshipsView(input.speakerCharacterId, now),
     getPilotHistoryView(input.speakerCharacterId, { topic, limit: PILOT_CONTEXT_EVENTS_MAX }),
     prisma.memory.findMany({
-      where: { participants: { some: { characterId: input.speakerCharacterId } } },
+      where: {
+        participants: { some: { characterId: input.speakerCharacterId } },
+        status: "ACTIVE",
+        OR: [{ universeId: character.universeId }, { universeId: null }],
+      },
       orderBy: [{ createdAt: "desc" }],
       take: 40,
-      select: { id: true, content: true, summary: true, importance: true, createdAt: true },
+      select: {
+        id: true,
+        content: true,
+        summary: true,
+        importance: true,
+        memoryType: true,
+        revision: true,
+        derivedKey: true,
+        createdAt: true,
+        experience: { select: { occurredAt: true } },
+      },
     }),
     loadCurrentUniverseState(input.speakerCharacterId, character.universeId),
   ]);
@@ -232,21 +246,30 @@ export async function resolvePilotContext(
   }
 
   const historicalContext = historyView.available ? historyView.relevant : [];
-  const memories = memoriesRaw
-    .map((memory) => ({ memory, relevance: memoryRelevance(memory, topic) }))
-    .sort((a, b) => {
-      if (b.relevance !== a.relevance) return b.relevance - a.relevance;
-      const createdDiff = b.memory.createdAt.getTime() - a.memory.createdAt.getTime();
-      if (createdDiff !== 0) return createdDiff;
-      return a.memory.id.localeCompare(b.memory.id);
-    })
-    .slice(0, PILOT_CONTEXT_MEMORIES_MAX)
-    .map(({ memory }) => ({
-      id: memory.id,
-      content: clampText(memory.content, 300),
-      summary: memory.summary ? clampText(memory.summary, 160) : null,
-      importance: memory.importance,
-    }));
+  const relevancePool = memoriesRaw.map((memory) => ({
+    id: memory.id,
+    revision: memory.revision,
+    importance: memory.importance,
+    memoryType: memory.memoryType,
+    content: memory.content,
+    summary: memory.summary,
+    occurredAt: memory.experience?.occurredAt ?? null,
+    createdAt: memory.createdAt,
+    derivedKey: memory.derivedKey,
+  }));
+  const memories = selectRelevantMemories(
+    relevancePool,
+    { topic, worldDate: now },
+    PILOT_CONTEXT_MEMORIES_MAX,
+  ).map((memory) => ({
+    id: memory.id,
+    revision: memory.revision,
+    memoryType: memory.memoryType,
+    content: clampText(memory.content, 300),
+    summary: memory.summary ? clampText(memory.summary, 160) : null,
+    importance: memory.importance,
+    occurredAt: memory.occurredAt,
+  }));
   if (memoriesRaw.length > memories.length) omitted.push("pilot-context-memories-truncated");
 
   const view: Omit<PilotContextView, "fingerprint"> = {
@@ -365,7 +388,7 @@ export function computePilotContextFingerprint(view: Omit<PilotContextView, "fin
       relationship.validTo?.toISOString() ?? null,
     ]),
     events: view.historicalContext.map((event) => [event.id, event.title, event.seasonYear]),
-    memories: view.memories.map((memory) => memory.id),
+    memories: view.memories.map(fingerprintMemory),
     state: {
       seasonId: view.currentUniverseState.seasonId,
       teamName: view.currentUniverseState.teamName,

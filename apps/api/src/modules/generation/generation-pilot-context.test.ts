@@ -311,4 +311,19 @@ describe("generation pilot context", () => {
     const other = computeGenerationKey(result.context, result.systemPrompt, result.meta, bob.characterId);
     expect(other).not.toBe(result.generationKey);
   });
+
+  it("9) memória invalidada não entra no prompt de geração", async () => {
+    const invalidated = await prisma.memory.create({
+      data: {
+        importance: "CRITICAL",
+        source: "GENERATED_EVENT",
+        status: "INVALIDATED",
+        content: "INVALIDATED-MEMORY-MARKER",
+        participants: { create: [{ characterId: alice.characterId }] },
+      },
+    });
+    const { result } = await bundleFor(alice.characterId);
+    expect(result.systemPrompt).not.toContain("INVALIDATED-MEMORY-MARKER");
+    await prisma.memory.delete({ where: { id: invalidated.id } });
+  });
 });
