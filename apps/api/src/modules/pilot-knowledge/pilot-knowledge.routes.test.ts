@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 
 import { buildApp } from "../../app.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { deleteKnowledgeSourcesForDrivers } from "../../test-utils/pilot-knowledge-cleanup.js";
 import { deleteUniverseDataForUsers } from "../../test-utils/universe-cleanup.js";
 import type {
   DriverIdentityQuery,
@@ -167,15 +168,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.externalSyncRun.deleteMany({ where: { triggeredById: { in: createdUserIds } } });
+  await deleteKnowledgeSourcesForDrivers(prisma, createdDriverIds);
   if (createdDriverIds.length > 0) {
     await prisma.externalResult.deleteMany({ where: { externalDriverId: { in: createdDriverIds } } });
     await prisma.externalStanding.deleteMany({ where: { externalDriverId: { in: createdDriverIds } } });
     await prisma.externalDriverSeason.deleteMany({ where: { externalDriverId: { in: createdDriverIds } } });
     await prisma.externalDriverEvent.deleteMany({ where: { externalDriverId: { in: createdDriverIds } } });
     await prisma.externalDriverRelationship.deleteMany({ where: { externalDriverId: { in: createdDriverIds } } });
-    await prisma.externalKnowledgeSource.deleteMany({
-      where: { driverProfiles: { some: { externalDriverId: { in: createdDriverIds } } } },
-    });
     await prisma.externalDriver.deleteMany({ where: { id: { in: createdDriverIds } } });
   }
   await deleteUniverseDataForUsers(prisma, createdUserIds);

@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { deleteKnowledgeSourcesForDrivers } from "../../test-utils/pilot-knowledge-cleanup.js";
 import {
   PilotKnowledgeError,
   resolvePilotKnowledgeAccess,
@@ -24,6 +25,7 @@ const createdDriverIds: string[] = [];
 const createdSourceIds: string[] = [];
 
 afterAll(async () => {
+  await deleteKnowledgeSourcesForDrivers(prisma, createdDriverIds);
   if (createdDriverIds.length > 0) {
     await prisma.externalDriver.deleteMany({ where: { id: { in: createdDriverIds } } });
   }

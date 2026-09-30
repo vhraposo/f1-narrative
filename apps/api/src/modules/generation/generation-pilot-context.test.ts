@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { deleteKnowledgeSourcesForDrivers } from "../../test-utils/pilot-knowledge-cleanup.js";
 import { deleteUniverseDataForUsers } from "../../test-utils/universe-cleanup.js";
 import { ingestPersonaEvidenceForDriver } from "../pilot-knowledge/pilot-knowledge.persona.js";
 import { upsertDriverProfileFromProvider } from "../pilot-knowledge/pilot-knowledge.profile.js";
@@ -191,6 +192,7 @@ afterAll(async () => {
     select: { id: true },
   });
   const driverIds = drivers.map((driver) => driver.id);
+  await deleteKnowledgeSourcesForDrivers(prisma, driverIds);
   if (driverIds.length > 0) {
     await prisma.externalDriverEvent.deleteMany({ where: { externalDriverId: { in: driverIds } } });
     await prisma.externalDriver.deleteMany({ where: { id: { in: driverIds } } });

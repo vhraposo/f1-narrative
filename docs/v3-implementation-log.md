@@ -883,3 +883,66 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Decisões:** nenhuma nova (V3.16 é camada de UI sobre D-061..D-066).
 - **Limitações:** sem migration/tabela nova; sem novos kinds; sem PATCH/DELETE de evento.
 - **Commit:** `feat(v3.16): complete timeline editor`.
+
+### V3.17.0 — Design (Pilot Knowledge, Persona & Context)
+- **Objetivo:** camada de conhecimento externo de piloto + public persona + biography + histórico + relacionamentos + Universe overrides + `PilotContextResolver` para a geração.
+- **Docs:** `v3.17-pilot-knowledge-architecture.md`, `v3.17-source-policy.md`, `v3.17-open-questions.md` (13 OQs resolvidas), D-067..D-071 em `v3-decisions.md`.
+- **Decisões:** D-067 (camada externa separada; Universe vence; sem escrita de Universe por refresh), D-068 (persona pública observável; conflito permanece CONFLICT; LLM só extrator), D-069 (resolver speaker-only determinístico + seção opcional `PILOT_CONTEXT`), D-070 (source ledger com licença por claim; sem crawler/persistência de conteúdo protegido; ≠ RAG), D-071 (marcos derivados de dados estruturados; Memory continua Universe-only).
+- **Commit:** `docs(v3.17): design pilot knowledge architecture`.
+
+### V3.17.1 — Foundation (migration + profile + ledger)
+- **Objetivo:** persistência/read model da camada externa.
+- **Arquivos:** migration `20260930160000_add_pilot_knowledge_foundation` (8 tabelas + 12 enums, aplicada somente no TEST), `pilot-knowledge.policy.ts`, `pilot-knowledge.sources.ts` (ledger com licença/attribution, dedupe por provider+url, rejeição de metadata com conteúdo bruto), `pilot-knowledge.profile.ts` (upsert estruturado, composer determinístico de biografia display/context ≤1200/≤600, refresh status FRESH/STALE/UNKNOWN), `pilot-knowledge.access.ts` (ownership + guarda P2021→503).
+- **Testes:** 21/21 (ledger, ownership, biografia sem invenção/cópia, precedência `Character.biography`).
+- **Commit:** `feat(v3.17): add pilot knowledge foundation`.
+
+### V3.17.2 — Providers F1DB + Wikidata
+- **Arquivos:** `providers/provider.types.ts` (contrato `ExternalDriverKnowledgeProvider`), `f1db.provider.ts` (release JSON local via `F1DB_DATA_DIR`, licença CC BY 4.0 + attribution/version), `wikidata.provider.ts` (SPARQL OTIMIZADO por QID/nome, parser de relações com validade, CC0; `fetchImpl` injetável; live opt-in), `pilot-knowledge.identity.ts` (match por provider id/QID/nome+nacionalidade+número+DOB, `AMBIGUOUS_IDENTITY` para colisões, `ensureExternalDriverForProvider` idempotente).
+- **Testes:** 22/22 (fixtures sanitizadas, sem rede; Max/Lando/Sainz×Sainz Jr./histórico/inexistente; erros sanitizados).
+- **Commit:** `feat(v3.17): add f1db and wikidata providers`.
+
+### V3.17.3 — Evidências e persona pública externa
+- **Arquivos:** migration `20260930161500_add_persona_evidence_source_kind`; `pilot-knowledge.extractor.ts` (interface + provider-backed com prompt de extração/grounding + `emptyPilotPersonaExtractor`), `pilot-knowledge.persona.ts` (ingestão de claims com evidência auditável, resolução por autoridade/temporalidade, `INFERRED` exige 2 evidências, conflito de mesma autoridade = `CONFLICT`, caps, view sem confidence/excerpt/url, refresh preserva `CharacterPersona`).
+- **Testes:** 15/15 (self-description, primary×secondary, conflito, inferred, caps, sem leakage, override manual preservado).
+- **Commit:** `feat(v3.17): add public persona extraction`.
+
+### V3.17.4 — Relacionamentos (externo × Universe override)
+- **Arquivos:** migration `20260930162000_add_character_relationship_target` (enum `CHARACTER`); `pilot-knowledge.relationships.ts` (ingestão idempotente com validade, resolução atual por autoridade→recência→confidence, conflito só no mesmo período/autoridade, override Universe CRUD com ownership, classificação `MATCH/DIVERGENT/UNKNOWN/CONFLICT`, rivalidade nunca inferida).
+- **Testes:** 10/10 (parceiro atual, troca com histórico, conflito, rumor novo × oficial antigo, override A→B→C, familiares/teammates, ownership, idempotência).
+- **Commit:** `feat(v3.17): add pilot relationships`.
+
+### V3.17.5 — Histórico (marcos determinísticos)
+- **Arquivos:** `pilot-knowledge.events.ts` (debut/first point/podium/pole/win/championship/team change derivados do espelho; eventos curados com source; `dedupeKey` idempotente; relevância por ano/corrida/título; vínculo season/race do Universe por binding; categoria/labels).
+- **Testes:** 6/6 (derivação + idempotência, sem duplicar `RaceResult`, curados, relevância, vínculo, vazio; cleanup de FKs Restrict corrigido no teste).
+- **Commit:** `feat(v3.17): add pilot historical context`.
+
+### V3.17.6 — PilotContextResolver
+- **Arquivos:** `pilot-context.policy.ts` (caps), `pilot-context.resolver.ts` (`resolvePilotContext` com queries agrupadas, precedence Universe→External, memories por relevância, estado atual do Universe, refresh status, fingerprint SHA-256 determinístico, early-exit sem `DriverProfile`, `loadSpeakerPilotContext` com degradação P2021→null), `pilot-context.prompt.ts` (bloco sem confidence/URLs/ids; caps 2000; rótulo de origem; estado omitido quando irrelevante).
+- **Testes:** 13/13 (11 casos do spec + prompt sem leakage + degradação).
+- **Commit:** `feat(v3.17): add pilot context resolver`.
+
+### V3.17.7 — Integração com geração
+- **Arquivos:** `generation.assembly.ts` — seção opcional `PILOT_CONTEXT` após `CHARACTER_DNA` (speaker-only), `loadSpeakerPilotContext` no bundle, reasons em `omitted`, contrato aceita a seção como opcional; `generation-pilot-context.test.ts` com fixtures de banco e spy provider.
+- **Testes:** geração completa 441/441 (regressão) + 8 novos (Alice×Bob, terceiros fora, evidence/confidence/URL/ids fora, sem conhecimento = 12 seções, key muda com perfil/persona/memória, override vence marcado, `CURRENT_TURN` preservado, key determinística).
+- **Commit:** `feat(v3.17): integrate pilot context with generation`.
+
+### V3.17.8 — UI do piloto + Persona sem 500
+- **Objetivo:** abas Visão geral/Persona/Histórico/Relacionamentos e correção do "Internal Server Error" da Persona no DEV (migration pendente) sem tocar DEV.
+- **Arquivos:** `persona.service.ts` (`isPersonaSchemaUnavailable`, `withPersonaAvailability`, carga P2021→`PersonaServiceError UNAVAILABLE 503`), `persona.routes.ts` (mapeamento 503 sanitizado); web `lib/pilot-knowledge.ts`, `hooks/use-pilot-knowledge.ts`, `components/pilot-knowledge/pilot-knowledge-panels.tsx` (overview/persona/history/relationships + fontes/licenças + classificação + CRUD de override), abas em `drivers/[id]/page.tsx`.
+- **Testes:** web 469/469 (61 arquivos), incluindo 7 novos dos painéis e regressão da página do piloto; API persona 302/302 (2 novos de availability).
+- **Commit:** `feat(v3.17): add pilot knowledge ui and persona availability guard`.
+
+### V3.17.9 — Refresh/rotas/isolamento
+- **Arquivos:** `pilot-knowledge.refresh.ts` (reutiliza `ExternalSyncRun`/lock; scopes `DRIVER_PROFILE/DRIVER_RELATIONSHIPS/DRIVER_EVENTS`; resolve identidade/ambiguidade; nunca escreve Universe), `pilot-knowledge.read.ts` (view agregada), `pilot-knowledge.routes.ts` (GET agregado owner-only leak-safe; refresh ADMIN+owner com providers injetados/503; status ADMIN; CRUD override), `app.ts` (DI opcional de providers), `pilot-knowledge.isolation.test.ts`.
+- **Testes:** módulo pilot-knowledge 84/84 + isolamento A/B com refresh externo.
+- **Deviação documentada:** refresh registra `DRIVER_PROFILE/DRIVER_RELATIONSHIPS/DRIVER_EVENTS`; `DRIVER_PERSONA` não tem run próprio porque traits entram por ingestão de evidência explícita (curated/extractor), nunca por refresh automático (D-068).
+- **Commit:** `feat(v3.17): add pilot knowledge refresh and routes`.
+
+### V3.17.10 — Final QA / Docs
+- **Regressão completa:** API **2376/2376** (147 arquivos) em **duas execuções consecutivas limpas no mesmo TEST**; Web **469/469** (61 arquivos) ×2 consecutivas limpas. Typecheck API/Web 0; lint API/Web 0; build API/Web 0 (4 execuções API limpas no total após o fix de cleanup).
+- **Banco:** TEST 32 migrations, 71 tabelas; 0 `TimelineEvent`/`WorldSnapshot`; 0 conhecimento externo/relacionamentos de universe/sources/runs de piloto; 0 users de fixture; 0 orphans de corrida. DEV intacto (27 migrations, 60 tabelas, 17 usuários, 2 `NUMBER_CORRECTED` pré-existentes); nenhuma migration aplicada ao DEV. External Mirror intocado.
+- **Problemas:** (1) resíduo real de `ExternalKnowledgeSource` (~420) por FKs `SetNull` sem cleanup nos testes — corrigido com `test-utils/pilot-knowledge-cleanup.ts` e validado (0 após execução); (2) 1ª execução completa da API teve 4 falhas em 1 arquivo, não reproduzidas em 4 execuções limpas subsequentes (resíduo de cleanups abortados de sessões de debug, limpo); (3) flake pré-existente `external-page.integration.test.tsx` (arquivo não tocado, conhecido desde a V3.14) falhou 1× sob carga, passou isolado e em execuções limpas.
+- **Docs:** `v3.17-pilot-knowledge-architecture.md` (§14 status + §15 QA), `v3.17-source-policy.md`, `v3.17-open-questions.md` (13 OQs), D-067..D-071, nota de compatibilidade V3.14.
+- **Decisões:** D-067..D-071.
+- **Limitações:** refresh de persona é ingestão explícita (sem run automático); UI de override cobre alvo `PUBLIC_PERSON`; live sources opt-in (suíte usa fixtures); sem evolução automática de personalidade (preparada, não implementada).
+- **Commit:** `feat(v3.17): complete pilot knowledge`.
