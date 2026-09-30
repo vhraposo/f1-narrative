@@ -19,10 +19,39 @@ export type TimelineItem = {
   values: Record<string, string | number | null> | null;
 };
 
+export type TimelineEditorKind =
+  | "RACE_RESULT"
+  | "SPRINT"
+  | "NUMBER"
+  | "STANDING"
+  | "RACE";
+
+export type TimelineEditBlockedReason =
+  | "NO_VISUAL_EDITOR"
+  | "EVOLUTION_STALE"
+  | "DERIVED_STANDING"
+  | "RESULT_NOT_FOUND"
+  | "DRIVER_NOT_IN_SEASON"
+  | "RACE_NOT_FOUND"
+  | "SEASON_NOT_FOUND"
+  | "WORLD_STATE_MISSING";
+
+export type TimelineEventEditModel = {
+  editorKind: TimelineEditorKind | null;
+  canEdit: boolean;
+  blockedReason: TimelineEditBlockedReason | null;
+  defaultWorldDate: string | null;
+  suggestedSupersedesId: string | null;
+  values: Record<string, string | number | null> | null;
+  currentValues: Record<string, string | number | null> | null;
+  narrativeStaleEventIds: string[];
+};
+
 export type TimelineEventDetail = {
   item: TimelineItem;
   supersedesChain: TimelineItem[];
   supersededByChain: TimelineItem[];
+  edit: TimelineEventEditModel;
 };
 
 export type TimelineListResponse = {
@@ -152,6 +181,108 @@ export function listTimeline(
 
 export function getTimelineEvent(eventId: string): Promise<TimelineEventDetail> {
   return get<TimelineEventDetail>(`/api/timeline/events/${eventId}`);
+}
+
+export type RaceResultCorrectionCommand = {
+  kind: "RACE_RESULT_CORRECTED";
+  worldDate: string;
+  raceId: string;
+  driverProfileId: string;
+  position?: number | null;
+  grid?: number | null;
+  status?: string | null;
+  supersedesId?: string | null;
+};
+
+export type SprintCorrectionCommand = {
+  kind: "RACE_SESSION_RESULT_CORRECTED";
+  worldDate: string;
+  raceId: string;
+  driverProfileId: string;
+  position?: number | null;
+  status?: string | null;
+  eligibility?: { neutralizedStart: boolean; distancePct: number } | null;
+  supersedesId?: string | null;
+};
+
+export type NumberCorrectionCommand = {
+  kind: "NUMBER_CORRECTED";
+  worldDate: string;
+  seasonId: string;
+  driverProfileId: string;
+  number: number | null;
+  supersedesId?: string | null;
+};
+
+export type StandingCorrectionCommand = {
+  kind: "STANDING_CORRECTED";
+  worldDate: string;
+  seasonId: string;
+  driverProfileId: string;
+  points?: number;
+  wins?: number;
+  podiums?: number;
+  position?: number | null;
+  supersedesId?: string | null;
+};
+
+export type CalendarCorrectionCommand = {
+  kind: "RACE_UPDATED";
+  worldDate: string;
+  raceId: string;
+  name?: string;
+  date?: string | null;
+  round?: number;
+  status?: string;
+  sprintOverride?: boolean | null;
+  supersedesId?: string | null;
+};
+
+export type CorrectionCommand =
+  | RaceResultCorrectionCommand
+  | SprintCorrectionCommand
+  | NumberCorrectionCommand
+  | StandingCorrectionCommand
+  | CalendarCorrectionCommand;
+
+export type CorrectionPreview = {
+  previewToken: string;
+  kind: string;
+  changes: Array<{
+    area: "RESULT" | "STANDING" | "CHAMPION" | "NUMBER" | "CALENDAR";
+    label: string;
+    field: string;
+    before: string | number | null;
+    after: string | number | null;
+  }>;
+  championBefore: string | null;
+  championAfter: string | null;
+  narrativeStaleEventIds: string[];
+  numberImpact: {
+    seasonId: string;
+    year: number;
+    currentHolderId: string | null;
+    expectedChampionId: string | null;
+    requiresAction: boolean;
+  } | null;
+};
+
+export function previewCorrection(
+  command: CorrectionCommand,
+): Promise<CorrectionPreview> {
+  return post<{ preview: CorrectionPreview }>(
+    "/api/timeline/corrections/preview",
+    command,
+  ).then((r) => r.preview);
+}
+
+export function applyCorrection(
+  command: CorrectionCommand,
+  previewToken: string,
+): Promise<{ event: { id: string; sequence: number; kind: string; supersedesId: string | null } }> {
+  return post<{
+    event: { id: string; sequence: number; kind: string; supersedesId: string | null };
+  }>("/api/timeline/corrections/apply", { command, previewToken });
 }
 
 export function getDivergence(seasonId: string): Promise<DivergenceReport> {

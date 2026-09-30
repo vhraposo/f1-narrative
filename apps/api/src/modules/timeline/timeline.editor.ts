@@ -158,10 +158,14 @@ export async function buildTimelineEventEditModel(
         position: true,
         status: true,
         points: true,
+        metadata: true,
         race: { select: { seasonId: true } },
       },
     });
     if (!result) return notEditable("RESULT_NOT_FOUND", { editorKind: "SPRINT" });
+    const eligibility = (result.metadata as {
+      eligibility?: { neutralizedStart?: boolean; distancePct?: number };
+    } | null)?.eligibility;
 
     const evolved = await prisma.timelineEvent.findFirst({
       where: {
@@ -177,6 +181,13 @@ export async function buildTimelineEventEditModel(
       position: result.position,
       status: result.status,
       points: result.points,
+      neutralizedStart:
+        eligibility?.neutralizedStart === undefined
+          ? null
+          : eligibility.neutralizedStart
+            ? 1
+            : 0,
+      distancePct: eligibility?.distancePct ?? null,
     }, await narrativeStaleEventIds(raceId));
   }
 

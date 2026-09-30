@@ -3,13 +3,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   applyChampionChange,
+  applyCorrection,
   getChampionDetail,
   getChampions,
   getDivergence,
   getTimelineEvent,
   listTimeline,
   previewChampionChange,
+  previewCorrection,
   type ChampionChangeRequest,
+  type CorrectionCommand,
   type TimelineListFilters,
 } from "@/lib/timeline";
 
@@ -61,6 +64,25 @@ export function usePreviewChampionChange() {
   return useMutation({
     mutationFn: (vars: { seasonId: string; request: ChampionChangeRequest }) =>
       previewChampionChange(vars.seasonId, vars.request),
+  });
+}
+
+export function usePreviewCorrection() {
+  return useMutation({
+    mutationFn: (command: CorrectionCommand) => previewCorrection(command),
+  });
+}
+
+export function useApplyCorrection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { command: CorrectionCommand; previewToken: string }) =>
+      applyCorrection(vars.command, vars.previewToken),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["timeline"] });
+      void queryClient.invalidateQueries({ queryKey: ["seasons"] });
+      void queryClient.invalidateQueries({ queryKey: ["races"] });
+    },
   });
 }
 

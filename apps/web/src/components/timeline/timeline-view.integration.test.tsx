@@ -62,6 +62,16 @@ const DETAIL: TimelineEventDetail = {
   item: CORRECTION,
   supersedesChain: [SUPERSEDED],
   supersededByChain: [],
+  edit: {
+    editorKind: "RACE_RESULT",
+    canEdit: true,
+    blockedReason: null,
+    defaultWorldDate: "2026-01-01T00:00:00.000Z",
+    suggestedSupersedesId: "e-corr",
+    values: { position: 1 },
+    currentValues: { position: 1, grid: 1, status: "Finished", points: 25 },
+    narrativeStaleEventIds: [],
+  },
 };
 
 const DIVERGENCE = {
@@ -227,8 +237,13 @@ describe("TimelineView", () => {
     const detail = await screen.findByRole("region", {
       name: "Detalhe do evento",
     });
-    expect(within(detail).getByText("Substitui")).toBeDefined();
-    expect(within(detail).getByText(/#2 · Resultado corrigido/)).toBeDefined();
+    await user.click(within(detail).getByRole("tab", { name: "Histórico" }));
+    expect(within(detail).getByText("Cadeia de correções")).toBeDefined();
+    expect(within(detail).getByText("#2")).toBeDefined();
+    expect(
+      within(detail).getByText(/Resultado corrigido em GP Sintético 1: Piloto Dois/),
+    ).toBeDefined();
+    expect(within(detail).getByText("Atual")).toBeDefined();
     expect(apiMock.get).toHaveBeenCalledWith("/api/timeline/events/e-corr");
   });
 

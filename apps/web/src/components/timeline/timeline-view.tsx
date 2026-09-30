@@ -4,6 +4,7 @@ import { History, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { SectionHeading } from "@/components/home/section-heading";
+import { TimelineEventPanel } from "@/components/timeline/timeline-event-panel";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,6 @@ import { useTeams } from "@/hooks/use-teams";
 import {
   useDivergence,
   useTimeline,
-  useTimelineEvent,
 } from "@/hooks/use-timeline";
 import {
   DIVERGENCE_LABELS,
@@ -113,108 +113,6 @@ function EventRow({
         )}
       </button>
     </li>
-  );
-}
-
-function EventDetail({ eventId }: { eventId: string }) {
-  const { data, isLoading, isError, error, refetch } = useTimelineEvent(eventId);
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-6" role="status" aria-label="Carregando evento">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (isError || !data) {
-    return (
-      <div className="space-y-2">
-        <p className="text-sm text-destructive" role="alert">
-          {error instanceof Error
-            ? error.message
-            : "Não foi possível carregar o evento."}
-        </p>
-        <Button variant="outline" size="sm" onClick={() => void refetch()}>
-          Tentar novamente
-        </Button>
-      </div>
-    );
-  }
-
-  const values = data.item.values
-    ? Object.entries(data.item.values).filter(([, value]) => value !== null)
-    : [];
-
-  return (
-    <div className="space-y-3">
-      <dl className="space-y-2 text-sm">
-        <div className="flex gap-2">
-          <dt className="w-32 shrink-0 text-muted-foreground">Evento</dt>
-          <dd className="font-medium text-foreground">{data.item.summary}</dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="w-32 shrink-0 text-muted-foreground">Tipo</dt>
-          <dd>{timelineKindLabel(data.item.kind)}</dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="w-32 shrink-0 text-muted-foreground">Data do mundo</dt>
-          <dd>{formatWorldDate(data.item.worldDate)}</dd>
-        </div>
-        {data.item.season && (
-          <div className="flex gap-2">
-            <dt className="w-32 shrink-0 text-muted-foreground">Temporada</dt>
-            <dd>{data.item.season.year}</dd>
-          </div>
-        )}
-        {data.item.driver && (
-          <div className="flex gap-2">
-            <dt className="w-32 shrink-0 text-muted-foreground">Piloto</dt>
-            <dd>{data.item.driver.name}</dd>
-          </div>
-        )}
-        {values.length > 0 && (
-          <div className="flex gap-2">
-            <dt className="w-32 shrink-0 text-muted-foreground">Valores</dt>
-            <dd className="space-x-3">
-              {values.map(([key, value]) => (
-                <span key={key} className="text-foreground">
-                  {key}: <span className="font-semibold">{String(value)}</span>
-                </span>
-              ))}
-            </dd>
-          </div>
-        )}
-      </dl>
-
-      {data.supersedesChain.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Substitui
-          </p>
-          <ul className="mt-1 space-y-1 text-sm">
-            {data.supersedesChain.map((item) => (
-              <li key={item.id} className="text-muted-foreground">
-                #{item.sequence} · {item.summary}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {data.supersededByChain.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Substituído por
-          </p>
-          <ul className="mt-1 space-y-1 text-sm">
-            {data.supersededByChain.map((item) => (
-              <li key={item.id} className="text-muted-foreground">
-                #{item.sequence} · {item.summary}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -578,7 +476,10 @@ export function TimelineView() {
           className="space-y-3 rounded-xl border border-border bg-card p-5"
         >
           <SectionHeading kicker="Detalhe" title="Evento selecionado" />
-          <EventDetail eventId={selectedEventId} />
+          <TimelineEventPanel
+            eventId={selectedEventId}
+            onClose={() => setSelectedEventId(null)}
+          />
         </section>
       )}
     </div>
