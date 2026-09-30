@@ -787,3 +787,15 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Limitações:** `EVOLUTION_STALE` bloqueia preview e apply (exibição como erro de domínio na UI).
 - **Commit:** `feat(v3): add timeline correction preview`.
 - **Próximo passo:** V3.15.4 — apply + recompute com revalidação de token.
+
+### V3.15.4 — Apply + Recompute
+- **Objetivo:** aplicar correções de forma atômica com revalidação de preview e invariantes.
+- **Arquivos:** `correction.apply.ts` (lock `timeline:<universeId>`, recomputa token do estado atual, `PREVIEW_STALE` 409, `applyCorrectionWithinTransaction`, verificação de invariante da persistência), rotas `POST /api/timeline/corrections/preview` e `POST /api/timeline/corrections/apply` (Zod discriminated union `.strict()`, `DERIVED_FIELD` para `points` em race/sprint, token no body do apply).
+- **Migrations:** nenhuma.
+- **Testes:** `correction.apply.test.ts` 7/7 (apply + recompute, token obsoleto sem escrita, reaplicação 409, concorrência com exatamente um vencedor, rollback por validação, 401, rota preview/apply + DERIVED_FIELD + stale).
+- **Typecheck:** 0. **Lint:** 0.
+- **Problemas:** tipagem do comando de teste precisou de tipo concreto (união discriminada + spread).
+- **Decisões:** nenhuma nova.
+- **Limitações:** apply repetido com token novo gera nova correção redundante (auditável); UI ainda não expõe preview/apply (V3.15.6/8).
+- **Commit:** `feat(v3): add timeline correction apply and recompute`.
+- **Próximo passo:** V3.15.5 — correções de RaceResult e Sprint (enum + applyTimelineEvent).
