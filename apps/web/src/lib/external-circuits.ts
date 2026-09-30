@@ -4,7 +4,21 @@ export type CircuitLayoutView = {
   key: string | null;
   url: string | null;
   source: string | null;
+  license: string | null;
+  attribution: string | null;
   available: boolean;
+};
+
+export type CircuitLayoutEntry = {
+  id: string;
+  effective: boolean;
+  lengthMeters: number | null;
+  turns: number | null;
+};
+
+export type CircuitProvenanceView = {
+  source: string;
+  sourceVersion: string | null;
 };
 
 export type CircuitPhotoView = {
@@ -26,6 +40,8 @@ export type CircuitMediaView = {
 export type ExternalCircuitListItem = {
   id: string;
   name: string;
+  fullName: string | null;
+  type: string | null;
   locality: string | null;
   country: string | null;
   latitude: number | null;
@@ -37,6 +53,7 @@ export type ExternalCircuitListItem = {
   lastRaceYear: number | null;
   raceCount: number;
   media: CircuitMediaView;
+  provenance: CircuitProvenanceView;
 };
 
 export type CircuitWinnerEntry = {
@@ -67,6 +84,7 @@ export type CircuitRaceLapEntry = {
 export type ExternalCircuitDetail = ExternalCircuitListItem & {
   source: string;
   sourceUrl: string | null;
+  layouts: CircuitLayoutEntry[];
   topWinners: CircuitWinnerEntry[];
   recentWinners: CircuitRecentWinnerEntry[];
   fastestRaceLap: CircuitRaceLapEntry | null;

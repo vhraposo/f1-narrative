@@ -13,6 +13,7 @@ import { ExternalSourceBadge } from "@/components/external/external-source-badge
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { API_BASE } from "@/lib/api";
 import {
   useExternalCircuitDetail,
   useExternalCircuits,
@@ -32,6 +33,17 @@ function formatLength(lengthMeters: number | null): string {
     maximumFractionDigits: 3,
   })} km`;
 }
+
+const CIRCUIT_TYPE_LABELS: Record<string, string> = {
+  RACE: "Circuito permanente",
+  STREET: "Circuito de rua",
+  ROAD: "Circuito de estrada",
+};
+
+const DIRECTION_LABELS: Record<string, string> = {
+  CLOCKWISE: "Horário",
+  ANTI_CLOCKWISE: "Anti-horário",
+};
 
 function CircuitCard({
   circuit,
@@ -101,9 +113,20 @@ function CircuitDetailPanel({ circuitId }: { circuitId: string }) {
           <h3 className="text-xl font-black tracking-tight text-foreground">
             {circuit.name}
           </h3>
+          {circuit.fullName && circuit.fullName !== circuit.name ? (
+            <p className="text-sm font-semibold text-muted-foreground">
+              {circuit.fullName}
+            </p>
+          ) : null}
           <p className="text-sm text-muted-foreground">
             {[country, circuit.locality].filter(Boolean).join(" · ") ||
               "Localização não informada"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Fonte do traçado/dados técnicos: {circuit.provenance.source}
+            {circuit.provenance.sourceVersion
+              ? ` · versão ${circuit.provenance.sourceVersion}`
+              : ""}
           </p>
         </div>
 
@@ -141,21 +164,21 @@ function CircuitDetailPanel({ circuitId }: { circuitId: string }) {
         )}
 
         {circuit.media.layout.available && circuit.media.layout.url ? (
-          <figure className="space-y-1">
+          <figure className="space-y-1 rounded-lg border border-border bg-white p-3">
             <img
-              src={circuit.media.layout.url}
+              src={`${API_BASE}${circuit.media.layout.url}`}
               alt={`Layout do circuito ${circuit.name}`}
-              className="h-40 w-full rounded-lg border border-border object-contain"
+              className="mx-auto h-44 w-full max-w-sm object-contain"
             />
-            <figcaption className="text-xs text-muted-foreground">
-              Layout: {circuit.media.layout.source ?? "fonte"} (
-              {circuit.media.layout.key ?? "sem chave"})
+            <figcaption className="text-center text-xs text-muted-foreground">
+              Layout: {circuit.media.layout.attribution ?? circuit.media.layout.source}
+              {circuit.media.layout.key ? ` · ${circuit.media.layout.key}` : ""}
             </figcaption>
           </figure>
         ) : (
           <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-            Layout não disponível: nenhum dataset de layouts (F1DB) configurado
-            neste ambiente.
+            Layout não disponível: nenhum asset licenciado (f1-circuits-svg/F1DB)
+            resolveu este circuito neste ambiente.
           </p>
         )}
 
@@ -166,11 +189,28 @@ function CircuitDetailPanel({ circuitId }: { circuitId: string }) {
               ["Cidade", circuit.locality ?? "Não informado."],
               ["Extensão", formatLength(circuit.lengthMeters)],
               ["Curvas", circuit.turns !== null ? String(circuit.turns) : "Não informado."],
-              ["Direção", circuit.direction ?? "Não informado."],
+              [
+                "Tipo",
+                circuit.type
+                  ? (CIRCUIT_TYPE_LABELS[circuit.type] ?? circuit.type)
+                  : "Não informado.",
+              ],
+              [
+                "Direção",
+                circuit.direction
+                  ? (DIRECTION_LABELS[circuit.direction] ?? circuit.direction)
+                  : "Não informado.",
+              ],
               [
                 "Primeiro GP de F1",
                 circuit.firstRaceYear !== null
                   ? String(circuit.firstRaceYear)
+                  : "Não informado.",
+              ],
+              [
+                "Última utilização",
+                circuit.lastRaceYear !== null
+                  ? String(circuit.lastRaceYear)
                   : "Não informado.",
               ],
               [
@@ -189,6 +229,26 @@ function CircuitDetailPanel({ circuitId }: { circuitId: string }) {
             </div>
           ))}
         </dl>
+
+        {circuit.layouts.length > 1 ? (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Traçados históricos
+            </p>
+            <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+              {circuit.layouts.map((layout) => (
+                <li key={layout.id} className="flex items-center justify-between gap-3">
+                  <span>{layout.id}</span>
+                  <span className="text-xs">
+                    {formatLength(layout.lengthMeters)}
+                    {layout.turns !== null ? ` · ${layout.turns} curvas` : ""}
+                    {layout.effective ? " · vigente" : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
           <div>

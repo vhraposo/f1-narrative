@@ -24,6 +24,14 @@ export type BiographyFacts = {
   readonly championships?: readonly number[];
   readonly interests?: readonly string[];
   readonly milestoneTitles?: readonly string[];
+  readonly career?: {
+    readonly wins: number;
+    readonly podiums: number;
+    readonly poles: number;
+    readonly fastestLaps: number;
+    readonly titles: number;
+    readonly starts: number;
+  } | null;
 };
 
 const BIRTH_DATE_FORMAT = new Intl.DateTimeFormat("pt-BR", {
@@ -84,6 +92,22 @@ export function composeBiographyDisplay(facts: BiographyFacts): string | null {
     sentences.push(
       `Conquistou o campeonato mundial em ${joinList(years)}.`,
     );
+  }
+
+  const career = facts.career;
+  if (career && (career.wins > 0 || career.podiums > 0 || career.starts > 0)) {
+    const parts: string[] = [];
+    if (career.wins > 0) parts.push(`${career.wins} vitórias`);
+    if (career.podiums > 0) parts.push(`${career.podiums} pódios`);
+    if (career.poles > 0) parts.push(`${career.poles} poles`);
+    if (career.fastestLaps > 0) parts.push(`${career.fastestLaps} voltas mais rápidas`);
+    if (parts.length > 0) {
+      const titles =
+        career.titles > 0
+          ? ` e ${career.titles} título${career.titles === 1 ? "" : "s"} mundial${career.titles === 1 ? "" : "is"}`
+          : "";
+      sentences.push(`Na carreira na Fórmula 1, soma ${joinList(parts)}${titles}.`);
+    }
   }
 
   if (facts.milestoneTitles && facts.milestoneTitles.length > 0) {

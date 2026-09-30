@@ -56,6 +56,8 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((value) => value === "true"),
+  F1DB_DATA_DIR: z.string().min(1).optional(),
+  F1DB_CIRCUITS_SVG_DIR: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

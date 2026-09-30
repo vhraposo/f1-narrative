@@ -351,4 +351,28 @@ describe("pilot historical events", () => {
     });
     expect(total).toBe(derived);
   });
+
+  it("8) F1DB histórico define marcos reais quando o espelho é parcial (Lando)", async () => {
+    const { driver } = await createFixture("f1db-land");
+    await prisma.externalDriver.update({
+      where: { id: driver.id },
+      data: { name: "Lando Norris", fullName: "Lando Norris" },
+    });
+    await seedCareer(driver.id, [
+      { year: 2026, round: 1, name: "GP 2026", position: 5, grid: 5, points: 10, date: "2026-03-01" },
+    ]);
+    const events = await deriveMilestonesFromExternalData(driver.id);
+    const byCategory = new Map(events.map((event) => [event.category, event]));
+    expect(byCategory.get("F1_DEBUT")?.seasonYear).toBe(2019);
+    expect(byCategory.get("FIRST_PODIUM")?.seasonYear).toBe(2020);
+    expect(byCategory.get("FIRST_POLE")?.seasonYear).toBe(2021);
+    expect(byCategory.get("FIRST_WIN")?.seasonYear).toBe(2024);
+    expect(byCategory.get("FIRST_CHAMPIONSHIP")?.seasonYear).toBe(2025);
+    expect(byCategory.get("CHAMPIONSHIP")?.seasonYear).toBe(2025);
+    const debut = await prisma.externalDriverEvent.findFirstOrThrow({
+      where: { externalDriverId: driver.id, category: "F1_DEBUT" },
+    });
+    expect(debut.sourceId).not.toBeNull();
+    expect(debut.title).toContain("2019");
+  });
 });

@@ -1,12 +1,33 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import {
+  getF1dbCircuitInfo,
+  resolveF1dbCircuitId,
+  type F1dbCircuitInfo,
+} from "../f1db/f1db.circuits.js";
+import { getF1dbDataset } from "../f1db/f1db.dataset.js";
+import { resolveCircuitSvg } from "../f1db/f1db.svg.js";
 
 export type CircuitLayoutView = {
   readonly key: string | null;
   readonly url: string | null;
   readonly source: string | null;
+  readonly license: string | null;
+  readonly attribution: string | null;
   readonly available: boolean;
+};
+
+export type CircuitLayoutEntry = {
+  readonly id: string;
+  readonly effective: boolean;
+  readonly lengthMeters: number | null;
+  readonly turns: number | null;
+};
+
+export type CircuitProvenanceView = {
+  readonly source: string;
+  readonly sourceVersion: string | null;
 };
 
 export type CircuitPhotoView = {
@@ -53,6 +74,8 @@ export type CircuitRaceLapEntry = {
 export type CircuitListItem = {
   readonly id: string;
   readonly name: string;
+  readonly fullName: string | null;
+  readonly type: string | null;
   readonly locality: string | null;
   readonly country: string | null;
   readonly latitude: number | null;
@@ -64,11 +87,13 @@ export type CircuitListItem = {
   readonly lastRaceYear: number | null;
   readonly raceCount: number;
   readonly media: CircuitMediaView;
+  readonly provenance: CircuitProvenanceView;
 };
 
 export type CircuitDetail = CircuitListItem & {
   readonly source: string;
   readonly sourceUrl: string | null;
+  readonly layouts: readonly CircuitLayoutEntry[];
   readonly topWinners: readonly CircuitWinnerEntry[];
   readonly recentWinners: readonly CircuitRecentWinnerEntry[];
   readonly fastestRaceLap: CircuitRaceLapEntry | null;
@@ -97,9 +122,13 @@ function sourceRecordString(
 }
 
 // Abstração de mídia de circuito: somente fontes licenciadas/configuradas.
-// Sem dataset F1DB (layouts) ou foto licenciada resolvida no sourceRecord,
-// devolve indisponível — nunca inventa URL nem usa imagem sem licença.
+// Layout: SVG do f1-circuits-svg (F1DB, CC BY 4.0) servido localmente e
+// sanitizado; fallback para layoutUrl do sourceRecord quando existir.
+// Foto: apenas quando o sourceRecord traz URL + licença identificada.
 export function resolveCircuitMedia(input: {
+  readonly circuitId: string;
+  readonly externalId: string | null;
+  readonly name: string;
   readonly layoutKey: string | null;
   readonly sourceRecord: Prisma.JsonValue | null;
 }): CircuitMediaView {
@@ -116,12 +145,34 @@ export function resolveCircuitMedia(input: {
         attribution: sourceRecordString(input.sourceRecord, "photoAttribution"),
       }
     : null;
+
+  const f1dbSvg = resolveCircuitSvg({
+    externalId: input.externalId,
+    name: input.name,
+  });
+  if (f1dbSvg) {
+    return {
+      layout: {
+        key: f1dbSvg.layoutId,
+        url: `/api/external/circuits/${input.circuitId}/layout.svg`,
+        source: f1dbSvg.source,
+        license: f1dbSvg.license,
+        attribution: f1dbSvg.attribution,
+        available: true,
+      },
+      photo,
+      attributionRequired: true,
+    };
+  }
+
   const layoutKey = input.layoutKey?.slice(0, SOURCE_RECORD_KEY_LIMIT) ?? null;
   const layoutUrl = sourceRecordString(input.sourceRecord, "layoutUrl");
   const layout = {
     key: layoutKey,
     url: layoutUrl,
     source: layoutUrl ? (sourceRecordString(input.sourceRecord, "layoutSource") ?? "F1DB") : null,
+    license: layoutUrl ? sourceRecordString(input.sourceRecord, "layoutLicense") : null,
+    attribution: layoutUrl ? sourceRecordString(input.sourceRecord, "layoutAttribution") : null,
     available: layoutUrl !== null,
   };
   return {
@@ -133,6 +184,7 @@ export function resolveCircuitMedia(input: {
 
 type CircuitRow = {
   id: string;
+  externalId: string | null;
   name: string;
   locality: string | null;
   country: string | null;
@@ -145,27 +197,46 @@ type CircuitRow = {
   sourceRecord: Prisma.JsonValue | null;
 };
 
+function f1dbInfoFor(input: { externalId: string | null; name: string }): F1dbCircuitInfo | null {
+  const circuitId = resolveF1dbCircuitId({
+    externalId: input.externalId,
+    name: input.name,
+  });
+  return circuitId ? getF1dbCircuitInfo(circuitId) : null;
+}
+
 function toListItem(
   circuit: CircuitRow,
   stats: { firstRaceYear: number | null; lastRaceYear: number | null; raceCount: number },
+  f1db: F1dbCircuitInfo | null,
 ): CircuitListItem {
+  const lengthKm = f1db?.circuit.lengthKm ?? null;
   return {
     id: circuit.id,
     name: circuit.name,
-    locality: circuit.locality,
+    fullName: f1db?.circuit.fullName ?? null,
+    type: f1db?.circuit.type ?? null,
+    locality: circuit.locality ?? f1db?.circuit.placeName ?? null,
     country: circuit.country,
-    latitude: circuit.latitude,
-    longitude: circuit.longitude,
-    lengthMeters: circuit.lengthMeters,
-    turns: circuit.turns,
-    direction: circuit.direction,
-    firstRaceYear: stats.firstRaceYear,
-    lastRaceYear: stats.lastRaceYear,
-    raceCount: stats.raceCount,
+    latitude: circuit.latitude ?? f1db?.circuit.latitude ?? null,
+    longitude: circuit.longitude ?? f1db?.circuit.longitude ?? null,
+    lengthMeters:
+      lengthKm !== null ? Math.round(lengthKm * 1000) : circuit.lengthMeters,
+    turns: f1db?.circuit.turns ?? circuit.turns,
+    direction: f1db?.circuit.direction ?? circuit.direction,
+    firstRaceYear: f1db?.firstRaceYear ?? stats.firstRaceYear,
+    lastRaceYear: f1db?.lastRaceYear ?? stats.lastRaceYear,
+    raceCount: f1db ? f1db.raceCount : stats.raceCount,
     media: resolveCircuitMedia({
+      circuitId: circuit.id,
+      externalId: circuit.externalId,
+      name: circuit.name,
       layoutKey: circuit.layoutKey,
       sourceRecord: circuit.sourceRecord,
     }),
+    provenance: f1db
+      ? { source: "F1DB", sourceVersion: getF1dbDataset()?.sourceVersion ?? null }
+      : { source: "EXTERNAL_MIRROR", sourceVersion: null },
   };
 }
 
@@ -219,6 +290,7 @@ export async function listExternalCircuits(options: {
       skip: offset,
       select: {
         id: true,
+        externalId: true,
         name: true,
         locality: true,
         country: true,
@@ -235,7 +307,11 @@ export async function listExternalCircuits(options: {
   const stats = await raceStatsByCircuit(rows.map((row) => row.id));
   return {
     circuits: rows.map((row) =>
-      toListItem(row, stats.get(row.id) ?? { firstRaceYear: null, lastRaceYear: null, raceCount: 0 }),
+      toListItem(
+        row,
+        stats.get(row.id) ?? { firstRaceYear: null, lastRaceYear: null, raceCount: 0 },
+        f1dbInfoFor({ externalId: row.externalId, name: row.name }),
+      ),
     ),
     total,
   };
@@ -336,6 +412,7 @@ export async function getExternalCircuitDetail(
     where: { id: circuitId },
     select: {
       id: true,
+      externalId: true,
       name: true,
       source: true,
       url: true,
@@ -359,14 +436,25 @@ export async function getExternalCircuitDetail(
     fastestRaceLapForCircuit(circuit.id),
   ]);
 
+  const f1db = f1dbInfoFor({ externalId: circuit.externalId, name: circuit.name });
   return {
-    ...toListItem(circuit, stats.get(circuit.id) ?? {
-      firstRaceYear: null,
-      lastRaceYear: null,
-      raceCount: 0,
-    }),
+    ...toListItem(
+      circuit,
+      stats.get(circuit.id) ?? {
+        firstRaceYear: null,
+        lastRaceYear: null,
+        raceCount: 0,
+      },
+      f1db,
+    ),
     source: circuit.source,
     sourceUrl: circuit.url,
+    layouts: (f1db?.layouts ?? []).map((layout) => ({
+      id: layout.id,
+      effective: layout.effective,
+      lengthMeters: layout.lengthKm !== null ? Math.round(layout.lengthKm * 1000) : null,
+      turns: layout.turns,
+    })),
     topWinners,
     recentWinners,
     fastestRaceLap,

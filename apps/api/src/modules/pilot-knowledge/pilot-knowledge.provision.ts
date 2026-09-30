@@ -1,6 +1,12 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { getF1dbDataset } from "../f1db/f1db.dataset.js";
+import {
+  computeF1dbDriverMilestones,
+  getF1dbDriverStats,
+  resolveF1dbDriver,
+} from "../f1db/f1db.drivers.js";
 import { deriveMilestonesFromExternalData } from "./pilot-knowledge.events.js";
 import {
   readDriverSourceIdentity,
@@ -74,11 +80,34 @@ async function buildMirrorProfileInput(
     deriveMilestonesFromExternalData(externalDriverId, now),
   ]);
   const sourceIdentity = readDriverSourceIdentity(driver.sourceRecord);
+
+  const dataset = getF1dbDataset();
+  const f1dbDriver = dataset
+    ? resolveF1dbDriver({ name: driver.name, driverCode: sourceIdentity.driverCode })
+    : null;
+  const f1dbMilestones = f1dbDriver
+    ? computeF1dbDriverMilestones(f1dbDriver.id)
+    : null;
+  const f1dbStats = f1dbDriver ? getF1dbDriverStats(f1dbDriver) : null;
+
+  const debutYears = [
+    career.debutYear,
+    f1dbMilestones?.debut?.year ?? null,
+  ].filter((year): year is number => typeof year === "number");
+  const championships = [
+    ...new Set([...career.championships, ...(f1dbMilestones?.championshipYears ?? [])]),
+  ].sort((a, b) => a - b);
+  const dateOfBirth = sourceIdentity.dateOfBirth ?? (f1dbDriver?.dateOfBirth
+    ? new Date(`${f1dbDriver.dateOfBirth}T00:00:00.000Z`)
+    : null);
+  const driverCode = sourceIdentity.driverCode ?? f1dbDriver?.abbreviation ?? null;
+
   return {
     fullName: driver.fullName,
     publicName: driver.name,
-    dateOfBirth: sourceIdentity.dateOfBirth,
-    driverCode: sourceIdentity.driverCode,
+    dateOfBirth,
+    placeOfBirth: f1dbDriver?.placeOfBirth ?? null,
+    driverCode,
     nationality: driver.nationality,
     driverNumber: career.driverNumber ?? driver.number ?? null,
     currentTeamName: career.currentTeamName,
@@ -86,12 +115,23 @@ async function buildMirrorProfileInput(
     biographyFacts: {
       publicName: driver.name,
       fullName: driver.fullName,
-      dateOfBirth: sourceIdentity.dateOfBirth,
+      dateOfBirth,
+      placeOfBirth: f1dbDriver?.placeOfBirth ?? null,
       nationality: driver.nationality,
-      debutYear: career.debutYear,
+      debutYear: debutYears.length > 0 ? Math.min(...debutYears) : null,
       teams: career.teams,
-      championships: career.championships,
+      championships,
       milestoneTitles: topMilestoneTitles(milestones),
+      career: f1dbStats
+        ? {
+            wins: f1dbStats.wins,
+            podiums: f1dbStats.podiums,
+            poles: f1dbStats.poles,
+            fastestLaps: f1dbStats.fastestLaps,
+            titles: f1dbStats.titles,
+            starts: f1dbStats.starts,
+          }
+        : null,
     },
   };
 }

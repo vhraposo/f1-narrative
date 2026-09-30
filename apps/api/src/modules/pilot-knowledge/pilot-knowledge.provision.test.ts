@@ -288,6 +288,28 @@ describe("pilot knowledge provisioning", () => {
       "Equipe B",
     ]);
   });
+
+  it("7) provisiona fatos F1DB (nascimento/local/código/carreira) com espelho parcial", async () => {
+    const fixture = await createFixture("f1db-land", { withData: true, round: 14 });
+    await prisma.externalDriver.update({
+      where: { id: fixture.driver.id },
+      data: { name: "Lando Norris", fullName: "Lando Norris", nationality: "British" },
+    });
+    const result = await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    expect(result.outcome).toBe("PROVISIONED");
+
+    const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    expect(profile.dateOfBirth?.toISOString()).toBe("1999-11-13T00:00:00.000Z");
+    expect(profile.placeOfBirth).toBe("Bristol");
+    expect(profile.driverCode).toBe("NOR");
+    expect(profile.biographyDisplay).toContain("Bristol");
+    expect(profile.biographyDisplay).toContain("13 de novembro de 1999");
+    expect(profile.biographyDisplay).toContain("campeonato mundial em 2016 e 2025");
+    expect(profile.biographyDisplay).toContain("vitórias");
+    expect(profile.biographyDisplay).toContain("nacionalidade britânica");
+  });
 });
 
 

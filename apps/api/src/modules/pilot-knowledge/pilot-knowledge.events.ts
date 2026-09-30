@@ -5,6 +5,14 @@ import type {
 } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import {
+  computeF1dbDriverMilestones,
+  getF1dbRaceLabel,
+  resolveF1dbDriver,
+  type F1dbMilestonePoint,
+} from "../f1db/f1db.drivers.js";
+import { getF1dbDataset } from "../f1db/f1db.dataset.js";
+import { readDriverSourceIdentity } from "./pilot-knowledge.profile.js";
 import { EVENTS_MAX } from "./pilot-knowledge.policy.js";
 import { recordKnowledgeSource, type KnowledgeSourceInput } from "./pilot-knowledge.sources.js";
 
@@ -43,7 +51,7 @@ export async function deriveMilestonesFromExternalData(
 ): Promise<readonly ExternalDriverEvent[]> {
   const driver = await prisma.externalDriver.findUnique({
     where: { id: externalDriverId },
-    select: { id: true },
+    select: { id: true, name: true, sourceRecord: true },
   });
   if (!driver) return [];
 
@@ -72,6 +80,7 @@ export async function deriveMilestonesFromExternalData(
     summary: string | null;
     importance: number;
     dedupeKey: string;
+    sourceId?: string | null;
   };
   const derived: Derived[] = [];
 
@@ -220,6 +229,177 @@ export async function deriveMilestonesFromExternalData(
     }
   }
 
+  const dataset = getF1dbDataset();
+  if (dataset) {
+    const sourceIdentity = readDriverSourceIdentity(driver.sourceRecord);
+    const f1dbDriver = resolveF1dbDriver({
+      name: driver.name,
+      driverCode: sourceIdentity.driverCode,
+    });
+    const milestones = f1dbDriver
+      ? computeF1dbDriverMilestones(f1dbDriver.id)
+      : null;
+    if (f1dbDriver && milestones) {
+      let f1dbSourceId: string | null = null;
+      const ensureSource = async () => {
+        if (f1dbSourceId) return f1dbSourceId;
+        const source = await recordKnowledgeSource(
+          {
+            provider: "F1DB",
+            sourceKind: "STRUCTURED_RELEASE",
+            url: `https://github.com/f1db/f1db/releases/tag/${dataset.sourceVersion}`,
+            title: `F1DB release ${dataset.sourceVersion}`,
+            license: "CC_BY_4_0",
+            attributionRequirement: "Obrigatória",
+            attributionText: "F1DB — CC BY 4.0",
+            sourceVersion: dataset.sourceVersion,
+          },
+          now,
+        );
+        f1dbSourceId = source.id;
+        return f1dbSourceId;
+      };
+
+      const applyMilestone = async (
+        category: ExternalDriverEventCategory,
+        point: F1dbMilestonePoint | null,
+        title: string,
+        summary: string,
+        importance: number,
+      ) => {
+        if (!point) return;
+        const existing = derived.find((item) => item.category === category);
+        if (existing && (existing.seasonYear ?? Number.MAX_SAFE_INTEGER) <= point.year) {
+          return;
+        }
+        const race = dataset.racesById.get(point.raceId);
+        const sourceId = await ensureSource();
+        const candidate: Derived = {
+          category,
+          title,
+          eventDate: race?.date ? new Date(`${race.date}T00:00:00.000Z`) : null,
+          seasonYear: point.year,
+          externalRaceId: null,
+          summary,
+          importance,
+          dedupeKey: `f1db:${category}:${point.year}:r${point.round}`,
+          sourceId,
+        };
+        if (existing) {
+          const index = derived.indexOf(existing);
+          derived[index] = candidate;
+        } else {
+          derived.push(candidate);
+        }
+      };
+
+      const raceLabel = (point: F1dbMilestonePoint) =>
+        getF1dbRaceLabel(point.raceId) ?? "corrida";
+
+      await applyMilestone(
+        "F1_DEBUT",
+        milestones.debut,
+        milestones.debut ? `Estreia na F1 em ${milestones.debut.year}` : "",
+        milestones.debut
+          ? `Primeira corrida registrada na carreira (${raceLabel(milestones.debut)}).`
+          : "",
+        5,
+      );
+      await applyMilestone(
+        "FIRST_POINT",
+        milestones.firstPoints,
+        milestones.firstPoints
+          ? `Primeiros pontos em ${milestones.firstPoints.year}`
+          : "",
+        milestones.firstPoints
+          ? `Primeiro resultado com pontos (${raceLabel(milestones.firstPoints)}).`
+          : "",
+        3,
+      );
+      await applyMilestone(
+        "FIRST_PODIUM",
+        milestones.firstPodium,
+        milestones.firstPodium
+          ? `Primeiro pódio em ${milestones.firstPodium.year}`
+          : "",
+        milestones.firstPodium
+          ? `Primeiro pódio (${raceLabel(milestones.firstPodium)}).`
+          : "",
+        4,
+      );
+      await applyMilestone(
+        "FIRST_POLE",
+        milestones.firstPole,
+        milestones.firstPole ? `Primeira pole em ${milestones.firstPole.year}` : "",
+        milestones.firstPole
+          ? `Primeira largada em primeiro no grid (${raceLabel(milestones.firstPole)}).`
+          : "",
+        3,
+      );
+      await applyMilestone(
+        "FIRST_WIN",
+        milestones.firstWin,
+        milestones.firstWin ? `Primeira vitória em ${milestones.firstWin.year}` : "",
+        milestones.firstWin
+          ? `Primeira vitória (${raceLabel(milestones.firstWin)}).`
+          : "",
+        5,
+      );
+      await applyMilestone(
+        "FIRST_FASTEST_LAP",
+        milestones.firstFastestLap,
+        milestones.firstFastestLap
+          ? `Primeira volta mais rápida em ${milestones.firstFastestLap.year}`
+          : "",
+        milestones.firstFastestLap
+          ? `Primeira volta mais rápida (${raceLabel(milestones.firstFastestLap)}).`
+          : "",
+        4,
+      );
+
+      for (const year of milestones.championshipYears) {
+        const key = `CHAMPIONSHIP:${year}`;
+        if (derived.some((item) => item.dedupeKey === key)) continue;
+        const sourceId = await ensureSource();
+        derived.push({
+          category: "CHAMPIONSHIP",
+          title: `Campeão mundial em ${year}`,
+          eventDate: null,
+          seasonYear: year,
+          externalRaceId: null,
+          summary: null,
+          importance: 5,
+          dedupeKey: key,
+          sourceId,
+        });
+      }
+      const firstTitleYear = milestones.championshipYears[0];
+      if (firstTitleYear !== undefined) {
+        const existing = derived.find((item) => item.category === "FIRST_CHAMPIONSHIP");
+        if (!existing || (existing.seasonYear ?? Number.MAX_SAFE_INTEGER) > firstTitleYear) {
+          const sourceId = await ensureSource();
+          const candidate: Derived = {
+            category: "FIRST_CHAMPIONSHIP",
+            title: `Primeiro título mundial em ${firstTitleYear}`,
+            eventDate: null,
+            seasonYear: firstTitleYear,
+            externalRaceId: null,
+            summary: null,
+            importance: 5,
+            dedupeKey: `FIRST_CHAMPIONSHIP:${firstTitleYear}`,
+            sourceId,
+          };
+          if (existing) {
+            const index = derived.indexOf(existing);
+            derived[index] = candidate;
+          } else {
+            derived.push(candidate);
+          }
+        }
+      }
+    }
+  }
+
   const dedupeKeys = derived.map((item) => item.dedupeKey);
   for (const item of derived) {
     await prisma.externalDriverEvent.upsert({
@@ -235,6 +415,7 @@ export async function deriveMilestonesFromExternalData(
         importance: item.importance,
         derivation: "DERIVED_RESULTS",
         dedupeKey: item.dedupeKey,
+        sourceId: item.sourceId ?? null,
       },
       update: {
         title: item.title,
@@ -243,6 +424,7 @@ export async function deriveMilestonesFromExternalData(
         externalRaceId: item.externalRaceId,
         summary: item.summary,
         importance: item.importance,
+        sourceId: item.sourceId ?? null,
         updatedAt: now,
       },
     });

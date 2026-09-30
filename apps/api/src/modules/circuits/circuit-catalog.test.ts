@@ -256,4 +256,72 @@ describe("catálogo externo de circuitos", () => {
     expect(res.statusCode).toBe(404);
     expect((res.json() as { code: string }).code).toBe("CIRCUIT_NOT_FOUND");
   });
+
+  it("5) enriquece com F1DB real e serve o layout SVG sanitizado", async () => {
+    const circuit = await createCircuit("Interlagos-F1DB", {
+      country: "Brazil",
+    });
+    await prisma.externalCircuit.update({
+      where: { id: circuit.id },
+      data: { externalId: "interlagos", name: "Autódromo José Carlos Pace" },
+    });
+
+    const list = await app.inject({
+      method: "GET",
+      url: `/api/external/circuits?search=${encodeURIComponent("José Carlos Pace")}`,
+      headers: { cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect(list.statusCode).toBe(200);
+    const item = (
+      list.json() as {
+        circuits: Array<{
+          id: string;
+          lengthMeters: number | null;
+          turns: number | null;
+          type: string | null;
+          locality: string | null;
+          firstRaceYear: number | null;
+          provenance: { source: string; sourceVersion: string | null };
+          media: { layout: { available: boolean; url: string | null; attribution: string | null } };
+        }>;
+      }
+    ).circuits.find((entry) => entry.id === circuit.id)!;
+    expect(item.lengthMeters).toBe(4309);
+    expect(item.turns).toBe(15);
+    expect(item.type).toBe("RACE");
+    expect(item.locality).toBe("São Paulo");
+    expect(item.firstRaceYear).toBe(1973);
+    expect(item.provenance.source).toBe("F1DB");
+    expect(item.provenance.sourceVersion).toBe("v2026.15.1");
+    expect(item.media.layout.available).toBe(true);
+    expect(item.media.layout.url).toBe(`/api/external/circuits/${circuit.id}/layout.svg`);
+    expect(item.media.layout.attribution).toContain("CC BY 4.0");
+
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/external/circuits/${circuit.id}`,
+      headers: { cookie },
+      remoteAddress: remoteAddress(),
+    });
+    const detailBody = detail.json() as {
+      circuit: { layouts: Array<{ id: string; effective: boolean; turns: number | null }> };
+    };
+    expect(detailBody.circuit.layouts.length).toBeGreaterThanOrEqual(2);
+    expect(
+      detailBody.circuit.layouts.find((layout) => layout.effective)?.id,
+    ).toBe("interlagos-2");
+
+    const svg = await app.inject({
+      method: "GET",
+      url: `/api/external/circuits/${circuit.id}/layout.svg`,
+      headers: { cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect(svg.statusCode).toBe(200);
+    expect(svg.headers["content-type"]).toContain("image/svg+xml");
+    expect(String(svg.headers["x-attribution"])).toContain("CC BY 4.0");
+    expect(svg.body.startsWith("<svg")).toBe(true);
+    expect(svg.body.includes("<script")).toBe(false);
+  });
 });
