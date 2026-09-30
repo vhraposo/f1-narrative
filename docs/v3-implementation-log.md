@@ -1030,3 +1030,16 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **QA:** API e Web ×2 + smoke DEV (Albon: `driverCode=ALB`, `dateOfBirth=1996-03-23`, bio/contexto pt-BR; sem sources duplicadas); typecheck/lint/build 0/0.
 - **Docs:** `v3.21-calendar-circuit-progression.md` (inclui matriz do que existe × pendências de circuito/calendário), D-078..D-080.
 
+### V3.22 — External Data Hub, Circuits, Historical Champions & Pilot Data Quality
+- **Inventário (FASE 1):** mapeamento completo de external-sync/circuits/calendar/standings/providers/mídia/avatar/champions antes de mudar código; classificações IMPLEMENTED/PARTIAL/BROKEN/MISSING documentadas em `v3.22-external-data-hub.md` (inclui matriz de fontes FASE 56).
+- **Campeões 2000-2025:** `champions.canonical.ts` com 26 temporadas factuais (FIA_CANONICAL_CHRONOLOGY/FACTUAL_REFERENCE); resolução standing → canônico com `sourceConflict`/`canonicalChampion` explícitos; baseline MATCH read-only para Universe sem temporada (sem fabricar seasons/resultados); 2026 nunca aparece; apply de campeões agora invalida `PilotExperience` da temporada (D-081).
+- **Avatar (bug real, 2 causas-raiz):** CORP `same-origin` do helmet bloqueava `<img>` cross-origin — liberado somente em `/api/media/:id`; cookie cache de 5 min da sessão devolvia `User.image` antigo — `POST/DELETE /api/profile/avatar` limpam `f1nw.session_data` (testes: Set-Cookie + header CORP + sessão pós-upload) (D-082).
+- **Milestones:** nova categoria `FIRST_FASTEST_LAP` + `ExternalResult.fastestLapTime` (migration aditiva `20260930223000`, aplicada em TEST e DEV com backup); Jolpica `FastestLap.Time` normalizado; primeira ocorrência + prune mantidos (D-084).
+- **Catálogo de circuitos:** `GET /api/external/circuits` (lista global, busca, stats via groupBy único) e `/api/external/circuits/:id` (maiores vencedores, recentes, volta mais rápida em corrida, recorde oficial indisponível com razão, mídia por resolver abstêmio); aba Externo → Circuitos com lista/detalhe/busca e país pt-BR (`localizeCountryPtBr`) (D-083).
+- **Atualidade × histórico:** teste garante que temporada corrente nova atualiza equipe/número/bio sem reescrever `ExternalDriverSeason` históricos.
+- **Higiene:** cleanup de circuitos do teste de sync Jolpica (+ guard `races: none`); TEST 0 resíduos.
+- **QA:** API 2459/2459 (159 arquivos) ×2; Web 495/495 (65 arquivos) em execuções limpas ×2 (flake pré-existente `external-page` reproduzido 1×, isolado 21/21, não mascarado); typecheck/lint/build 0/0; DEV 36 migrations e dados intactos.
+- **Adiados com justificativa:** composer de biografia por LLM, F1DB/OpenF1/PitLane/Wikimedia como providers ativos do catálogo, layouts/fotos reais, recorde oficial de volta, backfill histórico em lote.
+- **Docs:** `v3.22-external-data-hub.md`, D-081..D-084.
+
+

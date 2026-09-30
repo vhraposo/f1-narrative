@@ -329,4 +329,21 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Decisão (V3.21):** a frase de carreira deriva da primeira temporada presente no espelho; com espelho parcial (DEV só tem 2026) dizer "estreou em 2026" seria afirmação histórica falsa. A redação canônica é "Tem registros na Fórmula 1 desde {ano}" e o contexto usa "registros na F1 desde {ano}"; os milestores mantêm o enquadramento "Primeira corrida registrada". Nenhum ano é inferido de fonte externa ao espelho.
 - **Consequência:** biografia nunca afirma debut/título que os dados não sustentam; quando o espelho tiver histórico completo a mesma frase continua verdadeira.
 
+## D-081 — Fallback canônico FIA para campeões 2000-2025 com conflito explícito e baseline read-only
+- **Decisão (V3.22):** a tela de Campeões nunca depende exclusivamente de `ExternalStanding` histórico. A resolução usa standing P1 quando existe (identidade + vínculo para MATCH/RESTORE) e cai para `FIA_CANONICAL_CHAMPIONS_2000_2025` (fonte factual, sem prosa) quando não existe. Se ambos existem e divergem, o conflito é exposto (`sourceConflict` + `canonicalChampion`), nunca escolhido em silêncio. Para Universe sem temporada, a linha é uma projeção `baseline` (state MATCH, sem criar Season/Race/Result nem habilitar edição; `blockedReason = SEASON_NOT_IN_UNIVERSE`).
+- **Consequência:** 26 campeões sempre visíveis e corretos; nenhum campeão fabricado; divergência e restore continuam exigindo temporada materializada + correção `STANDING_CORRECTED`.
+
+## D-082 — Avatar: CORP liberado apenas na rota de mídia e cookie cache de sessão limpo em mutações
+- **Decisão (V3.22):** o helmet global deixa de impor `Cross-Origin-Resource-Policy: same-origin` (a quebrava `<img>` cross-origin de `:3001` para a página em `:3000`, mesmo com 200) e apenas `/api/media/:id` responde `cross-origin` — rota autenticada e restrita ao dono. `POST/DELETE /api/profile/avatar` limpam `f1nw.session_data` (Max-Age=0) para o `get-session` do browser reler `User.image` sem esperar o cache de 5 min.
+- **Consequência:** avatar persiste e renderiza após reload/sessão; nenhuma credencial ou arquivo privado é exposto (ownership 404 leak-safe mantido). Risco residual de deploy cross-site (SameSite=Lax) documentado.
+
+## D-083 — Mídia de circuito por resolver abstêmio
+- **Decisão (V3.22):** `resolveCircuitMedia` só devolve layout/foto quando existir referência com licença identificada em `sourceRecord` (ex.: `layoutUrl`/`photo*` de provider licenciado). Sem isso, a UI informa indisponibilidade. Proibido inventar URL, usar imagem sem licença, scraping de buscadores ou copiar fotografia comercial.
+- **Consequência:** catálogo permanece correto e licenciável; F1DB (layouts) e Wikimedia Commons (fotos) plugam no resolver quando configurados, sem mudar contrato.
+
+## D-084 — Volta mais rápida: milestone de primeira ocorrência e tempo da corrida (recorde oficial separado)
+- **Decisão (V3.22):** `FIRST_FASTEST_LAP` é derivado do primeiro resultado com `fastestLap = true` (ordenado por temporada/round) e o tempo (`FastestLap.Time.time`) é persistido em `ExternalResult.fastestLapTime` (migration aditiva). O detalhe do circuito mostra "volta mais rápida em corrida (fonte)"; o recorde oficial homologado de circuito só é exibido quando uma fonte explícita o fornecer — hoje `officialLapRecord.available = false` com razão.
+- **Consequência:** nada confunde volta rápida de sessão/corrida com recorde oficial; prune de marcos obsoletos continua valendo para a nova categoria.
+
+
 
