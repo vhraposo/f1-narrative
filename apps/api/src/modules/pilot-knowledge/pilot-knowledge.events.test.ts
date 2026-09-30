@@ -190,12 +190,14 @@ describe("pilot historical events", () => {
   });
 
   it("2) eventos não duplicam RaceResult do Universe", async () => {
-    const { driver } = await createFixture("nodup");
+    const { universe, driver } = await createFixture("nodup");
     await seedCareer(driver.id, [
       { year: 2020, round: 1, name: "GP X", position: 5, grid: 5, points: 10, date: "2020-03-01" },
     ]);
     await deriveMilestonesFromExternalData(driver.id);
-    const raceResultCount = await prisma.raceResult.count();
+    const raceResultCount = await prisma.raceResult.count({
+      where: { driverProfile: { character: { universeId: universe.id } } },
+    });
     const eventCount = await prisma.externalDriverEvent.count({ where: { externalDriverId: driver.id } });
     expect(raceResultCount).toBe(0);
     expect(eventCount).toBeGreaterThan(0);
