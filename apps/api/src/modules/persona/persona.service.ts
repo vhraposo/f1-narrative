@@ -1,21 +1,31 @@
 import type { PersonaEvidenceType, PersonaOrigin, Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import {
+  inspectPersonaSummary,
+  inspectPersonaTrait,
+  inspectPersonaTraitKey,
   resolveEvidenceAuthority,
+  resolveManualTraitOverride,
   sortPersonaTraits,
   type PersonaEvidenceStatus,
+  type PersonaRuleIssue,
   type PersonaTraitSource,
 } from "./persona.rules.js";
 
 export const PERSONA_SCHEMA_VERSION = "persona.v1";
 
-export type PersonaServiceErrorCode = "NOT_FOUND" | "FORBIDDEN";
+export type PersonaServiceErrorCode =
+  | "NOT_FOUND"
+  | "TRAIT_NOT_FOUND"
+  | "FORBIDDEN"
+  | "VALIDATION_ERROR";
 
 export class PersonaServiceError extends Error {
   constructor(
     public readonly code: PersonaServiceErrorCode,
     message: string,
     public readonly statusCode: number,
+    public readonly issues: readonly PersonaRuleIssue[] = [],
   ) {
     super(message);
     this.name = "PersonaServiceError";
@@ -341,4 +351,178 @@ export async function ensurePersona(
     }
     throw error;
   }
+}
+
+export type ManualPersonaTraitInput = {
+  readonly key: string;
+  readonly value: string;
+};
+
+export type UpdatePersonaManuallyInput = {
+  readonly summary?: string | null;
+  readonly traits?: readonly ManualPersonaTraitInput[];
+};
+
+function validationError(
+  message: string,
+  issues: readonly PersonaRuleIssue[],
+): PersonaServiceError {
+  return new PersonaServiceError("VALIDATION_ERROR", message, 400, issues);
+}
+
+function traitNotFoundError(): PersonaServiceError {
+  return new PersonaServiceError("TRAIT_NOT_FOUND", "Trait não encontrado", 404);
+}
+
+function collectManualInputIssues(
+  input: UpdatePersonaManuallyInput,
+): PersonaRuleIssue[] {
+  const issues: PersonaRuleIssue[] = [];
+
+  if (typeof input.summary === "string") {
+    const summaryIssue = inspectPersonaSummary(input.summary);
+    if (summaryIssue) issues.push({ field: "summary", code: summaryIssue });
+  }
+
+  for (const trait of input.traits ?? []) {
+    issues.push(...inspectPersonaTrait({ key: trait.key, value: trait.value }));
+  }
+
+  return issues;
+}
+
+function requireManualAccess(
+  access: PersonaAccessResolution,
+): PersonaAccessCharacter {
+  if (access.kind === "NOT_FOUND") throw notFoundError();
+  if (access.kind === "FORBIDDEN" || access.kind === "GLOBAL_AI_CATALOG") {
+    throw forbiddenError("Persona não pode ser editada no catálogo global de AI");
+  }
+  return access.character;
+}
+
+async function retryOnUniqueConflict<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if ((error as { code?: string }).code !== "P2002") throw error;
+    return await operation();
+  }
+}
+
+export async function updatePersonaManually(
+  userId: string,
+  characterId: string,
+  input: UpdatePersonaManuallyInput,
+): Promise<PersonaView> {
+  const issues = collectManualInputIssues(input);
+  if (issues.length > 0) {
+    throw validationError("Dados de persona inválidos", issues);
+  }
+
+  const access = await resolvePersonaAccess(userId, characterId, "WRITE");
+  const character = requireManualAccess(access);
+
+  const traits = input.traits ?? [];
+  const summaryProvided = input.summary !== undefined;
+  const needsPersistence =
+    traits.length > 0 || (summaryProvided && input.summary !== null);
+
+  if (!needsPersistence) {
+    const existing = await loadPersona(characterId);
+    if (!existing) {
+      const origin = await resolveOwnedCharacterOrigin(character);
+      return buildEmptyPersonaView(characterId, origin);
+    }
+    if (summaryProvided && existing.summary !== null) {
+      const cleared = await prisma.characterPersona.update({
+        where: { characterId },
+        data: { summary: null },
+        include: personaInclude,
+      });
+      return buildPersonaView(cleared);
+    }
+    return buildPersonaView(existing);
+  }
+
+  await ensurePersona(userId, characterId);
+
+  const manual = resolveManualTraitOverride();
+
+  const updated = await retryOnUniqueConflict(() =>
+    prisma.$transaction(async (tx) => {
+      const persona = await tx.characterPersona.findUniqueOrThrow({
+        where: { characterId },
+        select: { id: true, summary: true },
+      });
+
+      if (summaryProvided && input.summary !== persona.summary) {
+        await tx.characterPersona.update({
+          where: { characterId },
+          data: { summary: input.summary ?? null },
+        });
+      }
+
+      for (const trait of traits) {
+        await tx.personaTrait.upsert({
+          where: { personaId_key: { personaId: persona.id, key: trait.key } },
+          update: { value: trait.value, ...manual },
+          create: {
+            personaId: persona.id,
+            key: trait.key,
+            value: trait.value,
+            ...manual,
+          },
+        });
+      }
+
+      return tx.characterPersona.findUniqueOrThrow({
+        where: { characterId },
+        include: personaInclude,
+      });
+    }),
+  );
+
+  return buildPersonaView(updated);
+}
+
+export async function deletePersonaTrait(
+  userId: string,
+  characterId: string,
+  traitKey: string,
+): Promise<PersonaView> {
+  const keyIssue = inspectPersonaTraitKey(traitKey);
+  if (keyIssue) {
+    throw validationError("Chave de trait inválida", [
+      { field: "traitKey", code: keyIssue },
+    ]);
+  }
+
+  const access = await resolvePersonaAccess(userId, characterId, "WRITE");
+  requireManualAccess(access);
+
+  const persona = await prisma.characterPersona.findUnique({
+    where: { characterId },
+    select: { id: true },
+  });
+  if (!persona) throw notFoundError();
+
+  const trait = await prisma.personaTrait.findUnique({
+    where: { personaId_key: { personaId: persona.id, key: traitKey } },
+    select: { id: true },
+  });
+  if (!trait) throw traitNotFoundError();
+
+  try {
+    await prisma.personaTrait.delete({ where: { id: trait.id } });
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2025") throw traitNotFoundError();
+    throw error;
+  }
+
+  const reloaded = await prisma.characterPersona.findUniqueOrThrow({
+    where: { characterId },
+    include: personaInclude,
+  });
+  return buildPersonaView(reloaded);
 }
