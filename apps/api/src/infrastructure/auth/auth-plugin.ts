@@ -24,6 +24,7 @@ const authPlugin = fp(
     fastify.addHook("preHandler", async (request: FastifyRequest) => {
       const sessionData = await auth.api.getSession({
         headers: request.headers as Record<string, string>,
+        query: { disableCookieCache: true },
       });
       request.session = sessionData?.session ?? null;
       request.user = sessionData?.user ?? null;

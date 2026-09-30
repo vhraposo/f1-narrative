@@ -356,6 +356,15 @@ describe("Profile + Media (Fase 5)", () => {
       remoteAddress: "10.55.0.14",
     });
     expect(reload.json().profile.image).toBe(image);
+
+    const sessionAfterUpload = await app.inject({
+      method: "GET",
+      url: "/api/auth/get-session",
+      headers: { cookie: user.cookie },
+      remoteAddress: "10.55.0.15",
+    });
+    expect(sessionAfterUpload.statusCode).toBe(200);
+    expect(sessionAfterUpload.json().user.image).toBe(image);
   });
 
   it("rejeita upload sem autenticação e tipos não suportados", async () => {
