@@ -10,6 +10,9 @@ export default defineConfig({
     // isolamento dos testes de determinismo. Forçar serialização (padrão para
     // suítes com banco de TEST mutável).
     fileParallelism: false,
+    // Teardown global de segurança (TEST-only): remove users/universes/@f1nw.test
+    // e memórias órfãs deixadas por módulos legados após a suíte completa.
+    globalSetup: ["./vitest.global-setup.ts"],
     env: {
       NODE_ENV: "test",
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/f1_narrative_test?schema=public",

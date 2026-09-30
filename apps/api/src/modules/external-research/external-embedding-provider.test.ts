@@ -78,9 +78,19 @@ describe("CohereEmbeddingProvider", () => {
   });
 
   it("B) falha fechada se API key ausente ou vazia (nunca fallback)", () => {
-    expect(() => new CohereEmbeddingProvider({ apiKey: "" })).toThrow(/COHERE_API_KEY/);
-    expect(() => new CohereEmbeddingProvider({ apiKey: "   " })).toThrow(/COHERE_API_KEY/);
-    expect(() => createCohereProviderFromEnv(undefined)).toThrow(/COHERE_API_KEY/);
+    const original = process.env.COHERE_API_KEY;
+    delete process.env.COHERE_API_KEY;
+    try {
+      expect(() => new CohereEmbeddingProvider({ apiKey: "" })).toThrow(/COHERE_API_KEY/);
+      expect(() => new CohereEmbeddingProvider({ apiKey: "   " })).toThrow(/COHERE_API_KEY/);
+      expect(() => createCohereProviderFromEnv(undefined)).toThrow(/COHERE_API_KEY/);
+    } finally {
+      if (original === undefined) {
+        delete process.env.COHERE_API_KEY;
+      } else {
+        process.env.COHERE_API_KEY = original;
+      }
+    }
   });
 
   it("C) embed vÃ¡lido retorna vetor de 1024 dimensÃµes", async () => {

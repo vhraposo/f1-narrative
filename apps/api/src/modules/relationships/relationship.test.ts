@@ -10,6 +10,8 @@ import { prisma } from "../../infrastructure/database/prisma.js";
 // matriz de testes.
 
 let app: FastifyInstance;
+const createdUserIds: string[] = [];
+const createdCharacterIds: string[] = [];
 
 type TestUser = {
   cookie: string;
@@ -44,6 +46,7 @@ async function createUser(
     .join("; ");
 
   const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+  createdUserIds.push(user.id);
   return { cookie, userId: user.id };
 }
 
@@ -58,7 +61,9 @@ async function createCharacter(
     payload,
   });
   expect(res.statusCode).toBe(201);
-  return res.json().character as Character;
+  const character = res.json().character as Character;
+  createdCharacterIds.push(character.id);
+  return character;
 }
 
 async function createRelationship(
@@ -87,6 +92,20 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (createdCharacterIds.length > 0) {
+    await prisma.relationship.deleteMany({
+      where: {
+        OR: [
+          { characterAId: { in: createdCharacterIds } },
+          { characterBId: { in: createdCharacterIds } },
+        ],
+      },
+    });
+    await prisma.character.deleteMany({ where: { id: { in: createdCharacterIds } } });
+  }
+  if (createdUserIds.length > 0) {
+    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+  }
   await prisma.$disconnect();
   await app.close();
 });
