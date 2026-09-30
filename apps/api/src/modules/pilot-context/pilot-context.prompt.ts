@@ -95,6 +95,10 @@ export function composePilotContextPromptBlock(view: PilotContextView): PilotCon
     sections.push(["Memórias no Universe:", ...kept].join("\n"));
   }
 
+  if (view.evolution.notes.length > 0) {
+    sections.push(`Ajustes derivados de experiência: ${view.evolution.notes.join("; ")}.`);
+  }
+
   const state = view.currentUniverseState;
   const stateParts: string[] = [];
   if (state.seasonYear !== null) stateParts.push(`temporada ${state.seasonYear}`);

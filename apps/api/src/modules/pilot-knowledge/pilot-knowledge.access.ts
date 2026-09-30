@@ -13,7 +13,8 @@ export type PilotKnowledgeErrorCode =
   | "RELATIONSHIP_NOT_FOUND"
   | "SOURCE_NOT_FOUND"
   | "AMBIGUOUS_CANDIDATES"
-  | "PROVIDERS_UNAVAILABLE";
+  | "PROVIDERS_UNAVAILABLE"
+  | "EVOLUTION_STALE";
 
 export class PilotKnowledgeError extends Error {
   constructor(

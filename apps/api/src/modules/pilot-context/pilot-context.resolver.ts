@@ -12,6 +12,10 @@ import {
 } from "../pilot-knowledge/pilot-knowledge.relationships.js";
 import { selectRelevantMemories } from "../pilot-experience/pilot-experience.relevance.js";
 import {
+  computeEffectiveTraits,
+  toAppliedEffect,
+} from "../pilot-experience/persona-evolution.rules.js";
+import {
   PILOT_CONTEXT_BIOGRAPHY_CAP,
   PILOT_CONTEXT_EVENTS_MAX,
   PILOT_CONTEXT_MEMORIES_MAX,
@@ -42,6 +46,8 @@ export type PilotContextTrait = {
   readonly value: string;
   readonly origin: "UNIVERSE" | "EXTERNAL";
   readonly status: string | null;
+  readonly effectiveConfidence: number | null;
+  readonly evolutionNotes: readonly string[];
 };
 
 export type PilotContextRelationship = {
@@ -90,6 +96,10 @@ export type PilotContextView = {
   readonly historicalContext: readonly DriverEventView[];
   readonly memories: readonly PilotContextMemory[];
   readonly currentUniverseState: PilotContextCurrentState;
+  readonly evolution: {
+    readonly revision: number;
+    readonly notes: readonly string[];
+  };
   readonly refresh: {
     readonly profile: "FRESH" | "STALE" | "UNKNOWN";
     readonly persona: "FRESH" | "STALE" | "UNKNOWN";
@@ -121,7 +131,7 @@ export async function resolvePilotContext(
       universeId: true,
       biography: true,
       driverProfile: { select: { id: true } },
-      persona: { include: { traits: true } },
+      persona: { include: { traits: true, traitEvolutions: true } },
     },
   });
   if (!character) return null;
@@ -186,17 +196,46 @@ export async function resolvePilotContext(
           value: trait.value,
           origin: "EXTERNAL" as const,
           status: trait.status,
+          effectiveConfidence: null as number | null,
+          evolutionNotes: [] as string[],
         }))
       : [];
-  const universeTraits = character.persona
-    ? character.persona.traits.map((trait) => ({
-        key: trait.key,
-        label: publicTraitLabel(trait.key),
-        value: clampText(trait.value, TRAIT_VALUE_CAP),
-        origin: "UNIVERSE" as const,
-        status: null,
-      }))
+  const evolutionEffects = (character.persona?.traitEvolutions ?? []).map((row) =>
+    toAppliedEffect({
+      ruleCode: row.ruleCode,
+      traitKey: row.traitKey,
+      confidenceDelta: row.confidenceDelta,
+      reason: row.reason,
+      sourceExperienceId: row.sourceExperienceId,
+      value: row.value,
+      rulePriority: row.rulePriority,
+      experienceTitle: null,
+    }),
+  );
+  const baseTraits = (character.persona?.traits ?? []).map((trait) => ({
+    key: trait.key,
+    value: trait.value,
+    confidence: trait.confidence,
+    sourceKind: trait.sourceKind,
+  }));
+  const effectiveUniverseTraits = character.persona
+    ? computeEffectiveTraits(baseTraits, evolutionEffects)
     : [];
+  const universeTraits = effectiveUniverseTraits.map((trait) => ({
+    key: trait.key,
+    label: trait.label === trait.key ? publicTraitLabel(trait.key) : trait.label,
+    value: clampText(trait.value, TRAIT_VALUE_CAP),
+    origin: "UNIVERSE" as const,
+    status: null,
+    effectiveConfidence: trait.effectiveConfidence,
+    evolutionNotes: [
+      ...new Set(trait.appliedEffects.map((effect) => effect.reason)),
+    ],
+  }));
+  const evolutionRevision = character.persona?.evolutionRevision ?? 0;
+  const evolutionNotes = [
+    ...new Set(evolutionEffects.map((effect) => effect.reason)),
+  ].sort((a, b) => a.localeCompare(b));
   const traitsByKey = new Map<string, PilotContextTrait>();
   for (const trait of universeTraits) traitsByKey.set(trait.key, trait);
   for (const trait of externalTraits) {
@@ -282,6 +321,7 @@ export async function resolvePilotContext(
     historicalContext,
     memories,
     currentUniverseState: state,
+    evolution: { revision: evolutionRevision, notes: evolutionNotes },
     refresh: {
       profile: profileView.available ? profileView.refresh.status : "UNKNOWN",
       persona: personaView.available ? personaView.refresh.status : "UNKNOWN",
@@ -377,7 +417,15 @@ export function computePilotContextFingerprint(view: Omit<PilotContextView, "fin
     universeId: view.universeId,
     identity: view.identity,
     biography: view.biography,
-    persona: view.effectivePersona.map((trait) => [trait.key, trait.value, trait.origin]),
+    persona: view.effectivePersona.map((trait) => [
+      trait.key,
+      trait.value,
+      trait.origin,
+      trait.effectiveConfidence,
+      trait.evolutionNotes,
+    ]),
+    evolutionRevision: view.evolution.revision,
+    evolutionNotes: view.evolution.notes,
     relationships: view.relationships.map((relationship) => [
       relationship.kind,
       relationship.displayName,
