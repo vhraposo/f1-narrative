@@ -685,3 +685,26 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `test(v3): harden test isolation`.
+
+### Subfase D — Database residual audit (somente leitura)
+| Banco | Tamanho | Tabelas públicas | Migrations | Usuários | Propósito | Ação |
+|---|---|---|---|---|---|---|
+| `f1-narrative` | 12 MB | 60 | 27 | 17 | DEV canônico (fonte da verdade) | Não modificar |
+| `f1_narrative_test` | 15 MB | 60 | 27 | 479 (resíduo descartável) | TEST (pode recriar) | Recriável a qualquer momento |
+| `f1nw_qa_v212` | 7,4 MB | **0** | inexistente | inexistente | Resíduo de QA do V2.12 | **Candidato a DROP** — obsoleto (nenhum objeto Prisma); requer autorização explícita antes de remover |
+| `postgres` | 7,5 MB | — | — | — | Banco default do container | Não tocar |
+
+- Nenhuma operação destrutiva executada. Recomendação: autorizar `DROP DATABASE f1nw_qa_v212` em execução futura.
+
+### Subfase E — Relatório final de qualidade (V3.13)
+- **Suíte API:** 1853/1853 em banco limpo e 1853/1853 na reexecução no mesmo DB (flakiness de resíduo eliminada na Subfase C).
+- **Suíte Web:** 418/418.
+- **Typecheck:** API 0; Web **0** (antes 4).
+- **Lint:** API **0** (antes 30); Web 0 erros/0 warnings.
+- **Build Web:** exit 0.
+- **Migrations:** `migrate deploy` validado no TEST (27 migrations completas, 60 tabelas); nenhuma migration nova nesta execução. DEV íntegro (17 usuários, sem migração pendente).
+- **Isolation checks:** suíte completa repetida no mesmo banco verde; contagens agora escopadas por fixture nas três verificações legadas.
+- **Limitações restantes:** nenhuma falha conhecida; único item pendente é o DROP autorizado de `f1nw_qa_v212`; decisões de produto (relógio do Universe, persona, timeline histórica) permanecem fora do escopo.
+
+### Commit
+- `docs(v3): complete tech debt report`.
