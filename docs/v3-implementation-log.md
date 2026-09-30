@@ -775,3 +775,15 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Limitações:** número #1 continua validado pelo campeão derivado; códigos de domínio `EMPTY_CORRECTION`/`INVALID_POSITION`/`INVALID_ELIGIBILITY`/`INVALID_ROUND`/`INVALID_DATE`/`DERIVED_STANDING`/`NUMBER_*`/`CHAMPION_ONLY`/`EVOLUTION_STALE`/`SCHEDULE_ORDER_UNSAFE`.
 - **Commit:** `feat(v3): add timeline correction foundation`.
 - **Próximo passo:** V3.15.3 — preview engine (transação com rollback + token).
+
+### V3.15.3 — Correction Preview Engine
+- **Objetivo:** preview determinístico sem persistência (transação com rollback garantido) + token de estado.
+- **Arquivos:** `apps/api/src/modules/timeline/correction.preview.ts` (diff RESULT/SPRINT/CALENDAR/NUMBER/STANDING/CHAMPION, detecção de narrativa stale por `payload.raceId`, impacto de número `#1` com `requiresAction`, `buildCorrectionPreviewToken` = sha256(universe, lastSequence, world, standings, comando canônico)), `correction.fixtures.ts` (fixture compartilhada com variante anexada a Universe existente).
+- **Migrations:** nenhuma.
+- **Testes:** `correction.preview.test.ts` 6/6 (diff completo, preview não escreve — timeline/snapshot/resultados/standings/Event/Memory/Persona/DriverAttribute inalterados, determinismo, token muda com estado, EVOLUTION_STALE propagado, isolamento leak-safe).
+- **Typecheck:** 0. **Lint:** 0.
+- **Problemas:** asserção de campeão com empate dependia da ordenação por uuid; fixture ajustada para flip determinístico (correção tira o líder da pontuação) e `requiresAction` verdadeiro.
+- **Decisões:** nenhuma nova.
+- **Limitações:** `EVOLUTION_STALE` bloqueia preview e apply (exibição como erro de domínio na UI).
+- **Commit:** `feat(v3): add timeline correction preview`.
+- **Próximo passo:** V3.15.4 — apply + recompute com revalidação de token.
