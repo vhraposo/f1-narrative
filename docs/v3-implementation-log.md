@@ -708,3 +708,18 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `docs(v3): complete tech debt report`.
+
+---
+
+## V3.14 — Driver Persona / AI Character Profiles
+
+### Contexto (STEPs 1–5)
+- `docs(v3): design driver persona architecture` (63931c6); `feat(v3): add persona persistence foundation` (7e53936); `feat(v3): add persona domain rules` (f82e8da); `feat(v3): add persona service core` (3def4c4); `feat(v3): add manual persona mutations` (14e5560); `feat(v3): add persona evidence workflow` (2857afa). Decisões D-050..D-059; TEST/DEV preservados; nenhuma migration além da fundação.
+
+### STEP 6 — Persona HTTP API
+- **Implementação:** `persona.schema.ts` (Zod `.strict()`: params de character/trait/evidence; PATCH manual sem `sourceKind`/`confidence`/`evidenceId`/`origin` e com rejeição de keys duplicadas; evidence create sem campos de revisão; review `APPROVED|REJECTED` + confidence opcional) e `persona.routes.ts` (GET/PATCH/DELETE trait/POST evidence/PATCH review; `fastify.authenticate`; ownership e ADMIN delegados 100% ao `persona.service`; erros `PersonaServiceError` mapeados para 400/403/404/409 sem stack/SQL/Prisma; resposta `{ persona: PersonaView }`, `201` no create de evidence). Registro em `app.ts`. Nenhuma regra de domínio duplicada.
+- **Testes:** `persona.routes.test.ts` **60/60** (auth, GET/leak-safe/catálogo, PATCH lazy/validações estritas/conversão EVIDENCE→MANUAL, DELETE, create evidence, review + reconcile, isolamento, contrato de erro, smoke characters); módulo persona completo **283/283** (6 arquivos); smoke `app.test` + `characters.test` 25/25. Typecheck 0; lint 0. TEST sem resíduos; DEV intocado; zero migrations.
+- **Docs:** `v3.14-persona-architecture.md` §15 convertida de proposta para contrato implementado (rotas, payloads, erros, autorização, response shape). Nenhuma decisão nova (D-060+ não necessária).
+
+### Commit
+- `feat(v3): add persona api`.

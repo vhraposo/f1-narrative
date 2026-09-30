@@ -79,6 +79,7 @@ import { OpenF1Client } from "./modules/external-openf1/openf1.client.js";
 import openF1EnrichmentRoutes, {
   type OpenF1EnrichmentRoutesOptions,
 } from "./modules/external-openf1/openf1.routes.js";
+import personaRoutes from "./modules/persona/persona.routes.js";
 
 function defaultRagProvider(): EmbeddingProviderWithInputType {
   const apiKey = process.env.COHERE_API_KEY;
@@ -136,6 +137,7 @@ export function buildApp(
   void app.register(healthRoutes);
   void app.register(authRoutes);
   void app.register(charactersRoutes);
+  void app.register(personaRoutes);
   void app.register(characterHeadshotMaterializationRoutes);
   void app.register(driversRoutes);
   void app.register(teamsRoutes);
