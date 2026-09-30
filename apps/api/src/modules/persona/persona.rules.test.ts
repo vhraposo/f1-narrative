@@ -1,23 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
   MANUAL_TRAIT_CONFIDENCE,
+  MAX_EVIDENCE_EXCERPT_LENGTH,
+  MAX_EVIDENCE_TITLE_LENGTH,
+  MAX_EVIDENCE_URL_LENGTH,
   MAX_PROMPT_PERSONA_BLOCK_LENGTH,
   MAX_PROMPT_SUMMARY_LENGTH,
   MAX_PROMPT_TRAITS,
   MAX_SUMMARY_LENGTH,
   MAX_TRAIT_VALUE_LENGTH,
+  PERSONA_EVIDENCE_TYPES,
   PERSONA_TRAIT_KEYS,
   PERSONA_TRAIT_REGISTRY,
   canTransitionPersonaEvidenceStatus,
   compareApprovedEvidenceAuthority,
   getPersonaTraitDefinition,
   inspectPersonaConfidence,
+  inspectPersonaEvidenceExcerpt,
   inspectPersonaEvidenceProposal,
+  inspectPersonaEvidencePublishedAt,
+  inspectPersonaEvidenceSourceType,
+  inspectPersonaEvidenceTitle,
+  inspectPersonaEvidenceUrl,
   inspectPersonaProposedValue,
   inspectPersonaSummary,
   inspectPersonaTrait,
   inspectPersonaTraitKey,
   inspectPersonaTraitValue,
+  isPersonaEvidenceType,
   isPersonaTraitKey,
   planPersonaEvidenceStatusTransition,
   planPersonaTraitReconcile,
@@ -703,5 +713,111 @@ describe("persona.rules — reconcile plan", () => {
       evidenceId: null,
     });
     expect(resolveManualTraitOverride().confidence).toBe(1);
+  });
+});
+
+describe("persona.rules — evidence metadata validation", () => {
+  it("44) metadados válidos passam (inclui ausentes opcionais)", () => {
+    expect(
+      inspectPersonaEvidenceProposal({
+        traitKey: "humor",
+        proposedValue: "Sarcástico",
+        confidence: 0.7,
+        sourceType: "INTERVIEW",
+        title: "Entrevista",
+        url: "https://example.com/fonte",
+        publishedAt: new Date("2026-01-15T00:00:00.000Z"),
+        excerpt: "Trecho",
+      }),
+    ).toEqual([]);
+    expect(
+      inspectPersonaEvidenceProposal({
+        traitKey: "humor",
+        proposedValue: "Sarcástico",
+        confidence: 0.7,
+      }),
+    ).toEqual([]);
+  });
+
+  it("45) title vazio ou > 200 é rejeitado", () => {
+    expect(inspectPersonaEvidenceTitle("")).toBe("EVIDENCE_TITLE_EMPTY");
+    expect(inspectPersonaEvidenceTitle("   ")).toBe("EVIDENCE_TITLE_EMPTY");
+    expect(inspectPersonaEvidenceTitle("x".repeat(200))).toBeNull();
+    expect(inspectPersonaEvidenceTitle("x".repeat(201))).toBe(
+      "EVIDENCE_TITLE_TOO_LONG",
+    );
+    expect(MAX_EVIDENCE_TITLE_LENGTH).toBe(200);
+  });
+
+  it("46) excerpt vazio ou > 500 é rejeitado", () => {
+    expect(inspectPersonaEvidenceExcerpt("")).toBe("EVIDENCE_EXCERPT_EMPTY");
+    expect(inspectPersonaEvidenceExcerpt("x".repeat(500))).toBeNull();
+    expect(inspectPersonaEvidenceExcerpt("x".repeat(501))).toBe(
+      "EVIDENCE_EXCERPT_TOO_LONG",
+    );
+    expect(MAX_EVIDENCE_EXCERPT_LENGTH).toBe(500);
+  });
+
+  it("47) url inválida, protocolo não-http ou > 2048 é rejeitada; ausente é válida", () => {
+    expect(inspectPersonaEvidenceUrl(null)).toBeNull();
+    expect(inspectPersonaEvidenceUrl(undefined)).toBeNull();
+    expect(inspectPersonaEvidenceUrl("https://example.com/fonte")).toBeNull();
+    expect(inspectPersonaEvidenceUrl("http://example.com")).toBeNull();
+    expect(inspectPersonaEvidenceUrl("não é url")).toBe("EVIDENCE_URL_INVALID");
+    expect(inspectPersonaEvidenceUrl("ftp://example.com")).toBe(
+      "EVIDENCE_URL_INVALID",
+    );
+    expect(inspectPersonaEvidenceUrl(`https://example.com/${"x".repeat(2048)}`)).toBe(
+      "EVIDENCE_URL_TOO_LONG",
+    );
+    expect(MAX_EVIDENCE_URL_LENGTH).toBe(2048);
+  });
+
+  it("48) publishedAt inválida é rejeitada; ausente/nula são válidas", () => {
+    expect(inspectPersonaEvidencePublishedAt(null)).toBeNull();
+    expect(inspectPersonaEvidencePublishedAt(undefined)).toBeNull();
+    expect(inspectPersonaEvidencePublishedAt(new Date("2026-01-15T00:00:00.000Z"))).toBeNull();
+    expect(inspectPersonaEvidencePublishedAt(new Date("invalid"))).toBe(
+      "EVIDENCE_PUBLISHED_AT_INVALID",
+    );
+  });
+
+  it("49) sourceType válido é aceito e desconhecido é rejeitado", () => {
+    expect(isPersonaEvidenceType("INTERVIEW")).toBe(true);
+    expect(isPersonaEvidenceType("PODCAST")).toBe(false);
+    expect(PERSONA_EVIDENCE_TYPES).toEqual([
+      "OFFICIAL_PROFILE",
+      "INTERVIEW",
+      "BIOGRAPHY",
+      "PUBLIC_STATEMENT",
+      "OTHER_APPROVED",
+    ]);
+    for (const sourceType of PERSONA_EVIDENCE_TYPES) {
+      expect(inspectPersonaEvidenceSourceType(sourceType)).toBeNull();
+    }
+    expect(inspectPersonaEvidenceSourceType("PODCAST")).toBe(
+      "EVIDENCE_SOURCE_TYPE_UNKNOWN",
+    );
+  });
+
+  it("50) proposal agregada reporta issues de metadados", () => {
+    const issues = inspectPersonaEvidenceProposal({
+      traitKey: "humor",
+      proposedValue: "Sarcástico",
+      confidence: 0.7,
+      sourceType: "PODCAST",
+      title: "x".repeat(201),
+      url: "não é url",
+      publishedAt: new Date("invalid"),
+      excerpt: "x".repeat(501),
+    });
+    expect(issues).toContainEqual({ field: "sourceType", code: "EVIDENCE_SOURCE_TYPE_UNKNOWN" });
+    expect(issues).toContainEqual({ field: "title", code: "EVIDENCE_TITLE_TOO_LONG" });
+    expect(issues).toContainEqual({ field: "url", code: "EVIDENCE_URL_INVALID" });
+    expect(issues).toContainEqual({
+      field: "publishedAt",
+      code: "EVIDENCE_PUBLISHED_AT_INVALID",
+    });
+    expect(issues).toContainEqual({ field: "excerpt", code: "EVIDENCE_EXCERPT_TOO_LONG" });
   });
 });

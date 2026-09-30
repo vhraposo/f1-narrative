@@ -4,6 +4,19 @@ export const MAX_PROMPT_PERSONA_BLOCK_LENGTH = 2000;
 export const MAX_SUMMARY_LENGTH = 2000;
 export const MAX_PROMPT_SUMMARY_LENGTH = 600;
 export const MANUAL_TRAIT_CONFIDENCE = 1;
+export const MAX_EVIDENCE_TITLE_LENGTH = 200;
+export const MAX_EVIDENCE_EXCERPT_LENGTH = 500;
+export const MAX_EVIDENCE_URL_LENGTH = 2048;
+
+export const PERSONA_EVIDENCE_TYPES = [
+  "OFFICIAL_PROFILE",
+  "INTERVIEW",
+  "BIOGRAPHY",
+  "PUBLIC_STATEMENT",
+  "OTHER_APPROVED",
+] as const;
+
+export type PersonaRuleEvidenceType = (typeof PERSONA_EVIDENCE_TYPES)[number];
 
 export const PERSONA_TRAIT_KEYS = [
   "communicationStyle",
@@ -105,13 +118,29 @@ export type PersonaConfidenceIssue = "CONFIDENCE_OUT_OF_RANGE";
 export type PersonaProposedValueIssue =
   | "PROPOSED_VALUE_EMPTY"
   | "PROPOSED_VALUE_TOO_LONG";
+export type PersonaEvidenceTitleIssue =
+  | "EVIDENCE_TITLE_EMPTY"
+  | "EVIDENCE_TITLE_TOO_LONG";
+export type PersonaEvidenceExcerptIssue =
+  | "EVIDENCE_EXCERPT_EMPTY"
+  | "EVIDENCE_EXCERPT_TOO_LONG";
+export type PersonaEvidenceUrlIssue =
+  | "EVIDENCE_URL_INVALID"
+  | "EVIDENCE_URL_TOO_LONG";
+export type PersonaEvidencePublishedAtIssue = "EVIDENCE_PUBLISHED_AT_INVALID";
+export type PersonaEvidenceSourceTypeIssue = "EVIDENCE_SOURCE_TYPE_UNKNOWN";
 
 export type PersonaRuleIssue =
   | { readonly field: "traitKey"; readonly code: PersonaTraitKeyIssue }
   | { readonly field: "value"; readonly code: PersonaTraitValueIssue }
   | { readonly field: "summary"; readonly code: PersonaSummaryIssue }
   | { readonly field: "confidence"; readonly code: PersonaConfidenceIssue }
-  | { readonly field: "proposedValue"; readonly code: PersonaProposedValueIssue };
+  | { readonly field: "proposedValue"; readonly code: PersonaProposedValueIssue }
+  | { readonly field: "title"; readonly code: PersonaEvidenceTitleIssue }
+  | { readonly field: "excerpt"; readonly code: PersonaEvidenceExcerptIssue }
+  | { readonly field: "url"; readonly code: PersonaEvidenceUrlIssue }
+  | { readonly field: "publishedAt"; readonly code: PersonaEvidencePublishedAtIssue }
+  | { readonly field: "sourceType"; readonly code: PersonaEvidenceSourceTypeIssue };
 
 export function inspectPersonaTraitKey(key: string): PersonaTraitKeyIssue | null {
   if (!isPersonaTraitKey(key)) return "TRAIT_KEY_UNKNOWN";
@@ -163,10 +192,66 @@ export function inspectPersonaTrait(input: {
   return issues;
 }
 
+export function isPersonaEvidenceType(value: string): value is PersonaRuleEvidenceType {
+  return (PERSONA_EVIDENCE_TYPES as readonly string[]).includes(value);
+}
+
+export function inspectPersonaEvidenceTitle(
+  title: string,
+): PersonaEvidenceTitleIssue | null {
+  if (title.trim().length === 0) return "EVIDENCE_TITLE_EMPTY";
+  if (title.length > MAX_EVIDENCE_TITLE_LENGTH) return "EVIDENCE_TITLE_TOO_LONG";
+  return null;
+}
+
+export function inspectPersonaEvidenceExcerpt(
+  excerpt: string,
+): PersonaEvidenceExcerptIssue | null {
+  if (excerpt.trim().length === 0) return "EVIDENCE_EXCERPT_EMPTY";
+  if (excerpt.length > MAX_EVIDENCE_EXCERPT_LENGTH) return "EVIDENCE_EXCERPT_TOO_LONG";
+  return null;
+}
+
+export function inspectPersonaEvidenceUrl(
+  url: string | null | undefined,
+): PersonaEvidenceUrlIssue | null {
+  if (url === null || url === undefined) return null;
+  if (url.length > MAX_EVIDENCE_URL_LENGTH) return "EVIDENCE_URL_TOO_LONG";
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "EVIDENCE_URL_INVALID";
+    }
+    return null;
+  } catch {
+    return "EVIDENCE_URL_INVALID";
+  }
+}
+
+export function inspectPersonaEvidencePublishedAt(
+  publishedAt: Date | null | undefined,
+): PersonaEvidencePublishedAtIssue | null {
+  if (publishedAt === null || publishedAt === undefined) return null;
+  if (Number.isNaN(publishedAt.getTime())) return "EVIDENCE_PUBLISHED_AT_INVALID";
+  return null;
+}
+
+export function inspectPersonaEvidenceSourceType(
+  sourceType: string,
+): PersonaEvidenceSourceTypeIssue | null {
+  if (!isPersonaEvidenceType(sourceType)) return "EVIDENCE_SOURCE_TYPE_UNKNOWN";
+  return null;
+}
+
 export function inspectPersonaEvidenceProposal(input: {
   readonly traitKey: string;
   readonly proposedValue: string;
   readonly confidence: number;
+  readonly sourceType?: string;
+  readonly title?: string;
+  readonly url?: string | null;
+  readonly publishedAt?: Date | null;
+  readonly excerpt?: string;
 }): readonly PersonaRuleIssue[] {
   const issues: PersonaRuleIssue[] = [];
 
@@ -178,6 +263,27 @@ export function inspectPersonaEvidenceProposal(input: {
 
   const confidenceIssue = inspectPersonaConfidence(input.confidence);
   if (confidenceIssue) issues.push({ field: "confidence", code: confidenceIssue });
+
+  if (input.title !== undefined) {
+    const titleIssue = inspectPersonaEvidenceTitle(input.title);
+    if (titleIssue) issues.push({ field: "title", code: titleIssue });
+  }
+
+  if (input.excerpt !== undefined) {
+    const excerptIssue = inspectPersonaEvidenceExcerpt(input.excerpt);
+    if (excerptIssue) issues.push({ field: "excerpt", code: excerptIssue });
+  }
+
+  const urlIssue = inspectPersonaEvidenceUrl(input.url);
+  if (urlIssue) issues.push({ field: "url", code: urlIssue });
+
+  const publishedAtIssue = inspectPersonaEvidencePublishedAt(input.publishedAt);
+  if (publishedAtIssue) issues.push({ field: "publishedAt", code: publishedAtIssue });
+
+  if (input.sourceType !== undefined) {
+    const sourceTypeIssue = inspectPersonaEvidenceSourceType(input.sourceType);
+    if (sourceTypeIssue) issues.push({ field: "sourceType", code: sourceTypeIssue });
+  }
 
   return issues;
 }

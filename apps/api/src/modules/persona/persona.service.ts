@@ -1,9 +1,13 @@
 import type { PersonaEvidenceType, PersonaOrigin, Prisma } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import {
+  inspectPersonaConfidence,
+  inspectPersonaEvidenceProposal,
   inspectPersonaSummary,
   inspectPersonaTrait,
   inspectPersonaTraitKey,
+  planPersonaEvidenceStatusTransition,
+  planPersonaTraitReconcile,
   resolveEvidenceAuthority,
   resolveManualTraitOverride,
   sortPersonaTraits,
@@ -17,8 +21,10 @@ export const PERSONA_SCHEMA_VERSION = "persona.v1";
 export type PersonaServiceErrorCode =
   | "NOT_FOUND"
   | "TRAIT_NOT_FOUND"
+  | "EVIDENCE_NOT_FOUND"
   | "FORBIDDEN"
-  | "VALIDATION_ERROR";
+  | "VALIDATION_ERROR"
+  | "INVALID_TRANSITION";
 
 export class PersonaServiceError extends Error {
   constructor(
@@ -391,7 +397,7 @@ function collectManualInputIssues(
   return issues;
 }
 
-function requireManualAccess(
+function requireWriteAccess(
   access: PersonaAccessResolution,
 ): PersonaAccessCharacter {
   if (access.kind === "NOT_FOUND") throw notFoundError();
@@ -421,7 +427,7 @@ export async function updatePersonaManually(
   }
 
   const access = await resolvePersonaAccess(userId, characterId, "WRITE");
-  const character = requireManualAccess(access);
+  const character = requireWriteAccess(access);
 
   const traits = input.traits ?? [];
   const summaryProvided = input.summary !== undefined;
@@ -499,7 +505,7 @@ export async function deletePersonaTrait(
   }
 
   const access = await resolvePersonaAccess(userId, characterId, "WRITE");
-  requireManualAccess(access);
+  requireWriteAccess(access);
 
   const persona = await prisma.characterPersona.findUnique({
     where: { characterId },
@@ -525,4 +531,220 @@ export async function deletePersonaTrait(
     include: personaInclude,
   });
   return buildPersonaView(reloaded);
+}
+
+export type CreatePersonaEvidenceInput = {
+  readonly traitKey: string;
+  readonly proposedValue: string;
+  readonly sourceType: PersonaEvidenceType;
+  readonly title: string;
+  readonly url?: string | null;
+  readonly publishedAt?: Date | null;
+  readonly excerpt: string;
+  readonly confidence: number;
+};
+
+export type PersonaEvidenceReviewStatus = "APPROVED" | "REJECTED";
+
+export type ReviewPersonaEvidenceInput = {
+  readonly status: PersonaEvidenceReviewStatus;
+  readonly confidence?: number;
+};
+
+function evidenceNotFoundError(): PersonaServiceError {
+  return new PersonaServiceError(
+    "EVIDENCE_NOT_FOUND",
+    "Evidência não encontrada",
+    404,
+  );
+}
+
+function invalidTransitionError(
+  from: PersonaEvidenceStatus,
+  to: PersonaEvidenceStatus,
+): PersonaServiceError {
+  return new PersonaServiceError(
+    "INVALID_TRANSITION",
+    `Transição de evidência inválida: ${from} -> ${to}`,
+    409,
+  );
+}
+
+async function requireAdminReviewer(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!user || user.role !== "ADMIN") {
+    throw forbiddenError("Apenas administradores podem revisar evidências de persona");
+  }
+}
+
+async function reconcileTraitWithinTransaction(
+  tx: Prisma.TransactionClient,
+  personaId: string,
+  traitKey: string,
+): Promise<void> {
+  const evidences = await tx.personaEvidence.findMany({
+    where: { personaId, traitKey },
+  });
+  const trait = await tx.personaTrait.findUnique({
+    where: { personaId_key: { personaId, key: traitKey } },
+  });
+
+  const plan = planPersonaTraitReconcile({
+    currentSourceKind: trait?.sourceKind ?? null,
+    currentEvidenceId: trait?.evidenceId ?? null,
+    evidences,
+  });
+
+  if (plan.kind === "NO_EFFECTIVE_TRAIT" || plan.kind === "KEEP_MANUAL_TRAIT") {
+    return;
+  }
+
+  if (plan.kind === "REMOVE_EVIDENCE_TRAIT") {
+    if (trait) await tx.personaTrait.delete({ where: { id: trait.id } });
+    return;
+  }
+
+  const unchanged =
+    trait !== null &&
+    trait.value === plan.value &&
+    trait.confidence === plan.confidence &&
+    trait.evidenceId === plan.evidenceId;
+  if (unchanged) return;
+
+  if (trait) {
+    await tx.personaTrait.update({
+      where: { id: trait.id },
+      data: {
+        value: plan.value,
+        confidence: plan.confidence,
+        sourceKind: "EVIDENCE",
+        evidenceId: plan.evidenceId,
+      },
+    });
+    return;
+  }
+
+  await tx.personaTrait.create({
+    data: {
+      personaId,
+      key: traitKey,
+      value: plan.value,
+      confidence: plan.confidence,
+      sourceKind: "EVIDENCE",
+      evidenceId: plan.evidenceId,
+    },
+  });
+}
+
+export async function createPersonaEvidence(
+  userId: string,
+  characterId: string,
+  input: CreatePersonaEvidenceInput,
+): Promise<PersonaView> {
+  const issues = inspectPersonaEvidenceProposal({
+    traitKey: input.traitKey,
+    proposedValue: input.proposedValue,
+    confidence: input.confidence,
+    sourceType: input.sourceType,
+    title: input.title,
+    url: input.url,
+    publishedAt: input.publishedAt,
+    excerpt: input.excerpt,
+  });
+  if (issues.length > 0) {
+    throw validationError("Dados de evidência inválidos", issues);
+  }
+
+  const access = await resolvePersonaAccess(userId, characterId, "WRITE");
+  requireWriteAccess(access);
+
+  const ensured = await ensurePersona(userId, characterId);
+  const personaId = ensured.persona.id;
+  if (!personaId) throw notFoundError();
+
+  await prisma.personaEvidence.create({
+    data: {
+      personaId,
+      traitKey: input.traitKey,
+      proposedValue: input.proposedValue,
+      sourceType: input.sourceType,
+      title: input.title,
+      url: input.url ?? null,
+      publishedAt: input.publishedAt ?? null,
+      excerpt: input.excerpt,
+      confidence: input.confidence,
+      status: "PROPOSED",
+      createdById: userId,
+    },
+  });
+
+  const refreshed = await prisma.characterPersona.findUniqueOrThrow({
+    where: { characterId },
+    include: personaInclude,
+  });
+  return buildPersonaView(refreshed);
+}
+
+export async function reviewPersonaEvidence(
+  reviewerUserId: string,
+  evidenceId: string,
+  input: ReviewPersonaEvidenceInput,
+): Promise<PersonaView> {
+  if (input.status !== "APPROVED" && input.status !== "REJECTED") {
+    throw validationError("Status de revisão inválido", []);
+  }
+
+  if (input.confidence !== undefined) {
+    const confidenceIssue = inspectPersonaConfidence(input.confidence);
+    if (confidenceIssue) {
+      throw validationError("Confiança inválida", [
+        { field: "confidence", code: confidenceIssue },
+      ]);
+    }
+  }
+
+  await requireAdminReviewer(reviewerUserId);
+
+  const evidence = await prisma.personaEvidence.findUnique({
+    where: { id: evidenceId },
+    select: { id: true, personaId: true },
+  });
+  if (!evidence) throw evidenceNotFoundError();
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`persona:${evidence.personaId}`}))`;
+
+    const current = await tx.personaEvidence.findUnique({
+      where: { id: evidenceId },
+      select: { id: true, personaId: true, traitKey: true, status: true },
+    });
+    if (!current) throw evidenceNotFoundError();
+
+    const transition = planPersonaEvidenceStatusTransition(current.status, input.status);
+    if (!transition.allowed) {
+      throw invalidTransitionError(current.status, input.status);
+    }
+
+    await tx.personaEvidence.update({
+      where: { id: evidenceId },
+      data: {
+        status: input.status,
+        ...(input.confidence !== undefined ? { confidence: input.confidence } : {}),
+        reviewedById: reviewerUserId,
+        reviewedAt: new Date(),
+      },
+    });
+
+    await reconcileTraitWithinTransaction(tx, current.personaId, current.traitKey);
+
+    return tx.characterPersona.findUniqueOrThrow({
+      where: { id: current.personaId },
+      include: personaInclude,
+    });
+  });
+
+  return buildPersonaView(updated);
 }
