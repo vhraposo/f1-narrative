@@ -833,3 +833,12 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Decisões:** nenhuma nova (a classificação segue a arquitetura §31 item 7).
 - **Limitações:** criação retroativa de resultado ausente em corrida finalizada não é suportada v1; `points` continua aceito no CRUD de corrida aberta (pré-finalização) como sempre.
 - **Commit:** `feat(v3): harden timeline legacy writers`.
+
+### V3.15.8 — Final QA / E2E / Documentation
+- **Objetivo:** provar a V3.15 integrada, determinística e sem regressões.
+- **E2E:** `timeline.e2e.test.ts` 8/8 — fluxo completo (preview sem escrita com diff/impacto → apply atômico → standings/campeão derivados → `#1` explícito → supersession com original imutável → stale 409 sem aplicação parcial → recompute determinístico 2× → narrativa/evolução preservadas com `EVOLUTION_STALE` sanitizado → divergência leitura pura → isolamento entre universos).
+- **Regressão completa:** API **2249/2249** (131 arquivos) em **duas execuções consecutivas no mesmo TEST** sem flakiness; Web **448/448** (58 arquivos). Typecheck API/Web 0; lint API/Web 0; `next build` exit 0.
+- **Banco:** TEST 29 migrations, 63 tabelas, 0 timeline/snapshots residuais, 0 resíduos de fixture; DEV intacto (27 migrations, 60 tabelas, 17 usuários, sem tabelas Persona/V3.15; 2 `NUMBER_CORRECTED` pré-existentes da era V3.04, sem alteração).
+- **Docs:** `v3.15-timeline-architecture.md` com §0 de status (implementado/limitado/unsupported/future); `v3.15-open-questions.md` com as 8 OQs resolvidas; `docs/v3.15-final-report.md` criado.
+- **Decisões:** nenhuma nova (D-061..D-065 + defaults das OQs).
+- **Commit:** `feat(v3): complete historical timeline`.
