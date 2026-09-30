@@ -842,3 +842,13 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Docs:** `v3.15-timeline-architecture.md` com §0 de status (implementado/limitado/unsupported/future); `v3.15-open-questions.md` com as 8 OQs resolvidas; `docs/v3.15-final-report.md` criado.
 - **Decisões:** nenhuma nova (D-061..D-065 + defaults das OQs).
 - **Commit:** `feat(v3): complete historical timeline`.
+
+### Extensão — Campeões (Narrativa → Linha do Tempo)
+- **Objetivo:** subaba com histórico de campeões (fonte externa × Universe), edição controlada e restauração, reutilizando corrections/recompute/divergence.
+- **Arquivos:** `apps/api/src/modules/timeline/champions.service.ts` (read model por temporada com estados `MATCH/DIVERGENT/UNIVERSE_ONLY/EXTERNAL_ONLY/NONE`, origem `DERIVED/STANDING/NONE`, `canEdit/canRestore`, pares atômicos de `STANDING_CORRECTED`, preview por rollback e apply com token sob lock), rotas `GET /api/timeline/champions`, `GET /api/timeline/champions/:seasonId`, `POST .../preview`, `POST .../apply`; web `lib/timeline.ts` + `hooks/use-timeline.ts` + `components/timeline/champions-panel.tsx` + abas `História | Campeões` na página da Linha do Tempo.
+- **Migrations:** nenhuma.
+- **Testes:** API `champions.test.ts` 11/11 (lista/estados/origem, filtros, detalhe com histórico, preview zero-write e determinístico, edit com 2 eventos, bloqueio `DERIVED_STANDING` 409, restore preservando histórico e voltando a MATCH, stale 409 sanitizado, External intacto, `UNIVERSE_ONLY`, `EXTERNAL_CHAMPION_MISSING`); Web `champions-panel.integration.test.tsx` 8/8 (loading/empty/lista/estados/disabled derivado/filtros/detalhe/modais com preview+apply/erro/retry). Suíte API **2260/2260 ×2** no mesmo TEST; Web **456/456 ×2**; typecheck 0/0; lint 0/0; build 0.
+- **Problemas:** `post` ausente no import de `lib/timeline.ts`; cleanup pré-existente de `championship.test.ts` não removia users (corrigido, resíduo anterior limpo); flakes intermitentes pré-existentes em páginas externas/universe sob carga (não reproduzem isoladas nem em execuções limpas consecutivas; arquivos não tocados).
+- **Decisões:** D-066 (campeão derivado; edição = par atômico `STANDING_CORRECTED`; restore como correção; `NONE` no read model).
+- **Limitações:** troca de campeão exige piloto com perfil no Universe; temporadas `DERIVED` direcionam para correção de resultado; sem criação de pilotos novos pela aba.
+- **Commit:** `feat(v3): add historical champions timeline`.

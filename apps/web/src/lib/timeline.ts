@@ -1,4 +1,4 @@
-import { get } from "./api";
+import { get, post } from "./api";
 
 export type TimelineItem = {
   id: string;
@@ -158,4 +158,98 @@ export function getDivergence(seasonId: string): Promise<DivergenceReport> {
   return get<{ divergence: DivergenceReport }>(
     `/api/timeline/divergence?seasonId=${seasonId}`,
   ).then((r) => r.divergence);
+}
+
+export type ChampionState =
+  | "MATCH"
+  | "DIVERGENT"
+  | "UNIVERSE_ONLY"
+  | "EXTERNAL_ONLY"
+  | "NONE";
+
+export const CHAMPION_STATE_LABELS: Record<ChampionState, string> = {
+  MATCH: "Original",
+  DIVERGENT: "Divergente",
+  UNIVERSE_ONLY: "Somente Universe",
+  EXTERNAL_ONLY: "Somente externo",
+  NONE: "Sem campeão",
+};
+
+export type ExternalChampionDescriptor = {
+  externalDriverId: string;
+  name: string;
+  source: string;
+};
+
+export type UniverseChampionDescriptor = {
+  driverProfileId: string;
+  characterId: string;
+  name: string;
+  externalDriverId: string | null;
+};
+
+export type ChampionEntry = {
+  seasonId: string;
+  year: number;
+  externalChampion: ExternalChampionDescriptor | null;
+  universeChampion: UniverseChampionDescriptor | null;
+  state: ChampionState;
+  origin: "DERIVED" | "STANDING" | "NONE";
+  canEdit: boolean;
+  canRestore: boolean;
+  blockedReason: "DERIVED_CHAMPION" | null;
+  restoreDriverProfileId: string | null;
+};
+
+export type ChampionChangeMode = "EDIT" | "RESTORE";
+
+export type ChampionChangeRequest =
+  | { mode: "EDIT"; driverProfileId: string }
+  | { mode: "RESTORE" };
+
+export type ChampionChangePreview = {
+  previewToken: string;
+  seasonId: string;
+  year: number;
+  mode: ChampionChangeMode;
+  externalChampion: ExternalChampionDescriptor | null;
+  before: UniverseChampionDescriptor | null;
+  after: UniverseChampionDescriptor;
+  changes: Array<{ field: "champion"; before: string | null; after: string }>;
+  commandCount: number;
+};
+
+export type ChampionDetail = {
+  champion: ChampionEntry;
+  history: TimelineItem[];
+};
+
+export function getChampions(): Promise<ChampionEntry[]> {
+  return get<{ champions: ChampionEntry[] }>("/api/timeline/champions").then(
+    (r) => r.champions,
+  );
+}
+
+export function getChampionDetail(seasonId: string): Promise<ChampionDetail> {
+  return get<ChampionDetail>(`/api/timeline/champions/${seasonId}`);
+}
+
+export function previewChampionChange(
+  seasonId: string,
+  request: ChampionChangeRequest,
+): Promise<ChampionChangePreview> {
+  return post<{ preview: ChampionChangePreview }>(
+    `/api/timeline/champions/${seasonId}/preview`,
+    request,
+  ).then((r) => r.preview);
+}
+
+export function applyChampionChange(
+  seasonId: string,
+  request: ChampionChangeRequest & { previewToken: string },
+): Promise<{ events: Array<{ id: string; sequence: number; kind: string }> }> {
+  return post<{ events: Array<{ id: string; sequence: number; kind: string }> }>(
+    `/api/timeline/champions/${seasonId}/apply`,
+    request,
+  );
 }

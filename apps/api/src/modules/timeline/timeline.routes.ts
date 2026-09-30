@@ -17,6 +17,12 @@ import {
   queryTimelineItems,
 } from "./timeline.read.js";
 import { buildDivergenceReport } from "./divergence.service.js";
+import {
+  applyChampionChange,
+  getChampionDetail,
+  listUniverseChampions,
+  previewChampionChange,
+} from "./champions.service.js";
 import { applyCorrection } from "./correction.apply.js";
 import { previewCorrection } from "./correction.preview.js";
 import type { CorrectionCommand } from "./correction.service.js";
@@ -70,6 +76,33 @@ const divergenceQuerySchema = z
     seasonId: z.string().uuid("Identificador de temporada inválido"),
   })
   .strict();
+
+const championParamsSchema = z.object({
+  seasonId: z.string().uuid("Identificador de temporada inválido"),
+});
+
+const championPreviewSchema = z.discriminatedUnion("mode", [
+  z
+    .object({ mode: z.literal("EDIT"), driverProfileId: z.string().uuid() })
+    .strict(),
+  z.object({ mode: z.literal("RESTORE") }).strict(),
+]);
+
+const championApplySchema = z.discriminatedUnion("mode", [
+  z
+    .object({
+      mode: z.literal("EDIT"),
+      driverProfileId: z.string().uuid(),
+      previewToken: z.string().min(16).max(80),
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal("RESTORE"),
+      previewToken: z.string().min(16).max(80),
+    })
+    .strict(),
+]);
 
 const worldDateSchema = z.string().datetime({ offset: true });
 const supersedesSchema = z.string().uuid().nullable().optional();
@@ -364,6 +397,97 @@ export const timelineRoutes: FastifyPluginAsync = async (fastify) => {
           supersedesId: parsed.data.supersedesId ?? null,
         });
         return reply.send({ event });
+      } catch (error) {
+        if (sendTimelineError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.get(
+    "/api/timeline/champions",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const universe = await ensureUniverse(request.user!.id);
+      const champions = await listUniverseChampions(universe.id);
+      return reply.send({ champions });
+    },
+  );
+
+  fastify.get(
+    "/api/timeline/champions/:seasonId",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = championParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({
+          error: "Identificador inválido",
+          code: "VALIDATION_ERROR",
+        });
+      }
+      const universe = await ensureUniverse(request.user!.id);
+      try {
+        const detail = await getChampionDetail(universe.id, params.data.seasonId);
+        return reply.send(detail);
+      } catch (error) {
+        if (sendTimelineError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/timeline/champions/:seasonId/preview",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = championParamsSchema.safeParse(request.params);
+      const body = championPreviewSchema.safeParse(request.body ?? {});
+      if (!params.success || !body.success) {
+        return reply.code(400).send({
+          error: "Dados inválidos",
+          code: "VALIDATION_ERROR",
+          ...(body.success ? {} : { issues: body.error.issues }),
+        });
+      }
+      const universe = await ensureUniverse(request.user!.id);
+      try {
+        const preview = await previewChampionChange(
+          universe.id,
+          params.data.seasonId,
+          body.data.mode,
+          body.data.mode === "EDIT" ? body.data.driverProfileId : undefined,
+        );
+        return reply.send({ preview });
+      } catch (error) {
+        if (sendTimelineError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/timeline/champions/:seasonId/apply",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = championParamsSchema.safeParse(request.params);
+      const body = championApplySchema.safeParse(request.body ?? {});
+      if (!params.success || !body.success) {
+        return reply.code(400).send({
+          error: "Dados inválidos",
+          code: "VALIDATION_ERROR",
+          ...(body.success ? {} : { issues: body.error.issues }),
+        });
+      }
+      const universe = await ensureUniverse(request.user!.id);
+      try {
+        const result = await applyChampionChange(
+          universe.id,
+          params.data.seasonId,
+          body.data.mode,
+          body.data.previewToken,
+          body.data.mode === "EDIT" ? body.data.driverProfileId : undefined,
+        );
+        return reply.send(result);
       } catch (error) {
         if (sendTimelineError(reply, error)) return;
         throw error;

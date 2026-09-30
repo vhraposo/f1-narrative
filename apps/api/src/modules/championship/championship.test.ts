@@ -173,6 +173,13 @@ afterAll(async () => {
     await prisma.race.deleteMany({ where: { seasonId: { in: createdSeasonIds } } });
     await prisma.season.deleteMany({ where: { id: { in: createdSeasonIds } } });
   }
+  const userIds = [owner?.userId, intruder?.userId].filter(
+    (id): id is string => typeof id === "string",
+  );
+  if (userIds.length > 0) {
+    await prisma.universe.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+  }
   await prisma.$disconnect();
   await app.close();
 });

@@ -8,8 +8,8 @@ import type { Tx } from "./timeline.service.js";
 
 const WORLD_KEY = "default";
 
-export class CorrectionPreviewAbort extends Error {
-  constructor(public readonly report: CorrectionPreview) {
+export class CorrectionPreviewAbort<T = CorrectionPreview> extends Error {
+  constructor(public readonly report: T) {
     super("correction-preview-abort");
     this.name = "CorrectionPreviewAbort";
   }
@@ -93,10 +93,19 @@ function canonicalCommand(command: CorrectionCommand): string {
   );
 }
 
+function canonicalCommands(
+  commands: CorrectionCommand | readonly CorrectionCommand[],
+): string {
+  if (Array.isArray(commands)) {
+    return JSON.stringify(commands.map((command) => canonicalCommand(command)));
+  }
+  return canonicalCommand(commands as CorrectionCommand);
+}
+
 export async function buildCorrectionPreviewToken(
   tx: Tx,
   universeId: string,
-  command: CorrectionCommand,
+  commands: CorrectionCommand | readonly CorrectionCommand[],
   seasonId: string | null,
 ): Promise<string> {
   const world = await tx.worldState.findUnique({
@@ -120,7 +129,7 @@ export async function buildCorrectionPreviewToken(
         }
       : null,
     standings,
-    command: canonicalCommand(command),
+    commands: canonicalCommands(commands),
   });
   return `sha256:${createHash("sha256").update(payload, "utf8").digest("hex")}`;
 }
