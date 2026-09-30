@@ -274,7 +274,7 @@ export const pilotExperienceRoutes: FastifyPluginAsync = async (fastify) => {
         }
         if (existing.derivation !== "MANUAL") {
           throw new PilotKnowledgeError(
-            "VALIDATION_ERROR",
+            "DERIVED_MEMORY_IMMUTABLE",
             "Memória derivada é imutável; crie uma memória manual ou corrija a fonte.",
             409,
           );

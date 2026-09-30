@@ -226,7 +226,7 @@ export async function refreshDriverKnowledge(input: {
   if (results.every((result) => result.status === "FAILED")) {
     const first = results[0];
     throw new PilotKnowledgeError(
-      "DRIVER_NOT_FOUND",
+      "REFRESH_FAILED",
       first?.error ?? "Refresh falhou em todos os providers",
       502,
     );

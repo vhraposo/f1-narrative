@@ -373,12 +373,12 @@ describe("News × temporada (Fase 7)", () => {
     }
 
     const crossSeason = await listNews(app, userA, `?seasonId=${fixtureB.seasonId}`);
-    expect(crossSeason.statusCode).toBe(403);
-    expect(crossSeason.json().code).toBe("SEASON_NOT_IN_UNIVERSE");
+    expect(crossSeason.statusCode).toBe(404);
+    expect(crossSeason.json().code).toBe("SEASON_NOT_FOUND");
 
     const crossRace = await listNews(app, userA, `?raceId=${fixtureB.raceAId}`);
-    expect(crossRace.statusCode).toBe(403);
-    expect(crossRace.json().code).toBe("RACE_NOT_IN_UNIVERSE");
+    expect(crossRace.statusCode).toBe(404);
+    expect(crossRace.json().code).toBe("RACE_NOT_FOUND");
   });
 
   it("retorna 404 para temporada/corrida inexistente e 401 sem sessão", async () => {
@@ -462,8 +462,8 @@ describe("News × temporada (Fase 7)", () => {
       },
       remoteAddress: "10.88.4.1",
     });
-    expect(wrongRace.statusCode).toBe(403);
-    expect(wrongRace.json().code).toBe("RACE_NOT_IN_UNIVERSE");
+    expect(wrongRace.statusCode).toBe(404);
+    expect(wrongRace.json().code).toBe("RACE_NOT_FOUND");
 
     const wrongSeason = await app.inject({
       method: "POST",
@@ -476,8 +476,8 @@ describe("News × temporada (Fase 7)", () => {
       },
       remoteAddress: "10.88.4.2",
     });
-    expect(wrongSeason.statusCode).toBe(403);
-    expect(wrongSeason.json().code).toBe("SEASON_NOT_IN_UNIVERSE");
+    expect(wrongSeason.statusCode).toBe(404);
+    expect(wrongSeason.json().code).toBe("SEASON_NOT_FOUND");
 
     const mismatch = await app.inject({
       method: "POST",
@@ -490,7 +490,7 @@ describe("News × temporada (Fase 7)", () => {
       },
       remoteAddress: "10.88.4.3",
     });
-    expect(mismatch.statusCode).toBe(403);
+    expect(mismatch.statusCode).toBe(404);
 
     const valid = await app.inject({
       method: "POST",
@@ -512,8 +512,8 @@ describe("News × temporada (Fase 7)", () => {
       payload: { payload: { raceId: fixtureB.raceAId } },
       remoteAddress: "10.88.4.5",
     });
-    expect(patch.statusCode).toBe(403);
-    expect(patch.json().code).toBe("RACE_NOT_IN_UNIVERSE");
+    expect(patch.statusCode).toBe(404);
+    expect(patch.json().code).toBe("RACE_NOT_FOUND");
   });
 
   it("é idempotente: reprocessar a corrida não duplica eventos nem notícias", async () => {

@@ -14,7 +14,9 @@ export type PilotKnowledgeErrorCode =
   | "SOURCE_NOT_FOUND"
   | "AMBIGUOUS_CANDIDATES"
   | "PROVIDERS_UNAVAILABLE"
-  | "EVOLUTION_STALE";
+  | "EVOLUTION_STALE"
+  | "DERIVED_MEMORY_IMMUTABLE"
+  | "REFRESH_FAILED";
 
 export class PilotKnowledgeError extends Error {
   constructor(

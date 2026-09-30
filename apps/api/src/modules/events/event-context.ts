@@ -54,9 +54,9 @@ export async function validateEventPayloadContext(
     }
     if (race.season.universeId !== universe.id) {
       return {
-        statusCode: 403,
-        code: "RACE_NOT_IN_UNIVERSE",
-        error: "Corrida não pertence ao seu Universe",
+        statusCode: 404,
+        code: "RACE_NOT_FOUND",
+        error: "Corrida não encontrada",
       };
     }
     raceSeasonId = race.seasonId;
@@ -76,9 +76,9 @@ export async function validateEventPayloadContext(
     }
     if (season.universeId !== universe.id) {
       return {
-        statusCode: 403,
-        code: "SEASON_NOT_IN_UNIVERSE",
-        error: "Temporada não pertence ao seu Universe",
+        statusCode: 404,
+        code: "SEASON_NOT_FOUND",
+        error: "Temporada não encontrada",
       };
     }
     if (raceSeasonId && raceSeasonId !== seasonId) {

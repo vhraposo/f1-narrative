@@ -208,6 +208,7 @@ describe("pilot experience routes", () => {
       remoteAddress: remoteAddress(),
     });
     expect(blocked.statusCode).toBe(409);
+    expect((blocked.json() as { code: string }).code).toBe("DERIVED_MEMORY_IMMUTABLE");
 
     const invalid = await app.inject({
       method: "POST",

@@ -91,11 +91,7 @@ export async function listUniverseNews(
       throw new NewsError("RACE_NOT_FOUND", "Corrida não encontrada", 404);
     }
     if (found.season.universeId !== universe.id) {
-      throw new NewsError(
-        "RACE_NOT_IN_UNIVERSE",
-        "Corrida não pertence ao seu Universe",
-        403,
-      );
+      throw new NewsError("RACE_NOT_FOUND", "Corrida não encontrada", 404);
     }
     race = { id: found.id, name: found.name, round: found.round };
     season = { id: found.season.id, year: found.season.year };
@@ -109,11 +105,7 @@ export async function listUniverseNews(
       throw new NewsError("SEASON_NOT_FOUND", "Temporada não encontrada", 404);
     }
     if (found.universeId !== universe.id) {
-      throw new NewsError(
-        "SEASON_NOT_IN_UNIVERSE",
-        "Temporada não pertence ao seu Universe",
-        403,
-      );
+      throw new NewsError("SEASON_NOT_FOUND", "Temporada não encontrada", 404);
     }
     season = { id: found.id, year: found.year };
     filteredSeasonId = found.id;
