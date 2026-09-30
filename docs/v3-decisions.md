@@ -345,5 +345,22 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Decisão (V3.22):** `FIRST_FASTEST_LAP` é derivado do primeiro resultado com `fastestLap = true` (ordenado por temporada/round) e o tempo (`FastestLap.Time.time`) é persistido em `ExternalResult.fastestLapTime` (migration aditiva). O detalhe do circuito mostra "volta mais rápida em corrida (fonte)"; o recorde oficial homologado de circuito só é exibido quando uma fonte explícita o fornecer — hoje `officialLapRecord.available = false` com razão.
 - **Consequência:** nada confunde volta rápida de sessão/corrida com recorde oficial; prune de marcos obsoletos continua valendo para a nova categoria.
 
+## D-085 — Override histórico de campeão como TimelineEvent + projeção, sem materializar Season
+- **Decisão (V3.23):** permitir que o jogador sobrescreva o campeão de 2000–2025 mesmo sem `Season` materializada via `HISTORICAL_CHAMPION_OVERRIDE_SET/CLEARED` (TimelineEvent) e projeção `HistoricalChampionOverride` (unique `universeId+year`). O evento carrega driverProfileId do Universe; supersession de SET por SET mantém a cadeia; RESTORE emite CLEARED. `WorldSnapshot` inclui os overrides; a fonte externa nunca é escrita; nenhuma corrida/resultado é fabricado. Edição por standings (`STANDING_CORRECTED`) continua para temporadas materializadas.
+- **Consequência:** baseline (fonte = Universe) e divergência (Alicya vs Verstappen) convivem na mesma tela, com restore e auditoria na Linha do Tempo.
+
+## D-086 — F1DB vendorizado como snapshot gerado, com layouts SVG sanitizados e atribuição
+- **Decisão (V3.23):** o subset do release oficial F1DB `v2026.15.1` (CC BY 4.0) é versionado em `data/external/f1db/` com `PROVENANCE.json` (asset sha256, retrievedAt) e checksums; os SVGs do `f1-circuits-svg` (CC BY 4.0, ROY Jules) em `data/external/f1-circuits-svg/`. O provider local resolve por `F1DB_DATA_DIR`/caminho do repo; o endpoint de layout serve o SVG do layout vigente sanitizado (sem script/foreignObject/on*/javascript:) com headers de atribuição. Proibido buscar imagem em runtime sem licença identificada.
+- **Consequência:** catálogo de circuitos funciona offline com dados e traçados reais, reprodutível e licenciado.
+
+## D-087 — F1DB como autoridade histórica de marcos; espelho permanece para o presente
+- **Decisão (V3.23):** quando o piloto resolve no F1DB (nome/abbreviation), os marcos de primeira ocorrência (`F1_DEBUT`, `FIRST_POINT/PODIUM/POLE/WIN/FASTEST_LAP`, títulos) usam o histórico completo do dataset; o espelho vence o merge como fallback e F1DB só substitui quando o ano é estritamente anterior. Perfil (DOB/local/código) e estatísticas de carreira também caem para o F1DB quando o `sourceRecord` não tem. Eventos F1DB carregam `sourceId` do ledger (F1DB/STRUCTURED_RELEASE/CC BY 4.0). O espelho (Jolpica) continua a fonte do tempo presente (resultados/standings/calendário).
+- **Consequência:** “primeira vitória em 2026” deixa de aparecer para pilotos com histórico; nada é inventado e a provenance é auditável.
+
+## D-088 — Composer de biografia claims-only com LLM opcional e preservação de bio gerada
+- **Decisão (V3.23):** `BiographyComposer` recebe apenas claims estruturados (nunca texto de fonte), prompt canônico proíbe invenção/diagnóstico/cópia, saída é sanitizada (sem HTML/URLs, cap 2400) e persistida com source ledger `CURATED`/`BIOGRAPHY_PAGE` + metadata do gerador. LLM é opcional (usa `GenerationProvider` existente); sem LLM ou em falha, cai no compositor determinístico. Biografia gerada é tratada como “provider-owned”: preservada na reabertura (sem re-chamada de LLM).
+- **Consequência:** biografia rica quando houver LLM, factual sempre; nenhum conteúdo LLM vira fato canônico sem ledger e fingerprint de claims.
+
+
 
 

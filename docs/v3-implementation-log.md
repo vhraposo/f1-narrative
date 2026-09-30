@@ -1042,4 +1042,14 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Adiados com justificativa:** composer de biografia por LLM, F1DB/OpenF1/PitLane/Wikimedia como providers ativos do catálogo, layouts/fotos reais, recorde oficial de volta, backfill histórico em lote.
 - **Docs:** `v3.22-external-data-hub.md`, D-081..D-084.
 
+### V3.23 — Historical Champion Overrides, F1DB Integration & Biography Composer
+- **Override histórico de campeão (sem Season):** migration aditiva `20260930234500_add_historical_champion_override` (enum SET/CLEARED + tabela + índices), comandos no correction framework, replay/projeção com nota em `WorldSnapshot`, rotas `POST /api/timeline/champions/historical/:year/preview|apply` (EDIT/RESTORE com token determinístico e supersession de SET por SET) e UI (“Campeão histórico do Universe” com select, prévia e restaurar). Aceitação: 2024 Verstappen → Alicya Kuchinski no Universe, espelho intacto, restore volta ao baseline (D-085).
+- **F1DB real vendorizado:** subset CSV do release v2026.15.1 (CC BY 4.0) em `data/external/f1db/` + SVGs f1-circuits-svg (CC BY 4.0) em `data/external/f1-circuits-svg/`, ambos com `PROVENANCE.json`; provider local (parser CSV, alias Ergast→F1DB, fallback por nome), enriquecimento de circuito (extensão/curvas/tipo/direção/cidade/primeiro GP) e endpoint `layout.svg` sanitizado com atribuição (D-086).
+- **Marcos históricos reais:** merge F1DB (primeira ocorrência no histórico completo) com o espelho, sourceId no ledger; perfil do piloto cai para F1DB (DOB/local/código/stats/títulos); teste Lando 2019/2020/2021/2024/2025 (D-087).
+- **Biography composer:** pipeline claims-only, prompt canônico, LLM opcional (`GenerationProvider`), sanitização, source ledger BIOGRAPHY_PAGE, bio gerada preservada na reabertura; fallback determinístico com sentença de carreira (D-088).
+- **Avatar:** contrato cross-origin (Origin + CORP cross-origin + CORS) e sessão sem cookie de cache verificados em teste.
+- **QA:** API 2484/2484 (163 arquivos) ×2; Web 497/497 (65 arquivos) ×2; typecheck/lint/build 0/0; TEST 0 resíduos; DEV 37/37 migrations com backup e dados intactos.
+- **Docs:** `v3.23-external-data-quality.md`, D-085..D-088.
+
+
 
