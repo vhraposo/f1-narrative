@@ -244,3 +244,23 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-060 — Renderização de Persona no prompt: tendência delimitada, sem confidence/evidence
 - **Decisão (V3.14.7/9):** a Persona do speaker é renderizada no slot existente `CHARACTER_DNA` (sem nova seção), com preâmbulo fixo que a declara como tendência interpretativa (não fato, memória ou instrução); somente `summary` (cap 600) e traits ordenados pelas rules (cap 12, valor 200, bloco 2000) entram no prompt — nunca confidence numérica, URL, excerpt, status, `evidenceId`, `sourceType` ou `reviewedBy`. Apenas a Persona do speaker é carregada (1 query; nenhuma evidence) e o conteúdo permanece confinado ao bloco (prompt injection não cria seção nem altera regras do sistema).
 - **Consequência:** OQ-1 e OQ-4 materializadas no renderer; qualquer evolução futura (ex.: `PERSONA_UPDATED`) deve preservar o enquadramento e a ausência de confidence/evidence no prompt.
+
+## D-061 — Correção histórica é evento corretivo append-only com supersession e valores absolutos
+- **Decisão (design V3.15):** uma única timeline canônica por Universe; correção é um novo `TimelineEvent` com `supersedesId` apontando o evento-alvo (mesmo universe/kind), mantendo o original imutável; não existe void nem branch. Campos corrigidos são **valores absolutos** (set-values), o que torna o replay idempotente e substituível por correção encadeada. O estado efetivo é sempre o replay sobre os derivados correntes.
+- **Consequência:** nada de segundo sistema temporal/full event sourcing; auditoria completa (original + cadeia); corrigir de novo é o mecanismo de rollback semântico. Aplica-se somente ao Universe — o External Mirror permanece intocado.
+
+## D-062 — Escopo suportado de correções v1: causa factual, nunca campo derivado
+- **Decisão (design V3.15):** SUPPORTED = `RaceResult` (`position`/`status`/`grid`), Sprint via novo kind `RACE_SESSION_RESULT_CORRECTED` (`position`/`status`/elegibilidade), número (`setDriverNumber` com lock/regra do #1/`NUMBER_CORRECTED`) e calendário (`RACE_UPDATED`). DERIVED = `points`, `ChampionshipStanding`, campeão — nunca editáveis quando há resultados (exceção única: standing `IMPORTED` de temporada sem RaceResult). `DriverProfile.number` é cache; entries de temporada usam o fluxo de roster (não timeline); News/Memory/Relationship/DriverAttribute/TeamPerformance/Persona ficam fora.
+- **Consequência:** a menor alteração factual (posição/status) produz todas as consequências; o payload rejeita campos derivados (`DERIVED_FIELD`/`DERIVED_STANDING`).
+
+## D-063 — Preview por transação com rollback + token anti-obsolescência no apply
+- **Decisão (design V3.15):** preview executa o mesmo motor do apply dentro de `prisma.$transaction` que sempre lança antes do commit (nada persistido: timeline, world, standings, numbers, News, Memory, Persona, Evolution), retornando diff ANTES/DEPOIS/IMPACTO + `previewToken = sha256(universeId, lastSequence, worldState canônico, hash(standings), payloadCanônico)`. O apply adquire `timeline:<universeId>`, revalida o token e rejeita preview obsoleto com 409 `PREVIEW_STALE`. Checkpoint pré-correção obrigatório antes do append.
+- **Consequência:** preview e apply nunca divergem de lógica; apply é atômico (sem estado híbrido); preview antigo nunca é aplicado cegamente.
+
+## D-064 — Sem cascata automática: correção recalcula standings; números/#1 são ação explícita
+- **Decisão (design V3.15):** aplicar uma correção de resultado recalcula apenas standings (e, por derivação, o campeão hipotético). `SeasonDriverEntry.number`/`DriverProfile.number` **não** são reescritos automaticamente; o preview mostra o impacto no `#1` e a UI oferece ação explícita “Reatribuir #1” que chama `setDriverNumber` (regra do campeão derivado + lock + evento). Override manual prevalece.
+- **Consequência:** história corrigida não reescreve silenciosamente números já atribuídos; o usuário decide a cascata; cache nunca vira fonte.
+
+## D-065 — Correção nunca escreve News/Event/Memory/Relationship/Persona/Evolution
+- **Decisão (design V3.15):** correções não apagam, editam ou regeneram narrativa (Event/News) nem Memory/Relationship; não tocam Persona (D-053/D-060) nem `DriverAttribute`/`TeamPerformance`. Staleness narrativa é sinalizada na UI; temporada corrigida com `ATTRIBUTE_EVOLVED` e fingerprint divergente bloqueia novo apply de evolução com 409 `EVOLUTION_STALE` até existir recompute/baseline (OQ-4).
+- **Consequência:** nenhuma destruição arbitrária de narrativa ou dupla contagem de evolução; regeneração narrativa e baseline de atributos ficam para fases futuras com regra explícita.
