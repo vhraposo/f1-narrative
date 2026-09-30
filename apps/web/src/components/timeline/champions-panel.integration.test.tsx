@@ -48,6 +48,9 @@ function makeEntry(overrides: Partial<ChampionEntry> & { seasonId: string | null
     sourceConflict: false,
     canEdit: true,
     canRestore: false,
+    canEditOverride: false,
+    canRestoreOverride: false,
+    overrideDriverProfileId: null,
     blockedReason: null,
     restoreDriverProfileId: null,
     ...overrides,
@@ -144,6 +147,30 @@ beforeEach(() => {
     throw new ApiError("Não encontrado", 404);
   });
   apiMock.post.mockImplementation(async (path: string) => {
+    if (path.includes("/historical/") && path.endsWith("/preview")) {
+      return {
+        preview: {
+          previewToken: "sha256:token-historico-123456",
+          year: 2096,
+          mode: "EDIT",
+          externalChampion: {
+            externalDriverId: null,
+            name: "Max Verstappen",
+            source: "FIA_CANONICAL_CHRONOLOGY",
+            sourceType: "CANONICAL",
+          },
+          before: null,
+          after: {
+            driverProfileId: "d2",
+            characterId: "c2",
+            name: "Alicya Sintética",
+            externalDriverId: null,
+          },
+          changes: [{ field: "champion", before: null, after: "Alicya Sintética" }],
+          commandCount: 1,
+        },
+      };
+    }
     if (path.endsWith("/preview")) return { preview: PREVIEW };
     if (path.endsWith("/apply")) {
       return { events: [{ id: "e2", sequence: 6, kind: "STANDING_CORRECTED" }] };
@@ -313,6 +340,7 @@ describe("ChampionsPanel", () => {
         sourceType: "CANONICAL",
       },
       canEdit: false,
+      canEditOverride: true,
       blockedReason: "SEASON_NOT_IN_UNIVERSE",
     });
     const conflict = makeEntry({
@@ -340,5 +368,100 @@ describe("ChampionsPanel", () => {
     expect(
       screen.queryByRole("button", { name: "Editar campeão de 2096" }),
     ).toBeDefined();
+  });
+
+  it("10) override histórico sem Season pré-visualiza e aplica", async () => {
+    const baseline = makeEntry({
+      seasonId: null,
+      year: 2096,
+      universeChampion: null,
+      baseline: true,
+      externalChampion: {
+        externalDriverId: null,
+        name: "Max Verstappen",
+        source: "FIA_CANONICAL_CHRONOLOGY",
+        sourceType: "CANONICAL",
+      },
+      canEdit: false,
+      canEditOverride: true,
+      blockedReason: "SEASON_NOT_IN_UNIVERSE",
+    });
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/timeline/champions") return { champions: [baseline] };
+      if (path === "/api/drivers") {
+        return {
+          drivers: [
+            { id: "d2", character: { name: "Alicya Sintética" }, team: null, number: 7 },
+          ],
+        };
+      }
+      throw new ApiError("Não encontrado", 404);
+    });
+    const user = userEvent.setup();
+    renderWithClient(<ChampionsPanel />);
+    await user.click(
+      await screen.findByRole("button", { name: "Editar campeão de 2096" }),
+    );
+    expect(screen.getByText("Campeão histórico do Universe")).toBeDefined();
+    expect(screen.getAllByText("Max Verstappen").length).toBeGreaterThanOrEqual(1);
+
+    await user.click(screen.getByRole("button", { name: "Novo campeão" }));
+    await user.click(await screen.findByRole("option", { name: "Alicya Sintética" }));
+    await user.click(screen.getByRole("button", { name: "Pré-visualizar" }));
+    expect(await screen.findByText("Pré-visualização")).toBeDefined();
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/timeline/champions/historical/2096/preview",
+      { mode: "EDIT", driverProfileId: "d2" },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Confirmar alteração" }));
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/timeline/champions/historical/2096/apply",
+      expect.objectContaining({ mode: "EDIT", driverProfileId: "d2" }),
+    );
+  });
+
+  it("11) override existente oferece restaurar da fonte", async () => {
+    const overrideEntry = makeEntry({
+      seasonId: null,
+      year: 2094,
+      state: "DIVERGENT",
+      origin: "OVERRIDE",
+      baseline: false,
+      externalChampion: {
+        externalDriverId: null,
+        name: "Max Verstappen",
+        source: "FIA_CANONICAL_CHRONOLOGY",
+        sourceType: "CANONICAL",
+      },
+      universeChampion: {
+        driverProfileId: "d2",
+        characterId: "c2",
+        name: "Alicya Sintética",
+        externalDriverId: null,
+      },
+      canEdit: false,
+      canEditOverride: true,
+      canRestoreOverride: true,
+      overrideDriverProfileId: "d2",
+    });
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/timeline/champions") return { champions: [overrideEntry] };
+      if (path === "/api/drivers") return { drivers: [] };
+      throw new ApiError("Não encontrado", 404);
+    });
+    const user = userEvent.setup();
+    renderWithClient(<ChampionsPanel />);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Restaurar campeão histórico de 2094 da fonte",
+      }),
+    );
+    expect(screen.getByText("Campeão histórico do Universe")).toBeDefined();
+    await user.click(screen.getByRole("button", { name: "Pré-visualizar" }));
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/timeline/champions/historical/2094/preview",
+      { mode: "RESTORE" },
+    );
   });
 });

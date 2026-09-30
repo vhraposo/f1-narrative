@@ -71,14 +71,46 @@ export interface CalendarCorrectionCommand {
   supersedesId?: string | null;
 }
 
+export interface HistoricalChampionOverrideSetCommand {
+  kind: "HISTORICAL_CHAMPION_OVERRIDE_SET";
+  worldDate: CorrectionWorldDate;
+  year: number;
+  driverProfileId: string;
+  supersedesId?: string | null;
+}
+
+export interface HistoricalChampionOverrideClearedCommand {
+  kind: "HISTORICAL_CHAMPION_OVERRIDE_CLEARED";
+  worldDate: CorrectionWorldDate;
+  year: number;
+  supersedesId?: string | null;
+}
+
 export type CorrectionCommand =
   | RaceResultCorrectionCommand
   | SprintCorrectionCommand
   | NumberCorrectionCommand
   | StandingCorrectionCommand
-  | CalendarCorrectionCommand;
+  | CalendarCorrectionCommand
+  | HistoricalChampionOverrideSetCommand
+  | HistoricalChampionOverrideClearedCommand;
 
 const WORLD_KEY = "default";
+const HISTORICAL_OVERRIDE_MIN_YEAR = 1900;
+const HISTORICAL_OVERRIDE_MAX_YEAR = 2100;
+
+function assertOverrideYear(year: number): void {
+  if (
+    !Number.isInteger(year) ||
+    year < HISTORICAL_OVERRIDE_MIN_YEAR ||
+    year > HISTORICAL_OVERRIDE_MAX_YEAR
+  ) {
+    throw correctionError(
+      "INVALID_YEAR",
+      `O ano deve estar entre ${HISTORICAL_OVERRIDE_MIN_YEAR} e ${HISTORICAL_OVERRIDE_MAX_YEAR}.`,
+    );
+  }
+}
 
 function correctionError(code: string, message: string, statusCode = 400): TimelineError {
   return new TimelineError(code, message, statusCode);
@@ -395,6 +427,17 @@ export async function validateCorrectionCommand(
     return;
   }
 
+  if (
+    command.kind === "HISTORICAL_CHAMPION_OVERRIDE_SET" ||
+    command.kind === "HISTORICAL_CHAMPION_OVERRIDE_CLEARED"
+  ) {
+    assertOverrideYear(command.year);
+    if (command.kind === "HISTORICAL_CHAMPION_OVERRIDE_SET") {
+      await requireDriver(tx, universeId, command.driverProfileId);
+    }
+    return;
+  }
+
   await requireRace(tx, universeId, command.raceId);
   if (command.round !== undefined && (!Number.isInteger(command.round) || command.round < 1)) {
     throw correctionError("INVALID_ROUND", "round deve ser um inteiro positivo.");
@@ -460,6 +503,15 @@ export function correctionPayload(command: CorrectionCommand): Prisma.InputJsonV
       ...(command.podiums !== undefined ? { podiums: command.podiums } : {}),
       ...(command.position !== undefined ? { position: command.position } : {}),
     } as Prisma.InputJsonValue;
+  }
+  if (command.kind === "HISTORICAL_CHAMPION_OVERRIDE_SET") {
+    return {
+      year: command.year,
+      driverProfileId: command.driverProfileId,
+    } as Prisma.InputJsonValue;
+  }
+  if (command.kind === "HISTORICAL_CHAMPION_OVERRIDE_CLEARED") {
+    return { year: command.year } as Prisma.InputJsonValue;
   }
   return {
     raceId: command.raceId,

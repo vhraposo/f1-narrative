@@ -340,11 +340,14 @@ export type ChampionEntry = {
   canonicalChampion: CanonicalChampionDescriptor | null;
   universeChampion: UniverseChampionDescriptor | null;
   state: ChampionState;
-  origin: "DERIVED" | "STANDING" | "NONE";
+  origin: "DERIVED" | "STANDING" | "OVERRIDE" | "NONE";
   baseline: boolean;
   sourceConflict: boolean;
   canEdit: boolean;
   canRestore: boolean;
+  canEditOverride: boolean;
+  canRestoreOverride: boolean;
+  overrideDriverProfileId: string | null;
   blockedReason: ChampionBlockedReason | null;
   restoreDriverProfileId: string | null;
 };
@@ -373,6 +376,17 @@ export type ChampionChangePreview = {
   before: UniverseChampionDescriptor | null;
   after: UniverseChampionDescriptor;
   changes: Array<{ field: "champion"; before: string | null; after: string }>;
+  commandCount: number;
+};
+
+export type HistoricalChampionChangePreview = {
+  previewToken: string;
+  year: number;
+  mode: ChampionChangeMode;
+  externalChampion: ExternalChampionDescriptor | null;
+  before: UniverseChampionDescriptor | null;
+  after: UniverseChampionDescriptor | null;
+  changes: Array<{ field: "champion"; before: string | null; after: string | null }>;
   commandCount: number;
 };
 
@@ -407,6 +421,26 @@ export function applyChampionChange(
 ): Promise<{ events: Array<{ id: string; sequence: number; kind: string }> }> {
   return post<{ events: Array<{ id: string; sequence: number; kind: string }> }>(
     `/api/timeline/champions/${seasonId}/apply`,
+    request,
+  );
+}
+
+export function previewHistoricalChampionOverride(
+  year: number,
+  request: ChampionChangeRequest,
+): Promise<HistoricalChampionChangePreview> {
+  return post<{ preview: HistoricalChampionChangePreview }>(
+    `/api/timeline/champions/historical/${year}/preview`,
+    request,
+  ).then((r) => r.preview);
+}
+
+export function applyHistoricalChampionOverride(
+  year: number,
+  request: ChampionChangeRequest & { previewToken: string },
+): Promise<{ events: Array<{ id: string; sequence: number; kind: string }> }> {
+  return post<{ events: Array<{ id: string; sequence: number; kind: string }> }>(
+    `/api/timeline/champions/historical/${year}/apply`,
     request,
   );
 }

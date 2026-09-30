@@ -25,9 +25,11 @@ import {
 import { useDrivers } from "@/hooks/use-driver-profiles";
 import {
   useApplyChampionChange,
+  useApplyHistoricalChampionOverride,
   useChampionDetail,
   useChampions,
   usePreviewChampionChange,
+  usePreviewHistoricalChampionOverride,
 } from "@/hooks/use-timeline";
 import {
   CHAMPION_BLOCKED_REASONS,
@@ -36,6 +38,7 @@ import {
   type ChampionChangePreview,
   type ChampionEntry,
   type ChampionState,
+  type HistoricalChampionChangePreview,
 } from "@/lib/timeline";
 
 type BadgeTone = "muted" | "brand" | "warning" | "danger" | "success";
@@ -369,6 +372,207 @@ function RestoreChampionDialog({
   );
 }
 
+function HistoricalChampionDialog({
+  entry,
+  initialMode,
+  onClose,
+}: {
+  entry: ChampionEntry;
+  initialMode: "EDIT" | "RESTORE";
+  onClose: () => void;
+}) {
+  const driversQuery = useDrivers();
+  const previewMutation = usePreviewHistoricalChampionOverride();
+  const applyMutation = useApplyHistoricalChampionOverride();
+  const [mode, setMode] = useState<"EDIT" | "RESTORE">(initialMode);
+  const [driverProfileId, setDriverProfileId] = useState("");
+  const [preview, setPreview] = useState<HistoricalChampionChangePreview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const driverOptions = (driversQuery.data ?? []).map((driver) => ({
+    value: driver.id,
+    label: driver.character.name,
+  }));
+
+  function resetPreview(nextMode?: "EDIT" | "RESTORE") {
+    setPreview(null);
+    setError(null);
+    if (nextMode) setMode(nextMode);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Campeão histórico do Universe</DialogTitle>
+          <DialogDescription>
+            Temporada {entry.year} · sem Season materializada · afeta somente este
+            Universe
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">Campeão da fonte</span>
+            <span className="font-medium">{championName(entry.externalChampion)}</span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">Campeão atual do Universe</span>
+            <span className="font-medium">
+              {entry.universeChampion
+                ? championName(entry.universeChampion)
+                : "— (baseline da fonte)"}
+            </span>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={mode === "EDIT" ? "default" : "outline"}
+              onClick={() => resetPreview("EDIT")}
+            >
+              Sobrescrever
+            </Button>
+            <Button
+              size="sm"
+              variant={mode === "RESTORE" ? "default" : "outline"}
+              disabled={!entry.canRestoreOverride}
+              onClick={() => resetPreview("RESTORE")}
+            >
+              Restaurar da fonte
+            </Button>
+          </div>
+
+          {mode === "EDIT" ? (
+            <div className="space-y-1.5">
+              <Label id="historical-champion-driver-label">Novo campeão</Label>
+              <Select
+                value={driverProfileId}
+                onValueChange={(value) => {
+                  setDriverProfileId(value);
+                  resetPreview();
+                }}
+                options={driverOptions}
+                placeholder="Selecione o piloto"
+              >
+                <SelectTrigger aria-labelledby="historical-champion-driver-label">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Nenhuma temporada, corrida ou resultado é criado: o override é
+                registrado na Linha do Tempo e não altera o espelho externo.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              A operação remove o override deste Universe e volta ao campeão da
+              fonte. O espelho externo não é modificado.
+            </p>
+          )}
+
+          {preview && (
+            <div className="space-y-1 rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Pré-visualização
+              </p>
+              <p className="text-foreground">
+                <span className="text-muted-foreground">
+                  {championName(preview.before)}
+                </span>
+                {" → "}
+                <span className="font-semibold">{championName(preview.after)}</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Impacto: divergência histórica External × Universe; a fonte externa
+                permanece intacta.
+              </p>
+            </div>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={applyMutation.isPending}>
+            Cancelar
+          </Button>
+          {preview ? (
+            <Button
+              disabled={applyMutation.isPending}
+              onClick={() => {
+                setError(null);
+                applyMutation.mutate(
+                  {
+                    year: entry.year,
+                    request:
+                      mode === "EDIT"
+                        ? {
+                            mode: "EDIT",
+                            driverProfileId,
+                            previewToken: preview.previewToken,
+                          }
+                        : { mode: "RESTORE", previewToken: preview.previewToken },
+                  },
+                  {
+                    onSuccess: () => onClose(),
+                    onError: (err) =>
+                      setError(
+                        err instanceof Error ? err.message : "Falha ao aplicar",
+                      ),
+                  },
+                );
+              }}
+            >
+              {applyMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Confirmar alteração
+            </Button>
+          ) : (
+            <Button
+              disabled={
+                previewMutation.isPending ||
+                (mode === "EDIT" && driverProfileId.length === 0)
+              }
+              onClick={() => {
+                setError(null);
+                previewMutation.mutate(
+                  {
+                    year: entry.year,
+                    request:
+                      mode === "EDIT"
+                        ? { mode: "EDIT", driverProfileId }
+                        : { mode: "RESTORE" },
+                  },
+                  {
+                    onSuccess: (result) => setPreview(result),
+                    onError: (err) =>
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : "Falha ao pré-visualizar",
+                      ),
+                  },
+                );
+              }}
+            >
+              {previewMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Pré-visualizar
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function BlockedChampionDialog({
   entry,
   onClose,
@@ -514,6 +718,10 @@ export function ChampionsPanel({
   const [editEntry, setEditEntry] = useState<ChampionEntry | null>(null);
   const [restoreEntry, setRestoreEntry] = useState<ChampionEntry | null>(null);
   const [blockedEntry, setBlockedEntry] = useState<ChampionEntry | null>(null);
+  const [historicalEntry, setHistoricalEntry] = useState<{
+    entry: ChampionEntry;
+    mode: "EDIT" | "RESTORE";
+  } | null>(null);
 
   const entries = championsQuery.data ?? [];
   const yearOptions = useMemo(
@@ -660,13 +868,17 @@ export function ChampionsPanel({
                           title={
                             entry.canEdit
                               ? `Editar campeão de ${entry.year}`
-                              : entry.blockedReason
-                                ? CHAMPION_BLOCKED_REASONS[entry.blockedReason]
-                                : "Edição não disponível para esta temporada."
+                              : entry.canEditOverride
+                                ? `Definir campeão do Universe para ${entry.year}`
+                                : entry.blockedReason
+                                  ? CHAMPION_BLOCKED_REASONS[entry.blockedReason]
+                                  : "Edição não disponível para esta temporada."
                           }
                           onClick={(event) => {
                             event.stopPropagation();
                             if (entry.canEdit) setEditEntry(entry);
+                            else if (entry.canEditOverride)
+                              setHistoricalEntry({ entry, mode: "EDIT" });
                             else setBlockedEntry(entry);
                           }}
                         >
@@ -681,6 +893,20 @@ export function ChampionsPanel({
                             onClick={(event) => {
                               event.stopPropagation();
                               setRestoreEntry(entry);
+                            }}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {entry.canRestoreOverride && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Restaurar campeão histórico de ${entry.year} da fonte`}
+                            title={`Restaurar campeão histórico de ${entry.year} da fonte`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setHistoricalEntry({ entry, mode: "RESTORE" });
                             }}
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
@@ -713,6 +939,13 @@ export function ChampionsPanel({
         <RestoreChampionDialog
           entry={{ ...restoreEntry, seasonId: restoreEntry.seasonId }}
           onClose={() => setRestoreEntry(null)}
+        />
+      )}
+      {historicalEntry && (
+        <HistoricalChampionDialog
+          entry={historicalEntry.entry}
+          initialMode={historicalEntry.mode}
+          onClose={() => setHistoricalEntry(null)}
         />
       )}
       {blockedEntry && (

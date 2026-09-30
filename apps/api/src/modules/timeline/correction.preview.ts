@@ -80,6 +80,12 @@ export async function resolveCorrectionSeasonId(tx: Tx, universeId: string, comm
   if (command.kind === "NUMBER_CORRECTED" || command.kind === "STANDING_CORRECTED") {
     return command.seasonId;
   }
+  if (
+    command.kind === "HISTORICAL_CHAMPION_OVERRIDE_SET" ||
+    command.kind === "HISTORICAL_CHAMPION_OVERRIDE_CLEARED"
+  ) {
+    return null;
+  }
   const race = await tx.race.findFirst({
     where: { id: command.raceId, season: { universeId } },
     select: { seasonId: true },

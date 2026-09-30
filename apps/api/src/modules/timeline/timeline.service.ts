@@ -64,6 +64,15 @@ export interface NumberCorrectionPayload {
   number: number | null;
 }
 
+export interface HistoricalChampionOverrideSetPayload {
+  year: number;
+  driverProfileId: string;
+}
+
+export interface HistoricalChampionOverrideClearedPayload {
+  year: number;
+}
+
 export interface SnapshotState {
   world: {
     currentDate: string;
@@ -78,6 +87,10 @@ export interface SnapshotState {
     wins: number;
     podiums: number;
     position: number | null;
+  }>;
+  historicalChampionOverrides?: Array<{
+    year: number;
+    driverProfileId: string;
   }>;
 }
 
@@ -150,6 +163,11 @@ export async function buildSnapshotState(
         orderBy: [{ position: "asc" }, { driverProfileId: "asc" }],
       })
     : [];
+  const historicalChampionOverrides = await tx.historicalChampionOverride.findMany({
+    where: { universeId },
+    select: { year: true, driverProfileId: true },
+    orderBy: { year: "asc" },
+  });
   return {
     world: world
       ? {
@@ -161,6 +179,7 @@ export async function buildSnapshotState(
       : null,
     seasonId,
     standings,
+    historicalChampionOverrides,
   };
 }
 
@@ -236,6 +255,18 @@ async function restoreSnapshotState(
           wins: standing.wins,
           podiums: standing.podiums,
           position: standing.position,
+        })),
+      });
+    }
+  }
+  if (snapshot.historicalChampionOverrides !== undefined) {
+    await tx.historicalChampionOverride.deleteMany({ where: { universeId } });
+    if (snapshot.historicalChampionOverrides.length > 0) {
+      await tx.historicalChampionOverride.createMany({
+        data: snapshot.historicalChampionOverrides.map((override) => ({
+          universeId,
+          year: override.year,
+          driverProfileId: override.driverProfileId,
         })),
       });
     }
@@ -377,6 +408,32 @@ async function applyTimelineEvent(
           data: { number: payload.number },
         });
       }
+      return;
+    }
+    case "HISTORICAL_CHAMPION_OVERRIDE_SET": {
+      const payload = event.payload as unknown as HistoricalChampionOverrideSetPayload;
+      await tx.historicalChampionOverride.upsert({
+        where: {
+          universeId_year: { universeId, year: payload.year },
+        },
+        create: {
+          universeId,
+          year: payload.year,
+          driverProfileId: payload.driverProfileId,
+          timelineEventId: event.id,
+        },
+        update: {
+          driverProfileId: payload.driverProfileId,
+          timelineEventId: event.id,
+        },
+      });
+      return;
+    }
+    case "HISTORICAL_CHAMPION_OVERRIDE_CLEARED": {
+      const payload = event.payload as unknown as HistoricalChampionOverrideClearedPayload;
+      await tx.historicalChampionOverride.deleteMany({
+        where: { universeId, year: payload.year },
+      });
       return;
     }
     case "RACE_SCHEDULED":

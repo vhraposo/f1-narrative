@@ -18,9 +18,11 @@ import { buildDivergenceReport } from "./divergence.service.js";
 import { buildTimelineEventEditModel } from "./timeline.editor.js";
 import {
   applyChampionChange,
+  applyHistoricalChampionOverride,
   getChampionDetail,
   listUniverseChampions,
   previewChampionChange,
+  previewHistoricalChampionOverride,
 } from "./champions.service.js";
 import { applyCorrection } from "./correction.apply.js";
 import { previewCorrection } from "./correction.preview.js";
@@ -65,6 +67,10 @@ const divergenceQuerySchema = z
 
 const championParamsSchema = z.object({
   seasonId: z.string().uuid("Identificador de temporada inválido"),
+});
+
+const historicalChampionParamsSchema = z.object({
+  year: z.coerce.number().int("Ano inválido"),
 });
 
 const championPreviewSchema = z.discriminatedUnion("mode", [
@@ -456,6 +462,65 @@ export const timelineRoutes: FastifyPluginAsync = async (fastify) => {
         const result = await applyChampionChange(
           universe.id,
           params.data.seasonId,
+          body.data.mode,
+          body.data.previewToken,
+          body.data.mode === "EDIT" ? body.data.driverProfileId : undefined,
+        );
+        return reply.send(result);
+      } catch (error) {
+        if (sendTimelineError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/timeline/champions/historical/:year/preview",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = historicalChampionParamsSchema.safeParse(request.params);
+      const body = championPreviewSchema.safeParse(request.body ?? {});
+      if (!params.success || !body.success) {
+        return reply.code(400).send({
+          error: "Dados inválidos",
+          code: "VALIDATION_ERROR",
+          ...(body.success ? {} : { issues: body.error.issues }),
+        });
+      }
+      const universe = await ensureUniverse(request.user!.id);
+      try {
+        const preview = await previewHistoricalChampionOverride(
+          universe.id,
+          params.data.year,
+          body.data.mode,
+          body.data.mode === "EDIT" ? body.data.driverProfileId : undefined,
+        );
+        return reply.send({ preview });
+      } catch (error) {
+        if (sendTimelineError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/timeline/champions/historical/:year/apply",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = historicalChampionParamsSchema.safeParse(request.params);
+      const body = championApplySchema.safeParse(request.body ?? {});
+      if (!params.success || !body.success) {
+        return reply.code(400).send({
+          error: "Dados inválidos",
+          code: "VALIDATION_ERROR",
+          ...(body.success ? {} : { issues: body.error.issues }),
+        });
+      }
+      const universe = await ensureUniverse(request.user!.id);
+      try {
+        const result = await applyHistoricalChampionOverride(
+          universe.id,
+          params.data.year,
           body.data.mode,
           body.data.previewToken,
           body.data.mode === "EDIT" ? body.data.driverProfileId : undefined,

@@ -241,6 +241,7 @@ model Universe {
   driverRelationships UniverseDriverRelationship[]
   memories            Memory[]
   pilotExperiences    PilotExperience[]
+  historicalChampionOverrides HistoricalChampionOverride[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -362,6 +363,7 @@ model DriverProfile {
   seasonDriverEntries   SeasonDriverEntry[]
   driverAttributes      DriverAttribute[]
   sessionResults        RaceSessionResult[]
+  historicalChampionOverrides HistoricalChampionOverride[]
 
   favoritedByProfiles UserProfile[] @relation("UserProfileFavoriteDriver")
 
@@ -369,6 +371,26 @@ model DriverProfile {
   updatedAt DateTime @updatedAt
 
   @@index([teamId])
+}
+
+/// Override histórico de campeão pertencente ao Universe: permite divergir do
+/// External Mirror em temporadas sem Season materializada. Projeção mantida por
+/// TimelineEvents HISTORICAL_CHAMPION_OVERRIDE_SET/CLEARED (auditável/suprimível);
+/// nunca escreve no espelho externo.
+model HistoricalChampionOverride {
+  id              String        @id @default(uuid()) @db.Uuid
+  universeId      String        @db.Uuid
+  universe        Universe      @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  year            Int
+  driverProfileId String        @db.Uuid
+  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  timelineEventId String?       @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universeId, year])
+  @@index([universeId])
 }
 
 /// Equipe esportiva (vínculo feito via perfil de piloto).
@@ -1460,6 +1482,8 @@ enum TimelineEventKind {
   ATTRIBUTE_EVOLVED
   SESSION_COMPLETED
   PERSONA_UPDATED
+  HISTORICAL_CHAMPION_OVERRIDE_SET
+  HISTORICAL_CHAMPION_OVERRIDE_CLEARED
 }
 
 /// Log append-only de mudanças temporais do Universe. Ordenação determinística

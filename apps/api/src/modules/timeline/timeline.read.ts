@@ -13,6 +13,8 @@ export const TIMELINE_KINDS = [
   "STANDING_CORRECTED",
   "NUMBER_CORRECTED",
   "PERSONA_UPDATED",
+  "HISTORICAL_CHAMPION_OVERRIDE_SET",
+  "HISTORICAL_CHAMPION_OVERRIDE_CLEARED",
 ] as const;
 
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
@@ -22,6 +24,8 @@ const CORRECTION_KINDS: readonly string[] = [
   "RACE_SESSION_RESULT_CORRECTED",
   "STANDING_CORRECTED",
   "NUMBER_CORRECTED",
+  "HISTORICAL_CHAMPION_OVERRIDE_SET",
+  "HISTORICAL_CHAMPION_OVERRIDE_CLEARED",
 ];
 
 const MAX_SCAN = 1000;
@@ -151,6 +155,13 @@ export function valuesForEvent(event: TimelineEvent): Record<string, string | nu
         characterId: stringValue(payload, "characterId"),
         evolutionRevision: numberValue(payload, "evolutionRevision"),
       };
+    case "HISTORICAL_CHAMPION_OVERRIDE_SET":
+      return {
+        year: numberValue(payload, "year"),
+        driverProfileId: stringValue(payload, "driverProfileId"),
+      };
+    case "HISTORICAL_CHAMPION_OVERRIDE_CLEARED":
+      return { year: numberValue(payload, "year") };
     case "WORLD_ADVANCED":
       return {
         currentSeasonId: stringValue(payload, "currentSeasonId"),
@@ -305,6 +316,26 @@ function buildItem(event: TimelineEvent, maps: NameMaps): TimelineItem {
     case "PERSONA_UPDATED":
       summary = "Persona atualizada por experiência do Universe";
       break;
+    case "HISTORICAL_CHAMPION_OVERRIDE_SET": {
+      const year = numberValue(
+        (event.payload ?? {}) as Record<string, unknown>,
+        "year",
+      );
+      summary = year
+        ? `Campeão do Universe definido para ${year}: ${driverLabel}`
+        : `Campeão do Universe definido: ${driverLabel}`;
+      break;
+    }
+    case "HISTORICAL_CHAMPION_OVERRIDE_CLEARED": {
+      const year = numberValue(
+        (event.payload ?? {}) as Record<string, unknown>,
+        "year",
+      );
+      summary = year
+        ? `Override de campeão removido (${year})`
+        : "Override de campeão removido";
+      break;
+    }
     case "WORLD_ADVANCED":
       summary = "Mundo avançado";
       break;

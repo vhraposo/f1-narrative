@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   applyChampionChange,
   applyCorrection,
+  applyHistoricalChampionOverride,
   getChampionDetail,
   getChampions,
   getDivergence,
@@ -11,6 +12,7 @@ import {
   listTimeline,
   previewChampionChange,
   previewCorrection,
+  previewHistoricalChampionOverride,
   type ChampionChangeRequest,
   type CorrectionCommand,
   type TimelineListFilters,
@@ -93,6 +95,26 @@ export function useApplyChampionChange() {
       seasonId: string;
       request: ChampionChangeRequest & { previewToken: string };
     }) => applyChampionChange(vars.seasonId, vars.request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["timeline"] });
+    },
+  });
+}
+
+export function usePreviewHistoricalChampionOverride() {
+  return useMutation({
+    mutationFn: (vars: { year: number; request: ChampionChangeRequest }) =>
+      previewHistoricalChampionOverride(vars.year, vars.request),
+  });
+}
+
+export function useApplyHistoricalChampionOverride() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      year: number;
+      request: ChampionChangeRequest & { previewToken: string };
+    }) => applyHistoricalChampionOverride(vars.year, vars.request),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["timeline"] });
     },
