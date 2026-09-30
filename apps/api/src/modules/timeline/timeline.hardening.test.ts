@@ -398,4 +398,47 @@ describe("legacy writer hardening", () => {
     });
     expect(res.statusCode).toBe(404);
   });
+
+  it("11) rota legada de correção está selada e não escreve nada", async () => {
+    const before = await prisma.raceResult.count();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/timeline/corrections",
+      headers: auth(userA.cookie),
+      payload: {
+        kind: "RACE_RESULT_CORRECTED",
+        worldDate: "2097-12-01T00:00:00.000Z",
+        payload: { position: 1 },
+      },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("USE_TIMELINE_CORRECTION");
+    expect(await prisma.raceResult.count()).toBe(before);
+    const legacyEvents = await prisma.timelineEvent.count({
+      where: { universeId: universeAId, supersedesId: null, kind: "RACE_RESULT_CORRECTED" },
+    });
+    expect(legacyEvents).toBe(1);
+  });
+
+  it("12) timeline filtra e resume PERSONA_UPDATED", async () => {
+    await prisma.timelineEvent.create({
+      data: {
+        universeId: universeAId,
+        sequence: 900,
+        worldDate: new Date("2097-12-02T00:00:00.000Z"),
+        kind: "PERSONA_UPDATED",
+        payload: { characterId: "00000000-0000-4000-8000-0000000000c1", evolutionRevision: 1 },
+      },
+    });
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/timeline?kind=PERSONA_UPDATED",
+      headers: auth(userA.cookie),
+    });
+    expect(res.statusCode).toBe(200);
+    const events = res.json().events as Array<{ kind: string; summary: string }>;
+    expect(events.some((event) => event.kind === "PERSONA_UPDATED")).toBe(true);
+    const persona = events.find((event) => event.kind === "PERSONA_UPDATED");
+    expect(persona?.summary).toContain("Persona atualizada");
+  });
 });

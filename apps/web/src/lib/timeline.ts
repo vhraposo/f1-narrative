@@ -84,6 +84,7 @@ export const TIMELINE_KIND_LABELS: Record<string, string> = {
   RACE_SESSION_RESULT_CORRECTED: "Correção de sessão",
   STANDING_CORRECTED: "Correção de standing",
   NUMBER_CORRECTED: "Correção de número",
+  PERSONA_UPDATED: "Persona atualizada",
 };
 
 export function timelineKindLabel(kind: string): string {

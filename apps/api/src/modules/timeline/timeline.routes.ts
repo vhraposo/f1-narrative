@@ -1,11 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
-import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { ensureUniverse } from "../universe/universe.service.js";
 import {
   advanceUniverseTime,
-  applyRetroactiveCorrection,
   listWorldSnapshots,
   lockUniverseTimeline,
   recomputeUniverseState,
@@ -37,19 +35,6 @@ const advanceBodySchema = z
       .enum(["PRACTICE", "SPRINT_QUALIFYING", "SPRINT", "QUALIFYING", "RACE"])
       .nullable()
       .optional(),
-  })
-  .strict();
-
-const correctionBodySchema = z
-  .object({
-    kind: z.enum([
-      "RACE_RESULT_CORRECTED",
-      "STANDING_CORRECTED",
-      "NUMBER_CORRECTED",
-    ]),
-    worldDate: z.string().datetime({ offset: true }),
-    payload: z.record(z.string(), z.unknown()),
-    supersedesId: z.string().uuid().nullable().optional(),
   })
   .strict();
 
@@ -383,29 +368,12 @@ export const timelineRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/api/timeline/corrections",
     { preHandler: [fastify.authenticate] },
-    async (request, reply) => {
-      const userId = request.user!.id;
-      const parsed = correctionBodySchema.safeParse(request.body ?? {});
-      if (!parsed.success) {
-        return reply.code(400).send({
-          error: "Dados inválidos",
-          code: "VALIDATION_ERROR",
-          issues: parsed.error.issues,
-        });
-      }
-      const universe = await ensureUniverse(userId);
-      try {
-        const event = await applyRetroactiveCorrection(universe.id, {
-          kind: parsed.data.kind,
-          worldDate: new Date(parsed.data.worldDate),
-          payload: parsed.data.payload as unknown as Prisma.InputJsonValue,
-          supersedesId: parsed.data.supersedesId ?? null,
-        });
-        return reply.send({ event });
-      } catch (error) {
-        if (sendTimelineError(reply, error)) return;
-        throw error;
-      }
+    async (_request, reply) => {
+      return reply.code(409).send({
+        error:
+          "Este endpoint foi desativado por segurança; use /api/timeline/corrections/preview e /api/timeline/corrections/apply.",
+        code: "USE_TIMELINE_CORRECTION",
+      });
     },
   );
 

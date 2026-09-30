@@ -12,6 +12,7 @@ export const TIMELINE_KINDS = [
   "RACE_SESSION_RESULT_CORRECTED",
   "STANDING_CORRECTED",
   "NUMBER_CORRECTED",
+  "PERSONA_UPDATED",
 ] as const;
 
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
@@ -144,6 +145,11 @@ export function valuesForEvent(event: TimelineEvent): Record<string, string | nu
       return {
         fingerprint: stringValue(payload, "fingerprint"),
         racesConsidered: numberValue(payload, "racesConsidered"),
+      };
+    case "PERSONA_UPDATED":
+      return {
+        characterId: stringValue(payload, "characterId"),
+        evolutionRevision: numberValue(payload, "evolutionRevision"),
       };
     case "WORLD_ADVANCED":
       return {
@@ -295,6 +301,9 @@ function buildItem(event: TimelineEvent, maps: NameMaps): TimelineItem {
       summary = season
         ? `Evolução aplicada na temporada ${season.year}`
         : "Evolução aplicada";
+      break;
+    case "PERSONA_UPDATED":
+      summary = "Persona atualizada por experiência do Universe";
       break;
     case "WORLD_ADVANCED":
       summary = "Mundo avançado";
