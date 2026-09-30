@@ -283,4 +283,65 @@ describe("pilot knowledge panels", () => {
     expect(alert.textContent).not.toContain("Internal Server Error");
     expect(within(alert.closest("div") as HTMLElement).getByRole("button", { name: "Tentar novamente" })).toBeDefined();
   });
+
+  it("8) edita a biografia do Universe com payload correto", async () => {
+    const user = userEvent.setup();
+    renderWithClient(<PilotKnowledgeSection characterId="c1" section="overview" />);
+    await screen.findByText("Biografia pública sintetizada.");
+
+    await user.click(screen.getByRole("button", { name: "Editar biografia" }));
+    const field = screen.getByLabelText("Biografia do Universe");
+    expect((field as HTMLTextAreaElement).value).toBe("Biografia pública sintetizada.");
+
+    await user.clear(field);
+    await user.type(field, "Biografia do meu universo.");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(apiMock.patch).toHaveBeenCalledWith(
+      "/api/pilot-knowledge/drivers/c1/biography",
+      { display: "Biografia do meu universo." },
+    );
+  });
+
+  it("9) restaura a biografia personalizada para a fonte externa", async () => {
+    apiMock.get.mockImplementation(async () => ({
+      pilot: {
+        ...AVAILABLE_PILOT,
+        profile: {
+          ...AVAILABLE_PILOT.profile,
+          biography: {
+            display: "Biografia do Universe.",
+            context: "Biografia do Universe.",
+            origin: "UNIVERSE",
+            lastVerifiedAt: "2026-09-01T00:00:00.000Z",
+          },
+        },
+      },
+    }));
+    const user = userEvent.setup();
+    renderWithClient(<PilotKnowledgeSection characterId="c1" section="overview" />);
+    await screen.findByText("Biografia do Universe.");
+
+    await user.click(screen.getByRole("button", { name: "Restaurar da fonte" }));
+    expect(apiMock.remove).toHaveBeenCalledWith("/api/pilot-knowledge/drivers/c1/biography");
+  });
+
+  it("10) usa 'Não informado' quando o espelho não possui o campo", async () => {
+    apiMock.get.mockImplementation(async () => ({
+      pilot: {
+        ...AVAILABLE_PILOT,
+        profile: {
+          ...AVAILABLE_PILOT.profile,
+          identity: {
+            ...AVAILABLE_PILOT.profile.identity,
+            placeOfBirth: null,
+            driverCode: null,
+          },
+        },
+      },
+    }));
+    renderWithClient(<PilotKnowledgeSection characterId="c1" section="overview" />);
+    await screen.findByText("Biografia pública sintetizada.");
+    expect(screen.getAllByText("Não informado.").length).toBeGreaterThanOrEqual(2);
+  });
 });

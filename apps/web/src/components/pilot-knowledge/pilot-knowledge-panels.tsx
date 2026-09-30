@@ -13,11 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   useCreateUniverseRelationship,
   useDeleteUniverseRelationship,
   usePilotKnowledge,
+  useRestorePilotBiography,
+  useUpdatePilotBiography,
 } from "@/hooks/use-pilot-knowledge";
+import { localizeNationalityPtBr } from "@/lib/nationality-pt-br";
 import {
   PILOT_CLASSIFICATION_LABELS,
   PILOT_ORIGIN_LABELS,
@@ -41,7 +45,7 @@ const UNAVAILABLE_TEXT: Record<string, string> = {
     "Nenhuma informação pública sincronizada para este piloto ainda.",
 };
 
-const NO_DATA_TEXT = "Não informado por fonte disponível.";
+const NO_DATA_TEXT = "Não informado.";
 
 function Badge({
   children,
@@ -109,10 +113,144 @@ function PilotUnavailable({
   );
 }
 
-function OverviewPanel({ pilot }: { pilot: Extract<PilotKnowledgeView, { available: true }> }) {
+function BiographyCard({
+  characterId,
+  pilot,
+}: {
+  characterId: string;
+  pilot: Extract<PilotKnowledgeView, { available: true }>;
+}) {
+  const biography = pilot.profile.biography;
+  const refresh = pilot.profile.refresh;
+  const updateMutation = useUpdatePilotBiography(characterId);
+  const restoreMutation = useRestorePilotBiography(characterId);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function startEditing() {
+    setDraft(biography.display ?? "");
+    setError(null);
+    setEditing(true);
+  }
+
+  function save() {
+    const display = draft.trim();
+    if (display.length === 0) {
+      setError("Escreva a biografia antes de salvar.");
+      return;
+    }
+    setError(null);
+    updateMutation.mutate(display, {
+      onSuccess: () => setEditing(false),
+      onError: (err) => setError(err instanceof Error ? err.message : "Falha ao salvar"),
+    });
+  }
+
+  function restore() {
+    setError(null);
+    restoreMutation.mutate(undefined, {
+      onSuccess: () => setEditing(false),
+      onError: (err) => setError(err instanceof Error ? err.message : "Falha ao restaurar"),
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Biografia</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {editing ? (
+          <div className="space-y-2">
+            <Label htmlFor="pilot-biography">Biografia do Universe</Label>
+            <Textarea
+              id="pilot-biography"
+              rows={5}
+              maxLength={1200}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" disabled={updateMutation.isPending} onClick={save}>
+                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                Cancelar
+              </Button>
+              {biography.origin === "UNIVERSE" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={restoreMutation.isPending}
+                  onClick={restore}
+                >
+                  {restoreMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Restaurar da fonte
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            {biography.display ? (
+              <>
+                <p className="text-sm leading-relaxed text-foreground">{biography.display}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {biography.origin !== "NONE" && <OriginBadge origin={biography.origin} />}
+                  {biography.origin === "EXTERNAL" && (
+                    <span className="text-xs text-muted-foreground">
+                      Última verificação: {formatDate(refresh.lastVerifiedAt)}
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma informação pública confiável encontrada.
+              </p>
+            )}
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={startEditing}>
+                Editar biografia
+              </Button>
+              {biography.origin === "UNIVERSE" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={restoreMutation.isPending}
+                  onClick={restore}
+                >
+                  Restaurar da fonte
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function OverviewPanel({
+  characterId,
+  pilot,
+}: {
+  characterId: string;
+  pilot: Extract<PilotKnowledgeView, { available: true }>;
+}) {
   const { profile, history } = pilot;
-  const biography = profile.biography;
-  const refresh = profile.refresh;
   const milestones = history.events
     .slice()
     .sort((a, b) => (b.seasonYear ?? 0) - (a.seasonYear ?? 0))
@@ -128,13 +266,24 @@ function OverviewPanel({ pilot }: { pilot: Extract<PilotKnowledgeView, { availab
           <dl className="divide-y divide-border text-sm">
             {[
               ["Nome público", profile.identity.publicName],
-              ["Nome completo", profile.identity.fullName ?? "—"],
-              ["Nascimento", formatDate(profile.identity.dateOfBirth)],
-              ["Local de nascimento", profile.identity.placeOfBirth ?? "—"],
-              ["Nacionalidade", profile.identity.nationality ?? "—"],
-              ["Número", profile.identity.driverNumber !== null ? `#${profile.identity.driverNumber}` : "—"],
-              ["Código", profile.identity.driverCode ?? "—"],
-              ["Equipe atual (fonte)", profile.identity.currentTeamName ?? "—"],
+              ["Nome completo", profile.identity.fullName ?? NO_DATA_TEXT],
+              [
+                "Nascimento",
+                profile.identity.dateOfBirth ? formatDate(profile.identity.dateOfBirth) : NO_DATA_TEXT,
+              ],
+              ["Local de nascimento", profile.identity.placeOfBirth ?? NO_DATA_TEXT],
+              [
+                "Nacionalidade",
+                localizeNationalityPtBr(profile.identity.nationality) ?? NO_DATA_TEXT,
+              ],
+              [
+                "Número",
+                profile.identity.driverNumber !== null
+                  ? `#${profile.identity.driverNumber}`
+                  : NO_DATA_TEXT,
+              ],
+              ["Código", profile.identity.driverCode ?? NO_DATA_TEXT],
+              ["Equipe atual (fonte)", profile.identity.currentTeamName ?? NO_DATA_TEXT],
             ].map(([label, value]) => (
               <div key={label} className="flex items-baseline justify-between gap-4 py-2 first:pt-0">
                 <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -159,30 +308,7 @@ function OverviewPanel({ pilot }: { pilot: Extract<PilotKnowledgeView, { availab
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Biografia</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {biography.display ? (
-            <>
-              <p className="text-sm leading-relaxed text-foreground">{biography.display}</p>
-              <div className="flex flex-wrap items-center gap-2">
-                {biography.origin !== "NONE" && <OriginBadge origin={biography.origin} />}
-                {biography.origin === "EXTERNAL" && (
-                  <span className="text-xs text-muted-foreground">
-                    Última verificação: {formatDate(refresh.lastVerifiedAt)}
-                  </span>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Nenhuma informação pública confiável encontrada.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <BiographyCard characterId={characterId} pilot={pilot} />
 
       <Card>
         <CardHeader>
@@ -639,7 +765,7 @@ export function PilotKnowledgeSection({
     );
   }
 
-  if (section === "overview") return <OverviewPanel pilot={pilot} />;
+  if (section === "overview") return <OverviewPanel characterId={characterId} pilot={pilot} />;
   if (section === "persona") return <PublicPersonaPanel pilot={pilot} />;
   if (section === "history") return <HistoryPanel pilot={pilot} />;
   return <RelationshipsPanel characterId={characterId} pilot={pilot} />;

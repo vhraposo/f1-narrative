@@ -179,6 +179,17 @@ export function refreshPilotKnowledge(
   return post(`/api/pilot-knowledge/drivers/${characterId}/refresh`, { scope });
 }
 
+export function updatePilotBiography(
+  characterId: string,
+  display: string,
+): Promise<{ biography: { display: string | null; origin: "UNIVERSE" } }> {
+  return patch(`/api/pilot-knowledge/drivers/${characterId}/biography`, { display });
+}
+
+export function restorePilotBiography(characterId: string): Promise<void> {
+  return remove<void>(`/api/pilot-knowledge/drivers/${characterId}/biography`);
+}
+
 export function getPilotKnowledgeStatus(): Promise<{
   status: {
     profiles: { total: number; fresh: number; stale: number; unknown: number };

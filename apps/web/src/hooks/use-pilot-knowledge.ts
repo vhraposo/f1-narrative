@@ -2,10 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { driversKey } from "@/hooks/use-driver-profiles";
 import {
   createUniverseRelationship,
   deleteUniverseRelationship,
   getPilotKnowledge,
+  restorePilotBiography,
+  updatePilotBiography,
   updateUniverseRelationship,
   type PilotKnowledgeView,
   type UniverseRelationshipInput,
@@ -53,6 +56,28 @@ export function useDeleteUniverseRelationship(characterId: string) {
   return useMutation({
     mutationFn: (id: string) => deleteUniverseRelationship(id),
     onSuccess: invalidate,
+  });
+}
+
+export function useUpdatePilotBiography(characterId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (display: string) => updatePilotBiography(characterId, display),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["pilot-knowledge", characterId] });
+      void queryClient.invalidateQueries({ queryKey: driversKey });
+    },
+  });
+}
+
+export function useRestorePilotBiography(characterId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => restorePilotBiography(characterId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["pilot-knowledge", characterId] });
+      void queryClient.invalidateQueries({ queryKey: driversKey });
+    },
   });
 }
 

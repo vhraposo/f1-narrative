@@ -13,6 +13,7 @@ import {
   type Driver,
 } from "@/lib/driver-profiles";
 import { resolveNationality } from "@/lib/nationalities";
+import { localizeNationalityPtBr } from "@/lib/nationality-pt-br";
 import { cn } from "@/lib/utils";
 
 type DriverCardProps = {
@@ -78,7 +79,7 @@ export function DriverCard({
                 label={`${nationalityInfo.countryName ?? driver.character.nationality} flag`}
               />
             )}
-            {driver.character.nationality}
+            {localizeNationalityPtBr(driver.character.nationality)}
           </span>
           {team && (
             <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-foreground">

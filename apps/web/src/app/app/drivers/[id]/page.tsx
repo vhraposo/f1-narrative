@@ -28,6 +28,7 @@ import { useDriver, useUpdateDriver } from "@/hooks/use-driver-profiles";
 import { useWorld } from "@/hooks/use-world";
 import { formatBirthDate } from "@/lib/characters";
 import { formatDriverNumber } from "@/lib/driver-profiles";
+import { localizeNationalityPtBr } from "@/lib/nationality-pt-br";
 
 export default function DriverDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -89,7 +90,7 @@ export default function DriverDetailPage() {
   const rows = [
     { label: "Número", value: formatDriverNumber(driver.number) },
     { label: "Equipe", value: driver.team?.name ?? "—" },
-    { label: "Nacionalidade", value: driver.character.nationality },
+    { label: "Nacionalidade", value: localizeNationalityPtBr(driver.character.nationality) ?? "—" },
     {
       label: "Nascimento",
       value: driver.character.birthDate
