@@ -11,6 +11,10 @@ import {
   PilotKnowledgeSection,
   type PilotKnowledgeSectionKind,
 } from "@/components/pilot-knowledge/pilot-knowledge-panels";
+import {
+  PilotEvolutionCard,
+  PilotMemoriesPanel,
+} from "@/components/pilot-knowledge/pilot-experience-panels";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -35,7 +39,7 @@ export default function DriverDetailPage() {
   const [showForm, setShowForm] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
-  const [tab, setTab] = useState<PilotKnowledgeSectionKind>("overview");
+  const [tab, setTab] = useState<PilotKnowledgeSectionKind | "memories">("overview");
 
   const displayHeadshotUrl = driver?.displayHeadshotUrl ?? driver?.headshotUrl ?? null;
 
@@ -120,6 +124,7 @@ export default function DriverDetailPage() {
             ["persona", "Persona"],
             ["history", "Histórico"],
             ["relationships", "Relacionamentos"],
+            ["memories", "Memórias"],
           ] as const
         ).map(([value, label]) => (
           <Button
@@ -267,6 +272,7 @@ export default function DriverDetailPage() {
             showEvidence
           />
           <PilotKnowledgeSection characterId={driver.characterId} section="persona" />
+          <PilotEvolutionCard characterId={driver.characterId} />
         </>
       )}
 
@@ -277,6 +283,8 @@ export default function DriverDetailPage() {
       {tab === "relationships" && (
         <PilotKnowledgeSection characterId={driver.characterId} section="relationships" />
       )}
+
+      {tab === "memories" && <PilotMemoriesPanel characterId={driver.characterId} />}
     </div>
   );
 }
