@@ -72,6 +72,7 @@ import {
   pilotKnowledgeRoutes,
   type PilotKnowledgeRoutesOptions,
 } from "./modules/pilot-knowledge/pilot-knowledge.routes.js";
+import { pilotExperienceRoutes } from "./modules/pilot-experience/pilot-experience.routes.js";
 import {
   OpeningGridClient,
 } from "./modules/opening-grid/opening-grid.client.js";
@@ -231,6 +232,7 @@ export function buildApp(
   void app.register(playerEntryRoutes);
   void app.register(universeEditorRoutes);
   void app.register(pilotKnowledgeRoutes, pilotKnowledgeOptions ?? {});
+  void app.register(pilotExperienceRoutes);
 
   return app;
 }
