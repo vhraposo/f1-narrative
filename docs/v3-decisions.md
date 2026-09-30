@@ -289,3 +289,23 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Decisão (V3.17):** `ExternalDriverEvent` é baseline histórica resumida (debut, first point/podium/pole/win, campeonatos, mudança de equipe, marcos) e é derivado deterministicamente do espelho esportivo quando possível (`derivation`), com `dedupeKey` único por piloto; nunca duplica `RaceResult`. LLM não "descobre" fato esportivo que o banco já contém. Memória permanece exclusiva do Universe (V3.14): nenhum histórico externo vira Memory e nenhuma frase "eu me lembro" é gerada sem Memory correspondente. Relevância selecionada deterministicamente por tópico (corrida/temporada/ano/piloto/time mencionado) com fallback para milestones recentes/importantes.
 - **Consequência:** histórico na UI é milestone, não log de resultados; separação Memory × Historical Event preservada.
 
+## D-072 — Experience é projeção determinística do Universe; Memory é estendida (não substituída)
+- **Decisão (V3.18):** `PilotExperience` é uma projeção source-keyed e idempotente de fatos do Universe (`RACE_RESULT|STANDING|TIMELINE_CORRECTION|UNIVERSE_EVENT|RELATIONSHIP|CURATED`), com resumo estruturado (tipo + chaves + salience + resumo), nunca texto livre como única representação; `Memory` ganha colunas aditivas (`universeId`, `memoryType`, `derivation`, `status`, `revision`, `experienceId`, `timelineEventId`, `derivedKey`) reutilizando `importance` como salience. Nenhum segundo sistema temporal/narrativo; nada disso escreve External Knowledge.
+- **Consequência:** mesma fonte ⇒ mesmas experiences/memories (reconciliação idempotente); correção invalida e a reconciliação cria replacement com revision; histórico nunca é deletado.
+
+## D-073 — Memory projection com gatilhos explícitos; derivada é imutável
+- **Decisão (V3.18):** só experiências com gatilho explícito geram Memory (título, primeira vitória no Universe, team change, relationship start/end, narrativa CRITICAL/HIGH, perda de título, conflito, marcos de carreira); resultado comum continua Historical Event. Derivation ∈ `MANUAL|DERIVED|RULE_DERIVED`; derivada não é editável (409 `DERIVED_MEMORY_IMMUTABLE`; override = nova manual ou correção da fonte) e arquivamento manual é `ARCHIVED`. Texto é renderização do structured, sem copiar fontes e sem afirmar emoção.
+- **Consequência:** "não criar Memory para cada RaceResult" verificável; proveniência (experienceId/timelineEventId/derivation) preservada sempre.
+
+## D-074 — Correção histórica invalida experiences/memories na própria transação
+- **Decisão (V3.18):** `applyCorrection` (V3.15/V3.16) passa a invalidar, sob o mesmo lock e sem LLM: race corrections → experiences ACTIVE com `raceId` ou `seasonId` afetados; standing corrections → `seasonId`; number/calendar → sem efeito. Memories derivadas das experiences invalidadas → `INVALIDATED`. Nada é deletado; replacement determinístico surge na `reconcile` explícita. Regeneração narrativa continua fora (D-065).
+- **Consequência:** chat deixa de tratar memória invalidada como fato atual (resolver filtra ACTIVE); auditoria completa da existência histórica daquelas memórias.
+
+## D-075 — Persona evolution = baseline + efeitos append-only com fingerprint único
+- **Decisão (V3.18):** evolução de Persona registra `PersonaTraitEvolution` append-only (regra, experiência-fonte, delta, reason, fingerprint `@unique` sha256(universe|character|rule|experience)); efetivo = `clamp(base + Σ deltas ativos, 0, 1)` — nunca mutação cumulativa do valor; MANUAL vence (efeito vira `skipped-manual`); `CharacterPersona.evolutionRevision` versiona; preview→apply exige `expectedRevision`+`expectedPendingFingerprint` (409 `EVOLUTION_STALE`); apply grava `TimelineEvent PERSONA_UPDATED` state-neutral com before/after. Regras v1 limitadas a 5 códigos e traits canônicos V3.14, sem saúde/psicologia.
+- **Consequência:** reaplicar é no-op (double-count impossível), explainability por efeito, auditoria na Timeline sem replay de estado.
+
+## D-076 — Resolver seleciona memories ACTIVE de forma determinística; generationKey herda
+- **Decisão (V3.18):** `PilotContextResolver` lê Memory com `status=ACTIVE` do universe do speaker, ranqueia por tópico→salience→recência→recorrência→career-defining→id (cap existente) e inclui `{id, revision, memoryType}` + `evolutionRevision` no fingerprint; `context.assembly` filtra memórias ACTIVE; `generationKey` continua derivado do `systemPrompt` (mudança relevante invalida automaticamente). Seleção é backend; LLM recebe só o subset final; AI Behavior permanece inalterado.
+- **Consequência:** outras personagens/outros Universes nunca entram; prompt sem confidence/IDs/status; cache/fingerprint auditáveis.
+
