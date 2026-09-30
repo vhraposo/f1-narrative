@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ExternalCalendar } from "@/components/external/external-calendar";
+import { ExternalCircuitsCatalog } from "@/components/external/external-circuits";
 import { ExternalDrivers } from "@/components/external/external-drivers";
 import { ExternalGrid } from "@/components/external/external-grid";
 import { ExternalOverview } from "@/components/external/external-overview";
@@ -43,6 +44,7 @@ export default function F1WorldDataPage() {
   const driversQuery = useExternalDrivers();
 
   const [year, setYear] = useState<number | null>(null);
+  const [tab, setTab] = useState<"season" | "circuits">("season");
   const seasons = useMemo(() => seasonsQuery.data ?? [], [seasonsQuery.data]);
 
   useEffect(() => {
@@ -206,15 +208,41 @@ export default function F1WorldDataPage() {
         }
       />
 
-      <ExternalSyncPanel year={year} />
+      <div
+        role="tablist"
+        aria-label="Seções de dados externos"
+        className="flex flex-wrap gap-2 border-b border-border pb-2"
+      >
+        {(
+          [
+            ["season", "Temporada"],
+            ["circuits", "Circuitos"],
+          ] as const
+        ).map(([value, label]) => (
+          <Button
+            key={value}
+            role="tab"
+            aria-selected={tab === value}
+            variant={tab === value ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setTab(value)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
 
-      {seasonsQuery.isLoading && (
+      {tab === "circuits" && <ExternalCircuitsCatalog />}
+
+      {tab === "season" && <ExternalSyncPanel year={year} />}
+
+      {tab === "season" && seasonsQuery.isLoading && (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {seasonsQuery.isError && (
+      {tab === "season" && seasonsQuery.isError && (
         <ErrorState
           title="Dados indisponíveis"
           description="Não foi possível carregar as temporadas da fonte."
@@ -234,7 +262,8 @@ export default function F1WorldDataPage() {
         />
       )}
 
-      {!seasonsQuery.isLoading &&
+      {tab === "season" &&
+        !seasonsQuery.isLoading &&
         !seasonsQuery.isError &&
         seasons.length === 0 && (
           <EmptyState
@@ -243,7 +272,8 @@ export default function F1WorldDataPage() {
           />
         )}
 
-      {!seasonsQuery.isLoading &&
+      {tab === "season" &&
+        !seasonsQuery.isLoading &&
         !seasonsQuery.isError &&
         seasons.length > 0 &&
         year != null && (

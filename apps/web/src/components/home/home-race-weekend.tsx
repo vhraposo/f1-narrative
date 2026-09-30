@@ -140,17 +140,30 @@ export function HomeRaceWeekend() {
                   {race.name}
                 </h3>
                 {race.circuit ? (
-                  <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                  <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" aria-hidden="true" />
                     {[
                       race.circuit.name,
                       [race.circuit.locality, race.circuit.country]
                         .filter(Boolean)
                         .join(", "),
+                      race.circuit.lengthMeters !== null
+                        ? `${(race.circuit.lengthMeters / 1000).toLocaleString("pt-BR", {
+                            minimumFractionDigits: 3,
+                            maximumFractionDigits: 3,
+                          })} km`
+                        : null,
                     ]
                       .filter(Boolean)
                       .join(" — ")}
                   </p>
+                ) : null}
+                {race.circuit?.layoutUrl ? (
+                  <img
+                    src={race.circuit.layoutUrl}
+                    alt={`Layout do circuito ${race.circuit.name}`}
+                    className="mt-3 h-24 w-full max-w-xs rounded-sm border border-border object-contain"
+                  />
                 ) : null}
                 {race.date ? (
                   <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">

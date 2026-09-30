@@ -57,6 +57,7 @@ import reconciliationRoutes from "./modules/reconciliation/reconciliation.routes
 import universeRoutes from "./modules/universe/universe.routes.js";
 import timelineRoutes from "./modules/timeline/timeline.routes.js";
 import nextRaceRoutes from "./modules/calendar/next-race.routes.js";
+import { circuitCatalogRoutes } from "./modules/circuits/circuit-catalog.routes.js";
 import driverNumberRoutes from "./modules/drivers/driver-number.routes.js";
 import universeInitRoutes from "./modules/universe-init/universe-init.routes.js";
 import { profileRoutes } from "./modules/profile/profile.routes.js";
@@ -150,6 +151,7 @@ export function buildApp(
   void app.register(teamsRoutes);
   void app.register(timelineRoutes);
   void app.register(nextRaceRoutes);
+  void app.register(circuitCatalogRoutes);
   void app.register(driverNumberRoutes);
   void app.register(profileRoutes, { storageProvider });
   void app.register(mediaRoutes, { storageProvider });

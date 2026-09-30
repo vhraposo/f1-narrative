@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { localizeNationalityPtBr } from "./nationality-pt-br";
+import { localizeCountryPtBr, localizeNationalityPtBr } from "./nationality-pt-br";
 
 describe("localizeNationalityPtBr", () => {
   it("1) traduz demonimos em inglês do espelho", () => {
@@ -21,5 +21,21 @@ describe("localizeNationalityPtBr", () => {
     expect(localizeNationalityPtBr("Atlantean")).toBe("Atlantean");
     expect(localizeNationalityPtBr(null)).toBeNull();
     expect(localizeNationalityPtBr("  ")).toBeNull();
+  });
+});
+
+describe("localizeCountryPtBr", () => {
+  it("4) nomeia países em pt-BR e aceita ISO-3", () => {
+    expect(localizeCountryPtBr("Brazil")).toBe("Brasil");
+    expect(localizeCountryPtBr("Italy")).toBe("Itália");
+    expect(localizeCountryPtBr("United Kingdom")).toBe("Reino Unido");
+    expect(localizeCountryPtBr("Netherlands")).toBe("Países Baixos");
+    expect(localizeCountryPtBr("BRA")).toBe("Brasil");
+    expect(localizeCountryPtBr("ITA")).toBe("Itália");
+  });
+
+  it("5) preserva desconhecidos e vazio", () => {
+    expect(localizeCountryPtBr("Atlantis")).toBe("Atlantis");
+    expect(localizeCountryPtBr(null)).toBeNull();
   });
 });
