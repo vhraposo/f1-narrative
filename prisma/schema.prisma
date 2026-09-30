@@ -237,6 +237,8 @@ model Universe {
   bindingStandings     ExternalBindingStanding[]
 
   driverRelationships UniverseDriverRelationship[]
+  memories            Memory[]
+  pilotExperiences    PilotExperience[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -325,6 +327,7 @@ model Character {
   relationshipsB           Relationship[]            @relation("characterB")
   driverRelationships       UniverseDriverRelationship[] @relation("UniverseRelationshipSubject")
   driverRelationshipsTarget UniverseDriverRelationship[] @relation("UniverseRelationshipTarget")
+  pilotExperiences          PilotExperience[]
   availability             CharacterAvailability?
   schedules                CharacterSchedule[]
   conversationParticipants ConversationParticipant[]
@@ -425,6 +428,7 @@ model Season {
   universeEditorDecisions UniverseEditorDecision[]
   teamPerformances         TeamPerformance[]
   driverAttributes         DriverAttribute[]
+  pilotExperiences         PilotExperience[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -457,6 +461,7 @@ model Race {
   results              RaceResult[]
   sessionResults       RaceSessionResult[]
   externalRaceBindings ExternalBindingRace[]
+  pilotExperiences     PilotExperience[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1106,6 +1111,23 @@ model Memory {
   eventId String? @db.Uuid
   event   Event?  @relation(fields: [eventId], references: [id])
 
+  universeId String?   @db.Uuid
+  universe   Universe? @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
+  memoryType PilotExperienceType?
+  derivation PilotMemoryDerivation @default(MANUAL)
+  status     PilotMemoryStatus     @default(ACTIVE)
+  revision   Int                   @default(1)
+
+  experienceId String?          @db.Uuid
+  experience   PilotExperience? @relation(fields: [experienceId], references: [id], onDelete: SetNull)
+
+  timelineEventId String?        @db.Uuid
+  timelineEvent   TimelineEvent? @relation(fields: [timelineEventId], references: [id], onDelete: SetNull)
+
+  derivedKey          String?
+  updatedByRevisionAt DateTime?
+
   importance      MemoryImportance  @default(LOW)
   source          CanonSource       @default(USER_DEFINED)
   content         String
@@ -1119,6 +1141,10 @@ model Memory {
 
   @@index([importance])
   @@index([eventId])
+  @@index([universeId, status])
+  @@index([universeId, derivedKey])
+  @@index([experienceId])
+  @@index([timelineEventId])
 }
 
 /// Associação N:N entre Memory e Character (personagens aos quais a memória é relevante).
@@ -1175,6 +1201,7 @@ model Event {
   participants EventCharacter[]
   memories     Memory[]
   newsItems    NewsItem[]
+  pilotExperiences PilotExperience[]
 
   createdAt DateTime @default(now())
 
@@ -1425,6 +1452,7 @@ enum TimelineEventKind {
   RACE_UPDATED
   ATTRIBUTE_EVOLVED
   SESSION_COMPLETED
+  PERSONA_UPDATED
 }
 
 /// Log append-only de mudanças temporais do Universe. Ordenação determinística
@@ -1442,6 +1470,9 @@ model TimelineEvent {
   supersedesId String?           @db.Uuid
   supersedes   TimelineEvent?    @relation("TimelineSupersession", fields: [supersedesId], references: [id], onDelete: SetNull)
   supersededBy TimelineEvent[]   @relation("TimelineSupersession")
+
+  pilotExperiences PilotExperience[]
+  memories         Memory[]
 
   createdAt DateTime @default(now())
 
@@ -1638,11 +1669,15 @@ model CharacterPersona {
   summary       String?
   schemaVersion String        @default("persona.v1")
 
+  evolutionRevision  Int       @default(0)
+  evolutionAppliedAt DateTime?
+
   createdById String? @db.Uuid
   createdBy   User?   @relation("PersonaCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  traits    PersonaTrait[]
-  evidences PersonaEvidence[]
+  traits          PersonaTrait[]
+  evidences       PersonaEvidence[]
+  traitEvolutions PersonaTraitEvolution[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2032,4 +2067,121 @@ model UniverseDriverRelationship {
 
   @@index([universeId, characterId, kind])
   @@index([targetCharacterId])
+}
+
+// ---------------------------------------------------------------------------
+// V3.18 — Pilot Experience, Memory & Evolution
+// Experience é projeção determinística de fatos do Universe; Memory é a
+// representação durável; evolução de persona é baseline + efeitos append-only.
+// ---------------------------------------------------------------------------
+
+enum PilotExperienceType {
+  CAREER_MILESTONE
+  SPORTING_VICTORY
+  SPORTING_DEFEAT
+  CHAMPIONSHIP
+  TEAM_CHANGE
+  RELATIONSHIP_EVENT
+  CONFLICT
+  PERSONAL_MILESTONE
+  NARRATIVE_EVENT
+  SIGNIFICANT_RACE
+  OTHER_RELEVANT_EXPERIENCE
+}
+
+enum PilotExperienceSource {
+  RACE_RESULT
+  STANDING
+  TIMELINE_CORRECTION
+  UNIVERSE_EVENT
+  RELATIONSHIP
+  CURATED
+}
+
+enum PilotExperienceStatus {
+  ACTIVE
+  INVALIDATED
+  SUPERSEDED
+}
+
+enum PilotMemoryDerivation {
+  MANUAL
+  DERIVED
+  RULE_DERIVED
+}
+
+enum PilotMemoryStatus {
+  ACTIVE
+  ARCHIVED
+  SUPERSEDED
+  INVALIDATED
+}
+
+/// Acontecimento vivenciado pelo piloto, derivado deterministicamente de fatos
+/// do Universe. Nunca substitui RaceResult/Event/TimelineEvent; é resumo/marco.
+model PilotExperience {
+  id               String         @id @default(uuid()) @db.Uuid
+  universeId       String         @db.Uuid
+  universe         Universe       @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  characterId      String         @db.Uuid
+  character        Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  experienceType PilotExperienceType
+  source         PilotExperienceSource
+  sourceKey      String
+
+  seasonYear Int?
+  seasonId   String?  @db.Uuid
+  season     Season?  @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  raceId     String?  @db.Uuid
+  race       Race?    @relation(fields: [raceId], references: [id], onDelete: SetNull)
+  eventId    String?  @db.Uuid
+  event      Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  timelineEventId String?        @db.Uuid
+  timelineEvent   TimelineEvent? @relation(fields: [timelineEventId], references: [id], onDelete: SetNull)
+
+  occurredAt DateTime?
+  salience   MemoryImportance @default(MEDIUM)
+  title      String
+  summary    String?
+
+  status             PilotExperienceStatus @default(ACTIVE)
+  invalidationReason String?
+  revision           Int                   @default(1)
+
+  memories        Memory[]
+  traitEvolutions PersonaTraitEvolution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universeId, characterId, source, sourceKey])
+  @@index([universeId, characterId, status])
+  @@index([universeId, seasonId])
+  @@index([universeId, raceId])
+}
+
+/// Efeito de evolução de persona (append-only). O valor efetivo é sempre
+/// baseline + soma dos efeitos ativos; nunca mutação cumulativa no trait.
+model PersonaTraitEvolution {
+  id        String           @id @default(uuid()) @db.Uuid
+  personaId String           @db.Uuid
+  persona   CharacterPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  traitKey  String
+  ruleCode  String
+  rulePriority Int
+  value     String?
+  confidenceDelta Float
+  reason    String
+
+  sourceExperienceId String?          @db.Uuid
+  sourceExperience   PilotExperience? @relation(fields: [sourceExperienceId], references: [id], onDelete: SetNull)
+
+  fingerprint String @unique
+  appliedAt   DateTime @default(now())
+
+  @@index([personaId, traitKey])
+  @@index([sourceExperienceId])
 }
