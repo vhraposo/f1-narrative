@@ -747,3 +747,19 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `feat(v3): complete driver persona`.
+
+---
+
+## V3.15 — Historical Timeline / Alternate History
+
+### V3.15.1 — Timeline Read Model + UI
+- **Objetivo:** superfície de leitura da timeline (sem correções ainda) + divergência Universe × External.
+- **Arquivos:** `apps/api/src/modules/timeline/timeline.read.ts` (view model + filtros + cursor + detalhe com cadeia de supersession), `divergence.service.ts` (classificações MATCH/DIVERGENT/NO_EXTERNAL/UNIVERSE_ONLY/EXTERNAL_ONLY via bindings), `timeline.routes.ts` (GET `/api/timeline` com filtros/paginação, GET `/api/timeline/events/:eventId`, GET `/api/timeline/divergence`); web `lib/timeline.ts`, `hooks/use-timeline.ts`, `components/timeline/timeline-view.tsx`, `app/app/timeline/page.tsx`, nav (Narrativa → Linha do Tempo).
+- **Migrations:** nenhuma.
+- **Testes:** API `timeline.read.test.ts` 12/12 (leitura, filtros, ordenação, cursor, supersession, isolamento, divergência match/divergente/universe-only/external-only, rotas 401/400/404); timeline módulo 21/21. Web `timeline-view.integration.test.tsx` 8/8; suíte Web 448/448.
+- **Typecheck:** API 0; Web 0. **Lint:** API 0; Web 0. **Build Web:** exit 0.
+- **Problemas:** filtro `correctionsOnly` não pode incluir kind ainda inexistente no enum (ajustado para os 3 kinds atuais; V3.15.5 amplia); resíduo de execução falha de fixture limpo no TEST.
+- **Decisões:** nenhuma nova (segue D-061..D-065).
+- **Limitações:** UI mostra primeira página (50) com aviso de `hasMore`; scans limitados a 1000 eventos por universo com flag `beyondScanLimit`.
+- **Commit:** `feat(v3): add timeline read model and ui`.
+- **Próximo passo:** V3.15.2 — correction command foundation + number lock.

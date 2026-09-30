@@ -6,12 +6,17 @@ import { ensureUniverse } from "../universe/universe.service.js";
 import {
   advanceUniverseTime,
   applyRetroactiveCorrection,
-  listTimelineEvents,
   listWorldSnapshots,
   lockUniverseTimeline,
   recomputeUniverseState,
   TimelineError,
 } from "./timeline.service.js";
+import {
+  TIMELINE_KINDS,
+  getTimelineEventDetail,
+  queryTimelineItems,
+} from "./timeline.read.js";
+import { buildDivergenceReport } from "./divergence.service.js";
 
 const advanceBodySchema = z
   .object({
@@ -38,6 +43,31 @@ const correctionBodySchema = z
   })
   .strict();
 
+const timelineQuerySchema = z
+  .object({
+    seasonId: z.string().uuid().optional(),
+    from: z.string().datetime({ offset: true }).optional(),
+    to: z.string().datetime({ offset: true }).optional(),
+    driverProfileId: z.string().uuid().optional(),
+    teamId: z.string().uuid().optional(),
+    raceId: z.string().uuid().optional(),
+    kind: z.enum(TIMELINE_KINDS).optional(),
+    correctionsOnly: z.enum(["true", "false"]).optional(),
+    cursor: z.string().max(80).optional(),
+    limit: z.coerce.number().int().min(1).max(200).optional(),
+  })
+  .strict();
+
+const timelineEventParamsSchema = z.object({
+  eventId: z.string().uuid("Identificador de evento inválido"),
+});
+
+const divergenceQuerySchema = z
+  .object({
+    seasonId: z.string().uuid("Identificador de temporada inválido"),
+  })
+  .strict();
+
 function sendTimelineError(
   reply: {
     code: (code: number) => { send: (payload: Record<string, unknown>) => void };
@@ -57,9 +87,89 @@ export const timelineRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
       const userId = request.user!.id;
+      const query = timelineQuerySchema.safeParse(request.query ?? {});
+      if (!query.success) {
+        return reply.code(400).send({
+          error: "Filtros inválidos",
+          code: "VALIDATION_ERROR",
+          issues: query.error.issues,
+        });
+      }
       const universe = await ensureUniverse(userId);
-      const events = await listTimelineEvents(universe.id);
-      return reply.send({ events });
+      const page = await queryTimelineItems(universe.id, {
+        seasonId: query.data.seasonId,
+        from: query.data.from ? new Date(query.data.from) : undefined,
+        to: query.data.to ? new Date(query.data.to) : undefined,
+        driverProfileId: query.data.driverProfileId,
+        teamId: query.data.teamId,
+        raceId: query.data.raceId,
+        kind: query.data.kind,
+        correctionsOnly:
+          query.data.correctionsOnly === undefined
+            ? undefined
+            : query.data.correctionsOnly === "true",
+        cursor: query.data.cursor,
+        limit: query.data.limit,
+      });
+      return reply.send({
+        events: page.items,
+        nextCursor: page.nextCursor,
+        hasMore: page.hasMore,
+        beyondScanLimit: page.beyondScanLimit,
+      });
+    },
+  );
+
+  fastify.get(
+    "/api/timeline/events/:eventId",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const userId = request.user!.id;
+      const params = timelineEventParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({
+          error: "Identificador inválido",
+          code: "VALIDATION_ERROR",
+        });
+      }
+      const universe = await ensureUniverse(userId);
+      try {
+        const detail = await getTimelineEventDetail(
+          universe.id,
+          params.data.eventId,
+        );
+        return reply.send(detail);
+      } catch (error) {
+        if (sendTimelineError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.get(
+    "/api/timeline/divergence",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const userId = request.user!.id;
+      const query = divergenceQuerySchema.safeParse(request.query ?? {});
+      if (!query.success) {
+        return reply.code(400).send({
+          error: "Filtros inválidos",
+          code: "VALIDATION_ERROR",
+          issues: query.error.issues,
+        });
+      }
+      const universe = await ensureUniverse(userId);
+      try {
+        const divergence = await buildDivergenceReport(
+          universe.id,
+          query.data.seasonId,
+        );
+        return reply.send({ divergence });
+      } catch (error) {
+        if (sendTimelineError(reply, error)) return;
+        throw error;
+      }
     },
   );
 
