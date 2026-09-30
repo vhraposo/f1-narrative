@@ -120,10 +120,12 @@ export async function resolvePilotContext(
       id: true,
       universeId: true,
       biography: true,
+      driverProfile: { select: { id: true } },
       persona: { include: { traits: true } },
     },
   });
   if (!character) return null;
+  if (!character.driverProfile) return null;
   if (input.universeId && character.universeId !== input.universeId) return null;
 
   const [profileView, personaView, relationshipsView, historyView, memoriesRaw, state] = await Promise.all([

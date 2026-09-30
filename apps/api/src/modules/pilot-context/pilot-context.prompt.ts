@@ -109,7 +109,10 @@ export function composePilotContextPromptBlock(view: PilotContextView): PilotCon
       .join(", ");
     stateParts.push(`últimos resultados: ${results}`);
   }
-  if (stateParts.length > 0) {
+  if (
+    stateParts.length > 0 &&
+    (state.seasonYear !== null || state.teamName !== null || state.standingPosition !== null)
+  ) {
     sections.push(`Estado atual no Universe: ${stateParts.join(" · ")}`);
   }
 

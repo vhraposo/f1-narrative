@@ -21,6 +21,8 @@ import {
   composePersonaPromptBlock,
   type SpeakerPersonaPromptInput,
 } from "../persona/persona.prompt.js";
+import { composePilotContextPromptBlock } from "../pilot-context/pilot-context.prompt.js";
+import { loadSpeakerPilotContext } from "../pilot-context/pilot-context.resolver.js";
 import { readConversationRag } from "../context/conversation-rag-read.js";
 import {
   resolveGenerationRagContext,
@@ -172,6 +174,7 @@ export const SECTION_IDS = [
   "ACTIVE_SPEAKER",
   "CURRENT_TURN",
   "CHARACTER_DNA",
+  "PILOT_CONTEXT",
   "WORLD_STATE",
   "MEMORIES",
   "RELATIONSHIPS",
@@ -679,6 +682,7 @@ export function composeSystemPrompt(
   speakerCharacterId?: string,
   turnContext?: TurnContext,
   speakerPersonaText?: string,
+  speakerPilotContextText?: string,
 ): string {
   const blocks: Array<[SectionId, string]> = [
     ["GLOBAL_RULES", sectionGlobalRules()],
@@ -701,6 +705,10 @@ export function composeSystemPrompt(
     if (dnaSection.length > 0) {
       blocks.push(["CHARACTER_DNA", dnaSection]);
     }
+  }
+
+  if (speakerCharacterId !== undefined && speakerPilotContextText && speakerPilotContextText.length > 0) {
+    blocks.push(["PILOT_CONTEXT", speakerPilotContextText]);
   }
 
   blocks.push(
@@ -812,11 +820,25 @@ export async function assembleGenerationBundle(
       ? personaBlock.text
       : undefined;
 
+  const pilotContext = await loadSpeakerPilotContext(speakerCharacterId, {
+    topic: request.userPrompt ?? null,
+  });
+  const pilotContextBlock =
+    pilotContext === null ? null : composePilotContextPromptBlock(pilotContext);
+  if (pilotContextBlock !== null && pilotContextBlock.omittedReasons.length > 0) {
+    contextWithRag.omitted.reasons.push(...pilotContextBlock.omittedReasons);
+  }
+  const speakerPilotContextText =
+    pilotContextBlock !== null && pilotContextBlock.text.length > 0
+      ? pilotContextBlock.text
+      : undefined;
+
   const systemPrompt = composeSystemPrompt(
     contextWithRag,
     speakerCharacterId,
     request.turnContext,
     speakerPersonaText,
+    speakerPilotContextText,
   );
 
   const providerUserPrompt = request.providerUserPrompt ?? request.userPrompt;
@@ -1037,7 +1059,12 @@ export function assertGenerationContract(result: GenerationResult): boolean {
     pos = m.index;
     found.push(beginId);
   }
-  const optionalSections = new Set(["EXTERNAL_CONTEXT", "CHARACTER_DNA", "CURRENT_TURN"]);
+  const optionalSections = new Set([
+    "EXTERNAL_CONTEXT",
+    "CHARACTER_DNA",
+    "CURRENT_TURN",
+    "PILOT_CONTEXT",
+  ]);
   const expectedIds = SECTION_IDS.filter(
     (id) => found.includes(id) || !optionalSections.has(id),
   );
