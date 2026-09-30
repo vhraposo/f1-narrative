@@ -946,3 +946,50 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **Decisões:** D-067..D-071.
 - **Limitações:** refresh de persona é ingestão explícita (sem run automático); UI de override cobre alvo `PUBLIC_PERSON`; live sources opt-in (suíte usa fixtures); sem evolução automática de personalidade (preparada, não implementada).
 - **Commit:** `feat(v3.17): complete pilot knowledge`.
+
+### V3.18.0 — Design (Pilot Experience, Memory & Evolution)
+- **Docs:** `v3.18-pilot-experience-memory-architecture.md`, `v3.18-evolution-rules.md`, `v3.18-open-questions.md` (16 OQs resolvidas), D-072..D-076.
+- **Decisões:** D-072 (Experience = projeção determinística; Memory estendida), D-073 (memory projection com gatilhos; derivada imutável), D-074 (correção invalida experiences/memories na transação), D-075 (evolução baseline+efeitos append-only com fingerprint único), D-076 (resolver lê memories ACTIVE com relevância determinística; generationKey herda).
+- **Commit:** `docs(v3.18): design pilot experience and memory architecture`.
+
+### V3.18.1 — Experience/Memory foundation
+- **Migrations:** `20260930170000_add_pilot_experience_memory_evolution` (tabelas `PilotExperience`/`PersonaTraitEvolution`, enums de tipo/source/status/derivation, colunas novas em `Memory`/`CharacterPersona`, enum `PERSONA_UPDATED`) — somente TEST.
+- **Arquivos:** `pilot-experience.derive.ts` (derivação determinística de vitória/marcos/campeonato/team change/relação/narrativa/curadoria + filtro de futuro), `pilot-experience.memory-rules.ts` (gatilhos de Memory, derivedKey estável, render sem LLM).
+- **Testes:** 10/10 puros (derivação, salience, determinismo, projeção, DNF sem memória).
+- **Commit:** `feat(v3.18): add pilot experience and memory foundation`.
+
+### V3.18.2 — Reconciliação e invalidação por correção
+- **Arquivos:** `pilot-experience.reconcile.ts` (`reconcilePilotExperiences` idempotente com upsert/reaktivação/invalidação, projeção de memories com supercessão por revision, preservação de MANUAL, report) + `invalidatePilotExperienceForCorrection`; hook em `correction.apply.ts` (race→raceId+seasonId; standing→seasonId; number/calendar sem efeito), sem deletar histórico.
+- **Testes:** 6/6 de banco (idempotência, manual preservada, P1→P5 invalida vitória, correção que tira título gera SPORTING_DEFEAT + memory substituta, primeira vitória muda → invalidação/replacement, isolamento A/B). Timeline 92/92 verde.
+- **Commit:** `feat(v3.18): add experience reconciliation and correction invalidation`.
+
+### V3.18.3 — Integração com contexto/geração
+- **Arquivos:** `pilot-experience.relevance.ts` (score determinístico tópico→salience→recência→career-defining), resolver (memories ACTIVE do universe do speaker + legado null, fingerprint com revision/tipo), `context.assembly` (filtro ACTIVE), prompt com `[TIPO]`.
+- **Testes:** 4 novos de resolver + 4 puros de relevância + geração 480/480 (memória invalidada fora do prompt).
+- **Commit:** `feat(v3.18): integrate memories with pilot context`.
+
+### V3.18.4 — Persona evolution foundation
+- **Arquivos:** `persona-evolution.rules.ts` (5 regras nomeadas, valores canônicos, fingerprint por regra+experiência, baseline+Σ deltas com clamp, MANUAL vence), `persona-evolution.service.ts` (preview/apply com `expectedRevision`+`expectedPendingFingerprint`, 409 `EVOLUTION_STALE`, `evolutionRevision`, `TimelineEvent PERSONA_UPDATED`), resolver expõe `evolution.notes`/revision no fingerprint e no bloco.
+- **Testes:** 7 puros + 5 de serviço (double-count impossível, no-op na reaplicação, stale, precedência manual, dois títulos, prompt/key mudam).
+- **Commit:** `feat(v3.18): add persona evolution foundation`.
+
+### V3.18.5 — Relationship experiences
+- **Testes:** 4/4 (relação → experience/memory factual sem emoção inferida; encerrada preserva início; remoção invalida sem deletar; `Relationship.dimensions` intocado).
+- **Commit:** `feat(v3.18): add relationship experiences`.
+
+### V3.18.6 — API
+- **Rotas:** `GET/POST /api/pilot-context/:characterId/memories`, `PATCH .../memories/:id` (derivada → 409), `GET .../experiences`, `POST .../reconcile`, `POST .../evolution/preview|apply` — owner-only leak-safe; `app.ts` registra o módulo.
+- **Testes:** 5/5 de rotas (auth/ownership/filtros/CRUD/reconcile idempotente/evolution preview→apply→stale 409→no-op).
+- **Commit:** `feat(v3.18): add pilot context memory api`.
+
+### V3.18.7 — UI
+- **Arquivos:** `lib/pilot-experience.ts`, `hooks/use-pilot-experience.ts`, `components/pilot-knowledge/pilot-experience-panels.tsx` (aba **Memórias** com filtros, criação manual, arquivamento, badge derivada/manual, reconciliação; card **Evolução da persona** com preview before/after, razões/expertise e apply explícito), aba Memórias no piloto.
+- **Testes:** 7 novos de painéis; Web 476/476 (61/62 arquivos) com o flake conhecido de external-page registrado.
+- **Commit:** `feat(v3.18): add pilot memory and evolution ui`.
+
+### V3.18.8 — Final QA / Docs
+- **Regressão completa:** API **2422/2422** (155 arquivos) em duas execuções consecutivas limpas no mesmo TEST; Web **476/476** (62 arquivos) ×2 consecutivas limpas. Typecheck/Lint/Build 0 em API e Web.
+- **Banco:** TEST 33 migrations, 73 tabelas; 0 `PilotExperience`/`PersonaTraitEvolution`/`Memory` de fixture/`TimelineEvent`/`WorldSnapshot`/users de fixture; 0 knowledge sources/runs de piloto. Resíduo pré-existente de 97 `Memory` órfãs (universeId null, sem participantes) limpo no QA. DEV intacto (27/60/17 + 2 `NUMBER_CORRECTED` legados).
+- **Flakes:** 1 falha isolada em execução completa da Web durante o desenvolvimento (arquivo não retido; não reproduzida em 3 execuções limpas consecutivas) + flake pré-existente `external-page.integration.test.tsx` (arquivo não tocado desde V3.14).
+- **Docs:** `v3.18-pilot-experience-memory-architecture.md` (§10 status + §11 QA), `v3.18-evolution-rules.md`, `v3.18-open-questions.md` (16 OQs), `v3.18-final-report.md`, D-072..D-076.
+- **Commit:** `feat(v3.18): complete pilot experience and evolution`.
