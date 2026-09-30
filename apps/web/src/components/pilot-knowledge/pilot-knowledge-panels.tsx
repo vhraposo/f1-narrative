@@ -38,8 +38,10 @@ const UNAVAILABLE_TEXT: Record<string, string> = {
   NO_EXTERNAL_BINDING:
     "Este piloto ainda não possui vínculo externo — nenhuma informação pública disponível.",
   NO_EXTERNAL_PROFILE:
-    "Nenhuma informação pública foi sincronizada para este piloto ainda.",
+    "Nenhuma informação pública sincronizada para este piloto ainda.",
 };
+
+const NO_DATA_TEXT = "Não informado por fonte disponível.";
 
 function Badge({
   children,
@@ -85,11 +87,25 @@ function formatPeriod(validFrom: string | null, validTo: string | null): string 
   return `${start} – ${end}`;
 }
 
-function PilotUnavailable({ reason }: { reason: string }) {
+function PilotUnavailable({
+  reason,
+  sync,
+}: {
+  reason: string;
+  sync?: { providersConfigured: boolean; lastStatus: string | null };
+}) {
   return (
-    <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-      {UNAVAILABLE_TEXT[reason] ?? "Informação pública indisponível para este piloto."}
-    </p>
+    <div className="space-y-1 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+      <p>{UNAVAILABLE_TEXT[reason] ?? "Informação pública indisponível para este piloto."}</p>
+      {reason === "NO_EXTERNAL_PROFILE" && (
+        <p className="text-xs">
+          {sync?.providersConfigured
+            ? "Use Sincronizar para buscar dados públicos deste piloto."
+            : "Nenhum provider externo está configurado neste ambiente; dados do espelho interno são provisionados ao abrir o piloto."}
+          {sync?.lastStatus === "FAILED" && " A última sincronização falhou."}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -615,7 +631,12 @@ export function PilotKnowledgeSection({
 
   const pilot = data?.pilot as PilotKnowledgeView | undefined;
   if (!pilot || !pilot.available) {
-    return <PilotUnavailable reason={pilot?.reason ?? "NO_EXTERNAL_PROFILE"} />;
+    return (
+      <PilotUnavailable
+        reason={pilot?.reason ?? "NO_EXTERNAL_PROFILE"}
+        sync={data?.sync}
+      />
+    );
   }
 
   if (section === "overview") return <OverviewPanel pilot={pilot} />;

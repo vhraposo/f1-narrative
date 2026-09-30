@@ -446,4 +446,37 @@ describe("pilot knowledge routes", () => {
     });
     expect(response.statusCode).toBe(404);
   });
+
+  it("9) GET provisiona conhecimento do espelho de forma lazy e retorna sync", async () => {
+    const owner = await createUser("owner-9");
+    const { character } = await createPilotFixture(owner, "own9");
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/pilot-knowledge/drivers/${character.id}`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as {
+      pilot: {
+        available: boolean;
+        profile: { identity: { publicName: string } };
+      };
+      sync: { providersConfigured: boolean; provisioned: boolean; lastStatus: string | null };
+    };
+    expect(body.pilot.available).toBe(true);
+    expect(body.pilot.profile.identity.publicName).toBe("PK own9");
+    expect(body.sync.provisioned).toBe(true);
+    expect(body.sync.providersConfigured).toBe(false);
+    expect(body.sync.lastStatus).toBeNull();
+
+    const second = await app.inject({
+      method: "GET",
+      url: `/api/pilot-knowledge/drivers/${character.id}`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect((second.json() as { sync: { provisioned: boolean } }).sync.provisioned).toBe(false);
+  });
 });

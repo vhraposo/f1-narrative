@@ -151,11 +151,25 @@ export const PILOT_ORIGIN_LABELS: Record<string, string> = {
 export function getPilotKnowledge(
   characterId: string,
   topic?: string,
-): Promise<{ pilot: PilotKnowledgeView }> {
+): Promise<{
+  pilot: PilotKnowledgeView;
+  sync?: {
+    providersConfigured: boolean;
+    provisioned: boolean;
+    lastStatus: string | null;
+    lastAt: string | null;
+  };
+}> {
   const query = topic && topic.trim().length > 0 ? `?topic=${encodeURIComponent(topic.trim())}` : "";
-  return get<{ pilot: PilotKnowledgeView }>(
-    `/api/pilot-knowledge/drivers/${characterId}${query}`,
-  );
+  return get<{
+    pilot: PilotKnowledgeView;
+    sync?: {
+      providersConfigured: boolean;
+      provisioned: boolean;
+      lastStatus: string | null;
+      lastAt: string | null;
+    };
+  }>(`/api/pilot-knowledge/drivers/${characterId}${query}`);
 }
 
 export function refreshPilotKnowledge(

@@ -15,6 +15,7 @@ import {
   type PilotRefreshScope,
 } from "./pilot-knowledge.refresh.js";
 import { getPilotKnowledgeView } from "./pilot-knowledge.read.js";
+import { ensurePilotKnowledgeProvisioned } from "./pilot-knowledge.provision.js";
 import {
   createUniverseDriverRelationship,
   deleteUniverseDriverRelationship,
@@ -116,11 +117,30 @@ export const pilotKnowledgeRoutes: FastifyPluginAsync<PilotKnowledgeRoutesOption
       if (!query.success) return sendInvalid(reply, "Consulta inválida");
       try {
         const access = await resolvePilotKnowledgeAccess(request.user!.id, params.data.characterId);
-        requireOwnedAccess(access);
+        const character = requireOwnedAccess(access);
+        const provision = await withPilotKnowledgeAvailability(() =>
+          ensurePilotKnowledgeProvisioned(character.id),
+        );
         const pilot = await withPilotKnowledgeAvailability(() =>
           getPilotKnowledgeView(params.data.characterId, { topic: query.data.topic ?? null }),
         );
-        return reply.send({ pilot });
+        const lastRun = await prisma.externalSyncRun.findFirst({
+          where: {
+            scope: { in: [...PILOT_SYNC_SCOPES] },
+            triggeredById: request.user!.id,
+          },
+          orderBy: [{ startedAt: "desc" }],
+          select: { status: true, startedAt: true, finishedAt: true },
+        });
+        return reply.send({
+          pilot,
+          sync: {
+            providersConfigured: providers.length > 0,
+            provisioned: provision.outcome === "PROVISIONED",
+            lastStatus: lastRun?.status ?? null,
+            lastAt: lastRun?.startedAt ?? null,
+          },
+        });
       } catch (error) {
         if (sendPilotError(reply, error)) return;
         throw error;
