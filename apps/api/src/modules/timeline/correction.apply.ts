@@ -1,5 +1,6 @@
 import type { TimelineEvent } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { invalidatePilotExperienceForCorrection } from "../pilot-experience/pilot-experience.reconcile.js";
 import {
   applyCorrectionWithinTransaction,
   type CorrectionCommand,
@@ -34,6 +35,25 @@ export async function applyCorrection(
     }
 
     const event = await applyCorrectionWithinTransaction(tx, universeId, command);
+
+    if (
+      command.kind === "RACE_RESULT_CORRECTED" ||
+      command.kind === "RACE_SESSION_RESULT_CORRECTED"
+    ) {
+      await invalidatePilotExperienceForCorrection(
+        tx,
+        universeId,
+        { raceId: command.raceId, seasonId },
+        "resultado corrigido pela Timeline",
+      );
+    } else if (command.kind === "STANDING_CORRECTED") {
+      await invalidatePilotExperienceForCorrection(
+        tx,
+        universeId,
+        { seasonId },
+        "classificação corrigida pela Timeline",
+      );
+    }
 
     const persisted = await tx.timelineEvent.findUnique({
       where: { id: event.id },
