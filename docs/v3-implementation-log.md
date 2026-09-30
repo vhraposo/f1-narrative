@@ -694,7 +694,7 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 | `f1nw_qa_v212` | 7,4 MB | **0** | inexistente | inexistente | Resíduo de QA do V2.12 | **Candidato a DROP** — obsoleto (nenhum objeto Prisma); requer autorização explícita antes de remover |
 | `postgres` | 7,5 MB | — | — | — | Banco default do container | Não tocar |
 
-- Nenhuma operação destrutiva executada. Recomendação: autorizar `DROP DATABASE f1nw_qa_v212` em execução futura.
+- Nenhuma operação destrutiva executada na auditoria. **Remoção autorizada (2026-09-29):** `f1nw_qa_v212` foi removido via `DROP DATABASE "f1nw_qa_v212"` após confirmação de alvo exato, zero conexões ativas e listagem prévia; `f1-narrative` permanece acessível (17 usuários) e `f1_narrative_test` intacto/recriável.
 
 ### Subfase E — Relatório final de qualidade (V3.13)
 - **Suíte API:** 1853/1853 em banco limpo e 1853/1853 na reexecução no mesmo DB (flakiness de resíduo eliminada na Subfase C).
