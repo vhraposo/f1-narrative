@@ -69,7 +69,30 @@ function stateTone(state: ChampionState): BadgeTone {
 function championName(
   value: { name: string } | null | undefined,
 ): string {
-  return value?.name ?? "—";
+  return value?.name ?? "-";
+}
+
+function ExternalChampionCell({ entry }: { entry: ChampionEntry }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span>{championName(entry.externalChampion)}</span>
+      {entry.externalChampion?.sourceType === "CANONICAL" && (
+        <span
+          className="text-[10px] uppercase tracking-wide text-muted-foreground"
+          title="Fallback factual da cronologia oficial (2000-2025)"
+        >
+          cronologia oficial
+        </span>
+      )}
+      {entry.sourceConflict && (
+        <Badge tone="warning">
+          <span title={`Standing externo diverge da cronologia oficial (${entry.canonicalChampion?.name ?? "—"})`}>
+            Fonte em conflito
+          </span>
+        </Badge>
+      )}
+    </span>
+  );
 }
 
 function PreviewDiff({ preview }: { preview: ChampionChangePreview }) {
@@ -603,11 +626,18 @@ export function ChampionsPanel({
                       {entry.year}
                     </td>
                     <td className="px-4 py-3 text-foreground/90">
-                      {championName(entry.externalChampion)}
+                      <ExternalChampionCell entry={entry} />
                     </td>
                     <td className="px-4 py-3 text-foreground/90">
                       {entry.universeChampion ? (
                         championName(entry.universeChampion)
+                      ) : entry.baseline ? (
+                        <span className="inline-flex flex-wrap items-center gap-1.5">
+                          <span>{championName(entry.externalChampion)}</span>
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            baseline histórico
+                          </span>
+                        </span>
                       ) : (
                         <span className="text-muted-foreground">
                           {entry.blockedReason

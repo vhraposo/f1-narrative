@@ -307,8 +307,16 @@ export const CHAMPION_STATE_LABELS: Record<ChampionState, string> = {
   NONE: "Sem campeão",
 };
 
+export type ExternalChampionSourceType = "STANDING" | "CANONICAL";
+
 export type ExternalChampionDescriptor = {
-  externalDriverId: string;
+  externalDriverId: string | null;
+  name: string;
+  source: string;
+  sourceType: ExternalChampionSourceType;
+};
+
+export type CanonicalChampionDescriptor = {
   name: string;
   source: string;
 };
@@ -329,9 +337,12 @@ export type ChampionEntry = {
   seasonId: string | null;
   year: number;
   externalChampion: ExternalChampionDescriptor | null;
+  canonicalChampion: CanonicalChampionDescriptor | null;
   universeChampion: UniverseChampionDescriptor | null;
   state: ChampionState;
   origin: "DERIVED" | "STANDING" | "NONE";
+  baseline: boolean;
+  sourceConflict: boolean;
   canEdit: boolean;
   canRestore: boolean;
   blockedReason: ChampionBlockedReason | null;

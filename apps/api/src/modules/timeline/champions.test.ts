@@ -245,9 +245,11 @@ describe("campeões — leitura", () => {
       state: string;
       origin: string;
       canEdit: boolean;
+      baseline: boolean;
+      sourceConflict: boolean;
       blockedReason: string | null;
       seasonId: string | null;
-      externalChampion: { name: string } | null;
+      externalChampion: { name: string; sourceType: string } | null;
       universeChampion: { name: string } | null;
     }>;
     expect(champions).toHaveLength(26);
@@ -261,7 +263,9 @@ describe("campeões — leitura", () => {
     expect(match.origin).toBe("STANDING");
     expect(match.canEdit).toBe(true);
     expect(match.externalChampion!.name).toContain("Lando");
+    expect(match.externalChampion!.sourceType).toBe("STANDING");
     expect(match.universeChampion!.name).toContain("Lando");
+    expect(match.sourceConflict).toBe(true);
 
     const derived = champions.find((entry) => entry.year === 2011)!;
     expect(derived.origin).toBe("DERIVED");
@@ -274,14 +278,17 @@ describe("campeões — leitura", () => {
     expect(externalOnly.canEdit).toBe(false);
     expect(externalOnly.blockedReason).toBe("SEASON_IN_PROGRESS");
 
-    const none = champions.find((entry) => entry.year === 2014)!;
-    expect(none.state).toBe("NONE");
-    expect(none.externalChampion).toBeNull();
-    expect(none.universeChampion).toBeNull();
-    expect(none.blockedReason).toBe("SEASON_IN_PROGRESS");
+    const canonicalOnly = champions.find((entry) => entry.year === 2014)!;
+    expect(canonicalOnly.state).toBe("EXTERNAL_ONLY");
+    expect(canonicalOnly.externalChampion!.name).toBe("Lewis Hamilton");
+    expect(canonicalOnly.externalChampion!.sourceType).toBe("CANONICAL");
+    expect(canonicalOnly.blockedReason).toBe("SEASON_IN_PROGRESS");
 
     const noSeason = champions.find((entry) => entry.year === 2005)!;
     expect(noSeason.seasonId).toBeNull();
+    expect(noSeason.baseline).toBe(true);
+    expect(noSeason.state).toBe("MATCH");
+    expect(noSeason.externalChampion!.name).toBe("Fernando Alonso");
     expect(noSeason.blockedReason).toBe("SEASON_NOT_IN_UNIVERSE");
   });
 
@@ -317,7 +324,10 @@ describe("campeões — leitura", () => {
     expect(res.statusCode).toBe(200);
     const champions = res.json().champions as Array<{
       year: number;
+      externalChampion: { name: string; sourceType: string } | null;
       universeChampion: unknown;
+      state: string;
+      baseline: boolean;
       origin: string;
       seasonId: string | null;
     }>;
@@ -325,6 +335,15 @@ describe("campeões — leitura", () => {
     expect(champions.every((entry) => entry.universeChampion === null)).toBe(true);
     expect(champions.every((entry) => entry.seasonId === null)).toBe(true);
     expect(champions.every((entry) => entry.origin === "NONE")).toBe(true);
+    expect(champions.every((entry) => entry.externalChampion !== null)).toBe(true);
+    expect(champions.every((entry) => entry.baseline === true)).toBe(true);
+    expect(champions.every((entry) => entry.state === "MATCH")).toBe(true);
+    expect(
+      champions.find((entry) => entry.year === 2007)?.externalChampion?.name,
+    ).toBe("Kimi Räikkönen");
+    expect(
+      champions.find((entry) => entry.year === 2025)?.externalChampion?.sourceType,
+    ).toBe("CANONICAL");
 
     const preview = await app.inject({
       method: "POST",
@@ -517,7 +536,7 @@ describe("campeões — integridade", () => {
     expect(bindings).toBe(2);
   });
 
-  it("10) in-progress não vira campeão; UNIVERSE_ONLY sem fonte; 2026 fora da lista", async () => {
+  it("10) in-progress não vira campeão; canônico cobre o range sem standings; 2026 fora", async () => {
     const season2012 = await prisma.season.create({
       data: { universeId: universeAId, year: 2012, name: "2012", status: "FINISHED" },
     });
@@ -543,19 +562,23 @@ describe("campeões — integridade", () => {
       year: number;
       state: string;
       origin: string;
+      externalChampion: { name: string; sourceType: string } | null;
       universeChampion: unknown;
       blockedReason: string | null;
     }>;
     expect(champions).toHaveLength(26);
     expect(champions.map((entry) => entry.year)).not.toContain(2026);
 
-    const universeOnly = champions.find((champion) => champion.year === 2012)!;
-    expect(universeOnly.state).toBe("UNIVERSE_ONLY");
-    expect(universeOnly.origin).toBe("STANDING");
+    const divergentFromCanonical = champions.find((champion) => champion.year === 2012)!;
+    expect(divergentFromCanonical.state).toBe("DIVERGENT");
+    expect(divergentFromCanonical.origin).toBe("STANDING");
+    expect(divergentFromCanonical.externalChampion?.name).toBe("Sebastian Vettel");
+    expect(divergentFromCanonical.externalChampion?.sourceType).toBe("CANONICAL");
 
     const inProgress = champions.find((champion) => champion.year === 2014)!;
     expect(inProgress.universeChampion).toBeNull();
-    expect(inProgress.state).toBe("NONE");
+    expect(inProgress.state).toBe("EXTERNAL_ONLY");
+    expect(inProgress.externalChampion?.name).toBe("Lewis Hamilton");
     expect(inProgress.blockedReason).toBe("SEASON_IN_PROGRESS");
   });
 

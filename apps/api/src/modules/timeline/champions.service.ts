@@ -1,4 +1,5 @@
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { invalidatePilotExperienceForCorrection } from "../pilot-experience/pilot-experience.reconcile.js";
 import {
   applyCorrectionWithinTransaction,
   type StandingCorrectionCommand,
@@ -7,6 +8,11 @@ import {
   buildCorrectionPreviewToken,
   CorrectionPreviewAbort,
 } from "./correction.preview.js";
+import {
+  CANONICAL_CHAMPIONS_SOURCE,
+  canonicalChampionForYear,
+  canonicalNameMatches,
+} from "./champions.canonical.js";
 import { queryTimelineItems, type TimelineItem } from "./timeline.read.js";
 import { lockUniverseTimeline, TimelineError, type Tx } from "./timeline.service.js";
 
@@ -24,8 +30,16 @@ export type ChampionsState =
 
 export type ChampionOrigin = "DERIVED" | "STANDING" | "NONE";
 
+export type ExternalChampionSourceType = "STANDING" | "CANONICAL";
+
 export type ExternalChampionDescriptor = {
-  externalDriverId: string;
+  externalDriverId: string | null;
+  name: string;
+  source: string;
+  sourceType: ExternalChampionSourceType;
+};
+
+export type CanonicalChampionDescriptor = {
   name: string;
   source: string;
 };
@@ -46,9 +60,12 @@ export type ChampionEntry = {
   seasonId: string | null;
   year: number;
   externalChampion: ExternalChampionDescriptor | null;
+  canonicalChampion: CanonicalChampionDescriptor | null;
   universeChampion: UniverseChampionDescriptor | null;
   state: ChampionsState;
   origin: ChampionOrigin;
+  baseline: boolean;
+  sourceConflict: boolean;
   canEdit: boolean;
   canRestore: boolean;
   blockedReason: ChampionBlockedReason | null;
@@ -225,6 +242,7 @@ export async function listUniverseChampions(
         externalDriverId: standing.externalDriverId,
         name: standing.externalDriver.name,
         source: standing.source,
+        sourceType: "STANDING",
       });
     }
   }
@@ -259,14 +277,26 @@ export async function listUniverseChampions(
         }
       : null;
 
-    const externalRow = externalByYear.get(String(year)) ?? null;
-    const externalChampion: ExternalChampionDescriptor | null = externalRow
-      ? {
-          externalDriverId: externalRow.externalDriverId,
-          name: externalRow.name,
-          source: externalRow.source,
-        }
+    const standingRow = externalByYear.get(String(year)) ?? null;
+    const canonicalRow = canonicalChampionForYear(year);
+    const externalChampion: ExternalChampionDescriptor | null = standingRow
+      ? standingRow
+      : canonicalRow
+        ? {
+            externalDriverId: null,
+            name: canonicalRow.driverName,
+            source: CANONICAL_CHAMPIONS_SOURCE.provider,
+            sourceType: "CANONICAL",
+          }
+        : null;
+    const canonicalChampion: CanonicalChampionDescriptor | null = canonicalRow
+      ? { name: canonicalRow.driverName, source: CANONICAL_CHAMPIONS_SOURCE.provider }
       : null;
+    const sourceConflict =
+      standingRow !== null &&
+      canonicalRow !== null &&
+      !canonicalNameMatches(standingRow.name, canonicalRow.driverName);
+    const baseline = seasonId === null && externalChampion !== null;
 
     const hasResults = season ? (resultsBySeason.get(season.id) ?? 0) > 0 : false;
     const origin: ChampionOrigin =
@@ -277,7 +307,9 @@ export async function listUniverseChampions(
           : "NONE";
 
     let state: ChampionsState;
-    if (externalChampion && universeChampion) {
+    if (baseline) {
+      state = "MATCH";
+    } else if (externalChampion && universeChampion) {
       state =
         universeChampion.externalDriverId === externalChampion.externalDriverId
           ? "MATCH"
@@ -299,7 +331,7 @@ export async function listUniverseChampions(
             ? "DERIVED_CHAMPION"
             : null;
     const canEdit = season !== null && seasonCompleted && origin === "STANDING";
-    const restoreDriverProfileId = externalChampion
+    const restoreDriverProfileId = externalChampion?.externalDriverId
       ? (profileByExternalDriver.get(externalChampion.externalDriverId) ?? null)
       : null;
 
@@ -307,9 +339,12 @@ export async function listUniverseChampions(
       seasonId,
       year,
       externalChampion,
+      canonicalChampion,
       universeChampion,
       state,
       origin,
+      baseline,
+      sourceConflict,
       canEdit,
       canRestore: canEdit && state === "DIVERGENT" && restoreDriverProfileId !== null,
       blockedReason,
@@ -501,11 +536,21 @@ async function resolveExternalChampion(
       externalDriver: { select: { name: true } },
     },
   });
-  if (!external) return null;
+  if (external) {
+    return {
+      externalDriverId: external.externalDriverId,
+      name: external.externalDriver.name,
+      source: external.source,
+      sourceType: "STANDING",
+    };
+  }
+  const canonical = canonicalChampionForYear(year);
+  if (!canonical) return null;
   return {
-    externalDriverId: external.externalDriverId,
-    name: external.externalDriver.name,
-    source: external.source,
+    externalDriverId: null,
+    name: canonical.driverName,
+    source: CANONICAL_CHAMPIONS_SOURCE.provider,
+    sourceType: "CANONICAL",
   };
 }
 
@@ -624,6 +669,12 @@ export async function applyChampionChange(
       const event = await applyCorrectionWithinTransaction(tx, universeId, command);
       events.push({ id: event.id, sequence: event.sequence, kind: event.kind });
     }
+    await invalidatePilotExperienceForCorrection(
+      tx,
+      universeId,
+      { seasonId },
+      "título corrigido pela tela de campeões",
+    );
     return { events };
   });
 }

@@ -27,9 +27,15 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-function makeEntry(overrides: Partial<ChampionEntry> & { seasonId: string; year: number }): ChampionEntry {
+function makeEntry(overrides: Partial<ChampionEntry> & { seasonId: string | null; year: number }): ChampionEntry {
   return {
-    externalChampion: { externalDriverId: "ext-1", name: "Piloto Externo", source: "synth" },
+    externalChampion: {
+      externalDriverId: "ext-1",
+      name: "Piloto Externo",
+      source: "synth",
+      sourceType: "STANDING",
+    },
+    canonicalChampion: null,
     universeChampion: {
       driverProfileId: "d1",
       characterId: "c1",
@@ -38,6 +44,8 @@ function makeEntry(overrides: Partial<ChampionEntry> & { seasonId: string; year:
     },
     state: "MATCH",
     origin: "STANDING",
+    baseline: false,
+    sourceConflict: false,
     canEdit: true,
     canRestore: false,
     blockedReason: null,
@@ -73,7 +81,12 @@ const PREVIEW: ChampionChangePreview = {
   seasonId: "s2",
   year: 2098,
   mode: "RESTORE",
-  externalChampion: { externalDriverId: "ext-1", name: "Piloto Externo", source: "synth" },
+  externalChampion: {
+    externalDriverId: "ext-1",
+    name: "Piloto Externo",
+    source: "synth",
+    sourceType: "STANDING",
+  },
   before: {
     driverProfileId: "d2",
     characterId: "c2",
@@ -285,5 +298,47 @@ describe("ChampionsPanel", () => {
     const before = apiMock.get.mock.calls.length;
     await user.click(screen.getByRole("button", { name: /Tentar novamente/ }));
     expect(apiMock.get.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it("9) mostra baseline canônico do Universe e conflito de fonte", async () => {
+    const baseline = makeEntry({
+      seasonId: null,
+      year: 2096,
+      universeChampion: null,
+      baseline: true,
+      externalChampion: {
+        externalDriverId: null,
+        name: "Campeão Canônico",
+        source: "FIA_CANONICAL_CHRONOLOGY",
+        sourceType: "CANONICAL",
+      },
+      canEdit: false,
+      blockedReason: "SEASON_NOT_IN_UNIVERSE",
+    });
+    const conflict = makeEntry({
+      seasonId: "s3",
+      year: 2095,
+      externalChampion: {
+        externalDriverId: "ext-9",
+        name: "Piloto Diverge",
+        source: "jolpica",
+        sourceType: "STANDING",
+      },
+      canonicalChampion: { name: "Campeão Oficial", source: "FIA_CANONICAL_CHRONOLOGY" },
+      sourceConflict: true,
+    });
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/timeline/champions") return { champions: [baseline, conflict] };
+      if (path === "/api/drivers") return { drivers: [] };
+      throw new ApiError("Não encontrado", 404);
+    });
+    renderWithClient(<ChampionsPanel />);
+    expect((await screen.findAllByText("Campeão Canônico")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("baseline histórico")).toBeDefined();
+    expect(screen.getByText("cronologia oficial")).toBeDefined();
+    expect(screen.getByText("Fonte em conflito")).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: "Editar campeão de 2096" }),
+    ).toBeDefined();
   });
 });
