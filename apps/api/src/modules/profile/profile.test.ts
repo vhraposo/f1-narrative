@@ -340,12 +340,13 @@ describe("Profile + Media (Fase 5)", () => {
     const media = await app.inject({
       method: "GET",
       url: `/api/media/${assetId}`,
-      headers: { cookie: user.cookie },
+      headers: { cookie: user.cookie, origin: "http://localhost:3000" },
       remoteAddress: "10.55.0.12",
     });
     expect(media.statusCode).toBe(200);
     expect(media.headers["content-type"]).toContain("image/png");
     expect(media.headers["cross-origin-resource-policy"]).toBe("cross-origin");
+    expect(media.headers["access-control-allow-origin"]).toBe("http://localhost:3000");
     expect(media.rawPayload.equals(PNG)).toBe(true);
 
     const foreign = await app.inject({
@@ -373,6 +374,19 @@ describe("Profile + Media (Fase 5)", () => {
     });
     expect(sessionAfterUpload.statusCode).toBe(200);
     expect(sessionAfterUpload.json().user.image).toBe(image);
+
+    const freshCookie = user.cookie
+      .split("; ")
+      .filter((entry) => !entry.startsWith("f1nw.session_data="))
+      .join("; ");
+    const sessionWithoutCache = await app.inject({
+      method: "GET",
+      url: "/api/auth/get-session",
+      headers: { cookie: freshCookie },
+      remoteAddress: "10.55.0.16",
+    });
+    expect(sessionWithoutCache.statusCode).toBe(200);
+    expect(sessionWithoutCache.json().user.image).toBe(image);
   });
 
   it("rejeita upload sem autenticação e tipos não suportados", async () => {
