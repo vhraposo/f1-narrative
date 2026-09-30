@@ -202,6 +202,8 @@ model User {
   createdPersonaEvidence  PersonaEvidence[]  @relation("PersonaEvidenceCreatedBy")
   reviewedPersonaEvidence PersonaEvidence[]  @relation("PersonaEvidenceReviewedBy")
 
+  createdUniverseDriverRelationships UniverseDriverRelationship[] @relation("UniverseDriverRelationshipCreatedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -233,6 +235,8 @@ model Universe {
   bindingDriverSeasons ExternalBindingDriverSeason[]
   bindingResults       ExternalBindingResult[]
   bindingStandings     ExternalBindingStanding[]
+
+  driverRelationships UniverseDriverRelationship[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -319,6 +323,8 @@ model Character {
 
   relationshipsA           Relationship[]            @relation("characterA")
   relationshipsB           Relationship[]            @relation("characterB")
+  driverRelationships       UniverseDriverRelationship[] @relation("UniverseRelationshipSubject")
+  driverRelationshipsTarget UniverseDriverRelationship[] @relation("UniverseRelationshipTarget")
   availability             CharacterAvailability?
   schedules                CharacterSchedule[]
   conversationParticipants ConversationParticipant[]
@@ -666,6 +672,11 @@ nationality String?
   externalStandings ExternalStanding[]
   bindings          ExternalBindingDriver[]
 
+  knowledgeProfile      ExternalDriverProfile?
+  knowledgeEvents       ExternalDriverEvent[]
+  relationshipsFrom     ExternalDriverRelationship[] @relation("ExternalDriverRelationshipSubject")
+  relationshipsTo       ExternalDriverRelationship[] @relation("ExternalDriverRelationshipTarget")
+
   @@unique([source, externalId])
   @@index([source, name])
 }
@@ -858,6 +869,7 @@ model ExternalRace {
 
   results  ExternalResult[]
   bindings ExternalBindingRace[]
+  knowledgeEvents ExternalDriverEvent[]
 
   @@unique([source, seasonYear, round])
   @@index([source, seasonYear])
@@ -1686,4 +1698,336 @@ model PersonaEvidence {
 
   @@index([personaId, status])
   @@index([personaId, traitKey])
+}
+
+// ---------------------------------------------------------------------------
+// V3.17 — Pilot Knowledge (External Driver Knowledge + Universe overrides)
+// External Knowledge != Universe Truth: nada aqui escreve o Universe.
+// ---------------------------------------------------------------------------
+
+enum ExternalKnowledgeProvider {
+  F1DB
+  WIKIDATA
+  F1_OFFICIAL
+  FIA_OFFICIAL
+  TEAM_OFFICIAL
+  DRIVER_OFFICIAL
+  REPUTABLE_NEWS
+  CURATED
+}
+
+enum ExternalKnowledgeSourceKind {
+  STRUCTURED_RELEASE
+  OFFICIAL_PROFILE
+  INTERVIEW
+  PRESS_CONFERENCE
+  BIOGRAPHY_PAGE
+  NEWS_REPORT
+  DATABASE_EXPORT
+  PUBLIC_STATEMENT
+}
+
+enum ExternalKnowledgeLicense {
+  CC_BY_4_0
+  CC0
+  CC_BY_SA_4_0
+  PROPRIETARY_REFERENCE_ONLY
+  UNKNOWN
+}
+
+enum ExternalRefreshStatus {
+  FRESH
+  STALE
+  UNKNOWN
+}
+
+enum ExternalClaimStatus {
+  SUPPORTED
+  UNCERTAIN
+  CONFLICT
+  UNKNOWN
+}
+
+enum ExternalPublicTraitSource {
+  DIRECT_SELF_DESCRIPTION
+  OBSERVED_PUBLIC_BEHAVIOR
+  INFERRED
+}
+
+enum ExternalPublicEvidenceType {
+  SELF_DESCRIPTION
+  OFFICIAL_INTERVIEW
+  FIA_TRANSCRIPT
+  TEAM_PROFILE
+  F1_PROFILE
+  DRIVER_OFFICIAL
+  REPUTABLE_NEWS
+  STRUCTURED_DATA
+}
+
+enum DriverRelationshipKind {
+  ROMANTIC_PARTNER
+  SPOUSE
+  PARENT
+  CHILD
+  SIBLING
+  TEAMMATE
+  TEAM_RELATION
+  MENTOR
+  OTHER_PUBLIC_RELATION
+}
+
+enum DriverRelationshipTarget {
+  DRIVER
+  PUBLIC_PERSON
+}
+
+enum DriverRelationshipState {
+  ACTIVE
+  ENDED
+  UNKNOWN
+}
+
+enum ExternalDriverEventCategory {
+  F1_DEBUT
+  FIRST_POINT
+  FIRST_PODIUM
+  FIRST_POLE
+  FIRST_WIN
+  FIRST_CHAMPIONSHIP
+  CHAMPIONSHIP
+  TEAM_CHANGE
+  MAJOR_CAREER_MILESTONE
+  SIGNIFICANT_RACE
+  CAREER_ENTRY
+}
+
+enum ExternalEventDerivation {
+  DERIVED_RESULTS
+  DERIVED_STANDINGS
+  CURATED_SOURCE
+}
+
+/// Ledger de proveniência/licença do conhecimento externo de piloto.
+/// Nunca armazena páginas/artigos/transcrições — apenas metadados + claims.
+model ExternalKnowledgeSource {
+  id       String                      @id @default(uuid()) @db.Uuid
+  provider ExternalKnowledgeProvider
+  sourceKind ExternalKnowledgeSourceKind
+  url      String?
+  title    String?
+
+  license                 ExternalKnowledgeLicense @default(UNKNOWN)
+  attributionRequirement  String?
+  attributionText         String?
+  publishedAt             DateTime?
+  retrievedAt             DateTime                @default(now())
+  sourceVersion           String?
+  metadata                Json?
+
+  driverProfiles       ExternalDriverProfile[]    @relation("ExternalDriverProfilePrimarySource")
+  biographyProfiles    ExternalDriverProfile[]    @relation("ExternalDriverProfileBiographySource")
+  personaEvidences     ExternalPersonaEvidence[]
+  driverRelationships  ExternalDriverRelationship[]
+  driverEvents         ExternalDriverEvent[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([provider, url])
+  @@index([provider, retrievedAt])
+}
+
+/// Identidade/biografia estruturada de um piloto externo (1:1 ExternalDriver).
+model ExternalDriverProfile {
+  id               String         @id @default(uuid()) @db.Uuid
+  externalDriverId String         @unique @db.Uuid
+  externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Cascade)
+
+  fullName           String?
+  publicName         String?
+  dateOfBirth        DateTime?
+  placeOfBirth       String?
+  nationality        String?
+  representedCountry String?
+  driverNumber       Int?
+  driverCode         String?
+  currentTeamName    String?
+  officialLinks      Json?
+
+  biographyDisplay  String?
+  biographyContext  String?
+  biographySourceId String?                 @db.Uuid
+  biographySource   ExternalKnowledgeSource? @relation("ExternalDriverProfileBiographySource", fields: [biographySourceId], references: [id], onDelete: SetNull)
+
+  wikidataQid  String? @unique
+  f1dbDriverId String? @unique
+
+  refreshStatus  ExternalRefreshStatus @default(UNKNOWN)
+  lastVerifiedAt DateTime?
+
+  sourceId String?                 @db.Uuid
+  source   ExternalKnowledgeSource? @relation("ExternalDriverProfilePrimarySource", fields: [sourceId], references: [id], onDelete: SetNull)
+
+  persona ExternalDriverPersona?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([refreshStatus, lastVerifiedAt])
+}
+
+/// Perfil público observável do piloto (baseline externa; não é a persona do Universe).
+model ExternalDriverPersona {
+  id        String               @id @default(uuid()) @db.Uuid
+  profileId String               @unique @db.Uuid
+  profile   ExternalDriverProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  schemaVersion  String              @default("external-persona.v1")
+  summary        String?
+  status         ExternalClaimStatus @default(UNKNOWN)
+  lastVerifiedAt DateTime?
+
+  traits    ExternalPersonaTrait[]
+  evidences ExternalPersonaEvidence[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ExternalPersonaTrait {
+  id        String                @id @default(uuid()) @db.Uuid
+  personaId String                @db.Uuid
+  persona   ExternalDriverPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  traitKey   String
+  value      String
+  sourceKind ExternalPublicTraitSource
+  status     ExternalClaimStatus       @default(SUPPORTED)
+  confidence Float?
+
+  evidenceId String?                 @db.Uuid
+  evidence   ExternalPersonaEvidence? @relation("ExternalTraitAuthoritativeEvidence", fields: [evidenceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([personaId, traitKey])
+  @@index([personaId])
+  @@index([evidenceId])
+}
+
+model ExternalPersonaEvidence {
+  id        String                @id @default(uuid()) @db.Uuid
+  personaId String                @db.Uuid
+  persona   ExternalDriverPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  traitKey      String
+  proposedValue String
+  evidenceType  ExternalPublicEvidenceType
+
+  sourceId String?                 @db.Uuid
+  source   ExternalKnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  summary      String
+  confidence   Float?
+  status       ExternalClaimStatus @default(SUPPORTED)
+  retrievedAt  DateTime            @default(now())
+
+  authoritativeTraits ExternalPersonaTrait[] @relation("ExternalTraitAuthoritativeEvidence")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personaId, traitKey])
+  @@index([personaId, status])
+}
+
+model ExternalDriverRelationship {
+  id               String         @id @default(uuid()) @db.Uuid
+  externalDriverId String         @db.Uuid
+  externalDriver   ExternalDriver @relation("ExternalDriverRelationshipSubject", fields: [externalDriverId], references: [id], onDelete: Cascade)
+
+  kind       DriverRelationshipKind
+  targetType DriverRelationshipTarget
+
+  targetExternalDriverId String?         @db.Uuid
+  targetExternalDriver   ExternalDriver? @relation("ExternalDriverRelationshipTarget", fields: [targetExternalDriverId], references: [id], onDelete: SetNull)
+  targetWikidataQid      String?
+
+  displayName String
+  state       DriverRelationshipState @default(UNKNOWN)
+  validFrom   DateTime?
+  validTo     DateTime?
+
+  sourceId       String?                 @db.Uuid
+  source         ExternalKnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  confidence     Float?
+  lastVerifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([externalDriverId, kind])
+  @@index([targetExternalDriverId])
+}
+
+/// Marco histórico resumido (não duplica RaceResult).
+model ExternalDriverEvent {
+  id               String         @id @default(uuid()) @db.Uuid
+  externalDriverId String         @db.Uuid
+  externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Cascade)
+
+  category ExternalDriverEventCategory
+  title    String
+
+  eventDate     DateTime?
+  seasonYear    Int?
+  externalRaceId String?        @db.Uuid
+  externalRace   ExternalRace?  @relation(fields: [externalRaceId], references: [id], onDelete: SetNull)
+
+  summary    String?
+  importance Int                @default(3)
+  derivation ExternalEventDerivation
+
+  sourceId String?                 @db.Uuid
+  source   ExternalKnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  dedupeKey String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([externalDriverId, dedupeKey])
+  @@index([externalDriverId, eventDate])
+}
+
+/// Override Universe-scoped de relacionamento público de um piloto (nunca toca o externo).
+model UniverseDriverRelationship {
+  id         String   @id @default(uuid()) @db.Uuid
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
+  characterId String    @db.Uuid
+  character   Character @relation("UniverseRelationshipSubject", fields: [characterId], references: [id], onDelete: Cascade)
+
+  kind       DriverRelationshipKind
+  targetType DriverRelationshipTarget
+
+  targetCharacterId String?    @db.Uuid
+  targetCharacter   Character? @relation("UniverseRelationshipTarget", fields: [targetCharacterId], references: [id], onDelete: SetNull)
+  targetWikidataQid String?
+
+  displayName String
+  state       DriverRelationshipState @default(UNKNOWN)
+  validFrom   DateTime?
+  validTo     DateTime?
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("UniverseDriverRelationshipCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([universeId, characterId, kind])
+  @@index([targetCharacterId])
 }
