@@ -34,6 +34,28 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
+const sessionMock = vi.hoisted(() => ({
+  session: {
+    data: { user: { role: "USER" as string } },
+    isPending: false,
+  },
+}));
+
+vi.mock("@/providers/session-provider", () => ({
+  useSession: () => sessionMock.session,
+}));
+
+const EMPTY_PERSONA = {
+  exists: false,
+  id: null,
+  characterId: "c1",
+  origin: "AI_CHARACTER",
+  summary: null,
+  schemaVersion: "persona.v1",
+  traits: [],
+  evidences: [],
+};
+
 const CHARACTER: Character = {
   id: "c1",
   name: "Alicya Kucharski",
@@ -120,6 +142,9 @@ beforeEach(() => {
     }
     if (path === "/api/characters/c1/memories") {
       return { memories: memoriesFixture };
+    }
+    if (path === "/api/characters/c1/persona") {
+      return { persona: EMPTY_PERSONA };
     }
     if (path === "/api/characters/c1/availability") {
       return {
@@ -211,5 +236,19 @@ describe("Character Detail - identidade e seções", () => {
     expect(
       screen.getAllByRole("heading", { level: 1 }).length,
     ).toBe(1);
+  });
+
+  it("mostra a seção Persona do personagem (empty state sem criar Persona)", async () => {
+    renderWithClient(<CharacterDetailPage />);
+
+    expect(
+      await screen.findByRole("region", {
+        name: "Persona de Alicya Kucharski",
+      }),
+    ).toBeDefined();
+    expect(await screen.findByText("Nenhuma persona registrada")).toBeDefined();
+    expect(
+      apiMock.get.mock.calls.map((call) => String(call[0])),
+    ).toContain("/api/characters/c1/persona");
   });
 });

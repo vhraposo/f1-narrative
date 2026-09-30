@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { DriverProfileForm } from "@/components/drivers/driver-profile-form";
 import { SeasonNumberPicker } from "@/components/drivers/season-number-picker";
+import { PersonaSection } from "@/components/persona/persona-section";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -183,6 +184,12 @@ export default function DriverDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <PersonaSection
+        characterId={driver.characterId}
+        characterName={driver.character.name}
+        showEvidence
+      />
 
       {world?.currentSeasonId ? (
         <SeasonNumberPicker

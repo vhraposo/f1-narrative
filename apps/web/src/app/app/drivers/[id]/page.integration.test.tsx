@@ -32,6 +32,28 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
+const sessionMock = vi.hoisted(() => ({
+  session: {
+    data: { user: { role: "USER" as string } },
+    isPending: false,
+  },
+}));
+
+vi.mock("@/providers/session-provider", () => ({
+  useSession: () => sessionMock.session,
+}));
+
+const EMPTY_PERSONA = {
+  exists: false,
+  id: null,
+  characterId: "c1",
+  origin: "REAL_DRIVER",
+  summary: null,
+  schemaVersion: "persona.v1",
+  traits: [],
+  evidences: [],
+};
+
 const DRIVER: DriverDetail = {
   id: "d1",
   characterId: "c1",
@@ -65,6 +87,7 @@ const DRIVER: DriverDetail = {
 beforeEach(() => {
   apiMock.get.mockImplementation(async (path: string) => {
     if (path === "/api/drivers/d1") return { driver: DRIVER };
+    if (path === "/api/characters/c1/persona") return { persona: EMPTY_PERSONA };
     throw new ApiError("Não encontrado", 404);
   });
   apiMock.patch.mockImplementation(async () => ({ driver: DRIVER }));
@@ -91,7 +114,12 @@ describe("Driver detail page", () => {
 
     const calls = apiMock.get.mock.calls.map((call) => String(call[0]));
     expect(calls).toContain("/api/drivers/d1");
-    expect(calls.some((path) => path.startsWith("/api/characters"))).toBe(false);
+    const characterCalls = calls.filter((path) =>
+      path.startsWith("/api/characters"),
+    );
+    expect(
+      characterCalls.every((path) => path === "/api/characters/c1/persona"),
+    ).toBe(true);
   });
 
   it("salva a edição pelo endpoint do Driver", async () => {
@@ -183,5 +211,18 @@ describe("Driver detail page", () => {
     expect(
       await screen.findByRole("heading", { name: "Piloto não encontrado" }),
     ).toBeDefined();
+  });
+
+  it("mostra a seção Persona com superfície de evidências do piloto", async () => {
+    renderWithClient(<DriverDetailPage />);
+
+    expect(
+      await screen.findByRole("region", { name: "Persona de Sergio Pérez" }),
+    ).toBeDefined();
+    expect(await screen.findByText("Nenhuma persona registrada")).toBeDefined();
+    await userEvent.setup().click(
+      screen.getByRole("button", { name: /Criar persona/ }),
+    );
+    expect(screen.getByLabelText("Resumo da persona")).toBeDefined();
   });
 });

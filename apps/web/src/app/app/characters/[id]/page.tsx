@@ -10,6 +10,7 @@ import { AiBehaviorPanel } from "@/components/ai-behavior/ai-behavior-panel";
 import { CharacterIdentity } from "@/components/characters/character-identity";
 import { DriverProfileForm } from "@/components/drivers/driver-profile-form";
 import { MemorySection } from "@/components/memory/memory-section";
+import { PersonaSection } from "@/components/persona/persona-section";
 import { RelationshipConnection } from "@/components/relationships/relationship-connection";
 import { SectionHeading } from "@/components/home/section-heading";
 import { ScheduleCard } from "@/components/schedule/schedule-card";
@@ -157,6 +158,8 @@ export default function CharacterDetailPage() {
           </div>
         </dl>
       </section>
+
+      <PersonaSection characterId={character.id} characterName={character.name} />
 
       <section aria-label="Perfil de piloto" className="space-y-3">
         <SectionHeading kicker="Papel" title="Perfil de piloto" />
