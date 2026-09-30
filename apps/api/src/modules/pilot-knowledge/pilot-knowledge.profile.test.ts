@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
@@ -57,7 +58,10 @@ async function createOwner(label: string) {
   return { user, universe };
 }
 
-async function createDriverFixture(label: string, options?: { universeId?: string }) {
+async function createDriverFixture(
+  label: string,
+  options?: { universeId?: string; sourceRecord?: Prisma.InputJsonValue },
+) {
   const owner = options?.universeId ? null : await createOwner(label);
   const universeId = options?.universeId ?? (owner as Awaited<ReturnType<typeof createOwner>>).universe.id;
   const driver = await prisma.externalDriver.create({
@@ -69,6 +73,7 @@ async function createDriverFixture(label: string, options?: { universeId?: strin
       nationality: "NED",
       number: 33,
       contentHash: `hash-${label}`,
+      ...(options?.sourceRecord !== undefined ? { sourceRecord: options.sourceRecord } : {}),
     },
   });
   createdDriverIds.push(driver.id);
@@ -97,6 +102,7 @@ describe("biography composer", () => {
       placeOfBirth: "Hasselt, Bélgica",
       nationality: "Países Baixos",
       representedCountry: "Países Baixos",
+      debutYear: 2015,
       teams: ["Equipe A", "Equipe B"],
       championships: [2021, 2022],
       interests: ["sim racing", "música"],
@@ -105,10 +111,14 @@ describe("biography composer", () => {
     const context = composeBiographyContext(facts);
 
     expect(display).toContain("Max Exemplo nasceu em Hasselt, Bélgica em 30 de setembro de 1997.");
+    expect(display).toContain("De nacionalidade neerlandesa.");
+    expect(display).toContain("Tem registros na Fórmula 1 desde 2015.");
     expect(display).toContain("Equipe A e Equipe B");
     expect(display).toContain("campeonato mundial em 2021 e 2022");
     expect(display).toContain("sim racing e música");
     expect(context).toContain("Max Exemplo");
+    expect(context).toContain("nacionalidade neerlandesa");
+    expect(context).toContain("registros na F1 desde 2015");
     expect(context).toContain("campeão em 2021, 2022");
   });
 
@@ -246,7 +256,7 @@ describe("driver profile upsert and view", () => {
     expect(view.available).toBe(true);
     if (!view.available) throw new Error("unreachable");
     expect(view.identity.publicName).toBe("Piloto Disponível");
-    expect(view.identity.nationality).toBe("NED");
+    expect(view.identity.nationality).toBe("Neerlandês");
     expect(view.identity.driverNumber).toBe(33);
     expect(view.biography.origin).toBe("EXTERNAL");
     expect(view.refresh.status).toBe("FRESH");
@@ -282,6 +292,22 @@ describe("driver profile upsert and view", () => {
     expect(view.available).toBe(false);
     if (view.available) throw new Error("unreachable");
     expect(view.reason).toBe("CHARACTER_NOT_FOUND");
+  });
+
+  it("15) view completa nascimento e código a partir do sourceRecord do espelho", async () => {
+    const { character, driver } = await createDriverFixture("source-record", {
+      sourceRecord: { code: "SRC", dateOfBirth: "1993-07-01" },
+    });
+    await upsertDriverProfileFromProvider(driver.id, {
+      publicName: "Piloto Source",
+      nationality: "NED",
+    });
+
+    const view = await getDriverProfileView(character.id);
+    expect(view.available).toBe(true);
+    if (!view.available) throw new Error("unreachable");
+    expect(view.identity.driverCode).toBe("SRC");
+    expect(view.identity.dateOfBirth?.toISOString()).toBe("1993-07-01T00:00:00.000Z");
   });
 });
 
@@ -328,3 +354,4 @@ describe("pilot knowledge access", () => {
     expect(new PilotKnowledgeError("NOT_FOUND", "x", 404).statusCode).toBe(404);
   });
 });
+

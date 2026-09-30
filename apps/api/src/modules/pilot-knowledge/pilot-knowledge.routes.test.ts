@@ -479,4 +479,94 @@ describe("pilot knowledge routes", () => {
     });
     expect((second.json() as { sync: { provisioned: boolean } }).sync.provisioned).toBe(false);
   });
+
+  it("10) edita e restaura biografia do Universe com ownership", async () => {
+    const owner = await createUser("owner-10");
+    const intruder = await createUser("intruder-10");
+    const { character } = await createPilotFixture(owner, "own10");
+
+    const anonymous = await app.inject({
+      method: "PATCH",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography`,
+      payload: { display: "Biografia secreta." },
+      remoteAddress: remoteAddress(),
+    });
+    expect(anonymous.statusCode).toBe(401);
+
+    const forbidden = await app.inject({
+      method: "PATCH",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography`,
+      headers: { cookie: intruder.cookie },
+      payload: { display: "Biografia secreta." },
+      remoteAddress: remoteAddress(),
+    });
+    expect(forbidden.statusCode).toBe(404);
+
+    const empty = await app.inject({
+      method: "PATCH",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography`,
+      headers: { cookie: owner.cookie },
+      payload: { display: "   " },
+      remoteAddress: remoteAddress(),
+    });
+    expect(empty.statusCode).toBe(400);
+
+    const overlong = await app.inject({
+      method: "PATCH",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography`,
+      headers: { cookie: owner.cookie },
+      payload: { display: "a".repeat(1201) },
+      remoteAddress: remoteAddress(),
+    });
+    expect(overlong.statusCode).toBe(400);
+
+    const patched = await app.inject({
+      method: "PATCH",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography`,
+      headers: { cookie: owner.cookie },
+      payload: { display: "Biografia personalizada do Universe." },
+      remoteAddress: remoteAddress(),
+    });
+    expect(patched.statusCode).toBe(200);
+    expect((patched.json() as { biography: { display: string; origin: string } }).biography).toEqual({
+      display: "Biografia personalizada do Universe.",
+      origin: "UNIVERSE",
+    });
+    const stored = await prisma.character.findUniqueOrThrow({ where: { id: character.id } });
+    expect(stored.biography).toBe("Biografia personalizada do Universe.");
+
+    const view = await app.inject({
+      method: "GET",
+      url: `/api/pilot-knowledge/drivers/${character.id}`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    const viewBody = view.json() as {
+      pilot: { profile: { biography: { display: string | null; origin: string } } };
+    };
+    expect(viewBody.pilot.profile.biography.origin).toBe("UNIVERSE");
+    expect(viewBody.pilot.profile.biography.display).toBe("Biografia personalizada do Universe.");
+
+    const restored = await app.inject({
+      method: "DELETE",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect(restored.statusCode).toBe(204);
+    const afterRestore = await prisma.character.findUniqueOrThrow({ where: { id: character.id } });
+    expect(afterRestore.biography).toBeNull();
+
+    const viewAfter = await app.inject({
+      method: "GET",
+      url: `/api/pilot-knowledge/drivers/${character.id}`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    const viewAfterBody = viewAfter.json() as {
+      pilot: { profile: { biography: { display: string | null; origin: string } } };
+    };
+    expect(viewAfterBody.pilot.profile.biography.origin).toBe("EXTERNAL");
+    expect(viewAfterBody.pilot.profile.biography.display).toContain("PK own10");
+  });
 });

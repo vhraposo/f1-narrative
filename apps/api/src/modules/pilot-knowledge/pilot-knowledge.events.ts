@@ -199,36 +199,44 @@ export async function deriveMilestonesFromExternalData(
     }
   }
 
-  const saved: ExternalDriverEvent[] = [];
+  const dedupeKeys = derived.map((item) => item.dedupeKey);
   for (const item of derived) {
-    saved.push(
-      await prisma.externalDriverEvent.upsert({
-        where: { externalDriverId_dedupeKey: { externalDriverId, dedupeKey: item.dedupeKey } },
-        create: {
-          externalDriverId,
-          category: item.category,
-          title: item.title,
-          eventDate: item.eventDate,
-          seasonYear: item.seasonYear,
-          externalRaceId: item.externalRaceId,
-          summary: item.summary,
-          importance: item.importance,
-          derivation: "DERIVED_RESULTS",
-          dedupeKey: item.dedupeKey,
-        },
-        update: {
-          title: item.title,
-          eventDate: item.eventDate,
-          seasonYear: item.seasonYear,
-          externalRaceId: item.externalRaceId,
-          summary: item.summary,
-          importance: item.importance,
-          updatedAt: now,
-        },
-      }),
-    );
+    await prisma.externalDriverEvent.upsert({
+      where: { externalDriverId_dedupeKey: { externalDriverId, dedupeKey: item.dedupeKey } },
+      create: {
+        externalDriverId,
+        category: item.category,
+        title: item.title,
+        eventDate: item.eventDate,
+        seasonYear: item.seasonYear,
+        externalRaceId: item.externalRaceId,
+        summary: item.summary,
+        importance: item.importance,
+        derivation: "DERIVED_RESULTS",
+        dedupeKey: item.dedupeKey,
+      },
+      update: {
+        title: item.title,
+        eventDate: item.eventDate,
+        seasonYear: item.seasonYear,
+        externalRaceId: item.externalRaceId,
+        summary: item.summary,
+        importance: item.importance,
+        updatedAt: now,
+      },
+    });
   }
-  return saved;
+  await prisma.externalDriverEvent.deleteMany({
+    where: {
+      externalDriverId,
+      derivation: "DERIVED_RESULTS",
+      ...(dedupeKeys.length > 0 ? { dedupeKey: { notIn: dedupeKeys } } : {}),
+    },
+  });
+  return prisma.externalDriverEvent.findMany({
+    where: { externalDriverId, derivation: "DERIVED_RESULTS" },
+    orderBy: [{ importance: "desc" }, { seasonYear: "asc" }],
+  });
 }
 
 export type CuratedEventInput = {

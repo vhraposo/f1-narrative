@@ -312,4 +312,35 @@ describe("pilot historical events", () => {
     expect(view.events).toEqual([]);
     expect(view.relevant).toEqual([]);
   });
+
+  it("7) re-derivação substitui marcos obsoletos quando surge dado mais antigo", async () => {
+    const { driver } = await createFixture("prune");
+    await seedCareer(driver.id, [
+      { year: 2020, round: 3, name: "GP Recente", position: 1, grid: 1, points: 25, date: "2020-04-05" },
+    ]);
+    await deriveMilestonesFromExternalData(driver.id);
+    let wins = await prisma.externalDriverEvent.findMany({
+      where: { externalDriverId: driver.id, category: "FIRST_WIN" },
+    });
+    expect(wins).toHaveLength(1);
+    expect(wins[0]?.seasonYear).toBe(2020);
+
+    await seedCareer(driver.id, [
+      { year: 2019, round: 7, name: "GP Antigo", position: 1, grid: 2, points: 25, date: "2019-06-09" },
+    ]);
+    await deriveMilestonesFromExternalData(driver.id);
+    wins = await prisma.externalDriverEvent.findMany({
+      where: { externalDriverId: driver.id, category: "FIRST_WIN" },
+    });
+    expect(wins).toHaveLength(1);
+    expect(wins[0]?.seasonYear).toBe(2019);
+
+    const derived = await prisma.externalDriverEvent.count({
+      where: { externalDriverId: driver.id, derivation: "DERIVED_RESULTS" },
+    });
+    const total = await prisma.externalDriverEvent.count({
+      where: { externalDriverId: driver.id },
+    });
+    expect(total).toBe(derived);
+  });
 });

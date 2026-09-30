@@ -9,6 +9,7 @@ import {
   clampText,
   computeRefreshStatus,
 } from "./pilot-knowledge.policy.js";
+import { feminizeNationalityPtBr, resolveNationalityPtBr } from "./nationality.ptbr.js";
 import type { DriverProfileView } from "./pilot-knowledge.access.js";
 
 export type BiographyFacts = {
@@ -18,6 +19,7 @@ export type BiographyFacts = {
   readonly placeOfBirth?: string | null;
   readonly nationality?: string | null;
   readonly representedCountry?: string | null;
+  readonly debutYear?: number | null;
   readonly teams?: readonly string[];
   readonly championships?: readonly number[];
   readonly interests?: readonly string[];
@@ -45,19 +47,32 @@ function joinList(values: readonly string[]): string {
 export function composeBiographyDisplay(facts: BiographyFacts): string | null {
   const name = (facts.publicName ?? facts.fullName ?? "").trim();
   const sentences: string[] = [];
+  const nationality = facts.nationality ? resolveNationalityPtBr(facts.nationality) : null;
+  const nationalityAdjective = nationality
+    ? feminizeNationalityPtBr(nationality).toLowerCase()
+    : null;
 
   const birthParts: string[] = [];
   if (facts.placeOfBirth) birthParts.push(`em ${facts.placeOfBirth}`);
   if (facts.dateOfBirth) birthParts.push(`em ${formatBirthDate(facts.dateOfBirth)}`);
   if (name.length > 0 && birthParts.length > 0) {
     sentences.push(`${name} nasceu ${birthParts.join(" ")}.`);
-  } else if (name.length > 0 && facts.nationality) {
-    sentences.push(`${name} tem nacionalidade ${facts.nationality}.`);
+    if (nationalityAdjective) {
+      sentences.push(`De nacionalidade ${nationalityAdjective}.`);
+    }
+  } else if (name.length > 0 && nationalityAdjective) {
+    sentences.push(`${name} tem nacionalidade ${nationalityAdjective}.`);
   }
 
-  const country = facts.representedCountry;
-  if (country && country !== facts.nationality) {
+  const country = facts.representedCountry
+    ? resolveNationalityPtBr(facts.representedCountry)
+    : null;
+  if (country && country !== nationality) {
     sentences.push(`Representa ${country} nas pistas.`);
+  }
+
+  if (facts.debutYear !== null && facts.debutYear !== undefined) {
+    sentences.push(`Tem registros na Fórmula 1 desde ${facts.debutYear}.`);
   }
 
   if (facts.teams && facts.teams.length > 0) {
@@ -87,9 +102,13 @@ export function composeBiographyContext(facts: BiographyFacts): string | null {
   const name = (facts.publicName ?? facts.fullName ?? "").trim();
   const parts: string[] = [];
   if (name.length > 0) parts.push(name);
-  if (facts.nationality) parts.push(facts.nationality);
+  const nationality = facts.nationality ? resolveNationalityPtBr(facts.nationality) : null;
+  if (nationality) parts.push(`nacionalidade ${feminizeNationalityPtBr(nationality).toLowerCase()}`);
   if (facts.dateOfBirth) parts.push(formatBirthDate(facts.dateOfBirth));
   if (facts.placeOfBirth) parts.push(facts.placeOfBirth);
+  if (facts.debutYear !== null && facts.debutYear !== undefined) {
+    parts.push(`registros na F1 desde ${facts.debutYear}`);
+  }
   if (facts.championships && facts.championships.length > 0) {
     parts.push(`campeão em ${facts.championships.join(", ")}`);
   }
@@ -177,6 +196,28 @@ export async function markDriverProfileStale(
   });
 }
 
+export type DriverSourceIdentity = {
+  readonly dateOfBirth: Date | null;
+  readonly driverCode: string | null;
+};
+
+export function readDriverSourceIdentity(
+  sourceRecord: Prisma.JsonValue | null | undefined,
+): DriverSourceIdentity {
+  if (sourceRecord === null || sourceRecord === undefined) {
+    return { dateOfBirth: null, driverCode: null };
+  }
+  if (typeof sourceRecord !== "object" || Array.isArray(sourceRecord)) {
+    return { dateOfBirth: null, driverCode: null };
+  }
+  const record = sourceRecord as Record<string, unknown>;
+  const rawDate = typeof record.dateOfBirth === "string" ? record.dateOfBirth.trim() : "";
+  const parsed = rawDate.length > 0 ? new Date(rawDate) : null;
+  const dateOfBirth = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+  const rawCode = typeof record.code === "string" ? record.code.trim() : "";
+  return { dateOfBirth, driverCode: rawCode.length > 0 ? rawCode : null };
+}
+
 export async function getDriverProfileView(
   characterId: string,
   now: Date = new Date(),
@@ -198,6 +239,7 @@ export async function getDriverProfileView(
               fullName: true,
               nationality: true,
               number: true,
+              sourceRecord: true,
               knowledgeProfile: { include: { persona: { select: { id: true } } } },
             },
           },
@@ -247,18 +289,19 @@ export async function getDriverProfileView(
           }
         : { display: null, context: null, origin: "NONE" as const, lastVerifiedAt: null };
 
+  const sourceIdentity = readDriverSourceIdentity(driver.sourceRecord);
   return {
     available: true,
     externalIdentity,
     identity: {
       publicName: profile.publicName?.trim() || driver.name,
       fullName: profile.fullName ?? driver.fullName,
-      dateOfBirth: profile.dateOfBirth,
+      dateOfBirth: profile.dateOfBirth ?? sourceIdentity.dateOfBirth,
       placeOfBirth: profile.placeOfBirth,
-      nationality: profile.nationality ?? driver.nationality,
-      representedCountry: profile.representedCountry,
+      nationality: resolveNationalityPtBr(profile.nationality ?? driver.nationality),
+      representedCountry: resolveNationalityPtBr(profile.representedCountry),
       driverNumber: profile.driverNumber ?? driver.number,
-      driverCode: profile.driverCode,
+      driverCode: profile.driverCode ?? sourceIdentity.driverCode,
       currentTeamName: profile.currentTeamName,
       officialLinks: profile.officialLinks ?? null,
     },

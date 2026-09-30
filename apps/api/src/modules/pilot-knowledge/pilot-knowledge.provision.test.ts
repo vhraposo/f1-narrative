@@ -4,6 +4,7 @@ import { prisma } from "../../infrastructure/database/prisma.js";
 import { deleteKnowledgeSourcesForDrivers } from "../../test-utils/pilot-knowledge-cleanup.js";
 import { deleteUniverseDataForUsers } from "../../test-utils/universe-cleanup.js";
 import { ensurePilotKnowledgeProvisioned } from "./pilot-knowledge.provision.js";
+import { recordKnowledgeSource } from "./pilot-knowledge.sources.js";
 
 const PREFIX = "pk-prov";
 const createdUserIds: string[] = [];
@@ -30,7 +31,15 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-async function createFixture(label: string, options?: { readonly bind?: boolean; readonly withData?: boolean }) {
+async function createFixture(
+  label: string,
+  options?: {
+    readonly bind?: boolean;
+    readonly withData?: boolean;
+    readonly withIdentity?: boolean;
+    readonly round?: number;
+  },
+) {
   const user = await prisma.user.create({
     data: {
       email: `${PREFIX}-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@f1nw.test`,
@@ -48,6 +57,9 @@ async function createFixture(label: string, options?: { readonly bind?: boolean;
       nationality: "NED",
       number: 33,
       contentHash: `hash-${label}`,
+      ...(options?.withIdentity
+        ? { sourceRecord: { code: "TST", dateOfBirth: "1997-09-30", permanentNumber: "33" } }
+        : {}),
     },
   });
   createdDriverIds.push(driver.id);
@@ -80,7 +92,7 @@ async function createFixture(label: string, options?: { readonly bind?: boolean;
       data: {
         source: "jolpica",
         seasonYear: 2016,
-        round: 1,
+        round: options?.round ?? 1,
         name: `GP ${label}`,
         date: new Date("2016-03-15T00:00:00.000Z"),
         contentHash: `race-${label}`,
@@ -105,7 +117,7 @@ async function createFixture(label: string, options?: { readonly bind?: boolean;
 
 describe("pilot knowledge provisioning", () => {
   it("1) provisiona perfil/biografia/marcos do espelho de forma idempotente", async () => {
-    const fixture = await createFixture("basic", { withData: true });
+    const fixture = await createFixture("basic", { withData: true, withIdentity: true });
     const first = await ensurePilotKnowledgeProvisioned(fixture.character.id);
     expect(first.outcome).toBe("PROVISIONED");
 
@@ -115,8 +127,13 @@ describe("pilot knowledge provisioning", () => {
     expect(profile.publicName).toBe("Piloto basic");
     expect(profile.currentTeamName).toBe("Equipe B");
     expect(profile.driverNumber).toBe(1);
+    expect(profile.driverCode).toBe("TST");
+    expect(profile.dateOfBirth).not.toBeNull();
     expect(profile.biographyDisplay).toContain("Equipe A e Equipe B");
     expect(profile.biographyDisplay).toContain("campeonato mundial em 2016");
+    expect(profile.biographyDisplay).toContain("Tem registros na Fórmula 1 desde 2015");
+    expect(profile.biographyDisplay).toContain("nacionalidade neerlandesa");
+    expect(profile.biographyDisplay).toContain("Primeira vitória");
     expect(profile.biographyContext).toContain("2016");
     expect(profile.biographySourceId).not.toBeNull();
 
@@ -163,7 +180,7 @@ describe("pilot knowledge provisioning", () => {
       where: { externalDriverId: fixture.driver.id },
     });
     expect(profile.publicName).toBe("Piloto plain");
-    expect(profile.biographyDisplay).toContain("nacionalidade NED");
+    expect(profile.biographyDisplay).toContain("nacionalidade neerlandesa");
     expect(profile.biographyDisplay).not.toContain("nasceu");
     expect(profile.biographyDisplay).not.toContain("Fórmula 1");
     expect(profile.biographyContext).toContain("Piloto plain");
@@ -172,4 +189,62 @@ describe("pilot knowledge provisioning", () => {
     });
     expect(milestones).toBe(0);
   });
+
+  it("4) reabertura atualiza biografia vinda do espelho sem duplicar sources", async () => {
+    const fixture = await createFixture("upgrade", { withData: true, withIdentity: true, round: 11 });
+    await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    const profileBefore = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    await prisma.externalDriverProfile.update({
+      where: { externalDriverId: fixture.driver.id },
+      data: { biographyDisplay: "Biografia antiga do espelho." },
+    });
+    const sourcesBefore = await prisma.externalKnowledgeSource.count({
+      where: { driverProfiles: { some: { externalDriverId: fixture.driver.id } } },
+    });
+
+    const second = await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    expect(second.outcome).toBe("ALREADY_PROVISIONED");
+
+    const profileAfter = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    expect(profileAfter.biographyDisplay).toContain("Tem registros na Fórmula 1 desde 2015");
+    expect(profileAfter.biographyDisplay).not.toBe("Biografia antiga do espelho.");
+    expect(profileAfter.biographySourceId).toBe(profileBefore.biographySourceId);
+    const sourcesAfter = await prisma.externalKnowledgeSource.count({
+      where: { driverProfiles: { some: { externalDriverId: fixture.driver.id } } },
+    });
+    expect(sourcesAfter).toBe(sourcesBefore);
+  });
+
+  it("5) biografia escrita por provider externo é preservada na reabertura", async () => {
+    const fixture = await createFixture("provider-bio", { withData: true, round: 12 });
+    await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    const providerSource = await recordKnowledgeSource({
+      provider: "F1DB",
+      sourceKind: "STRUCTURED_RELEASE",
+      url: `https://f1db.example/${PREFIX}-provider-bio`,
+      license: "CC_BY_4_0",
+    });
+    await prisma.externalDriverProfile.update({
+      where: { externalDriverId: fixture.driver.id },
+      data: {
+        biographyDisplay: "Biografia do provider.",
+        biographyContext: "Biografia do provider.",
+        biographySourceId: providerSource.id,
+      },
+    });
+
+    const second = await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    expect(second.outcome).toBe("ALREADY_PROVISIONED");
+    const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    expect(profile.biographyDisplay).toBe("Biografia do provider.");
+    expect(profile.biographySourceId).toBe(providerSource.id);
+  });
 });
+
+

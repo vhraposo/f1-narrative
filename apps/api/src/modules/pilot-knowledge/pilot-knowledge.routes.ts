@@ -14,6 +14,7 @@ import {
   refreshDriverKnowledge,
   type PilotRefreshScope,
 } from "./pilot-knowledge.refresh.js";
+import { PROFILE_BIOGRAPHY_DISPLAY_CAP } from "./pilot-knowledge.policy.js";
 import { getPilotKnowledgeView } from "./pilot-knowledge.read.js";
 import { ensurePilotKnowledgeProvisioned } from "./pilot-knowledge.provision.js";
 import {
@@ -59,6 +60,12 @@ const relationshipBodySchema = z
   .strict();
 
 const relationshipPatchSchema = relationshipBodySchema.partial().strict();
+
+const biographyBodySchema = z
+  .object({
+    display: z.string().trim().min(1).max(PROFILE_BIOGRAPHY_DISPLAY_CAP),
+  })
+  .strict();
 
 const refreshBodySchema = z
   .object({ scope: z.enum(["ALL", ...PILOT_SYNC_SCOPES]).default("ALL") })
@@ -141,6 +148,53 @@ export const pilotKnowledgeRoutes: FastifyPluginAsync<PilotKnowledgeRoutesOption
             lastAt: lastRun?.startedAt ?? null,
           },
         });
+      } catch (error) {
+        if (sendPilotError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.patch(
+    "/api/pilot-knowledge/drivers/:characterId/biography",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = characterParamsSchema.safeParse(request.params);
+      if (!params.success) return sendInvalid(reply, "Identificador inválido");
+      const body = biographyBodySchema.safeParse(request.body);
+      if (!body.success) return sendInvalid(reply, "Biografia inválida");
+      try {
+        const access = await resolvePilotKnowledgeAccess(request.user!.id, params.data.characterId);
+        const character = requireOwnedAccess(access);
+        const updated = await prisma.character.update({
+          where: { id: character.id },
+          data: { biography: body.data.display },
+          select: { biography: true },
+        });
+        return reply.send({
+          biography: { display: updated.biography, origin: "UNIVERSE" as const },
+        });
+      } catch (error) {
+        if (sendPilotError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.delete(
+    "/api/pilot-knowledge/drivers/:characterId/biography",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = characterParamsSchema.safeParse(request.params);
+      if (!params.success) return sendInvalid(reply, "Identificador inválido");
+      try {
+        const access = await resolvePilotKnowledgeAccess(request.user!.id, params.data.characterId);
+        const character = requireOwnedAccess(access);
+        await prisma.character.update({
+          where: { id: character.id },
+          data: { biography: null },
+        });
+        return reply.code(204).send();
       } catch (error) {
         if (sendPilotError(reply, error)) return;
         throw error;
