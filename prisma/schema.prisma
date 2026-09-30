@@ -1924,6 +1924,7 @@ model ExternalPersonaEvidence {
   traitKey      String
   proposedValue String
   evidenceType  ExternalPublicEvidenceType
+  sourceKind    ExternalPublicTraitSource    @default(OBSERVED_PUBLIC_BEHAVIOR)
 
   sourceId String?                 @db.Uuid
   source   ExternalKnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
