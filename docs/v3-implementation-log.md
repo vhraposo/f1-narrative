@@ -1019,3 +1019,14 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **QA:** API **2438/2438** (156 arquivos) ×2; Web **482/482** (63 arquivos) ×2; typecheck/lint/build 0/0; TEST zero resíduos; DEV smoke real (provisionamento do Albon + champions 2025..2000 sem 2026; dados intactos).
 - **Docs:** `v3.20.1-product-fixpack.md`.
 - **Commit:** `docs(v3.20.1): record product corrections`.
+
+### V3.21 — Calendar/Circuits Audit & Pilot Knowledge Completion
+- **Auditoria primeiro:** explorações independentes de circuits/calendar/next-race/progression e de pilot knowledge; concluiu-se que circuitos/calendário/Next Race/progressão já estão implementados e testados (`circuits/circuit.service.ts`, `GET /api/next-race`, `POST /api/world/progress`, `championship-progression.*`, sprint weekend) — o gap real de produto era o Pilot Knowledge incompleto (nacionalidade crua, bio superficial, milestones não autocorrigíveis, bio não editável).
+- **Nacionalidade pt-BR global:** `nationality.ptbr.ts` (API: demonimos, ISO-3, países, formas pt-BR, + `feminizeNationalityPtBr`) e `nationality-pt-br.ts` (Web: `localizeNationalityPtBr`); API localiza `identity.nationality` (mantém cru em `externalIdentity`) e Web localiza driver-card/página/painel. Nenhuma tradução ad-hoc em componente.
+- **Biografia rica:** nascimento do `sourceRecord` da Jolpica, nacionalidade flexionada em prosa, "Tem registros na Fórmula 1 desde {ano}" (D-080 — sem afirmar estreia com espelho parcial), equipes, títulos, até 3 marcos, interesses.
+- **Auto-upgrade self-healing:** perfis `CURATED`/sem bio são recompostos na reabertura (mesma source, sem duplicar ledger); bio de provider externo é preservada (D-079). `PATCH/DELETE /api/pilot-knowledge/drivers/:characterId/biography` owner-only (override Universe-scoped, cap 1200, leak-safe 404).
+- **Milestones:** prune de eventos `DERIVED_RESULTS` obsoletos — quando o espelho ganha corrida mais antiga, `FIRST_WIN` é movido e o antigo é removido; curados intactos.
+- **UI:** painel Overview com editar/restaurar biografia (textarea novo `ui/textarea.tsx`), badge de origem, "Não informado." para campos ausentes; invalidação de `drivers` mantém a ficha sincronizada.
+- **QA:** API e Web ×2 + smoke DEV (Albon: `driverCode=ALB`, `dateOfBirth=1996-03-23`, bio/contexto pt-BR; sem sources duplicadas); typecheck/lint/build 0/0.
+- **Docs:** `v3.21-calendar-circuit-progression.md` (inclui matriz do que existe × pendências de circuito/calendário), D-078..D-080.
+

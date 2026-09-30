@@ -317,3 +317,16 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Decisão (V3.19, auditoria):** `Event` continua global para leitura (feed/narrativa), mas PATCH/DELETE passam a exigir que o usuário seja o **criador** (`Event.createdById`, coluna aditiva), dono de ≥1 participante (character próprio ou do seu universe) ou ADMIN; caso contrário 404 leak-safe. O DELETE deixa de destruir memórias/notícias de outros tenants por id cru. A criação via `POST /api/events` grava `createdById`; eventos gerados por serviços internos (AI/narrativa) ficam com `createdById = null` e só podem ser mutados por dono de participante ou ADMIN.
 - **Contexto:** o contrato anterior (qualquer usuário autenticado podia editar/excluir qualquer Event global) foi corrigido por segurança multi-tenant; a leitura global permanece como projetada (docs pré-V3). Nota histórica em `docs/v3.19-audit-report.md` (H-1).
 
+## D-078 — Nacionalidade pt-BR é regra global com mapas espelhados API/Web (sem import cross-app)
+- **Decisão (V3.21):** demonimos/ISO/países são resolvidos para pt-BR por `resolveNationalityPtBr` (API) e `localizeNationalityPtBr` (Web); a API localiza a view do piloto (mantendo o valor cru em `externalIdentity`) e o Web localiza driver-card/página/painel. Os mapas são espelhados por app (bundles separados, sem pacote compartilhado com build) e ambos têm testes canônicos das mesmas entradas; formas já em pt-BR e valores desconhecidos passam intactos. Nenhum componente traduz nacionalidade ad-hoc.
+- **Consequência:** nenhuma nacionalidade crua de provider é exibida ao usuário; a flexão (`feminizeNationalityPtBr`) existe para prosa (`nacionalidade tailandesa`).
+
+## D-079 — Biografia do espelho é auto-atualizável; bio de provider externo nunca é sobrescrita
+- **Decisão (V3.21):** na reabertura do piloto, o provisionamento lazy recompõe e atualiza perfis cuja biografia pertence ao espelho (`biographySourceId` nulo ou provider `CURATED`), reusando a mesma source do ledger (sem duplicar). Se a biografia foi escrita por provider externo (F1DB/Wikidata), apenas os marcos são re-derivados e a bio é preservada. Edição do usuário vive em `Character.biography` (override Universe-scoped, rotas owner-only `PATCH/DELETE .../biography`), com precedência sobre a fonte e restauração que volta à bio do espelho/provider.
+- **Consequência:** perfis antigos se corrigem sozinhos quando o código evolui; nenhuma perda de bio curada por provider; override e fonte sempre distinguíveis por `origin` (`UNIVERSE|EXTERNAL|NONE`).
+
+## D-080 — Biografia usa "registros na F1 desde {ano}" enquanto o espelho for parcial
+- **Decisão (V3.21):** a frase de carreira deriva da primeira temporada presente no espelho; com espelho parcial (DEV só tem 2026) dizer "estreou em 2026" seria afirmação histórica falsa. A redação canônica é "Tem registros na Fórmula 1 desde {ano}" e o contexto usa "registros na F1 desde {ano}"; os milestores mantêm o enquadramento "Primeira corrida registrada". Nenhum ano é inferido de fonte externa ao espelho.
+- **Consequência:** biografia nunca afirma debut/título que os dados não sustentam; quando o espelho tiver histórico completo a mesma frase continua verdadeira.
+
+
