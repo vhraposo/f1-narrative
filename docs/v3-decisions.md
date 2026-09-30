@@ -31,6 +31,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Contexto:** F1DB é CC BY 4.0 e fornece layouts SVG, comprimento e voltas; Jolpica não fornece nada disso.
 - **Decisão:** os campos (`lengthMeters`, `turns`, `direction`, `layoutKey`, `layoutUrl`) existem no modelo, mas permanecem nulos até integração aprovada. Não fazer scraping de Formula1.com.
 - **Consequência:** nenhuma dependência nova nem dados inventados; a integração é aditiva quando decidida.
+- **Atualização V3.19:** F1DB foi integrado como **provider estruturado de driver knowledge** na V3.17 (D-070; `f1db.provider.ts` — identidade/carreira/biografia com CC BY 4.0). Os campos de assets de circuito (`lengthMeters/turns/layout*`) continuam nulos; "não integrado" aplica-se apenas a esses assets.
 
 ## D-008 — Regra de número de piloto (FIA × gameplay)
 - **Contexto:** a regra oficial vigente (2026): números 2–99; `#1` reservado ao campeão; `#17` aposentado (Bianchi); `#0` inelegível; número liberado após 2 temporadas sem uso.
@@ -181,7 +182,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Decisão:** `ExternalRace.hasSprint` guarda a informação estruturada da fonte (`true` com `Sprint`/`SprintQualifying`; `false` somente quando a fonte enumera o cronograma de sessões sem Sprint; `null` quando não há informação — nunca heurística por nome). O `Race` do Universe guarda `sprintOverride` (autoridade manual) e `sprintExternal` (sugestão), com valor efetivo `sprintOverride ?? sprintExternal ?? false`. Materialização/refresh atualizam apenas `sprintExternal` e jamais tocam o override.
 - **Consequência:** dois universos podem decidir diferente para o mesmo weekend externo; sync repetido é idempotente; ausência de dado permanece indeterminada (`null`), sem inventar ausência.
 
-## D-045 — Pontuação de Sprint: regulamento FIA vigente (implementação pendente)
+## D-045 — Pontuação de Sprint: regulamento FIA vigente (implementado na V3.5/D-048)
 - **Decisão (produto):** implementar Sprint conforme FIA 2026 — Section A Issue 03, Art. A2.2.2: P1..P8 = 8,7,6,5,4,3,2,1, atribuídos a Drivers' e Constructors' Championship; sem pontos se o líder não completar 2 voltas consecutivas sem SC/VSC; sem pontos com menos de 50% da Scheduled Sprint Distance; ≥50% aplica a tabela; dead heat pela regra oficial. Referências de lifecycle: Section B vigente (Iss 08, 05/08/2026) B2.1–B2.5 (FP, Sprint Qualifying, Sprint Session, Qualifying, Race).
 - **Consequência:** Sprint terá resultado próprio (`RaceSessionResult`, semanticamente distinto de Practice/Qualifying/Sprint Qualifying/Race) e a soma ao campeonato usará um mecanismo oficial de Sprint separado do Race — a implementação faz parte da sequência da Fase Race Weekend e não foi incluída na determinação de Sprint Weekend.
 
@@ -236,6 +237,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-058 — Sem `PERSONA_UPDATED` neste corte
 - **Decisão (V3.14.1):** nenhum evento novo de Timeline para Persona nesta fase; a Timeline permanece sem kind de Persona até a fase de evolução da Persona.
 - **Consequência:** a fundação persistente (D-050..D-057) permanece pura, sem sistema temporal de Persona; a auditoria temporal fica para a evolução futura via `persona.service` (D-053).
+- **Superseded parcialmente por D-075 (V3.18):** `PERSONA_UPDATED` foi implementado como auditoria state-neutral (apply de evolução), preservando o enquadramento de D-060.
 
 ## D-059 — Resolução de rules: ausência sem invenção, conflito classificado, mesmo status inválido
 - **Decisão (V3.14.2):** a resolução de confidence não inventa valor na ausência de evidência `APPROVED` (retorna `NONE`); o plano de reconcile remove trait `EVIDENCE` sem autoridade e nunca altera trait `MANUAL`. Conflito entre evidências `APPROVED` do mesmo `traitKey` não é erro: a autoritativa vem do comparator de D-055 e as demais são classificadas como suporte (mesmo `proposedValue`) ou conflitantes (valor diferente), sempre preservadas. Transição de status para o mesmo estado é explicitamente inválida (`SAME_STATUS`, distinta de `INVALID_TRANSITION`).
@@ -264,6 +266,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-065 — Correção nunca escreve News/Event/Memory/Relationship/Persona/Evolution
 - **Decisão (design V3.15):** correções não apagam, editam ou regeneram narrativa (Event/News) nem Memory/Relationship; não tocam Persona (D-053/D-060) nem `DriverAttribute`/`TeamPerformance`. Staleness narrativa é sinalizada na UI; temporada corrigida com `ATTRIBUTE_EVOLVED` e fingerprint divergente bloqueia novo apply de evolução com 409 `EVOLUTION_STALE` até existir recompute/baseline (OQ-4).
 - **Consequência:** nenhuma destruição arbitrária de narrativa ou dupla contagem de evolução; regeneração narrativa e baseline de atributos ficam para fases futuras com regra explícita.
+- **Superseded parcialmente por D-074 (V3.18):** correções agora **invalidam** (sem deletar) experiences e memories derivadas na própria transação; narrativa/Event/News continua intocada.
 
 ## D-066 — Campeão do Universe: derivado de standings; edição é par atômico de `STANDING_CORRECTED`
 - **Decisão (extensão Campeões):** o campeão do Universe continua derivado de `ChampionshipStanding.position === 1` (sem entidade nova). Temporadas com RaceResult permanecem `DERIVED` e a edição direta é bloqueada (409 `DERIVED_STANDING`; a causa esportiva é corrigida pela Timeline). Em temporadas sem resultados (importadas), editar o campeão é um **par atômico** de `STANDING_CORRECTED` — rebaixa o atual P1 para P2 e promove o novo para P1 — dentro de uma única transação, um único `previewToken` e um único apply; "Restaurar da fonte" é a mesma operação com alvo resolvido pelo binding do campeão externo (nunca DELETE; histórico preservado). O read model expõe estados `MATCH/DIVERGENT/UNIVERSE_ONLY/EXTERNAL_ONLY/NONE`; o External Mirror nunca é alterado.
@@ -304,6 +307,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-075 — Persona evolution = baseline + efeitos append-only com fingerprint único
 - **Decisão (V3.18):** evolução de Persona registra `PersonaTraitEvolution` append-only (regra, experiência-fonte, delta, reason, fingerprint `@unique` sha256(universe|character|rule|experience)); efetivo = `clamp(base + Σ deltas ativos, 0, 1)` — nunca mutação cumulativa do valor; MANUAL vence (efeito vira `skipped-manual`); `CharacterPersona.evolutionRevision` versiona; preview→apply exige `expectedRevision`+`expectedPendingFingerprint` (409 `EVOLUTION_STALE`); apply grava `TimelineEvent PERSONA_UPDATED` state-neutral com before/after. Regras v1 limitadas a 5 códigos e traits canônicos V3.14, sem saúde/psicologia.
 - **Consequência:** reaplicar é no-op (double-count impossível), explainability por efeito, auditoria na Timeline sem replay de estado.
+- **Atualização V3.19 (E-1):** efeitos cujas experiências-fonte forem invalidadas ganham `status SUPERSEDED` (migration `add_evolution_effect_status`) e deixam de somar; o preview expõe `revertedEffects` e o apply persiste a revogação (revision+1, `PERSONA_UPDATED` com `reverted`). Baseline+Σ volta a 0.6 quando o único efeito é revogado — sem mutação cumulativa.
 
 ## D-076 — Resolver seleciona memories ACTIVE de forma determinística; generationKey herda
 - **Decisão (V3.18):** `PilotContextResolver` lê Memory com `status=ACTIVE` do universe do speaker, ranqueia por tópico→salience→recência→recorrência→career-defining→id (cap existente) e inclui `{id, revision, memoryType}` + `evolutionRevision` no fingerprint; `context.assembly` filtra memórias ACTIVE; `generationKey` continua derivado do `systemPrompt` (mudança relevante invalida automaticamente). Seleção é backend; LLM recebe só o subset final; AI Behavior permanece inalterado.

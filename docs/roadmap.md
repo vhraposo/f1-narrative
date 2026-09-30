@@ -1,5 +1,7 @@
 # F1 Narrative Universe — Roadmap Oficial
 
+> **Nota V3.19:** documento histórico (pré-V3). Diversos itens listados como futuros já foram implementados (Memory/Conversation/ExternalSource, External Research, SSE, AI Behavior, Fases 10–13 e V3.14–V3.18). Para o estado atual, consultar `docs/v3-implementation-log.md` e os relatórios `docs/v3.*-final-report.md`.
+>
 > Documento oficial de planejamento das fases futuras do F1 Narrative Universe.
 > Este roadmap é adotado a partir da conclusão da **Fase 9** e é a fonte única de
 > referência para o planejamento das próximas etapas.
