@@ -600,19 +600,24 @@ describe("Reconciliation routes — endpoints (2028)", () => {
       query: { source: JOLPICA_SOURCE },
     });
     expect(res.statusCode).toBe(200);
+    const expected = await prisma.externalBindingDriver.findFirstOrThrow({
+      where: { characterId: ids.characterLandoId },
+      select: { id: true },
+    });
     const bindings = res.json().bindings;
-    expect(bindings).toHaveLength(1);
-    expect(bindings[0].confidence).toBe("CONFIRMED");
+    const listed = bindings.find(
+      (binding: { id: string }) => binding.id === expected.id,
+    );
+    expect(listed).toBeDefined();
+    expect(listed.confidence).toBe("CONFIRMED");
   });
 
   it("admin desvincula → 200", async () => {
-    const res = await app.inject({
-      method: "GET",
-      url: "/api/reconciliation/bindings",
-      headers: { cookie: adminCookie },
-      query: { source: JOLPICA_SOURCE },
+    const target = await prisma.externalBindingDriver.findFirstOrThrow({
+      where: { characterId: ids.characterLandoId },
+      select: { id: true },
     });
-    const bindingId = res.json().bindings[0].id;
+    const bindingId = target.id;
 
     const del = await app.inject({
       method: "DELETE",

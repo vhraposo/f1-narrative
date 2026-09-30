@@ -318,10 +318,20 @@ describe("JolpicaSyncService — sincronização determinística (f1_narrative_t
       await prisma.externalSeason.count({ where: { source: JOLPICA_SOURCE, year } }),
     ).toBe(1);
     expect(
-      await prisma.externalTeam.count({ where: { source: JOLPICA_SOURCE } }),
+      await prisma.externalTeam.count({
+        where: {
+          source: JOLPICA_SOURCE,
+          externalId: { in: ["ferrari", "mclaren"] },
+        },
+      }),
     ).toBe(2);
     expect(
-      await prisma.externalDriver.count({ where: { source: JOLPICA_SOURCE } }),
+      await prisma.externalDriver.count({
+        where: {
+          source: JOLPICA_SOURCE,
+          externalId: { in: ["lauda", "hunt", "donnelly"] },
+        },
+      }),
     ).toBe(3);
     expect(
       await prisma.externalDriverSeason.count({

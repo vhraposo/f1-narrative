@@ -677,3 +677,11 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 ### Commit
 - `chore(v3): reduce typecheck and lint debt`.
+
+### Subfase C — Test isolation / flakiness
+- **Causa raiz (reproduzida):** três testes legados usavam contagens globais sem escopo (`externalTeam/externalDriver.count()` sem ids, `bindings.toHaveLength(1)`, `externalBindingDriver.count()` global) e quebravam na segunda execução da suíte no mesmo banco — evidência: `1853/1853` em banco limpo, falhas `expected 6 to be 3`, `length 1 but got 3`, `expected 3 to be 1` após resíduo.
+- **Correções (sem mascarar):** `jolpica-sync.integration.test.ts` escopa times/pilotos aos externalIds do próprio fixture; `reconciliation.integration.test.ts` valida presença do vínculo confirmado pelo id do fixture (via `characterLandoId`) e usa esse id no unlink; `universe-init.service.test.ts` (caso G) escopa bindings ao `universeId`/`externalDriverId` do fixture.
+- **Validação:** arquivos afetados 55/55 no banco com resíduo; suíte API completa executada **duas vezes seguidas no mesmo DB**: **1853/1853** e **1853/1853**. Typecheck 0; lint 0.
+
+### Commit
+- `test(v3): harden test isolation`.

@@ -462,8 +462,19 @@ describe("UniverseInitService — materialização controlada (2031)", () => {
 
       expect(await prisma.team.count({ where: { universeId: ids.universeId } })).toBe(1);
       expect(await prisma.seasonDriverEntry.count({ where: { seasonId: ids.seasonId } })).toBe(1);
-      expect(await prisma.externalBindingDriver.count()).toBe(1);
-      expect(await prisma.externalBindingSeason.count()).toBe(0);
+      expect(
+        await prisma.externalBindingDriver.count({
+          where: {
+            universeId: ids.universeId,
+            externalDriverId: ids.extOscarId,
+          },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.externalBindingSeason.count({
+          where: { universeId: ids.universeId },
+        }),
+      ).toBe(0);
     } finally {
       await cleanup();
     }
