@@ -389,6 +389,11 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Decisão (V3.24.1):** o contrato do LLM passa a `paragraphs[].sentences[].{text,claimIds}` (1–8 parágrafos), com prompt narrativo (contextualizar kart→F1, hobbies/projetos naturais, atribuição de personalidade). Quando o coverage é rich e o LLM falha/está ausente, o fallback determinístico também produz narrativa multi-parágrafo com templates por categoria (nomes preservados, capitalização correta, sem HTML/markdown/URLs). Quality validator ganha checagem de parágrafos, `too-few-paragraphs` para rich raso e anos citados nos displays como permitidos. Claims derivados duplicados por `key` (e `TEAM_SEASON` quando há `TEAM_HISTORY` curado) são substituídos pela versão curada.
 - **Consequência:** o produto entrega biografia rica mesmo sem LLM (Ollama local não satisfaz o contrato estrito), e nenhuma garantia factual da V3.24 foi relaxada.
 
+## D-096 — Enriquecimento do catálogo é 100% Evidence; pipeline intocada
+- **Decisão (V3.24.2):** a riqueza biográfica é propriedade de PIPELINE + EVIDENCE, nunca de um piloto. Nenhum branch, arquivo ou tratamento especial por piloto; Max Verstappen entrou na mesma camada curada (`curated-evidence.json`, 34 claims com `sourceRef`/`authority`), e unique mudança de código permitida foi refinamento genérico do fallback rico: país de nascença não é mais inferido da nacionalidade (Hasselt/Bélgica vs nacionalidade neerlandesa) e a frase de trajetória de equipes passou a juntar displays como itens (“Sua trajetória por equipes: …”).
+- **Consequência:** qualquer piloto com Evidence suficiente atinge rich mode pelo mesmo caminho; sparse continua seguro; regeneração automática por `evidenceVersion`; Gasly/Norris/Max preservados e universalidade testada.
+
+
 
 
 

@@ -1071,6 +1071,16 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **QA:** pilot-knowledge 136/136 + suíte completa ×2 + Web ×2; lint/build 0; TEST limpo.
 - **Docs:** `v3.24.1-rich-biography.md`, D-093..D-095.
 
+### V3.24.2 — Universal Driver Biography Enrichment
+- **Diagnóstico:** matriz do catálogo mostrou Max sparse (4 áreas, 1 parágrafo) por ausência de claims editoriais; Lando/Gasly rich. Nenhuma lacuna de pipeline encontrada (D-096).
+- **Evidence do Max:** 34 claims no catálogo unificado com 6 fontes novas reais (Red Bull atleta, Red Bull Racing perfil e fatos, Verstappen.com About e coroação FIA 2013, Red Bull Max vs 100) cobrindo ORIGIN, KARTING (2013 KZ/KF), JUNIOR_CAREER, F1_ENTRY, TEAM_HISTORY, ACHIEVEMENTS (2021–2024 + vice 2025), PERSONALITY atribuída, INTERESTS, PROJECTS (Verstappen Racing, Nürburgring 24h, Max vs 100) e CURRENT_CONTEXT (Red Bull 2026, contrato 2030).
+- **Refinamento genérico do fallback rico:** país de nascença não inferido da nacionalidade (Hasselt sem “Países Baixos”) e trajetória de equipes com displays legíveis; sem nenhuma lógica por piloto.
+- **Resultado DEV:** Max passou de 1 para **8 parágrafos** rich pelo caminho real; Lando/Gasly preservados; demais 44 bindings seguem sparse documentados no coverage report.
+- **Testes novos:** Verstappen evidence (34 claims/fontes/atribuição), rich estrutural (família/kart 2013/Toro Rosso/Red Bull/títulos/interesses/projetos), fallback rico sem LLM, regeneração por `evidenceVersion` stale e proteção de Universe (RaceResult/Standing/Timeline/Snapshot/SeasonDriverEntry inalterados) — pilot-knowledge 140/140.
+- **QA:** API suíte completa ×2, Web ×2, lint/build 0, TEST limpo, backup `f1narrative_dev_pre_v3242.dump`.
+- **Docs:** `v3.24.2-universal-biography-enrichment.md`, D-096.
+
+
 
 
 
