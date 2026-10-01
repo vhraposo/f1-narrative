@@ -19,32 +19,42 @@ export function resolveF1dbDriver(input: {
   driverCode?: string | null;
   fullName?: string | null;
 }): F1dbDriver | null {
+  return resolveF1dbDriverStrict(input).driver;
+}
+
+export function resolveF1dbDriverStrict(input: {
+  name: string;
+  driverCode?: string | null;
+  fullName?: string | null;
+}): { driver: F1dbDriver | null; ambiguous: boolean } {
   const dataset = getF1dbDataset();
-  if (!dataset) return null;
+  if (!dataset) return { driver: null, ambiguous: false };
   const names = [input.fullName, input.name]
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .map(normalizeName);
   for (const candidate of names) {
-    const exact = dataset.drivers.find(
+    const exact = dataset.drivers.filter(
       (driver) =>
         normalizeName(driver.fullName) === candidate ||
         normalizeName(driver.name) === candidate,
     );
-    if (exact) return exact;
+    if (exact.length === 1) return { driver: exact[0] as F1dbDriver, ambiguous: false };
+    if (exact.length > 1) return { driver: null, ambiguous: true };
   }
   const code = input.driverCode?.trim().toUpperCase() ?? "";
   if (code.length > 0) {
-    const byCode = dataset.drivers.find(
+    const byCode = dataset.drivers.filter(
       (driver) => driver.abbreviation.toUpperCase() === code,
     );
-    if (byCode) return byCode;
+    if (byCode.length === 1) return { driver: byCode[0] as F1dbDriver, ambiguous: false };
+    if (byCode.length > 1) return { driver: null, ambiguous: true };
   }
   for (const candidate of names) {
     const parts = candidate.split(" ").filter(Boolean);
     if (parts.length < 2) continue;
     const surname = parts[parts.length - 1] as string;
     const initial = (parts[0] as string).charAt(0);
-    const match = dataset.drivers.find((driver) => {
+    const matches = dataset.drivers.filter((driver) => {
       const driverNames = [driver.name, driver.fullName].map((value) =>
         normalizeName(value).split(" ").filter(Boolean),
       );
@@ -56,9 +66,20 @@ export function resolveF1dbDriver(input: {
         );
       });
     });
-    if (match) return match;
+    if (matches.length === 1) return { driver: matches[0] as F1dbDriver, ambiguous: false };
+    if (matches.length > 1) return { driver: null, ambiguous: true };
   }
-  return null;
+  return { driver: null, ambiguous: false };
+}
+
+export function getF1dbDriverTeamSeasons(driverId: string): readonly {
+  year: number;
+  constructorId: string;
+  constructorName: string;
+  constructorFullName: string;
+}[] {
+  const dataset = getF1dbDataset();
+  return dataset?.teamSeasonsByDriverId.get(driverId) ?? [];
 }
 
 export type F1dbMilestonePoint = {

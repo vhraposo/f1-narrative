@@ -78,6 +78,19 @@ export type F1dbChampion = {
   positionNumber: number | null;
 };
 
+export type F1dbConstructor = {
+  id: string;
+  name: string;
+  fullName: string;
+};
+
+export type F1dbDriverTeamSeason = {
+  year: number;
+  constructorId: string;
+  constructorName: string;
+  constructorFullName: string;
+};
+
 export type F1dbDataset = {
   readonly dataDir: string;
   readonly sourceVersion: string;
@@ -90,6 +103,8 @@ export type F1dbDataset = {
   readonly racesById: ReadonlyMap<string, F1dbRace>;
   readonly resultsByDriverId: ReadonlyMap<string, readonly F1dbResult[]>;
   readonly championsByYear: ReadonlyMap<number, F1dbChampion>;
+  readonly constructorsById: ReadonlyMap<string, F1dbConstructor>;
+  readonly teamSeasonsByDriverId: ReadonlyMap<string, readonly F1dbDriverTeamSeason[]>;
 };
 
 const REQUIRED_FILES = [
@@ -247,6 +262,42 @@ export function loadF1dbDataset(): F1dbDataset | null {
     });
   }
 
+  const constructors: F1dbConstructor[] = existsSync(
+    path.join(dataDir, "f1db-constructors.csv"),
+  )
+    ? readRows(dataDir, "f1db-constructors.csv").map((row) => ({
+        id: row.id ?? "",
+        name: row.name ?? row.fullName ?? "",
+        fullName: row.fullName ?? row.name ?? "",
+      }))
+    : [];
+  const constructorsById = new Map(
+    constructors.map((constructor) => [constructor.id, constructor]),
+  );
+
+  const teamSeasonsByDriverId = new Map<string, F1dbDriverTeamSeason[]>();
+  if (existsSync(path.join(dataDir, "f1db-seasons-entrants-drivers.csv"))) {
+    for (const row of readRows(dataDir, "f1db-seasons-entrants-drivers.csv")) {
+      const year = toNumber(row.year);
+      const driverId = row.driverId ?? "";
+      const constructorId = row.constructorId ?? "";
+      if (year === null || driverId.length === 0 || constructorId.length === 0) continue;
+      if (toBoolean(row.testDriver)) continue;
+      const list = teamSeasonsByDriverId.get(driverId) ?? [];
+      const constructor = constructorsById.get(constructorId);
+      list.push({
+        year,
+        constructorId,
+        constructorName: constructor?.name ?? constructorId,
+        constructorFullName: constructor?.fullName ?? constructorId,
+      });
+      teamSeasonsByDriverId.set(driverId, list);
+    }
+    for (const list of teamSeasonsByDriverId.values()) {
+      list.sort((a, b) => a.year - b.year || a.constructorId.localeCompare(b.constructorId));
+    }
+  }
+
   const circuitsById = new Map(circuits.map((circuit) => [circuit.id, circuit]));
   const driversById = new Map(drivers.map((driver) => [driver.id, driver]));
   const racesById = new Map(races.map((race) => [race.id, race]));
@@ -263,6 +314,8 @@ export function loadF1dbDataset(): F1dbDataset | null {
     racesById,
     resultsByDriverId,
     championsByYear,
+    constructorsById,
+    teamSeasonsByDriverId,
   });
 }
 

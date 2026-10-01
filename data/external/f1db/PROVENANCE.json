@@ -14,8 +14,10 @@
     "f1db-circuits-layouts.csv",
     "f1db-grands-prix.csv",
     "f1db-drivers.csv",
+    "f1db-constructors.csv",
     "f1db-seasons.csv",
     "f1db-seasons-driver-standings.csv",
+    "f1db-seasons-entrants-drivers.csv",
     "f1db-races.csv",
     "f1db-races-race-results.csv"
   ],
