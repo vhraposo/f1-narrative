@@ -361,6 +361,23 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Decisão (V3.23):** `BiographyComposer` recebe apenas claims estruturados (nunca texto de fonte), prompt canônico proíbe invenção/diagnóstico/cópia, saída é sanitizada (sem HTML/URLs, cap 2400) e persistida com source ledger `CURATED`/`BIOGRAPHY_PAGE` + metadata do gerador. LLM é opcional (usa `GenerationProvider` existente); sem LLM ou em falha, cai no compositor determinístico. Biografia gerada é tratada como “provider-owned”: preservada na reabertura (sem re-chamada de LLM).
 - **Consequência:** biografia rica quando houver LLM, factual sempre; nenhum conteúdo LLM vira fato canônico sem ledger e fingerprint de claims.
 
+## D-089 — Biografia só compõe claims aprovados; identidade ambígua bloqueia LLM
+- **Decisão (V3.24):** o pipeline é SOURCE → FACT → NORMALIZED FACT → APPROVED CLAIM SET → PLANNER → COMPOSER → VALIDATION → PERSISTENCE. Cada claim tem id estável, chave tipada, autoridade (`STRUCTURED_CANONICAL`/`SECONDARY`) e provenance (provider/sourceVersion); `UNVERIFIED` nunca entra e `AMBIGUOUS_IDENTITY` (mais de um candidato F1DB para o mesmo piloto) desliga o LLM e usa somente o fallback determinístico. Títulos do espelho só viram claim quando o F1DB registra campeão final do ano (líder de temporada em andamento não é campeão).
+- **Consequência:** o composer nunca recebe o “universo” de dados; recebe um conjunto fechado, deduplicado e cronológico; datas/equipes/anos só existem se derivados de claim.
+
+## D-090 — Composer v2 com Structured Output estrito, validator determinístico e fallback obrigatório
+- **Decisão (V3.24):** o LLM devolve JSON estrito (`language`, `sentences[{text, claimIds}]`, ids existentes, 2–12 frases) e passa por `BiographyQualityValidator` genérico (idioma, HTML/markdown/URL/placeholder, duplicação, palavras concatenadas, idioma misturado, substantivo próprio/ano sem claim, tokens longos desconhecidos) e por `BiographySemanticVerifier` opcional (`{approved, issues, unsupportedStatements, claimMismatches}`). Qualquer falha (provider, parse, quality, verifier reprovando) → fallback determinístico com motivo observável; nunca se persiste texto corrompido. Bio gerada é regenerada quando `generatorVersion` muda ou o texto armazenado falha no validator (self-healing); bio de provider externo é preservada.
+- **Consequência:** o bug real do DEV (talentoexceptional/mix de idiomas/invenções) não pode mais ser persistido; o smoke com Ollama real resultou em fallback limpo, não em degradação.
+
+## D-091 — Next Race resolve o layout no F1DB por identidade de circuito
+- **Decisão (V3.24):** o Next Race enriquece o `Circuit` do Universe via F1DB (nome → id, alias Ergast→F1DB) expondo `layoutUrl` real (`/api/external/circuits/f1db/:circuitKey/layout.svg`), extensão/curvas/tipo/direção e `lengthSource` (UNIVERSE→F1DB). O nome do Grand Prix continua vindo da materialização/espelho — Circuit ≠ GrandPrix ≠ Race preservado.
+- **Consequência:** banner do próximo GP mostra o traçado real licenciado com atribuição, sem hardcode nem placeholder.
+
+## D-092 — Foto de circuito via Wikimedia Commons é opt-in com allowlist de licenças
+- **Decisão (V3.24):** `circuit-photo.provider.ts` consulta a API do Commons com `fetch` injetável, aceita somente CC0/CC BY/CC BY-SA (rejeita NC/ND/all rights reserved), registra author/license/licenseUrl/attribution/retrievedAt, cacheia por circuito, tem timeout e degrada para null. Fica **desabilitado por padrão** (`WIKIMEDIA_COMMONS_ENABLED=false`) e é exercitado apenas com mock nos testes; nenhuma imagem é persistida sem metadata. Recorde oficial de volta permanece separado de volta mais rápida em corrida e só ganha o rótulo “oficial” com fonte que o sustente.
+- **Consequência:** foto licenciada entra quando habilitada, sem scraping e sem placeholders mentirosos; a ausência continua sendo exibida honestamente.
+
+
 
 
 

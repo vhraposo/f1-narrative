@@ -1051,5 +1051,16 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **QA:** API 2484/2484 (163 arquivos) ×2; Web 497/497 (65 arquivos) ×2; typecheck/lint/build 0/0; TEST 0 resíduos; DEV 37/37 migrations com backup e dados intactos.
 - **Docs:** `v3.23-external-data-quality.md`, D-085..D-088.
 
+### V3.24 — Biography Quality & External Enrichment
+- **Auditoria primeiro:** trace completo da biografia + evidência real no DEV (5 bios `BIOGRAPHY_PAGE` corrompidas: "talentoexceptional", mix PT/EN, invenções) → causas-raiz C1–C6 (persistência sem validação, texto livre, prompt-only, sem verifier, sem fallback, sem versionamento); doc `v3.24-biography-quality.md` commitado antes do código (D-089..D-092).
+- **Claims aprovados:** `biography.claims.ts` (ids estáveis, chaves tipadas, autoridade, fingerprint, planner cronológico); F1DB ampliado com constructors/entrants (equipes reais por período, test drivers excluídos; Max → Toro Rosso 2015 / Red Bull 2016–2026); identidade estrita com `AMBIGUOUS_IDENTITY` bloqueando LLM.
+- **Composer v2 + validação:** Structured Output estrito com `claimIds`; `BiographyQualityValidator` genérico (concatenção, idioma misturado, substantivo/ano sem claim, etc.); `BiographySemanticVerifier` opcional; fallback determinístico com motivo observável; self-healing por `generatorVersion`/validação (reparou 23 perfis do DEV; 0 corrupções).
+- **Smoke LLM real:** Ollama executado (13,7 s) — contrato não satisfeito pelo modelo local → fallback limpo validado; nenhuma credencial OpenAI presente.
+- **Next Race:** layout F1DB real por chave (`/api/external/circuits/f1db/:key/layout.svg`), extensão/curvas/tipo/direção com `lengthSource`, web renderiza SVG com atribuição (D-091).
+- **Media:** provider Wikimedia Commons opt-in com allowlist CC0/CC BY/CC BY-SA, metadata/cache/timeout e degradação; desabilitado por padrão e testado com mock (D-092). OpenF1 permanece complementar (headshots); enriquecimento de circuito OpenF1 documentado como pendência.
+- **QA:** API 2505/2505 (165 arquivos) ×2; Web 497/497 (65 arquivos) ×2; typecheck/lint/build 0/0; TEST 0 resíduos; DEV preservado (37 migrations, 23 bios limpas, 0 "campeão 2026", backup `f1narrative_dev_pre_v324.dump`).
+- **Docs:** `v3.24-biography-quality.md`, D-089..D-092.
+
+
 
 
