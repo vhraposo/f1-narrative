@@ -17,6 +17,7 @@ import {
 import { PROFILE_BIOGRAPHY_DISPLAY_CAP } from "./pilot-knowledge.policy.js";
 import { getPilotKnowledgeView } from "./pilot-knowledge.read.js";
 import { createLlmBiographyComposer } from "./biography.composer.js";
+import { createLlmBiographyVerifier } from "./biography.verifier.js";
 import { ensurePilotKnowledgeProvisioned } from "./pilot-knowledge.provision.js";
 import {
   createUniverseDriverRelationship,
@@ -131,7 +132,11 @@ export const pilotKnowledgeRoutes: FastifyPluginAsync<PilotKnowledgeRoutesOption
         const provision = await withPilotKnowledgeAvailability(() =>
           ensurePilotKnowledgeProvisioned(character.id, new Date(), {
             ...(options.biographyProvider
-              ? { biographyComposer: createLlmBiographyComposer(options.biographyProvider) }
+              ? {
+                  biographyComposer: createLlmBiographyComposer(options.biographyProvider),
+                  biographyVerifier: createLlmBiographyVerifier(options.biographyProvider),
+                  biographyModel: options.biographyProvider.name,
+                }
               : {}),
           }),
         );

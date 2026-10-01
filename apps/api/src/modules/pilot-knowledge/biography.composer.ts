@@ -1,50 +1,127 @@
-import {
-  composeBiographyContext,
-  type BiographyFacts,
-} from "./pilot-knowledge.profile.js";
-import { feminizeNationalityPtBr, resolveNationalityPtBr } from "./nationality.ptbr.js";
+import type { GenerationProvider } from "../generation/generation.assembly.js";
+import type { ApprovedClaimSet, BiographyClaim } from "./biography.claims.js";
+import { planBiographyClaimIds } from "./biography.claims.js";
+import { composeBiographyContext, type BiographyFacts } from "./pilot-knowledge.profile.js";
 
-export const BIOGRAPHY_COMPOSER_VERSION = "biography-composer.v1";
+export const BIOGRAPHY_COMPOSER_VERSION = "biography-composer.v2";
 export const BIOGRAPHY_DISPLAY_CAP = 2400;
 
 export const BIOGRAPHY_COMPOSER_SYSTEM_PROMPT = [
   "Você é um editor biográfico especializado em Fórmula 1.",
-  "Produza uma biografia em português brasileiro.",
-  "Use exclusivamente os fatos fornecidos no evidence bundle.",
-  "A biografia deve ter aproximadamente 5 a 8 parágrafos curtos.",
-  "Inclua, quando houver evidência: nascimento, cidade/país, início no kart, caminho pelas categorias, entrada na F1, equipe(s), principais conquistas, personalidade pública observável, hobbies/interesses publicamente documentados, projetos fora das pistas e fatos relevantes para compreender o piloto.",
-  "Não invente características psicológicas. Não faça diagnóstico. Não especule.",
-  "Não diga que alguém é 'arrogante', 'tímido' ou 'gentil' sem evidência pública.",
-  "Quando descrever personalidade, use linguagem como 'Em entrevistas e aparições públicas, costuma ser descrito como...' ou 'O próprio piloto se descreveu como...' quando houver fonte.",
-  "Não copie frases longas de fontes. Produza texto original.",
-  "Toda afirmação factual importante deve estar presente no evidence bundle.",
-  "Se uma informação não estiver presente, não invente.",
-  "Não invente relacionamentos, hobbies, gostos ou citações.",
-  "Não inclua URLs, markdown, listas ou títulos; apenas parágrafos de prosa.",
+  "Use somente os claims fornecidos no evidence bundle.",
+  "Não use conhecimento externo. Não invente fatos.",
+  "Não corrija fatos silenciosamente. Não altere datas, nomes, equipes, resultados ou categorias.",
+  "Não transforme inferências em fatos. Não adicione personalidade ou hobbies sem claim.",
+  "Se informação suficiente não existir, omita.",
+  "Escreva em português brasileiro natural, sem misturar inglês, exceto nomes oficiais necessários.",
+  "Não traduza nomes próprios.",
+  "Não produza comentários sobre fontes, markdown, URLs, placeholders ou JSON dentro de strings.",
+  "Responda APENAS com JSON válido no formato exato:",
+  '{"language":"pt-BR","sentences":[{"text":"frase em pt-BR","claimIds":["CLAIM-001"]}]}',
+  "Cada frase deve citar apenas claimIds existentes no evidence bundle.",
+  "Produza entre 3 e 8 frases, em ordem cronológica.",
 ].join("\n");
 
-export type BiographyClaim = {
-  readonly label: string;
-  readonly value: string;
+export type ComposerSentence = {
+  readonly text: string;
+  readonly claimIds: readonly string[];
 };
 
-export type BiographyComposeInput = {
-  readonly subject: string;
-  readonly claims: readonly BiographyClaim[];
+export type ComposerOutput = {
+  readonly language: "pt-BR";
+  readonly sentences: readonly ComposerSentence[];
 };
 
-export type BiographyComposer = (
-  input: BiographyComposeInput,
-) => Promise<string | null>;
+function claimsForPrompt(set: ApprovedClaimSet, ids: readonly string[]): BiographyClaim[] {
+  const byId = new Map(set.claims.map((claim) => [claim.id, claim]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((claim): claim is BiographyClaim => claim !== undefined);
+}
 
-export function buildBiographyComposerUserPrompt(input: BiographyComposeInput): string {
+export function buildBiographyComposerUserPrompt(
+  set: ApprovedClaimSet,
+  plannedIds: readonly string[] = planBiographyClaimIds(set),
+): string {
   const lines = [
-    `Evidence bundle (única fonte permitida) para ${input.subject}:`,
-    ...input.claims.map((claim) => `- ${claim.label}: ${claim.value}`),
+    `Evidence bundle (única fonte permitida) para ${set.subjectName}:`,
+    ...claimsForPrompt(set, plannedIds).map(
+      (claim) => `${claim.id} [${claim.key}] ${claim.display}`,
+    ),
     "",
-    "Escreva a biografia agora, apenas com esses fatos.",
+    "Escreva a biografia agora, apenas com esses claims, no formato JSON exigido.",
   ];
   return lines.join("\n");
+}
+
+function stripCodeFences(raw: string): string {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
+  if (fenced?.[1]) return fenced[1].trim();
+  return raw.trim();
+}
+
+export function parseComposerOutput(
+  raw: string,
+  knownClaimIds: ReadonlySet<string>,
+): ComposerOutput | null {
+  const text = stripCodeFences(raw);
+  if (text.length === 0) return null;
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+  const record = parsed as Record<string, unknown>;
+  if (record.language !== "pt-BR") return null;
+  if (!Array.isArray(record.sentences)) return null;
+  if (record.sentences.length < 2 || record.sentences.length > 12) return null;
+  const sentences: ComposerSentence[] = [];
+  for (const item of record.sentences) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return null;
+    const sentence = item as Record<string, unknown>;
+    if (typeof sentence.text !== "string") return null;
+    const trimmed = sentence.text.trim();
+    if (trimmed.length < 10 || trimmed.length > 600) return null;
+    if (!Array.isArray(sentence.claimIds) || sentence.claimIds.length === 0) return null;
+    const ids: string[] = [];
+    for (const id of sentence.claimIds) {
+      if (typeof id !== "string" || !knownClaimIds.has(id)) return null;
+      ids.push(id);
+    }
+    sentences.push({ text: trimmed, claimIds: ids });
+  }
+  return { language: "pt-BR", sentences };
+}
+
+export function composerOutputToText(output: ComposerOutput): string {
+  return output.sentences.map((sentence) => sentence.text).join(" ");
+}
+
+export type BiographyComposer = (input: {
+  readonly claimSet: ApprovedClaimSet;
+}) => Promise<string | null>;
+
+export function createLlmBiographyComposer(provider: GenerationProvider): BiographyComposer {
+  return async ({ claimSet }) => {
+    const plannedIds = planBiographyClaimIds(claimSet);
+    const output = await provider.run({
+      context: {} as never,
+      systemPrompt: BIOGRAPHY_COMPOSER_SYSTEM_PROMPT,
+      userPrompt: buildBiographyComposerUserPrompt(claimSet, plannedIds),
+    });
+    if (output.mode !== "generated" || typeof output.text !== "string") return null;
+    const parsed = parseComposerOutput(
+      output.text,
+      new Set(claimSet.claims.map((claim) => claim.id)),
+    );
+    if (!parsed) return null;
+    return composerOutputToText(parsed);
+  };
 }
 
 export function sanitizeComposedBiography(raw: string): string | null {
@@ -59,88 +136,7 @@ export function sanitizeComposedBiography(raw: string): string | null {
   text = text.replace(/\n{3,}/g, "\n\n");
   text = text.trim();
   if (text.length < 80) return null;
-  if (text.includes("<") || text.toLowerCase().includes("<script")) return null;
-  if (text.length > BIOGRAPHY_DISPLAY_CAP) {
-    const slice = text.slice(0, BIOGRAPHY_DISPLAY_CAP);
-    const lastBreak = Math.max(slice.lastIndexOf("\n\n"), slice.lastIndexOf(". "));
-    text = `${(lastBreak > BIOGRAPHY_DISPLAY_CAP * 0.5 ? slice.slice(0, lastBreak) : slice).trimEnd()}`;
-  }
-  return text;
-}
-
-export function createLlmBiographyComposer(provider: {
-  readonly name: string;
-  run: (input: {
-    context: never;
-    systemPrompt: string;
-    userPrompt?: string;
-  }) => Promise<{ mode: string; text?: string }>;
-}): BiographyComposer {
-  return async (input) => {
-    const output = await provider.run({
-      context: {} as never,
-      systemPrompt: BIOGRAPHY_COMPOSER_SYSTEM_PROMPT,
-      userPrompt: buildBiographyComposerUserPrompt(input),
-    });
-    if (output.mode !== "generated" || typeof output.text !== "string") return null;
-    return sanitizeComposedBiography(output.text);
-  };
-}
-
-export function biographyClaimsFromFacts(facts: BiographyFacts): BiographyClaim[] {
-  const claims: BiographyClaim[] = [];
-  const fullName = (facts.fullName ?? facts.publicName ?? "").trim();
-  if (fullName.length > 0) claims.push({ label: "Nome completo", value: fullName });
-  if (facts.publicName && facts.publicName !== fullName) {
-    claims.push({ label: "Nome público", value: facts.publicName });
-  }
-  if (facts.dateOfBirth) {
-    claims.push({
-      label: "Data de nascimento",
-      value: facts.dateOfBirth.toISOString().slice(0, 10),
-    });
-  }
-  if (facts.placeOfBirth) {
-    claims.push({ label: "Local de nascimento", value: facts.placeOfBirth });
-  }
-  const nationality = facts.nationality ? resolveNationalityPtBr(facts.nationality) : null;
-  if (nationality) {
-    claims.push({
-      label: "Nacionalidade",
-      value: feminizeNationalityPtBr(nationality).toLowerCase(),
-    });
-  }
-  if (facts.debutYear !== null && facts.debutYear !== undefined) {
-    claims.push({
-      label: "Primeiro registro na F1",
-      value: String(facts.debutYear),
-    });
-  }
-  if (facts.teams && facts.teams.length > 0) {
-    claims.push({ label: "Equipes na F1", value: facts.teams.join(", ") });
-  }
-  if (facts.championships && facts.championships.length > 0) {
-    claims.push({
-      label: "Títulos mundiais (anos finais)",
-      value: facts.championships.join(", "),
-    });
-  }
-  if (facts.career) {
-    claims.push({
-      label: "Estatísticas de carreira na F1",
-      value: `${facts.career.starts} largadas, ${facts.career.wins} vitórias, ${facts.career.podiums} pódios, ${facts.career.poles} poles, ${facts.career.fastestLaps} voltas mais rápidas, ${facts.career.titles} títulos`,
-    });
-  }
-  if (facts.milestoneTitles && facts.milestoneTitles.length > 0) {
-    claims.push({
-      label: "Marcos registrados",
-      value: facts.milestoneTitles.join("; "),
-    });
-  }
-  if (facts.interests && facts.interests.length > 0) {
-    claims.push({ label: "Interesses públicos", value: facts.interests.join(", ") });
-  }
-  return claims;
+  return text.length > BIOGRAPHY_DISPLAY_CAP ? text.slice(0, BIOGRAPHY_DISPLAY_CAP) : text;
 }
 
 export function deterministicBiographyContext(facts: BiographyFacts): string | null {

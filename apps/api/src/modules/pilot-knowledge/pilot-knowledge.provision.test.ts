@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { deleteKnowledgeSourcesForDrivers } from "../../test-utils/pilot-knowledge-cleanup.js";
 import { deleteUniverseDataForUsers } from "../../test-utils/universe-cleanup.js";
+import type { ApprovedClaimSet } from "./biography.claims.js";
 import { ensurePilotKnowledgeProvisioned } from "./pilot-knowledge.provision.js";
 import { recordKnowledgeSource } from "./pilot-knowledge.sources.js";
 
@@ -311,42 +312,53 @@ describe("pilot knowledge provisioning", () => {
     expect(profile.biographyDisplay).toContain("nacionalidade britânica");
   });
 
-  it("8) composer LLM gera biografia com provenance e não é re-gerado na reabertura", async () => {
+  it("8) composer LLM gera biografia aprovada com provenance e não é re-gerado na reabertura", async () => {
     const fixture = await createFixture("llm-bio", { withData: true, round: 15 });
     let calls = 0;
-    const composed =
-      "Biografia ampliada e original produzida a partir de claims verificados do espelho e do F1DB, cobrindo origem, kart, categorias de base e trajetória até a Fórmula 1.";
+    let lastText = "";
+    const composer = async (input: { claimSet: ApprovedClaimSet }) => {
+      calls += 1;
+      lastText = input.claimSet.claims
+        .map((claim) => `${claim.display}.`)
+        .join(" ");
+      return lastText;
+    };
     const first = await ensurePilotKnowledgeProvisioned(fixture.character.id, new Date(), {
-      biographyComposer: async () => {
-        calls += 1;
-        return composed;
-      },
+      biographyComposer: composer,
+      biographyModel: "stub-model",
     });
     expect(first.outcome).toBe("PROVISIONED");
+    expect(first.biography?.mode).toBe("LLM_APPROVED");
     const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
       where: { externalDriverId: fixture.driver.id },
     });
-    expect(profile.biographyDisplay).toBe(composed);
+    expect(profile.biographyDisplay).toBe(lastText);
     expect(profile.biographySourceId).not.toBeNull();
     const source = await prisma.externalKnowledgeSource.findUniqueOrThrow({
       where: { id: profile.biographySourceId as string },
     });
     expect(source.sourceKind).toBe("BIOGRAPHY_PAGE");
     expect(source.provider).toBe("CURATED");
-    expect((source.metadata as { generator?: string }).generator).toBe("biography-composer");
+    const metadata = source.metadata as {
+      generator?: string;
+      generatorVersion?: string;
+      fingerprint?: string;
+      model?: string | null;
+    };
+    expect(metadata.generator).toBe("biography-composer");
+    expect(metadata.generatorVersion).toBe("biography-composer.v2");
+    expect(metadata.fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(metadata.model).toBe("stub-model");
 
     const second = await ensurePilotKnowledgeProvisioned(fixture.character.id, new Date(), {
-      biographyComposer: async () => {
-        calls += 1;
-        return composed;
-      },
+      biographyComposer: composer,
     });
     expect(second.outcome).toBe("ALREADY_PROVISIONED");
     expect(calls).toBe(1);
     const after = await prisma.externalDriverProfile.findUniqueOrThrow({
       where: { externalDriverId: fixture.driver.id },
     });
-    expect(after.biographyDisplay).toBe(composed);
+    expect(after.biographyDisplay).toBe(lastText);
   });
 
   it("9) composer sem saída válida cai no fallback determinístico", async () => {
@@ -357,6 +369,40 @@ describe("pilot knowledge provisioning", () => {
     const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
       where: { externalDriverId: fixture.driver.id },
     });
+    expect(profile.biographyDisplay).toContain("campeonato mundial em 2016");
+    const source = await prisma.externalKnowledgeSource.findUniqueOrThrow({
+      where: { id: profile.biographySourceId as string },
+    });
+    expect(source.sourceKind).toBe("DATABASE_EXPORT");
+  });
+
+  it("10) auto-repara biografia gerada corrompida ou de versão antiga", async () => {
+    const fixture = await createFixture("bio-repair", { withData: true, round: 17 });
+    await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    const legacySource = await recordKnowledgeSource({
+      provider: "CURATED",
+      sourceKind: "BIOGRAPHY_PAGE",
+      url: null,
+      title: "Biografia antiga (v1)",
+      license: "UNKNOWN",
+      metadata: { generator: "biography-composer", generatorVersion: "biography-composer.v1" },
+    });
+    await prisma.externalDriverProfile.update({
+      where: { externalDriverId: fixture.driver.id },
+      data: {
+        biographyDisplay:
+          "Piloto bio-repair demonstrou um talentoexceptional e starting forte nas categorias de base do automobilismo.",
+        biographySourceId: legacySource.id,
+      },
+    });
+
+    const result = await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    expect(result.outcome).toBe("ALREADY_PROVISIONED");
+    const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    expect(profile.biographyDisplay).not.toContain("talentoexceptional");
+    expect(profile.biographyDisplay).not.toContain("starting");
     expect(profile.biographyDisplay).toContain("campeonato mundial em 2016");
     const source = await prisma.externalKnowledgeSource.findUniqueOrThrow({
       where: { id: profile.biographySourceId as string },

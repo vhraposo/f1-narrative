@@ -1,81 +1,124 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
+import { buildApprovedBiographyClaims } from "./biography.claims.js";
 import {
-  biographyClaimsFromFacts,
+  BIOGRAPHY_COMPOSER_VERSION,
   buildBiographyComposerUserPrompt,
+  composerOutputToText,
   createLlmBiographyComposer,
+  parseComposerOutput,
   sanitizeComposedBiography,
 } from "./biography.composer.js";
 
-describe("biography composer", () => {
-  it("1) sanitiza HTML, URLs, markdown e limita tamanho", () => {
-    const html =
-      "<p>Lando Norris nasceu em Bristol, na Inglaterra, em novembro de 1999, e chegou à Fórmula 1 pela McLaren em 2019.</p><script>alert(1)</script><a href=\"https://x\">link</a>";
-    const clean = sanitizeComposedBiography(html);
-    expect(clean).not.toBeNull();
-    expect(clean).not.toContain("<");
-    expect(clean).not.toContain("http");
-    expect(clean).not.toContain("script");
+const CLAIM_SET = buildApprovedBiographyClaims({
+  externalDriverId: "ext-1",
+  f1dbDriver: null,
+  f1dbAmbiguous: false,
+  f1dbSourceVersion: "v2026.15.1",
+  facts: {
+    fullName: "Piloto Teste",
+    publicName: "Piloto Teste",
+    dateOfBirth: new Date("1997-09-30T00:00:00.000Z"),
+    nationality: "Dutch",
+  },
+});
+const KNOWN_IDS = new Set(CLAIM_SET.claims.map((claim) => claim.id));
+
+describe("biography composer v2", () => {
+  it("1) prompt usa somente claims com IDs estáveis", () => {
+    const prompt = buildBiographyComposerUserPrompt(CLAIM_SET);
+    expect(prompt).toContain("Piloto Teste");
+    expect(prompt).toContain("CLAIM-001");
+    expect(prompt).toContain("formato JSON exigido");
+    expect(prompt).not.toContain("conhecimento");
   });
 
-  it("2) rejeita textos curtos ou vazios", () => {
-    expect(sanitizeComposedBiography("")).toBeNull();
-    expect(sanitizeComposedBiography("curto demais")).toBeNull();
+  it("2) parse aceita JSON estrito e rejeita formatos inválidos", () => {
+    const valid = JSON.stringify({
+      language: "pt-BR",
+      sentences: [
+        { text: "Piloto Teste nasceu em 30 de setembro de 1997.", claimIds: ["CLAIM-001"] },
+        { text: "Tem nacionalidade neerlandesa.", claimIds: ["CLAIM-002"] },
+      ],
+    });
+    const parsed = parseComposerOutput(valid, KNOWN_IDS);
+    expect(parsed).not.toBeNull();
+    expect(composerOutputToText(parsed!)).toContain("nasceu");
+
+    expect(parseComposerOutput("texto livre", KNOWN_IDS)).toBeNull();
     expect(
-      sanitizeComposedBiography("```json\n{\"a\":1}\n```"),
+      parseComposerOutput(
+        JSON.stringify({ language: "en", sentences: [{ text: "x".repeat(20), claimIds: ["CLAIM-001"] }] }),
+        KNOWN_IDS,
+      ),
+    ).toBeNull();
+    expect(
+      parseComposerOutput(
+        JSON.stringify({
+          language: "pt-BR",
+          sentences: [
+            { text: "Frase válida de teste com tamanho adequado.", claimIds: ["CLAIM-999"] },
+          ],
+        }),
+        KNOWN_IDS,
+      ),
+    ).toBeNull();
+    expect(
+      parseComposerOutput(
+        JSON.stringify({
+          language: "pt-BR",
+          sentences: [{ text: "curta", claimIds: ["CLAIM-001"] }],
+        }),
+        KNOWN_IDS,
+      ),
     ).toBeNull();
   });
 
-  it("3) monta prompt com apenas os claims fornecidos", () => {
-    const prompt = buildBiographyComposerUserPrompt({
-      subject: "Lando Norris",
-      claims: [{ label: "Nascimento", value: "1999-11-13" }],
-    });
-    expect(prompt).toContain("Lando Norris");
-    expect(prompt).toContain("1999-11-13");
-    expect(prompt).toContain("apenas com esses fatos");
+  it("3) aceita cercas de código ao redor do JSON", () => {
+    const fenced = [
+      "```json",
+      JSON.stringify({
+        language: "pt-BR",
+        sentences: [
+          { text: "Piloto Teste nasceu em 30 de setembro de 1997.", claimIds: ["CLAIM-001"] },
+          { text: "Tem nacionalidade neerlandesa e registros na Fórmula 1.", claimIds: ["CLAIM-002"] },
+        ],
+      }),
+      "```",
+    ].join("\n");
+    expect(parseComposerOutput(fenced, KNOWN_IDS)).not.toBeNull();
   });
 
-  it("4) derivar claims de fatos localiza nacionalidade e estatísticas", () => {
-    const claims = biographyClaimsFromFacts({
-      fullName: "Lando Norris",
-      publicName: "Lando Norris",
-      dateOfBirth: new Date("1999-11-13T00:00:00.000Z"),
-      placeOfBirth: "Bristol",
-      nationality: "British",
-      debutYear: 2019,
-      teams: ["McLaren"],
-      championships: [2025],
-      career: {
-        wins: 13,
-        podiums: 49,
-        poles: 19,
-        fastestLaps: 20,
-        titles: 1,
-        starts: 150,
-      },
-    });
-    const byLabel = new Map(claims.map((claim) => [claim.label, claim.value]));
-    expect(byLabel.get("Nacionalidade")).toBe("britânica");
-    expect(byLabel.get("Local de nascimento")).toBe("Bristol");
-    expect(byLabel.get("Títulos mundiais (anos finais)")).toBe("2025");
-    expect(byLabel.get("Estatísticas de carreira na F1")).toContain("13 vitórias");
-  });
+  it("4) composer com provider usa o contrato estruturado", async () => {
+    const provider = {
+      name: "stub",
+      run: async () => ({
+        mode: "generated",
+        text: JSON.stringify({
+          language: "pt-BR",
+          sentences: [
+            { text: "Piloto Teste nasceu em 30 de setembro de 1997.", claimIds: ["CLAIM-001"] },
+            { text: "Tem nacionalidade neerlandesa na Fórmula 1.", claimIds: ["CLAIM-002"] },
+          ],
+        }),
+      }),
+    };
+    const composer = createLlmBiographyComposer(provider as never);
+    const text = await composer({ claimSet: CLAIM_SET });
+    expect(text).toContain("Piloto Teste");
+    expect(BIOGRAPHY_COMPOSER_VERSION).toBe("biography-composer.v2");
 
-  it("5) composer com provider: usa somente saída gerada e válida", async () => {
-    const run = vi.fn(async () => ({
-      mode: "generated",
-      text: "Lando Norris nasceu em Bristol, na Inglaterra, em novembro de 1999. Desde cedo mostrou talento no kart e chegou à Fórmula 1 em 2019 pela McLaren, tornando-se campeão mundial em 2025.",
-    }));
-    const composer = createLlmBiographyComposer({ name: "stub", run });
-    const text = await composer({ subject: "Lando Norris", claims: [] });
-    expect(text).toContain("Bristol");
-    expect(run).toHaveBeenCalledOnce();
-
-    const assemblyOnly = createLlmBiographyComposer({
+    const assembly = createLlmBiographyComposer({
       name: "null",
-      run: vi.fn(async () => ({ mode: "assembly-only" })),
-    });
-    expect(await assemblyOnly({ subject: "X", claims: [] })).toBeNull();
+      run: async () => ({ mode: "assembly-only" }),
+    } as never);
+    expect(await assembly({ claimSet: CLAIM_SET })).toBeNull();
+  });
+
+  it("5) sanitize continua syntax-level apenas para emergências", () => {
+    const html = "<p>Texto longo o suficiente para passar do mínimo e ser utilizado como fallback de emergência.</p><script>x</script>";
+    const clean = sanitizeComposedBiography(html);
+    expect(clean).not.toBeNull();
+    expect(clean).not.toContain("<");
   });
 });

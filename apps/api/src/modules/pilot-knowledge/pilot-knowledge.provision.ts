@@ -5,14 +5,21 @@ import { getF1dbDataset } from "../f1db/f1db.dataset.js";
 import {
   computeF1dbDriverMilestones,
   getF1dbDriverStats,
-  resolveF1dbDriver,
+  resolveF1dbDriverStrict,
 } from "../f1db/f1db.drivers.js";
+import type { F1dbDriver } from "../f1db/f1db.dataset.js";
 import {
   BIOGRAPHY_COMPOSER_VERSION,
-  biographyClaimsFromFacts,
   deterministicBiographyContext,
   type BiographyComposer,
 } from "./biography.composer.js";
+import {
+  buildApprovedBiographyClaims,
+  type ApprovedClaimSet,
+} from "./biography.claims.js";
+import { composeBiographyFromClaims } from "./biography.pipeline.js";
+import { validateBiographyText } from "./biography.quality.js";
+import type { BiographyVerifier } from "./biography.verifier.js";
 import { deriveMilestonesFromExternalData } from "./pilot-knowledge.events.js";
 import {
   readDriverSourceIdentity,
@@ -24,6 +31,8 @@ import { recordKnowledgeSource } from "./pilot-knowledge.sources.js";
 
 export type ProvisionOptions = {
   readonly biographyComposer?: BiographyComposer;
+  readonly biographyVerifier?: BiographyVerifier;
+  readonly biographyModel?: string;
 };
 
 export type ProvisionOutcome =
@@ -32,9 +41,15 @@ export type ProvisionOutcome =
   | "NO_EXTERNAL_BINDING"
   | "DRIVER_NOT_FOUND";
 
+export type ProvisionBiographyStatus = {
+  readonly mode: "LLM_APPROVED" | "FALLBACK" | "NOT_REQUESTED";
+  readonly fallbackReason: string | null;
+};
+
 export type ProvisionResult = {
   readonly outcome: ProvisionOutcome;
   readonly externalDriverId: string | null;
+  readonly biography?: ProvisionBiographyStatus;
 };
 
 type MirrorDriver = {
@@ -45,7 +60,15 @@ type MirrorDriver = {
   readonly sourceRecord: Prisma.JsonValue | null;
 };
 
-async function collectMirrorCareer(externalDriverId: string) {
+type MirrorCareer = {
+  teams: string[];
+  championships: number[];
+  currentTeamName: string | null;
+  driverNumber: number | null;
+  debutYear: number | null;
+};
+
+async function collectMirrorCareer(externalDriverId: string): Promise<MirrorCareer> {
   const [seasons, titles] = await Promise.all([
     prisma.externalDriverSeason.findMany({
       where: { externalDriverId },
@@ -80,23 +103,14 @@ function topMilestoneTitles(
     .map((event) => event.title);
 }
 
-async function buildMirrorProfileInput(
-  externalDriverId: string,
-  driver: MirrorDriver,
-  sourceId: string | null,
-  now: Date,
-  options: ProvisionOptions = {},
-): Promise<StructuredDriverProfileInput> {
-  const [career, milestones] = await Promise.all([
-    collectMirrorCareer(externalDriverId),
-    deriveMilestonesFromExternalData(externalDriverId, now),
-  ]);
-  const sourceIdentity = readDriverSourceIdentity(driver.sourceRecord);
-
-  const dataset = getF1dbDataset();
-  const f1dbDriver = dataset
-    ? resolveF1dbDriver({ name: driver.name, driverCode: sourceIdentity.driverCode })
-    : null;
+function buildBiographyFacts(input: {
+  driver: MirrorDriver;
+  career: MirrorCareer;
+  milestones: readonly { title: string; importance: number; seasonYear: number | null }[];
+  f1dbDriver: F1dbDriver | null;
+  sourceIdentity: { dateOfBirth: Date | null; driverCode: string | null };
+}): BiographyFacts {
+  const { driver, career, milestones, f1dbDriver, sourceIdentity } = input;
   const f1dbMilestones = f1dbDriver
     ? computeF1dbDriverMilestones(f1dbDriver.id)
     : null;
@@ -112,9 +126,8 @@ async function buildMirrorProfileInput(
   const dateOfBirth = sourceIdentity.dateOfBirth ?? (f1dbDriver?.dateOfBirth
     ? new Date(`${f1dbDriver.dateOfBirth}T00:00:00.000Z`)
     : null);
-  const driverCode = sourceIdentity.driverCode ?? f1dbDriver?.abbreviation ?? null;
 
-  const biographyFacts: BiographyFacts = {
+  return {
     publicName: driver.name,
     fullName: driver.fullName,
     dateOfBirth,
@@ -135,58 +148,174 @@ async function buildMirrorProfileInput(
         }
       : null,
   };
+}
 
-  let biographyContent: StructuredDriverProfileInput["biographyContent"] = null;
-  if (options.biographyComposer) {
-    try {
-      const claims = biographyClaimsFromFacts(biographyFacts);
-      const composed = await options.biographyComposer({
-        subject: driver.fullName ?? driver.name,
-        claims,
-      });
-      if (composed) {
-        const source = await recordKnowledgeSource(
-          {
-            provider: "CURATED",
-            sourceKind: "BIOGRAPHY_PAGE",
-            url: null,
-            title: `Biografia composta por IA (${BIOGRAPHY_COMPOSER_VERSION})`,
-            license: "UNKNOWN",
-            attributionRequirement: null,
-            attributionText:
-              "Síntese original gerada a partir de claims estruturados do espelho/F1DB; não copiada de fonte.",
-            metadata: {
-              generator: "biography-composer",
-              generatorVersion: BIOGRAPHY_COMPOSER_VERSION,
-              claimsCount: claims.length,
-            },
-          },
-          now,
-        );
-        biographyContent = {
-          display: composed,
-          context: deterministicBiographyContext(biographyFacts),
-          sourceId: source.id,
-        };
-      }
-    } catch {
-      biographyContent = null;
-    }
-  }
+async function recordGeneratedBiographySource(
+  claims: ApprovedClaimSet,
+  model: string | null,
+  now: Date,
+) {
+  return recordKnowledgeSource(
+    {
+      provider: "CURATED",
+      sourceKind: "BIOGRAPHY_PAGE",
+      url: null,
+      title: `Biografia composta por IA (${BIOGRAPHY_COMPOSER_VERSION})`,
+      license: "UNKNOWN",
+      attributionRequirement: null,
+      attributionText:
+        "Síntese original gerada a partir de claims aprovados do espelho/F1DB e validada; não copiada de fonte.",
+      metadata: {
+        generator: "biography-composer",
+        generatorVersion: BIOGRAPHY_COMPOSER_VERSION,
+        fingerprint: claims.fingerprint,
+        claimsCount: claims.claims.length,
+        model: model ?? null,
+      },
+    },
+    now,
+  );
+}
 
-  return {
+async function buildMirrorProfileInput(
+  externalDriverId: string,
+  driver: MirrorDriver,
+  sourceId: string | null,
+  now: Date,
+  options: ProvisionOptions = {},
+): Promise<{ input: StructuredDriverProfileInput; biography: ProvisionBiographyStatus }> {
+  const [career, milestones] = await Promise.all([
+    collectMirrorCareer(externalDriverId),
+    deriveMilestonesFromExternalData(externalDriverId, now),
+  ]);
+  const sourceIdentity = readDriverSourceIdentity(driver.sourceRecord);
+
+  const dataset = getF1dbDataset();
+  const resolution = dataset
+    ? resolveF1dbDriverStrict({
+        name: driver.name,
+        driverCode: sourceIdentity.driverCode,
+      })
+    : { driver: null, ambiguous: false };
+  const f1dbDriver = resolution.driver;
+
+  const biographyFacts = buildBiographyFacts({
+    driver,
+    career,
+    milestones,
+    f1dbDriver,
+    sourceIdentity,
+  });
+
+  const driverCode = sourceIdentity.driverCode ?? f1dbDriver?.abbreviation ?? null;
+  const baseInput = {
     fullName: driver.fullName,
     publicName: driver.name,
-    dateOfBirth,
-    placeOfBirth: f1dbDriver?.placeOfBirth ?? null,
+    dateOfBirth: biographyFacts.dateOfBirth ?? null,
+    placeOfBirth: biographyFacts.placeOfBirth ?? null,
     driverCode,
     nationality: driver.nationality,
     driverNumber: career.driverNumber ?? driver.number ?? null,
     currentTeamName: career.currentTeamName,
     sourceId,
     biographyFacts,
-    biographyContent,
+  } satisfies StructuredDriverProfileInput;
+
+  const claimSet = buildApprovedBiographyClaims({
+    externalDriverId,
+    facts: biographyFacts,
+    f1dbDriver,
+    f1dbAmbiguous: resolution.ambiguous,
+    f1dbSourceVersion: dataset?.sourceVersion ?? null,
+  });
+
+  if (!options.biographyComposer) {
+    return {
+      input: baseInput,
+      biography: { mode: "NOT_REQUESTED", fallbackReason: null },
+    };
+  }
+
+  const pipeline = await composeBiographyFromClaims({
+    claimSet,
+    facts: biographyFacts,
+    ...(options.biographyComposer ? { composer: options.biographyComposer } : {}),
+    ...(options.biographyVerifier ? { verifier: options.biographyVerifier } : {}),
+  });
+
+  if (pipeline.mode !== "LLM_APPROVED" || pipeline.display.trim().length === 0) {
+    return {
+      input: baseInput,
+      biography: { mode: "FALLBACK", fallbackReason: pipeline.fallbackReason },
+    };
+  }
+
+  const source = await recordGeneratedBiographySource(
+    claimSet,
+    options.biographyModel ?? null,
+    now,
+  );
+  return {
+    input: {
+      ...baseInput,
+      biographyContent: {
+        display: pipeline.display,
+        context: deterministicBiographyContext(biographyFacts),
+        sourceId: source.id,
+      },
+    },
+    biography: { mode: "LLM_APPROVED", fallbackReason: null },
   };
+}
+
+function storedBiographyIsValid(
+  claims: ApprovedClaimSet,
+  display: string,
+): boolean {
+  return validateBiographyText({ text: display, claims }).ok;
+}
+
+async function generatedBiographyNeedsRepair(input: {
+  externalDriverId: string;
+  driver: MirrorDriver;
+  profile: {
+    biographyDisplay: string | null;
+  };
+  metadata: Prisma.JsonValue | null;
+  now: Date;
+}): Promise<boolean> {
+  const metadata = (input.metadata ?? {}) as Record<string, unknown>;
+  if (metadata.generatorVersion !== BIOGRAPHY_COMPOSER_VERSION) return true;
+  const display = input.profile.biographyDisplay?.trim();
+  if (!display) return true;
+
+  const [career, milestones] = await Promise.all([
+    collectMirrorCareer(input.externalDriverId),
+    deriveMilestonesFromExternalData(input.externalDriverId, input.now),
+  ]);
+  const sourceIdentity = readDriverSourceIdentity(input.driver.sourceRecord);
+  const dataset = getF1dbDataset();
+  const resolution = dataset
+    ? resolveF1dbDriverStrict({
+        name: input.driver.name,
+        driverCode: sourceIdentity.driverCode,
+      })
+    : { driver: null, ambiguous: false };
+  const facts = buildBiographyFacts({
+    driver: input.driver,
+    career,
+    milestones,
+    f1dbDriver: resolution.driver,
+    sourceIdentity,
+  });
+  const claims = buildApprovedBiographyClaims({
+    externalDriverId: input.externalDriverId,
+    facts,
+    f1dbDriver: resolution.driver,
+    f1dbAmbiguous: resolution.ambiguous,
+    f1dbSourceVersion: dataset?.sourceVersion ?? null,
+  });
+  return !storedBiographyIsValid(claims, display);
 }
 
 export async function ensurePilotKnowledgeProvisioned(
@@ -217,22 +346,37 @@ export async function ensurePilotKnowledgeProvisioned(
 
   const existingProfile = await prisma.externalDriverProfile.findUnique({
     where: { externalDriverId },
-    select: { id: true, biographySourceId: true, sourceId: true },
+    select: {
+      id: true,
+      biographyDisplay: true,
+      biographySourceId: true,
+      sourceId: true,
+      publicName: true,
+      fullName: true,
+      dateOfBirth: true,
+      placeOfBirth: true,
+      nationality: true,
+    },
   });
 
   if (existingProfile) {
     const biographySource = existingProfile.biographySourceId
       ? await prisma.externalKnowledgeSource.findUnique({
           where: { id: existingProfile.biographySourceId },
-          select: { provider: true, sourceKind: true },
+          select: { provider: true, sourceKind: true, metadata: true },
         })
       : null;
+    const generated =
+      biographySource !== null &&
+      biographySource.provider === "CURATED" &&
+      biographySource.sourceKind === "BIOGRAPHY_PAGE";
     const ownedByMirror =
       biographySource === null ||
       (biographySource.provider === "CURATED" &&
-        biographySource.sourceKind !== "BIOGRAPHY_PAGE");
+        biographySource.sourceKind === "DATABASE_EXPORT");
+
     if (ownedByMirror) {
-      const input = await buildMirrorProfileInput(
+      const { input, biography } = await buildMirrorProfileInput(
         externalDriverId,
         driver,
         existingProfile.biographySourceId ?? existingProfile.sourceId ?? null,
@@ -240,10 +384,43 @@ export async function ensurePilotKnowledgeProvisioned(
         options,
       );
       await upsertDriverProfileFromProvider(externalDriverId, input, now);
-    } else {
-      await deriveMilestonesFromExternalData(externalDriverId, now);
+      return { outcome: "ALREADY_PROVISIONED", externalDriverId, biography };
     }
-    return { outcome: "ALREADY_PROVISIONED", externalDriverId };
+
+    if (!generated) {
+      await deriveMilestonesFromExternalData(externalDriverId, now);
+      return {
+        outcome: "ALREADY_PROVISIONED",
+        externalDriverId,
+        biography: { mode: "NOT_REQUESTED", fallbackReason: null },
+      };
+    }
+
+    const needsRepair = await generatedBiographyNeedsRepair({
+      externalDriverId,
+      driver,
+      profile: { biographyDisplay: existingProfile.biographyDisplay },
+      metadata: biographySource?.metadata ?? null,
+      now,
+    });
+    if (needsRepair) {
+      const { input, biography } = await buildMirrorProfileInput(
+        externalDriverId,
+        driver,
+        existingProfile.sourceId ?? existingProfile.biographySourceId ?? null,
+        now,
+        options,
+      );
+      await upsertDriverProfileFromProvider(externalDriverId, input, now);
+      return { outcome: "ALREADY_PROVISIONED", externalDriverId, biography };
+    }
+
+    await deriveMilestonesFromExternalData(externalDriverId, now);
+    return {
+      outcome: "ALREADY_PROVISIONED",
+      externalDriverId,
+      biography: { mode: "NOT_REQUESTED", fallbackReason: null },
+    };
   }
 
   const source = await recordKnowledgeSource(
@@ -260,7 +437,7 @@ export async function ensurePilotKnowledgeProvisioned(
     now,
   );
 
-  const input = await buildMirrorProfileInput(
+  const { input, biography } = await buildMirrorProfileInput(
     externalDriverId,
     driver,
     source.id,
@@ -269,5 +446,5 @@ export async function ensurePilotKnowledgeProvisioned(
   );
   await upsertDriverProfileFromProvider(externalDriverId, input, now);
 
-  return { outcome: "PROVISIONED", externalDriverId };
+  return { outcome: "PROVISIONED", externalDriverId, biography };
 }
