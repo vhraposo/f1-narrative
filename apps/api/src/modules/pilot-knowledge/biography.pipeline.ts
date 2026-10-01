@@ -3,6 +3,8 @@ import {
   type BiographyComposer,
 } from "./biography.composer.js";
 import type { ApprovedClaimSet } from "./biography.claims.js";
+import { evaluateBiographyCoverage, type BiographyCoverage } from "./biography.coverage.js";
+import { renderRichDeterministicBiography } from "./biography.fallback.js";
 import { validateBiographyText } from "./biography.quality.js";
 import type { BiographyVerifier } from "./biography.verifier.js";
 import {
@@ -10,7 +12,7 @@ import {
   type BiographyFacts,
 } from "./pilot-knowledge.profile.js";
 
-export type BiographyPipelineMode = "LLM_APPROVED" | "FALLBACK";
+export type BiographyPipelineMode = "LLM_APPROVED" | "RICH_DETERMINISTIC" | "FALLBACK";
 
 export type BiographyPipelineResult = {
   readonly display: string;
@@ -19,6 +21,8 @@ export type BiographyPipelineResult = {
   readonly fingerprint: string;
   readonly claimsCount: number;
   readonly generatorVersion: string;
+  readonly evidenceVersion: string | null;
+  readonly coverage: BiographyCoverage;
 };
 
 function minimalFromClaims(set: ApprovedClaimSet): string | null {
@@ -44,20 +48,33 @@ function minimalFromClaims(set: ApprovedClaimSet): string | null {
   return parts.join(" ");
 }
 
+function countParagraphs(text: string): number {
+  return text
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 0).length;
+}
+
 export async function composeBiographyFromClaims(input: {
   readonly claimSet: ApprovedClaimSet;
   readonly facts: BiographyFacts;
   readonly composer?: BiographyComposer;
   readonly verifier?: BiographyVerifier;
 }): Promise<BiographyPipelineResult> {
+  const coverage = evaluateBiographyCoverage(input.claimSet);
   const base = {
     fingerprint: input.claimSet.fingerprint,
     claimsCount: input.claimSet.claims.length,
     generatorVersion: BIOGRAPHY_COMPOSER_VERSION,
+    evidenceVersion: input.claimSet.evidenceVersion,
+    coverage,
   };
 
+  const richDisplay = coverage.rich
+    ? renderRichDeterministicBiography(input.claimSet)
+    : null;
   const deterministic =
-    composeBiographyDisplay(input.facts) ?? minimalFromClaims(input.claimSet);
+    richDisplay ?? composeBiographyDisplay(input.facts) ?? minimalFromClaims(input.claimSet);
 
   if (input.claimSet.identityStatus !== "RESOLVED") {
     return {
@@ -69,6 +86,14 @@ export async function composeBiographyFromClaims(input: {
   }
 
   if (!input.composer) {
+    if (richDisplay) {
+      return {
+        ...base,
+        display: richDisplay,
+        mode: "RICH_DETERMINISTIC",
+        fallbackReason: "rich-deterministic",
+      };
+    }
     return {
       ...base,
       display: deterministic ?? "",
@@ -87,7 +112,7 @@ export async function composeBiographyFromClaims(input: {
     return {
       ...base,
       display: deterministic ?? "",
-      mode: "FALLBACK",
+      mode: richDisplay ? "RICH_DETERMINISTIC" : "FALLBACK",
       fallbackReason: "composer-error",
     };
   }
@@ -95,18 +120,22 @@ export async function composeBiographyFromClaims(input: {
     return {
       ...base,
       display: deterministic ?? "",
-      mode: "FALLBACK",
+      mode: richDisplay ? "RICH_DETERMINISTIC" : "FALLBACK",
       fallbackReason: "composer-parse-failed",
     };
   }
 
   const quality = validateBiographyText({ text: candidate, claims: input.claimSet });
-  if (!quality.ok) {
+  const issues = [...quality.issues];
+  if (quality.ok && coverage.rich && countParagraphs(candidate) < 3) {
+    issues.push("too-few-paragraphs");
+  }
+  if (issues.length > 0) {
     return {
       ...base,
       display: deterministic ?? "",
-      mode: "FALLBACK",
-      fallbackReason: `quality:${quality.issues[0] ?? "unknown"}`,
+      mode: richDisplay ? "RICH_DETERMINISTIC" : "FALLBACK",
+      fallbackReason: `quality:${issues[0] ?? "unknown"}`,
     };
   }
 
@@ -121,7 +150,7 @@ export async function composeBiographyFromClaims(input: {
       return {
         ...base,
         display: deterministic ?? "",
-        mode: "FALLBACK",
+        mode: richDisplay ? "RICH_DETERMINISTIC" : "FALLBACK",
         fallbackReason: `semantic:${verification.issues[0] ?? verification.unsupportedStatements[0] ?? "rejected"}`,
       };
     }

@@ -16,7 +16,12 @@ import {
 import {
   buildApprovedBiographyClaims,
   type ApprovedClaimSet,
+  type BiographyClaimSourceRef,
 } from "./biography.claims.js";
+import {
+  curatedEvidenceVersion,
+  getCuratedEvidenceForDriver,
+} from "./biography.evidence.js";
 import { composeBiographyFromClaims } from "./biography.pipeline.js";
 import { validateBiographyText } from "./biography.quality.js";
 import type { BiographyVerifier } from "./biography.verifier.js";
@@ -42,7 +47,7 @@ export type ProvisionOutcome =
   | "DRIVER_NOT_FOUND";
 
 export type ProvisionBiographyStatus = {
-  readonly mode: "LLM_APPROVED" | "FALLBACK" | "NOT_REQUESTED";
+  readonly mode: "LLM_APPROVED" | "RICH_DETERMINISTIC" | "FALLBACK" | "NOT_REQUESTED";
   readonly fallbackReason: string | null;
 };
 
@@ -155,9 +160,51 @@ function buildBiographyFacts(input: {
   };
 }
 
+const SOURCE_PROVIDER_MAP: Record<string, "F1_OFFICIAL" | "TEAM_OFFICIAL" | "DRIVER_OFFICIAL" | "REPUTABLE_NEWS" | "CURATED"> = {
+  F1_OFFICIAL: "F1_OFFICIAL",
+  TEAM_OFFICIAL: "TEAM_OFFICIAL",
+  DRIVER_OFFICIAL: "DRIVER_OFFICIAL",
+  REPUTABLE_NEWS: "REPUTABLE_NEWS",
+};
+
+const SOURCE_KIND_MAP: Record<string, "OFFICIAL_PROFILE" | "BIOGRAPHY_PAGE" | "INTERVIEW" | "DATABASE_EXPORT"> = {
+  OFFICIAL_PROFILE: "OFFICIAL_PROFILE",
+  BIOGRAPHY_PAGE: "BIOGRAPHY_PAGE",
+  INTERVIEW: "INTERVIEW",
+};
+
+async function recordCuratedEvidenceSources(
+  claims: ApprovedClaimSet,
+  now: Date,
+): Promise<Array<{ url: string; sourceId: string }>> {
+  const refs = new Map<string, BiographyClaimSourceRef>();
+  for (const claim of claims.claims) {
+    if (claim.sourceRef) refs.set(claim.sourceRef.url, claim.sourceRef);
+  }
+  const recorded: Array<{ url: string; sourceId: string }> = [];
+  for (const ref of refs.values()) {
+    const source = await recordKnowledgeSource(
+      {
+        provider: SOURCE_PROVIDER_MAP[ref.provider] ?? "CURATED",
+        sourceKind: SOURCE_KIND_MAP[ref.sourceType] ?? "DATABASE_EXPORT",
+        url: ref.url,
+        title: ref.title,
+        license: "UNKNOWN",
+        attributionRequirement: "Obrigatória",
+        attributionText: "Fato estruturado com proveniência; nenhum texto de fonte foi copiado.",
+        metadata: { curatedEvidence: true },
+      },
+      now,
+    );
+    recorded.push({ url: ref.url, sourceId: source.id });
+  }
+  return recorded;
+}
+
 async function recordGeneratedBiographySource(
   claims: ApprovedClaimSet,
   model: string | null,
+  evidenceSources: ReadonlyArray<{ url: string; sourceId: string }>,
   now: Date,
 ) {
   return recordKnowledgeSource(
@@ -169,13 +216,15 @@ async function recordGeneratedBiographySource(
       license: "UNKNOWN",
       attributionRequirement: null,
       attributionText:
-        "Síntese original gerada a partir de claims aprovados do espelho/F1DB e validada; não copiada de fonte.",
+        "Síntese original gerada a partir de claims aprovados do espelho/F1DB e evidence curada; não copiada de fonte.",
       metadata: {
         generator: "biography-composer",
         generatorVersion: BIOGRAPHY_COMPOSER_VERSION,
         fingerprint: claims.fingerprint,
         claimsCount: claims.claims.length,
         model: model ?? null,
+        evidenceVersion: claims.evidenceVersion,
+        evidenceSources,
       },
     },
     now,
@@ -226,20 +275,17 @@ async function buildMirrorProfileInput(
     biographyFacts,
   } satisfies StructuredDriverProfileInput;
 
+  const curated = getCuratedEvidenceForDriver(f1dbDriver?.id ?? null);
+  const evidenceVersion = curatedEvidenceVersion();
   const claimSet = buildApprovedBiographyClaims({
     externalDriverId,
     facts: biographyFacts,
     f1dbDriver,
     f1dbAmbiguous: resolution.ambiguous,
     f1dbSourceVersion: dataset?.sourceVersion ?? null,
+    curated,
+    evidenceVersion,
   });
-
-  if (!options.biographyComposer) {
-    return {
-      input: baseInput,
-      biography: { mode: "NOT_REQUESTED", fallbackReason: null },
-    };
-  }
 
   const pipeline = await composeBiographyFromClaims({
     claimSet,
@@ -248,28 +294,47 @@ async function buildMirrorProfileInput(
     ...(options.biographyVerifier ? { verifier: options.biographyVerifier } : {}),
   });
 
-  if (pipeline.mode !== "LLM_APPROVED" || pipeline.display.trim().length === 0) {
+  if (pipeline.mode === "LLM_APPROVED" && pipeline.display.trim().length > 0) {
+    const evidenceSources = await recordCuratedEvidenceSources(claimSet, now);
+    const source = await recordGeneratedBiographySource(
+      claimSet,
+      options.biographyModel ?? null,
+      evidenceSources,
+      now,
+    );
     return {
-      input: baseInput,
-      biography: { mode: "FALLBACK", fallbackReason: pipeline.fallbackReason },
+      input: {
+        ...baseInput,
+        biographyContent: {
+          display: pipeline.display,
+          context: deterministicBiographyContext(biographyFacts),
+          sourceId: source.id,
+        },
+      },
+      biography: { mode: "LLM_APPROVED", fallbackReason: null },
     };
   }
 
-  const source = await recordGeneratedBiographySource(
-    claimSet,
-    options.biographyModel ?? null,
-    now,
-  );
-  return {
-    input: {
-      ...baseInput,
-      biographyContent: {
-        display: pipeline.display,
-        context: deterministicBiographyContext(biographyFacts),
-        sourceId: source.id,
+  if (pipeline.display.trim().length > 0 && typeof baseInput.sourceId === "string") {
+    return {
+      input: {
+        ...baseInput,
+        biographyContent: {
+          display: pipeline.display,
+          context: deterministicBiographyContext(biographyFacts),
+          sourceId: baseInput.sourceId,
+        },
       },
-    },
-    biography: { mode: "LLM_APPROVED", fallbackReason: null },
+      biography: {
+        mode: pipeline.mode === "RICH_DETERMINISTIC" ? "RICH_DETERMINISTIC" : "FALLBACK",
+        fallbackReason: pipeline.fallbackReason,
+      },
+    };
+  }
+
+  return {
+    input: baseInput,
+    biography: { mode: "NOT_REQUESTED", fallbackReason: pipeline.fallbackReason },
   };
 }
 
@@ -291,6 +356,7 @@ async function generatedBiographyNeedsRepair(input: {
 }): Promise<boolean> {
   const metadata = (input.metadata ?? {}) as Record<string, unknown>;
   if (metadata.generatorVersion !== BIOGRAPHY_COMPOSER_VERSION) return true;
+  if (metadata.evidenceVersion !== curatedEvidenceVersion()) return true;
   const display = input.profile.biographyDisplay?.trim();
   if (!display) return true;
 
@@ -319,6 +385,8 @@ async function generatedBiographyNeedsRepair(input: {
     f1dbDriver: resolution.driver,
     f1dbAmbiguous: resolution.ambiguous,
     f1dbSourceVersion: dataset?.sourceVersion ?? null,
+    curated: getCuratedEvidenceForDriver(resolution.driver?.id ?? null),
+    evidenceVersion: curatedEvidenceVersion(),
   });
   return !storedBiographyIsValid(claims, display);
 }

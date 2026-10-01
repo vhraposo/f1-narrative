@@ -1,25 +1,28 @@
 import type { GenerationProvider } from "../generation/generation.assembly.js";
-import type { ApprovedClaimSet, BiographyClaim } from "./biography.claims.js";
-import { planBiographyClaimIds } from "./biography.claims.js";
+import type { ApprovedClaimSet } from "./biography.claims.js";
+import { claimsByIds, planBiographyParagraphs } from "./biography.planner.js";
 import { composeBiographyContext, type BiographyFacts } from "./pilot-knowledge.profile.js";
 
-export const BIOGRAPHY_COMPOSER_VERSION = "biography-composer.v2";
-export const BIOGRAPHY_DISPLAY_CAP = 2400;
+export const BIOGRAPHY_COMPOSER_VERSION = "biography-composer.v3";
+export const BIOGRAPHY_DISPLAY_CAP = 3200;
 
 export const BIOGRAPHY_COMPOSER_SYSTEM_PROMPT = [
   "Você é um editor biográfico especializado em Fórmula 1.",
-  "Use somente os claims fornecidos no evidence bundle.",
-  "Não use conhecimento externo. Não invente fatos.",
-  "Não corrija fatos silenciosamente. Não altere datas, nomes, equipes, resultados ou categorias.",
-  "Não transforme inferências em fatos. Não adicione personalidade ou hobbies sem claim.",
-  "Se informação suficiente não existir, omita.",
-  "Escreva em português brasileiro natural, sem misturar inglês, exceto nomes oficiais necessários.",
-  "Não traduza nomes próprios.",
-  "Não produza comentários sobre fontes, markdown, URLs, placeholders ou JSON dentro de strings.",
+  "Produza uma biografia em português brasileiro natural, como uma narrativa biográfica contínua — nunca uma ficha estatística.",
+  "Use exclusivamente os fatos fornecidos no evidence bundle.",
+  "Não use conhecimento externo. Não invente informações. Não preencha lacunas.",
+  "Não altere datas, nomes, equipes, resultados, categorias ou anos.",
+  "Aproveite a evidência de diferentes etapas da vida e da carreira: origens, kart, categorias de base, entrada na F1, equipes, conquistas, personalidade pública, interesses e projetos.",
+  "Quando houver evidência de kart e categorias de base, contextualize a progressão até a F1.",
+  "Quando houver hobbies, interesses ou projetos, inclua-os naturalmente, sem exagerar.",
+  "Quando descrever personalidade, atribua corretamente: use expressões como 'em entrevista, descreveu-se como', 'o perfil oficial da equipe o descreve como' ou 'em aparições públicas, demonstrou'.",
+  "Nunca transforme uma descrição de fonte em verdade psicológica universal.",
+  "Não repita informações já apresentadas e não invente transições de carreira.",
+  "Escreva em português brasileiro; não misture inglês, exceto nomes oficiais.",
+  "Não produza títulos, bullets, markdown, URLs, comentários sobre fontes ou JSON dentro de strings.",
   "Responda APENAS com JSON válido no formato exato:",
-  '{"language":"pt-BR","sentences":[{"text":"frase em pt-BR","claimIds":["CLAIM-001"]}]}',
-  "Cada frase deve citar apenas claimIds existentes no evidence bundle.",
-  "Produza entre 3 e 8 frases, em ordem cronológica.",
+  '{"language":"pt-BR","paragraphs":[{"sentences":[{"text":"frase em pt-BR","claimIds":["CLAIM-001"]}]}]}',
+  "Organize os parágrafos na ordem temática indicada no prompt do usuário, omitindo temas sem claims.",
 ].join("\n");
 
 export type ComposerSentence = {
@@ -27,30 +30,28 @@ export type ComposerSentence = {
   readonly claimIds: readonly string[];
 };
 
-export type ComposerOutput = {
-  readonly language: "pt-BR";
+export type ComposerParagraph = {
   readonly sentences: readonly ComposerSentence[];
 };
 
-function claimsForPrompt(set: ApprovedClaimSet, ids: readonly string[]): BiographyClaim[] {
-  const byId = new Map(set.claims.map((claim) => [claim.id, claim]));
-  return ids
-    .map((id) => byId.get(id))
-    .filter((claim): claim is BiographyClaim => claim !== undefined);
-}
+export type ComposerOutput = {
+  readonly language: "pt-BR";
+  readonly paragraphs: readonly ComposerParagraph[];
+};
 
-export function buildBiographyComposerUserPrompt(
-  set: ApprovedClaimSet,
-  plannedIds: readonly string[] = planBiographyClaimIds(set),
-): string {
-  const lines = [
-    `Evidence bundle (única fonte permitida) para ${set.subjectName}:`,
-    ...claimsForPrompt(set, plannedIds).map(
-      (claim) => `${claim.id} [${claim.key}] ${claim.display}`,
-    ),
-    "",
-    "Escreva a biografia agora, apenas com esses claims, no formato JSON exigido.",
+export function buildBiographyComposerUserPrompt(set: ApprovedClaimSet): string {
+  const plans = planBiographyParagraphs(set);
+  const lines: string[] = [
+    `Evidence bundle (única fonte permitida) para ${set.subjectName}.`,
+    "Parágrafos planejados (use apenas os claims de cada bloco; omita blocos vazios):",
   ];
+  for (const [index, plan] of plans.entries()) {
+    lines.push(`PARÁGRAFO ${index + 1} — ${plan.topic}:`);
+    for (const claim of claimsByIds(set, plan.claimIds)) {
+      lines.push(`  ${claim.id} [${claim.category}] ${claim.display}`);
+    }
+  }
+  lines.push("Escreva a biografia agora, no formato JSON exigido.");
   return lines.join("\n");
 }
 
@@ -78,28 +79,43 @@ export function parseComposerOutput(
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
   const record = parsed as Record<string, unknown>;
   if (record.language !== "pt-BR") return null;
-  if (!Array.isArray(record.sentences)) return null;
-  if (record.sentences.length < 2 || record.sentences.length > 12) return null;
-  const sentences: ComposerSentence[] = [];
-  for (const item of record.sentences) {
+  if (!Array.isArray(record.paragraphs)) return null;
+  if (record.paragraphs.length < 1 || record.paragraphs.length > 8) return null;
+  const paragraphs: ComposerParagraph[] = [];
+  let totalSentences = 0;
+  for (const item of record.paragraphs) {
     if (typeof item !== "object" || item === null || Array.isArray(item)) return null;
-    const sentence = item as Record<string, unknown>;
-    if (typeof sentence.text !== "string") return null;
-    const trimmed = sentence.text.trim();
-    if (trimmed.length < 10 || trimmed.length > 600) return null;
-    if (!Array.isArray(sentence.claimIds) || sentence.claimIds.length === 0) return null;
-    const ids: string[] = [];
-    for (const id of sentence.claimIds) {
-      if (typeof id !== "string" || !knownClaimIds.has(id)) return null;
-      ids.push(id);
+    const paragraph = item as Record<string, unknown>;
+    if (!Array.isArray(paragraph.sentences)) return null;
+    if (paragraph.sentences.length < 1 || paragraph.sentences.length > 4) return null;
+    const sentences: ComposerSentence[] = [];
+    for (const sentence of paragraph.sentences) {
+      if (typeof sentence !== "object" || sentence === null || Array.isArray(sentence)) {
+        return null;
+      }
+      const entry = sentence as Record<string, unknown>;
+      if (typeof entry.text !== "string") return null;
+      const trimmed = entry.text.trim();
+      if (trimmed.length < 10 || trimmed.length > 600) return null;
+      if (!Array.isArray(entry.claimIds) || entry.claimIds.length === 0) return null;
+      const ids: string[] = [];
+      for (const id of entry.claimIds) {
+        if (typeof id !== "string" || !knownClaimIds.has(id)) return null;
+        ids.push(id);
+      }
+      sentences.push({ text: trimmed, claimIds: ids });
+      totalSentences += 1;
     }
-    sentences.push({ text: trimmed, claimIds: ids });
+    paragraphs.push({ sentences });
   }
-  return { language: "pt-BR", sentences };
+  if (totalSentences < 2 || totalSentences > 28) return null;
+  return { language: "pt-BR", paragraphs };
 }
 
 export function composerOutputToText(output: ComposerOutput): string {
-  return output.sentences.map((sentence) => sentence.text).join(" ");
+  return output.paragraphs
+    .map((paragraph) => paragraph.sentences.map((sentence) => sentence.text).join(" "))
+    .join("\n\n");
 }
 
 export type BiographyComposer = (input: {
@@ -108,11 +124,10 @@ export type BiographyComposer = (input: {
 
 export function createLlmBiographyComposer(provider: GenerationProvider): BiographyComposer {
   return async ({ claimSet }) => {
-    const plannedIds = planBiographyClaimIds(claimSet);
     const output = await provider.run({
       context: {} as never,
       systemPrompt: BIOGRAPHY_COMPOSER_SYSTEM_PROMPT,
-      userPrompt: buildBiographyComposerUserPrompt(claimSet, plannedIds),
+      userPrompt: buildBiographyComposerUserPrompt(claimSet),
     });
     if (output.mode !== "generated" || typeof output.text !== "string") return null;
     const parsed = parseComposerOutput(

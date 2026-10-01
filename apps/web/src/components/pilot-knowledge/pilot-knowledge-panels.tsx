@@ -201,7 +201,20 @@ function BiographyCard({
           <>
             {biography.display ? (
               <>
-                <p className="text-sm leading-relaxed text-foreground">{biography.display}</p>
+                <div className="space-y-3">
+                  {biography.display
+                    .split(/\n{2,}/)
+                    .map((paragraph) => paragraph.trim())
+                    .filter((paragraph) => paragraph.length > 0)
+                    .map((paragraph, index) => (
+                      <p
+                        key={`bio-paragraph-${index}`}
+                        className="text-sm leading-relaxed text-foreground"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {biography.origin !== "NONE" && <OriginBadge origin={biography.origin} />}
                   {biography.origin === "EXTERNAL" && (

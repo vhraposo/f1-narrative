@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "biography-evidence.v1",
+  "generatedAt": "2026-09-30T00:00:00.000Z",
+  "generatorVersion": "curated-evidence.v1",
+  "sources": {
+    "alpine-gasly": {
+      "provider": "TEAM_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "BWT Alpine Formula One Team — Pierre Gasly",
+      "url": "https://www.alpinef1.com/drivers/pierre-gasly"
+    },
+    "gasly-official": {
+      "provider": "DRIVER_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "Pierre Gasly — Site oficial",
+      "url": "https://www.pierregasly.com/pages/about"
+    },
+    "honda-gasly": {
+      "provider": "TEAM_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "Honda Global — Pierre Gasly",
+      "url": "https://global.honda/en/F1/driver/PierreGasly"
+    },
+    "motorsport-gasly": {
+      "provider": "REPUTABLE_NEWS",
+      "sourceType": "BIOGRAPHY_PAGE",
+      "title": "Motorsport.com — Pierre Gasly profile",
+      "url": "https://www.motorsport.com/driver/pierre-gasly/19626"
+    },
+    "wikipedia-gasly": {
+      "provider": "REPUTABLE_NEWS",
+      "sourceType": "BIOGRAPHY_PAGE",
+      "title": "Wikipedia — Pierre Gasly",
+      "url": "https://en.wikipedia.org/wiki/Pierre_Gasly"
+    },
+    "redbull-gasly": {
+      "provider": "TEAM_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "Red Bull — fatos sobre Pierre Gasly",
+      "url": "https://www.redbull.com/ca-en/facts-about-french-f1-driver-pierre-gasly"
+    },
+    "f1-norris": {
+      "provider": "F1_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "Formula 1 — Lando Norris",
+      "url": "https://www.formula1.com/en/drivers/lando-norris"
+    },
+    "f1-norris-hof": {
+      "provider": "F1_OFFICIAL",
+      "sourceType": "BIOGRAPHY_PAGE",
+      "title": "Formula 1 — Lando Norris (Hall of Fame)",
+      "url": "https://www.formula1.com/en/information/drivers-hall-of-fame-lando-norris.1x6Yu55IhitkH8t4NnFMmK"
+    },
+    "mclaren-norris": {
+      "provider": "TEAM_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "McLaren Racing — Lando Norris",
+      "url": "https://mclaren.com/racing/team/lando-norris"
+    },
+    "f1-norris-sim": {
+      "provider": "F1_OFFICIAL",
+      "sourceType": "INTERVIEW",
+      "title": "Formula 1 — Lando Norris on the thrill of sim racing",
+      "url": "https://www.formula1.com/en/latest/article/you-get-the-same-buzz-as-racing-for-real-lando-norris-on-the-thrill-of-sim.lFM26RLpKxViWXTYwSz0J"
+    },
+    "f1-norris-journey": {
+      "provider": "F1_OFFICIAL",
+      "sourceType": "BIOGRAPHY_PAGE",
+      "title": "Formula 1 — Lando Norris' journey to the World Championship",
+      "url": "https://www.formula1.com/en/latest/article/watch-from-karting-success-to-f1-glory-norris-journey-to-the-world.6JEMcR7kkWuASOn2mdw50"
+    },
+    "norris-official": {
+      "provider": "DRIVER_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "Lando Norris — site oficial",
+      "url": "https://landonorris.com/"
+    }
+  },
+  "drivers": {
+    "pierre-gasly": {
+      "claims": [
+        { "category": "IDENTITY", "key": "FULL_NAME", "value": "Pierre Jean-Jacques Gasly", "display": "Pierre Jean-Jacques Gasly", "sourceRef": "wikipedia-gasly", "authority": "STRUCTURED_CANONICAL" },
+        { "category": "IDENTITY", "key": "COUNTRY", "value": "France", "display": "França", "sourceRef": "alpine-gasly", "authority": "STRUCTURED_CANONICAL" },
+        { "category": "ORIGIN", "key": "MOTORSPORT_FAMILY", "value": "true", "display": "cresceu em uma família profundamente ligada ao automobilismo, com o pai ex-piloto amador de rali, o avô karter e a avó campeã de kart", "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "ORIGIN", "key": "FIRST_KART_AGE", "value": "6", "display": "teve o primeiro contato com o kart aos seis anos, em uma pista local perto de Rouen", "year": 2002, "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "ORIGIN", "key": "YOUTH_SPORTS", "value": "ice hockey, football", "display": "na infância também praticou hóquei no gelo e futebol antes de o kart prevalecer", "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "COMPETITIVE_YEARS", "value": "2006-2010", "display": "competiu no kart entre 2006 e 2010, na França e na Europa", "year": 2006, "endYear": 2010, "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "NATIONAL_PROGRESS", "value": "French Minime/Cadet", "display": "passou pelas categorias francesas Minime e Cadet antes de competir no cenário internacional", "year": 2008, "sourceRef": "wikipedia-gasly", "authority": "SECONDARY" },
+        { "category": "KARTING", "key": "EUROPEAN_VICE_CHAMPION", "value": "2010", "display": "encerrou a fase de kart com o vice-campeonato europeu CIK-FIA em 2010", "year": 2010, "sourceRef": "gasly-official", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "FRENCH_F4", "value": "2011-third", "display": "terminou em terceiro na Fórmula 4 francesa de 2011, em seu primeiro ano nos monopostos", "year": 2011, "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "RENAULT_EUROCUP_CHAMPION", "value": "2013", "display": "foi campeão da Eurocup Formula Renault 2.0 em 2013", "year": 2013, "sourceRef": "honda-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "WORLD_SERIES_VICE", "value": "2014", "display": "foi vice-campeão da World Series by Renault em 2014", "year": 2014, "sourceRef": "motorsport-gasly", "authority": "SECONDARY" },
+        { "category": "JUNIOR_CAREER", "key": "GP2_CHAMPION", "value": "2016", "display": "conquistou o título da GP2 Series em 2016", "year": 2016, "sourceRef": "honda-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "SUPER_FORMULA", "value": "2017", "display": "disputou a Super Formula no Japão em 2017 pela Team Mugen", "year": 2017, "sourceRef": "honda-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ENTRY", "key": "JUNIOR_PROGRAM", "value": "red-bull-junior-team", "display": "ingressou no programa de jovens da Red Bull após o título da Eurocup de 2013", "sourceRef": "motorsport-gasly", "authority": "SECONDARY" },
+        { "category": "F1_ENTRY", "key": "F1_DEBUT", "value": "2017", "display": "estreou na Fórmula 1 em 2017, no Grande Prêmio da Malásia, pela Toro Rosso", "year": 2017, "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "TEAM_HISTORY", "key": "TORO_ROSSO_DEBUT", "value": "2017", "display": "chegou à Toro Rosso em 2017, chamado no meio da temporada", "year": 2017, "sourceRef": "gasly-official", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "TEAM_HISTORY", "key": "RED_BULL_BRIEF", "value": "2019", "display": "foi promovido à Red Bull Racing no início de 2019", "year": 2019, "sourceRef": "gasly-official", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "TEAM_HISTORY", "key": "ALPHATAURI_RETURN", "value": "2019-2022", "display": "retornou à Toro Rosso/AlphaTauri ainda em 2019 e permaneceu na equipe até 2022", "year": 2019, "endYear": 2022, "sourceRef": "motorsport-gasly", "authority": "SECONDARY" },
+        { "category": "TEAM_HISTORY", "key": "ALPINE", "value": "2023-", "display": "corre pela BWT Alpine Formula One Team desde 2023", "year": 2023, "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "FIRST_PODIUM", "value": "2019", "display": "conquistou o primeiro pódio na Fórmula 1 no Grande Prêmio do Brasil de 2019, em segundo lugar, tornando-se o francês mais jovem a subir ao pódio na categoria", "year": 2019, "sourceRef": "gasly-official", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "FIRST_WIN", "value": "2020", "display": "venceu pela primeira vez na Fórmula 1 no Grande Prêmio da Itália de 2020, em Monza, pela AlphaTauri, tornando-se o 109º vencedor da categoria", "year": 2020, "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "ALPINE_PODIUMS", "value": "2023-2024", "display": "somou pódios pela Alpine, incluindo terceiros lugares na Sprint da Bélgica e no GP da Holanda de 2023 e no GP de São Paulo de 2024", "year": 2023, "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PUBLIC_PERSONALITY", "key": "NICKNAME", "value": "The Comeback Kid", "display": "ganhou o apelido de \"The Comeback Kid\" após o pódio no Brasil em 2019 (como registra seu site oficial)", "year": 2019, "sourceRef": "gasly-official", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PUBLIC_PERSONALITY", "key": "PRE_RACE_ROUTINE", "value": "signum-crucis", "display": "em suas aparições públicas, costuma fazer o sinal da cruz antes das corridas, uma rotina documentada em sua trajetória", "sourceRef": "wikipedia-gasly", "authority": "SECONDARY" },
+        { "category": "INTERESTS", "key": "FOOTBALL", "value": "football", "display": "é torcedor declarado de futebol, com ligação pública com o Paris Saint-Germain", "sourceRef": "redbull-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "CURRENT_CONTEXT", "key": "CURRENT_TEAM", "value": "Alpine", "display": "segue na Alpine como piloto titular na temporada 2026", "year": 2026, "sourceRef": "alpine-gasly", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "CURRENT_CONTEXT", "key": "CONTRACT", "value": "until-2028", "display": "teve contrato estendido com a Alpine, anunciado em setembro de 2025, válido até o fim de 2028", "year": 2025, "sourceRef": "gasly-official", "authority": "PRIMARY_OFFICIAL" }
+      ]
+    },
+    "lando-norris": {
+      "claims": [
+        { "category": "IDENTITY", "key": "COUNTRY", "value": "United Kingdom", "display": "Reino Unido", "sourceRef": "f1-norris", "authority": "STRUCTURED_CANONICAL" },
+        { "category": "ORIGIN", "key": "RAISED_IN", "value": "Glastonbury", "display": "foi criado em Glastonbury, na Inglaterra", "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "ORIGIN", "key": "MOTORCYCLE_INFLUENCE", "value": "Valentino Rossi", "display": "teve fascínio precoce por motos e se inspirou publicamente em Valentino Rossi", "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "ORIGIN", "key": "SIBLING_INFLUENCE", "value": "brother Oliver", "display": "seguiu o irmão mais velho, Oliver, na decisão de competir no kart", "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "START_AGE", "value": "8", "display": "começou a andar de kart aos oito anos, após visitar a pista local de Yeovil com o pai e o irmão", "year": 2008, "sourceRef": "f1-norris", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "FORMULA_KART_STARS", "value": "2012", "display": "foi campeão da classe Mini Max da Formula Kart Stars em 2012", "year": 2012, "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "KFJ_TITLES", "value": "2013", "display": "em 2013 conquistou os títulos europeu e da Copa Internacional CIK-FIA e a WSK Euro Series na classe KF-J", "year": 2013, "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "WORLD_CHAMPION", "value": "2014", "display": "em 2014 tornou-se campeão mundial de kart CIK-FIA na classe KF, aos 14 anos, o mais jovem campeão mundial da modalidade", "year": 2014, "sourceRef": "mclaren-norris", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "BRITISH_F4", "value": "2015", "display": "em 2015 venceu o campeonato britânico de Fórmula 4 (MSA Formula), pela Carlin", "year": 2015, "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "RENAULT_AND_TOYOTA", "value": "2016", "display": "em 2016 venceu a Toyota Racing Series e os campeonatos Eurocup e NEC da Formula Renault 2.0", "year": 2016, "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "F3_CHAMPION", "value": "2017", "display": "em 2017 foi campeão europeu de Fórmula 3, com nove vitórias, e realizou seus primeiros testes com um carro de Fórmula 1 da McLaren", "year": 2017, "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "F2_VICE", "value": "2018", "display": "em 2018 foi vice-campeão da Fórmula 2", "year": 2018, "sourceRef": "mclaren-norris", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ENTRY", "key": "JUNIOR_PROGRAM", "value": "2017", "display": "entrou para o programa de desenvolvimento da McLaren em 2017, após vencer o prêmio McLaren Autosport BRDC", "year": 2017, "sourceRef": "mclaren-norris", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ENTRY", "key": "F1_DEBUT", "value": "2019", "display": "estreou na Fórmula 1 em 2019, no Grande Prêmio da Austrália, pela McLaren, ao lado de Carlos Sainz", "year": 2019, "sourceRef": "f1-norris", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "FIRST_PODIUM", "value": "2020", "display": "conquistou o primeiro pódio em 2020, na Áustria", "year": 2020, "sourceRef": "f1-norris-journey", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "FIRST_POLE", "value": "2021", "display": "conquistou a primeira pole position em 2021", "year": 2021, "sourceRef": "f1-norris-journey", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "FIRST_WIN", "value": "2024", "display": "venceu pela primeira vez em 2024, no Grande Prêmio de Miami, somando mais três vitórias na temporada e ajudando a McLaren a conquistar o título de construtores", "year": 2024, "sourceRef": "f1-norris-journey", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "WORLD_CHAMPION", "value": "2025", "display": "em 2025 conquistou o título mundial de Fórmula 1, com sete vitórias na temporada, incluindo Mônaco e Silverstone, superando Max Verstappen e Oscar Piastri", "year": 2025, "sourceRef": "f1-norris-journey", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PUBLIC_PERSONALITY", "key": "SELF_COMPETITIVENESS", "value": "sim-racing-competitiveness", "display": "em entrevista à Fórmula 1, descreveu a competitividade como uma das coisas que mais o atrai nas corridas, dentro e fora da pista", "sourceRef": "f1-norris-sim", "authority": "PRIMARY_OFFICIAL", "attribution": "Em entrevista à Fórmula 1" },
+        { "category": "PUBLIC_PERSONALITY", "key": "ARTISTIC_SIDE", "value": "helmet-design", "display": "é conhecido por desenhar e pintar os próprios capacetes, um lado artístico destacado em seu perfil oficial na Fórmula 1", "sourceRef": "f1-norris", "authority": "PRIMARY_OFFICIAL", "attribution": "Perfil oficial da Fórmula 1" },
+        { "category": "PUBLIC_PERSONALITY", "key": "MENTAL_HEALTH_OPENNESS", "value": "open-about-struggles", "display": "tornou-se uma das vozes mais abertas da geração ao falar publicamente sobre saúde mental e pressão na Fórmula 1", "sourceRef": "f1-norris-hof", "authority": "PRIMARY_OFFICIAL", "attribution": "Perfil oficial da Fórmula 1" },
+        { "category": "INTERESTS", "key": "SIM_RACING", "value": "sim racing", "display": "mantém um simulador profissional em casa e costuma passar horas treinando e transmitindo corridas virtuais", "sourceRef": "f1-norris-sim", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "INTERESTS", "key": "GOLF", "value": "golf", "display": "aparece publicamente praticando golfe em seu site oficial, entre interesses fora das pistas", "sourceRef": "norris-official", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "INTERESTS", "key": "HELMET_DESIGN", "value": "design", "display": "tem no design de capacetes um interesse pessoal recorrente, com criações próprias divulgadas oficialmente", "sourceRef": "norris-official", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PROJECTS", "key": "QUADRANT", "value": "Quadrant", "display": "é cofundador da Quadrant, marca de conteúdo, vestuário e esports ligada a games e automobilismo", "sourceRef": "f1-norris", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PROJECTS", "key": "LN_RACING_KART", "value": "LN Racing Kart", "display": "é fundador da LN Racing Kart, iniciativa voltada ao karting", "sourceRef": "norris-official", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PROJECTS", "key": "JUNIOR_TEAM", "value": "junior-single-seater-team", "display": "cofundou uma equipe júnior de monopostos, noticiada no site oficial da Fórmula 1", "sourceRef": "f1-norris", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "CURRENT_CONTEXT", "key": "CURRENT_TEAM", "value": "McLaren", "display": "segue na McLaren como piloto titular na temporada 2026", "year": 2026, "sourceRef": "f1-norris", "authority": "PRIMARY_OFFICIAL" }
+      ]
+    }
+  }
+}
+

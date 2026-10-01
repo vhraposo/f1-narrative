@@ -58,6 +58,7 @@ const envSchema = z.object({
     .transform((value) => value === "true"),
   F1DB_DATA_DIR: z.string().min(1).optional(),
   F1DB_CIRCUITS_SVG_DIR: z.string().min(1).optional(),
+  BIOGRAPHY_EVIDENCE_DIR: z.string().min(1).optional(),
   WIKIMEDIA_COMMONS_ENABLED: z
     .enum(["true", "false"])
     .default("false")

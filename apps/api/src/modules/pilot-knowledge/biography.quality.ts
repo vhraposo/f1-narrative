@@ -127,8 +127,15 @@ export function validateBiographyText(input: {
   }
 
   const sentences = splitSentences(trimmed);
+  const paragraphs = trimmed
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 0);
   if (sentences.length < 2) issues.push("too-few-sentences");
-  if (sentences.length > 14) issues.push("too-many-sentences");
+  if (sentences.length > (paragraphs.length > 1 ? 28 : 14)) {
+    issues.push("too-many-sentences");
+  }
+  if (paragraphs.length > 1 && paragraphs.length > 8) issues.push("too-many-paragraphs");
 
   const vocabulary = claimVocabulary(input.claims);
   const tokens = tokenizeWithPositions(trimmed);
@@ -180,6 +187,11 @@ export function validateBiographyText(input: {
   for (const claim of input.claims.claims) {
     if (claim.year !== null) claimYears.add(claim.year);
     if (claim.endYear !== null) claimYears.add(claim.endYear);
+    for (const source of [claim.display, claim.value]) {
+      for (const match of source.match(/\b(?:19|20)\d{2}\b/g) ?? []) {
+        claimYears.add(Number(match));
+      }
+    }
   }
   const textYears = new Set(
     (trimmed.match(/\b(?:19|20)\d{2}\b/g) ?? []).map((year) => Number(year)),

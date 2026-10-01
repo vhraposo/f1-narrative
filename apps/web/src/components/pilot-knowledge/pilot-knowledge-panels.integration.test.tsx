@@ -344,4 +344,33 @@ describe("pilot knowledge panels", () => {
     await screen.findByText("Biografia pública sintetizada.");
     expect(screen.getAllByText("Não informado.").length).toBeGreaterThanOrEqual(2);
   });
+
+  it("11) renderiza biografia rica em múltiplos parágrafos", async () => {
+    apiMock.get.mockImplementation(async () => ({
+      pilot: {
+        ...AVAILABLE_PILOT,
+        profile: {
+          ...AVAILABLE_PILOT.profile,
+          biography: {
+            display:
+              "Piloto Teste nasceu em Hasselt, em 30 de setembro de 1997.\n\nNo kart, começou cedo e venceu campeonatos.\n\nNa Fórmula 1, passou pela Equipe Teste.",
+            context: "Biografia curta.",
+            origin: "EXTERNAL",
+            lastVerifiedAt: "2026-09-01T00:00:00.000Z",
+          },
+        },
+      },
+    }));
+    const { container } = renderWithClient(
+      <PilotKnowledgeSection characterId="c1" section="overview" />,
+    );
+    await screen.findByText(/Piloto Teste nasceu em Hasselt/);
+    const paragraphs = container.querySelectorAll("p");
+    const biographyParagraphs = Array.from(paragraphs).filter((paragraph) =>
+      paragraph.textContent?.includes("kart") ||
+      paragraph.textContent?.includes("Hasselt") ||
+      paragraph.textContent?.includes("Fórmula 1, passou"),
+    );
+    expect(biographyParagraphs.length).toBe(3);
+  });
 });

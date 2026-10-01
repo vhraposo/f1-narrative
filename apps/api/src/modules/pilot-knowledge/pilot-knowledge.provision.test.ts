@@ -307,11 +307,15 @@ describe("pilot knowledge provisioning", () => {
     expect(profile.driverCode).toBe("NOR");
     expect(profile.biographyDisplay).toContain("Bristol");
     expect(profile.biographyDisplay).toContain("13 de novembro de 1999");
-    expect(profile.biographyDisplay).toContain("campeonato mundial em 2016 e 2025");
+    const display = profile.biographyDisplay ?? "";
+    const paragraphs = display
+      .split(/\n{2,}/)
+      .map((paragraph) => paragraph.trim())
+      .filter((paragraph) => paragraph.length > 0);
+    expect(paragraphs.length).toBeGreaterThanOrEqual(5);
+    expect(profile.biographyDisplay).toContain("McLaren");
+    expect(profile.biographyDisplay).toContain("Campeão mundial em 2025");
     expect(profile.biographyDisplay).toContain("vitórias");
-    expect(profile.biographyDisplay).toContain("nacionalidade britânica");
-    expect(profile.biographyDisplay).toContain("1 título mundial");
-    expect(profile.biographyDisplay).toContain("13 vitórias");
     expect(profile.biographyDisplay).not.toContain("mundialis");
     expect(profile.biographyDisplay).not.toContain("1 vitórias");
   });
@@ -335,6 +339,38 @@ describe("pilot knowledge provisioning", () => {
     });
     expect(profile.biographyDisplay).not.toContain("2031");
     expect(profile.biographyDisplay).toContain("campeonato mundial em 2016");
+  });
+
+  it("12) provisiona biografia rica para piloto com evidence curada (Gasly)", async () => {
+    const fixture = await createFixture("gasly-rich", { withData: true, round: 19 });
+    await prisma.externalDriver.update({
+      where: { id: fixture.driver.id },
+      data: {
+        name: "Pierre Gasly",
+        fullName: "Pierre Gasly",
+        nationality: "French",
+      },
+    });
+    const result = await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    expect(result.outcome).toBe("PROVISIONED");
+    expect(result.biography?.mode).toBe("RICH_DETERMINISTIC");
+
+    const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    const display = profile.biographyDisplay ?? "";
+    const paragraphs = display
+      .split(/\n{2,}/)
+      .map((paragraph) => paragraph.trim())
+      .filter((paragraph) => paragraph.length > 0);
+    expect(paragraphs.length).toBeGreaterThanOrEqual(5);
+    expect(display).toContain("Rouen");
+    expect(display.toLowerCase()).toContain("kart");
+    expect(display).toContain("Toro Rosso");
+    expect(display).toContain("Monza");
+    expect(display).toContain("futebol");
+    expect(profile.biographyDisplay).not.toContain("Ferrari");
+    expect(profile.biographyDisplay).not.toContain("talentoexceptional");
   });
 
   it("8) composer LLM gera biografia aprovada com provenance e não é re-gerado na reabertura", async () => {
@@ -371,7 +407,7 @@ describe("pilot knowledge provisioning", () => {
       model?: string | null;
     };
     expect(metadata.generator).toBe("biography-composer");
-    expect(metadata.generatorVersion).toBe("biography-composer.v2");
+    expect(metadata.generatorVersion).toBe("biography-composer.v3");
     expect(metadata.fingerprint).toMatch(/^[a-f0-9]{64}$/);
     expect(metadata.model).toBe("stub-model");
 

@@ -6,26 +6,47 @@ import {
   getF1dbRaceLabel,
 } from "../f1db/f1db.drivers.js";
 import type { F1dbDriver } from "../f1db/f1db.dataset.js";
+import type { CuratedEvidenceBundle } from "./biography.evidence.js";
 import { feminizeNationalityPtBr, resolveNationalityPtBr } from "./nationality.ptbr.js";
 import type { BiographyFacts } from "./pilot-knowledge.profile.js";
 
 export const BIOGRAPHY_CLAIM_SCHEMA_VERSION = "biography-claims.v1";
 export const BIOGRAPHY_LANGUAGE = "pt-BR";
 
-export type BiographyClaimKey =
-  | "FULL_NAME"
-  | "PUBLIC_NAME"
-  | "BIRTH_DATE"
-  | "BIRTH_PLACE"
-  | "NATIONALITY"
-  | "F1_DEBUT"
-  | "TEAM_SEASON"
-  | "FIRST_WIN"
-  | "FIRST_PODIUM"
-  | "FIRST_POLE"
-  | "CHAMPIONSHIP"
-  | "CAREER_STATS"
-  | "INTEREST";
+export type BiographyEvidenceCategory =
+  | "IDENTITY"
+  | "ORIGIN"
+  | "KARTING"
+  | "JUNIOR_CAREER"
+  | "F1_ENTRY"
+  | "TEAM_HISTORY"
+  | "F1_ACHIEVEMENTS"
+  | "PUBLIC_PERSONALITY"
+  | "INTERESTS"
+  | "PROJECTS"
+  | "CURRENT_CONTEXT";
+
+export const BIOGRAPHY_EVIDENCE_CATEGORIES: readonly BiographyEvidenceCategory[] = [
+  "IDENTITY",
+  "ORIGIN",
+  "KARTING",
+  "JUNIOR_CAREER",
+  "F1_ENTRY",
+  "TEAM_HISTORY",
+  "F1_ACHIEVEMENTS",
+  "PUBLIC_PERSONALITY",
+  "INTERESTS",
+  "PROJECTS",
+  "CURRENT_CONTEXT",
+];
+
+export function isBiographyEvidenceCategory(
+  value: string,
+): value is BiographyEvidenceCategory {
+  return (BIOGRAPHY_EVIDENCE_CATEGORIES as readonly string[]).includes(value);
+}
+
+export type BiographyClaimKey = string;
 
 export type BiographyClaimAuthority =
   | "PRIMARY_OFFICIAL"
@@ -35,8 +56,16 @@ export type BiographyClaimAuthority =
 
 export type BiographyClaimStatus = "APPROVED" | "AMBIGUOUS_IDENTITY" | "UNVERIFIED";
 
+export type BiographyClaimSourceRef = {
+  readonly provider: string;
+  readonly sourceType: string;
+  readonly title: string;
+  readonly url: string;
+};
+
 export type BiographyClaim = {
   readonly id: string;
+  readonly category: BiographyEvidenceCategory;
   readonly key: BiographyClaimKey;
   readonly value: string;
   readonly display: string;
@@ -46,6 +75,8 @@ export type BiographyClaim = {
   readonly status: BiographyClaimStatus;
   readonly provider: string;
   readonly sourceVersion: string | null;
+  readonly attribution: string | null;
+  readonly sourceRef: BiographyClaimSourceRef | null;
 };
 
 export type ApprovedClaimSet = {
@@ -57,9 +88,71 @@ export type ApprovedClaimSet = {
   readonly identityStatus: "RESOLVED" | "AMBIGUOUS_IDENTITY";
   readonly claims: readonly BiographyClaim[];
   readonly fingerprint: string;
+  readonly evidenceVersion: string | null;
 };
 
-type ClaimDraft = Omit<BiographyClaim, "id" | "status">;
+type ClaimDraft = {
+  readonly category?: BiographyEvidenceCategory;
+  readonly key: BiographyClaimKey;
+  readonly value: string;
+  readonly display: string;
+  readonly year: number | null;
+  readonly endYear: number | null;
+  readonly authority: BiographyClaimAuthority;
+  readonly provider: string;
+  readonly sourceVersion: string | null;
+  readonly attribution?: string | null;
+  readonly sourceRef?: BiographyClaimSourceRef | null;
+};
+
+const KEY_CATEGORY: Record<string, BiographyEvidenceCategory> = {
+  FULL_NAME: "IDENTITY",
+  PUBLIC_NAME: "IDENTITY",
+  BIRTH_DATE: "IDENTITY",
+  BIRTH_PLACE: "IDENTITY",
+  NATIONALITY: "IDENTITY",
+  COUNTRY: "IDENTITY",
+  F1_DEBUT: "F1_ENTRY",
+  JUNIOR_PROGRAM: "F1_ENTRY",
+  DEBUT: "F1_ENTRY",
+  TEAM_SEASON: "TEAM_HISTORY",
+  FIRST_WIN: "F1_ACHIEVEMENTS",
+  FIRST_PODIUM: "F1_ACHIEVEMENTS",
+  FIRST_POLE: "F1_ACHIEVEMENTS",
+  CHAMPIONSHIP: "F1_ACHIEVEMENTS",
+  CAREER_STATS: "F1_ACHIEVEMENTS",
+  INTEREST: "INTERESTS",
+};
+
+function categoryForKey(key: string): BiographyEvidenceCategory {
+  return KEY_CATEGORY[key] ?? "F1_ACHIEVEMENTS";
+}
+
+const CATEGORY_ORDER: Record<BiographyEvidenceCategory, number> = {
+  IDENTITY: 0,
+  ORIGIN: 1,
+  KARTING: 2,
+  JUNIOR_CAREER: 3,
+  F1_ENTRY: 4,
+  TEAM_HISTORY: 5,
+  F1_ACHIEVEMENTS: 6,
+  PUBLIC_PERSONALITY: 7,
+  INTERESTS: 8,
+  PROJECTS: 9,
+  CURRENT_CONTEXT: 10,
+};
+
+function normalizeAuthority(value: string): BiographyClaimAuthority {
+  if (
+    value === "PRIMARY_OFFICIAL" ||
+    value === "STRUCTURED_CANONICAL" ||
+    value === "SECONDARY" ||
+    value === "UNVERIFIED"
+  ) {
+    return value;
+  }
+  return "SECONDARY";
+}
 
 const BIRTH_DATE_FORMAT = new Intl.DateTimeFormat("pt-BR", {
   day: "numeric",
@@ -72,21 +165,22 @@ function pushClaim(drafts: ClaimDraft[], draft: ClaimDraft | null): void {
   if (!draft) return;
   if (draft.value.trim().length === 0 || draft.display.trim().length === 0) return;
   const duplicate = drafts.some(
-    (item) => item.key === draft.key && item.value === draft.value && item.year === draft.year,
+    (item) =>
+      item.key === draft.key &&
+      item.value === draft.value &&
+      item.year === draft.year &&
+      item.category === draft.category,
   );
   if (!duplicate) drafts.push(draft);
 }
 
 function claimOrderKey(claim: ClaimDraft): [number, string, string] {
-  const group =
-    claim.key === "FULL_NAME" || claim.key === "PUBLIC_NAME"
-      ? 0
-      : claim.key === "BIRTH_DATE" || claim.key === "BIRTH_PLACE" || claim.key === "NATIONALITY"
-        ? 1
-        : claim.year === null
-          ? 3
-          : 2;
-  return [group, String(claim.year ?? 0).padStart(4, "0"), claim.key];
+  const category = claim.category ?? categoryForKey(claim.key);
+  return [
+    CATEGORY_ORDER[category],
+    String(claim.year ?? 0).padStart(4, "0"),
+    claim.key,
+  ];
 }
 
 export function buildApprovedBiographyClaims(input: {
@@ -95,6 +189,8 @@ export function buildApprovedBiographyClaims(input: {
   readonly f1dbDriver: F1dbDriver | null;
   readonly f1dbAmbiguous: boolean;
   readonly f1dbSourceVersion: string | null;
+  readonly curated?: CuratedEvidenceBundle | null;
+  readonly evidenceVersion?: string | null;
 }): ApprovedClaimSet {
   const drafts: ClaimDraft[] = [];
   const provider = input.f1dbDriver ? "F1DB" : "EXTERNAL_MIRROR";
@@ -322,6 +418,40 @@ export function buildApprovedBiographyClaims(input: {
     });
   }
 
+  const curatedKeys = new Set((input.curated?.claims ?? []).map((claim) => claim.key));
+  if (curatedKeys.size > 0) {
+    for (let index = drafts.length - 1; index >= 0; index -= 1) {
+      const draft = drafts[index];
+      if (draft && curatedKeys.has(draft.key) && !draft.sourceRef) {
+        drafts.splice(index, 1);
+      }
+    }
+  }
+
+  for (const claim of input.curated?.claims ?? []) {
+    if (!isBiographyEvidenceCategory(claim.category)) continue;
+    const source = input.curated?.sources.get(claim.sourceRef);
+    if (!source) continue;
+    pushClaim(drafts, {
+      category: claim.category,
+      key: claim.key,
+      value: claim.value,
+      display: claim.display,
+      year: claim.year,
+      endYear: claim.endYear,
+      authority: normalizeAuthority(claim.authority),
+      provider: source.provider,
+      sourceVersion: input.f1dbSourceVersion,
+      attribution: claim.attribution,
+      sourceRef: {
+        provider: source.provider,
+        sourceType: source.sourceType,
+        title: source.title,
+        url: source.url,
+      },
+    });
+  }
+
   drafts.sort((a, b) => {
     const [groupA, yearA, keyA] = claimOrderKey(a);
     const [groupB, yearB, keyB] = claimOrderKey(b);
@@ -332,6 +462,9 @@ export function buildApprovedBiographyClaims(input: {
 
   const claims: BiographyClaim[] = drafts.map((draft, index) => ({
     ...draft,
+    category: draft.category ?? categoryForKey(draft.key),
+    attribution: draft.attribution ?? null,
+    sourceRef: draft.sourceRef ?? null,
     id: `CLAIM-${String(index + 1).padStart(3, "0")}`,
     status: "APPROVED" as const,
   }));
@@ -345,7 +478,18 @@ export function buildApprovedBiographyClaims(input: {
         externalDriverId: input.externalDriverId,
         f1dbDriverId: input.f1dbDriver?.id ?? null,
         identityStatus,
-        claims: claims.map((claim) => [claim.key, claim.value, claim.year, claim.endYear, claim.display, claim.authority]),
+        evidenceVersion: input.evidenceVersion ?? null,
+        claims: claims.map((claim) => [
+          claim.category,
+          claim.key,
+          claim.value,
+          claim.year,
+          claim.endYear,
+          claim.display,
+          claim.authority,
+          claim.attribution,
+          claim.sourceRef?.url ?? null,
+        ]),
       }),
     )
     .digest("hex");
@@ -359,6 +503,7 @@ export function buildApprovedBiographyClaims(input: {
     identityStatus,
     claims,
     fingerprint,
+    evidenceVersion: input.evidenceVersion ?? null,
   };
 }
 
@@ -367,27 +512,7 @@ export function claimsFingerprint(set: ApprovedClaimSet): string {
 }
 
 export function planBiographyClaimIds(set: ApprovedClaimSet): readonly string[] {
-  const byKey = (key: BiographyClaimKey) =>
-    set.claims.filter((claim) => claim.key === key);
-  const planned: string[] = [];
-  const push = (claims: readonly BiographyClaim[]) => {
-    for (const claim of claims) planned.push(claim.id);
-  };
-
-  push(byKey("FULL_NAME"));
-  push(byKey("PUBLIC_NAME"));
-  push(byKey("BIRTH_DATE"));
-  push(byKey("BIRTH_PLACE"));
-  push(byKey("NATIONALITY"));
-  push(byKey("INTEREST"));
-  push(byKey("TEAM_SEASON"));
-  push(byKey("F1_DEBUT"));
-  push(byKey("FIRST_PODIUM"));
-  push(byKey("FIRST_POLE"));
-  push(byKey("FIRST_WIN"));
-  push(byKey("CHAMPIONSHIP"));
-  push(byKey("CAREER_STATS"));
-  return planned;
+  return set.claims.map((claim) => claim.id);
 }
 
 export function claimVocabulary(set: ApprovedClaimSet): ReadonlySet<string> {
