@@ -234,6 +234,7 @@ model Universe {
   bindingRaces         ExternalBindingRace[]
   bindingCircuits      ExternalBindingCircuit[]
   aiDecisions          AiDecision[]
+  characterGoals       CharacterGoal[]
   bindingDriverSeasons ExternalBindingDriverSeason[]
   bindingResults       ExternalBindingResult[]
   bindingStandings     ExternalBindingStanding[]
@@ -339,6 +340,7 @@ model Character {
   memoryMemberships        MemoryCharacter[]
   eventMemberships         EventCharacter[]
   aiDecisions              AiDecision[]
+  goals                    CharacterGoal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2281,4 +2283,68 @@ model PersonaTraitEvolution {
   @@index([personaId, traitKey])
   @@index([personaId, status])
   @@index([sourceExperienceId])
+}
+
+enum CharacterGoalKind {
+  WIN_RACE
+  WIN_CHAMPIONSHIP
+  OUTPERFORM_TEAMMATE
+  RECOVER_AFTER_SETBACK
+  PROTECT_RELATIONSHIP
+  CONFRONT_RIVAL
+  SUPPORT_FRIEND
+  MAINTAIN_POSITION
+  BUILD_REPUTATION
+  RESTORE_CONFIDENCE
+  USER_DEFINED_GOAL
+}
+
+enum CharacterGoalStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum CharacterGoalSource {
+  SYSTEM
+  MANUAL
+  DERIVED
+}
+
+model CharacterGoal {
+  id          String    @id @default(uuid()) @db.Uuid
+  universeId  String    @db.Uuid
+  universe    Universe  @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  characterId String    @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  kind      CharacterGoalKind
+  priority  Int                @default(50)
+  status    CharacterGoalStatus @default(ACTIVE)
+  source    CharacterGoalSource @default(SYSTEM)
+  ruleCode  String?
+  fingerprint String?
+
+  targetCharacterId String? @db.Uuid
+  targetRaceId      String? @db.Uuid
+  seasonId          String? @db.Uuid
+
+  validFrom DateTime?
+  validTo   DateTime?
+  progress  Json?
+  metadata  Json?
+
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universeId, fingerprint])
+  @@index([universeId, characterId, status])
+  @@index([characterId, status])
+  @@index([universeId, kind, status])
+  @@index([validTo])
 }

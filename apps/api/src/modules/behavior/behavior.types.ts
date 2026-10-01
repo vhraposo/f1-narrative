@@ -1,6 +1,9 @@
 import type {
   AiDecisionStatus,
   CharacterController,
+  CharacterGoalKind,
+  CharacterGoalSource,
+  CharacterGoalStatus,
   MemoryImportance,
   PilotExperienceType,
   RaceSession,
@@ -145,6 +148,12 @@ export type BehaviorMotorsportSection = {
     readonly wins: number;
     readonly podiums: number;
   } | null;
+  readonly teammate: {
+    readonly characterId: string;
+    readonly name: string;
+    readonly position: number | null;
+    readonly points: number;
+  } | null;
   readonly recentResults: ReadonlyArray<{
     readonly raceName: string;
     readonly round: number | null;
@@ -221,6 +230,19 @@ export type BehaviorContextView = {
   readonly omitted: readonly BehaviorContextOmission[];
 };
 
+export type BehaviorScoreBreakdown = {
+  readonly total: number;
+  readonly goalAlignment: number;
+  readonly triggerRelevance: number;
+  readonly contextRelevance: number;
+  readonly relationshipRelevance: number;
+  readonly experienceRelevance: number;
+  readonly availabilityBonus: number;
+  readonly cooldownPenalty: number;
+  readonly duplicatePenalty: number;
+  readonly policyBonus: number;
+};
+
 export type BehaviorCandidate = {
   readonly id: string;
   readonly actionType: BehaviorActionType;
@@ -233,6 +255,47 @@ export type BehaviorCandidate = {
   readonly failedPreconditions: readonly string[];
   readonly consequencesPreview: readonly string[];
   readonly metadata: Record<string, unknown>;
+  readonly goalIds: readonly string[];
+  readonly goalAlignment: number;
+  readonly score: number;
+  readonly scoreBreakdown: BehaviorScoreBreakdown;
+};
+
+export type ResolvedGoal = {
+  readonly id: string;
+  readonly kind: CharacterGoalKind;
+  readonly priority: number;
+  readonly status: CharacterGoalStatus;
+  readonly source: CharacterGoalSource;
+  readonly ruleCode: string | null;
+  readonly fingerprint: string | null;
+  readonly targetCharacterId: string | null;
+  readonly targetRaceId: string | null;
+  readonly seasonId: string | null;
+  readonly validTo: Date | null;
+};
+
+export type BehaviorCooldownState = {
+  readonly keys: ReadonlySet<string>;
+  readonly fingerprints: ReadonlySet<string>;
+};
+
+export const EMPTY_COOLDOWN_STATE: BehaviorCooldownState = {
+  keys: new Set<string>(),
+  fingerprints: new Set<string>(),
+};
+
+export type BehaviorExecutionStatus = "EXECUTED" | "REJECTED" | "FAILED" | "ALREADY_EXECUTED";
+
+export type BehaviorExecutionResult = {
+  readonly decisionId: string;
+  readonly status: BehaviorExecutionStatus;
+  readonly actionType: BehaviorActionType;
+  readonly reasonCode: string | null;
+  readonly errorCode: string | null;
+  readonly executedMessageId: string | null;
+  readonly executedEventId: string | null;
+  readonly latencyMs: number | null;
 };
 
 export type BehaviorPolicyResult = {
@@ -251,6 +314,9 @@ export type BehaviorDecisionResult = {
   readonly contextFingerprint: string;
   readonly policyCode: string;
   readonly trigger: BehaviorTrigger;
+  readonly goals: readonly ResolvedGoal[];
+  readonly actionFingerprint: string;
+  readonly worldDateBucket: string;
   readonly candidates: readonly BehaviorCandidate[];
   readonly selected: BehaviorCandidate;
   readonly rejected: readonly BehaviorCandidate[];

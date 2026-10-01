@@ -25,13 +25,19 @@ const REASON_PHRASES: Record<string, string> = {
   POLICY_NO_ACTION_BASELINE: "mantém-se em silêncio por enquanto",
 };
 
+export function deterministicTextFor(
+  context: BehaviorContextView,
+  reasonCode: string,
+): string {
+  const phrase = REASON_PHRASES[reasonCode] ?? "decide não agir agora";
+  return `${context.identity.name} ${phrase}.`;
+}
+
 export function createDeterministicLanguageEngine(): BehaviorLanguageEngine {
   return {
     async compose(input) {
-      const phrase = REASON_PHRASES[input.decision.reasonCode] ?? "decide não agir agora";
-      const text = `${input.context.identity.name} ${phrase}.`;
       return {
-        text,
+        text: deterministicTextFor(input.context, input.decision.reasonCode),
         provider: "deterministic",
         model: "behavior-language.v1",
         fallback: true,

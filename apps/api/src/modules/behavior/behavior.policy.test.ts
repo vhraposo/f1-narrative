@@ -39,7 +39,7 @@ function makeContext(overrides: Partial<BehaviorContextView> = {}): BehaviorCont
       currentRaceId: null,
       currentSession: null,
     },
-    motorsport: { teamName: null, number: null, standing: null, recentResults: [] },
+    motorsport: { teamName: null, number: null, standing: null, teammate: null, recentResults: [] },
     conversation: null,
     availability: null,
     schedule: { due: [], upcoming: [] },

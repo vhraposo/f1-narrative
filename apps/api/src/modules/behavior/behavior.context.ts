@@ -42,7 +42,7 @@ export async function buildBehaviorContext(
         select: {
           id: true,
           number: true,
-          team: { select: { name: true } },
+          team: { select: { id: true, name: true } },
         },
       },
       persona: {
@@ -195,6 +195,35 @@ export async function buildBehaviorContext(
       : Promise.resolve([]),
   ]);
 
+  let teammate: BehaviorContextView["motorsport"]["teammate"] = null;
+  if (character.driverProfile?.team) {
+    const teammateProfile = await prisma.driverProfile.findFirst({
+      where: {
+        teamId: character.driverProfile.team.id,
+        id: { not: character.driverProfile.id },
+      },
+      orderBy: { id: "asc" },
+      select: {
+        characterId: true,
+        character: { select: { name: true } },
+        championshipStandings: {
+          where: { seasonId: worldState?.currentSeasonId ?? "__none__" },
+          select: { position: true, points: true },
+          take: 1,
+        },
+      },
+    });
+    if (teammateProfile) {
+      const standing = teammateProfile.championshipStandings[0] ?? null;
+      teammate = {
+        characterId: teammateProfile.characterId,
+        name: teammateProfile.character.name,
+        position: standing?.position ?? null,
+        points: standing?.points ?? 0,
+      };
+    }
+  }
+
   let event: BehaviorContextView["currentState"]["event"] = null;
   if (request.eventId) {
     const loaded = await prisma.event.findUnique({
@@ -336,6 +365,7 @@ export async function buildBehaviorContext(
       teamName: character.driverProfile?.team?.name ?? null,
       number: character.driverProfile?.number ?? null,
       standing,
+      teammate,
       recentResults: recentResults.map((result) => ({
         raceName: result.race.name,
         round: result.race.round,
