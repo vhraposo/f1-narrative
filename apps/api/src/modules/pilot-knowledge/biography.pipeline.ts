@@ -77,7 +77,7 @@ export async function composeBiographyFromClaims(input: {
     };
   }
 
-  let candidate: string | null | undefined = null;
+  let candidate: string | null | undefined;
   try {
     candidate = await input.composer({ claimSet: input.claimSet });
   } catch {
@@ -111,7 +111,7 @@ export async function composeBiographyFromClaims(input: {
   }
 
   if (input.verifier) {
-    let verification: Awaited<ReturnType<BiographyVerifier>> = null;
+    let verification: Awaited<ReturnType<BiographyVerifier>>;
     try {
       verification = await input.verifier({ text: candidate, claimSet: input.claimSet });
     } catch {

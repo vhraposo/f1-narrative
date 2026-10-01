@@ -293,10 +293,14 @@ export function buildApprovedBiographyClaims(input: {
 
   const career = input.facts.career;
   if (career && career.starts > 0) {
+    const titlesLabel =
+      career.titles === 1
+        ? "1 título mundial"
+        : `${career.titles} títulos mundiais`;
     pushClaim(drafts, {
       key: "CAREER_STATS",
       value: `${career.starts}:${career.wins}:${career.podiums}:${career.poles}:${career.fastestLaps}:${career.titles}`,
-      display: `${career.starts} largadas, ${career.wins} vitórias, ${career.podiums} pódios, ${career.poles} poles, ${career.fastestLaps} voltas mais rápidas e ${career.titles} título${career.titles === 1 ? "" : "s"} mundial${career.titles === 1 ? "" : "is"}`,
+      display: `${career.starts} largadas, ${career.wins} vitórias, ${career.podiums} pódios, ${career.poles} poles, ${career.fastestLaps} voltas mais rápidas e ${titlesLabel}`,
       year: null,
       endYear: null,
       authority: "STRUCTURED_CANONICAL",

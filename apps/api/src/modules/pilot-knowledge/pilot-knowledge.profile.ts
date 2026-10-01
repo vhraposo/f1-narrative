@@ -97,16 +97,30 @@ export function composeBiographyDisplay(facts: BiographyFacts): string | null {
   const career = facts.career;
   if (career && (career.wins > 0 || career.podiums > 0 || career.starts > 0)) {
     const parts: string[] = [];
-    if (career.wins > 0) parts.push(`${career.wins} vitórias`);
-    if (career.podiums > 0) parts.push(`${career.podiums} pódios`);
-    if (career.poles > 0) parts.push(`${career.poles} poles`);
-    if (career.fastestLaps > 0) parts.push(`${career.fastestLaps} voltas mais rápidas`);
+    if (career.wins > 0) {
+      parts.push(`${career.wins} ${career.wins === 1 ? "vitória" : "vitórias"}`);
+    }
+    if (career.podiums > 0) {
+      parts.push(`${career.podiums} ${career.podiums === 1 ? "pódio" : "pódios"}`);
+    }
+    if (career.poles > 0) {
+      parts.push(`${career.poles} ${career.poles === 1 ? "pole" : "poles"}`);
+    }
+    if (career.fastestLaps > 0) {
+      parts.push(
+        career.fastestLaps === 1
+          ? "1 volta mais rápida"
+          : `${career.fastestLaps} voltas mais rápidas`,
+      );
+    }
     if (parts.length > 0) {
-      const titles =
-        career.titles > 0
-          ? ` e ${career.titles} título${career.titles === 1 ? "" : "s"} mundial${career.titles === 1 ? "" : "is"}`
-          : "";
-      sentences.push(`Na carreira na Fórmula 1, soma ${joinList(parts)}${titles}.`);
+      const titlesLabel =
+        career.titles === 1
+          ? "1 título mundial"
+          : `${career.titles} títulos mundiais`;
+      sentences.push(
+        `Na carreira na Fórmula 1, soma ${joinList(parts)}${career.titles > 0 ? ` e ${titlesLabel}` : ""}.`,
+      );
     }
   }
 

@@ -375,4 +375,40 @@ describe("pilot historical events", () => {
     expect(debut.sourceId).not.toBeNull();
     expect(debut.title).toContain("2019");
   });
+
+  it("9) P1 de temporada em andamento não vira campeonato", async () => {
+    const { driver } = await createFixture("in-progress");
+    await seedCareer(driver.id, [
+      { year: 2031, round: 1, name: "GP 2031", position: 1, grid: 1, points: 25, date: "2031-03-01" },
+    ]);
+    await prisma.externalStanding.create({
+      data: {
+        source: "jolpica",
+        externalDriverId: driver.id,
+        seasonYear: 2031,
+        position: 1,
+        points: 120,
+        wins: 5,
+        contentHash: "st-ip-champ",
+      },
+    });
+    await prisma.externalStanding.create({
+      data: {
+        source: "jolpica",
+        externalDriverId: driver.id,
+        seasonYear: 2021,
+        position: 1,
+        points: 400,
+        wins: 10,
+        contentHash: "st-2021-champ",
+      },
+    });
+    const events = await deriveMilestonesFromExternalData(driver.id);
+    expect(
+      events.some((event) => event.category === "CHAMPIONSHIP" && event.seasonYear === 2031),
+    ).toBe(false);
+    expect(
+      events.some((event) => event.category === "CHAMPIONSHIP" && event.seasonYear === 2021),
+    ).toBe(true);
+  });
 });

@@ -310,6 +310,31 @@ describe("pilot knowledge provisioning", () => {
     expect(profile.biographyDisplay).toContain("campeonato mundial em 2016 e 2025");
     expect(profile.biographyDisplay).toContain("vitórias");
     expect(profile.biographyDisplay).toContain("nacionalidade britânica");
+    expect(profile.biographyDisplay).toContain("1 título mundial");
+    expect(profile.biographyDisplay).toContain("13 vitórias");
+    expect(profile.biographyDisplay).not.toContain("mundialis");
+    expect(profile.biographyDisplay).not.toContain("1 vitórias");
+  });
+
+  it("11) líder de temporada em andamento não vira campeão na biografia", async () => {
+    const fixture = await createFixture("in-progress", { withData: true, round: 18 });
+    await prisma.externalStanding.create({
+      data: {
+        source: "jolpica",
+        externalDriverId: fixture.driver.id,
+        seasonYear: 2031,
+        position: 1,
+        points: 120,
+        wins: 5,
+        contentHash: "st-in-progress",
+      },
+    });
+    await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    expect(profile.biographyDisplay).not.toContain("2031");
+    expect(profile.biographyDisplay).toContain("campeonato mundial em 2016");
   });
 
   it("8) composer LLM gera biografia aprovada com provenance e não é re-gerado na reabertura", async () => {

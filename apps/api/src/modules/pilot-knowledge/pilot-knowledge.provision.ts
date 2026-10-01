@@ -82,8 +82,13 @@ async function collectMirrorCareer(externalDriverId: string): Promise<MirrorCare
     }),
   ]);
 
+  // P1 de temporada em andamento não é título: só anos com campeão final
+  // conhecido no F1DB entram como campeonato (líder ≠ campeão).
+  const dataset = getF1dbDataset();
+  const championships = titles
+    .map((title) => title.seasonYear)
+    .filter((year) => !dataset || dataset.championsByYear.has(year));
   const teams = [...new Set(seasons.map((season) => season.teamNameSnapshot).filter(Boolean))] as string[];
-  const championships = titles.map((title) => title.seasonYear);
   const lastSeason = seasons[seasons.length - 1] ?? null;
   return {
     teams,

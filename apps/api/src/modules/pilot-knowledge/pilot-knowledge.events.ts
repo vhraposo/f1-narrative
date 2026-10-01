@@ -83,6 +83,7 @@ export async function deriveMilestonesFromExternalData(
     sourceId?: string | null;
   };
   const derived: Derived[] = [];
+  const dataset = getF1dbDataset();
 
   const first = results[0];
   if (first) {
@@ -182,7 +183,11 @@ export async function deriveMilestonesFromExternalData(
     });
   }
 
-  const titles = standings.filter((standing) => standing.position === 1);
+  const titles = standings.filter(
+    (standing) =>
+      standing.position === 1 &&
+      (dataset === null || dataset.championsByYear.has(standing.seasonYear)),
+  );
   for (const title of titles) {
     derived.push({
       category: "CHAMPIONSHIP",
@@ -229,7 +234,6 @@ export async function deriveMilestonesFromExternalData(
     }
   }
 
-  const dataset = getF1dbDataset();
   if (dataset) {
     const sourceIdentity = readDriverSourceIdentity(driver.sourceRecord);
     const f1dbDriver = resolveF1dbDriver({
