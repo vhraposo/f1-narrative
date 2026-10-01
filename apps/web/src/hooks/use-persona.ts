@@ -8,6 +8,7 @@ import {
   reviewPersonaEvidence,
   updatePersona,
   type CreatePersonaEvidenceInput,
+  type PersonaTraitContext,
   type ReviewPersonaEvidenceInput,
   type UpdatePersonaInput,
 } from "@/lib/persona";
@@ -42,8 +43,8 @@ export function useUpdatePersona(characterId: string) {
 export function useDeletePersonaTrait(characterId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (traitKey: string) =>
-      deletePersonaTrait(characterId, traitKey),
+    mutationFn: (vars: { traitKey: string; context: PersonaTraitContext }) =>
+      deletePersonaTrait(characterId, vars.traitKey, vars.context),
     onSuccess: () => invalidatePersona(queryClient, characterId),
   });
 }

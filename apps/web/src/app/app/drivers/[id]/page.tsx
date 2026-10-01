@@ -122,7 +122,7 @@ export default function DriverDetailPage() {
         {(
           [
             ["overview", "Visão geral"],
-            ["persona", "Persona"],
+            ["persona", "Personalidade"],
             ["history", "Histórico"],
             ["relationships", "Relacionamentos"],
             ["memories", "Memórias"],

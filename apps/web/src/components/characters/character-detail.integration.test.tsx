@@ -238,12 +238,12 @@ describe("Character Detail - identidade e seções", () => {
     ).toBe(1);
   });
 
-  it("mostra a seção Persona do personagem (empty state sem criar Persona)", async () => {
+  it("mostra a seção Personalidade do personagem (empty state sem criar Persona)", async () => {
     renderWithClient(<CharacterDetailPage />);
 
     expect(
       await screen.findByRole("region", {
-        name: "Persona de Alicya Kucharski",
+        name: "Personalidade de Alicya Kucharski",
       }),
     ).toBeDefined();
     expect(await screen.findByText("Nenhuma persona registrada")).toBeDefined();

@@ -43,6 +43,7 @@ function makeTrait(overrides: Partial<PersonaTrait> & { id: string; key: string 
     value: "Valor",
     confidence: 1,
     sourceKind: "MANUAL",
+    context: "ON_TRACK",
     evidenceId: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -254,7 +255,7 @@ describe("PersonaSection — mutations", () => {
     await user.type(screen.getByLabelText("Valor do trait"), "Direto");
     await user.click(screen.getByRole("button", { name: /Adicionar trait/ }));
     expect(apiMock.patch).toHaveBeenCalledWith("/api/characters/c1/persona", {
-      traits: [{ key: "humor", value: "Direto" }],
+      traits: [{ key: "humor", value: "Direto", context: "ON_TRACK" }],
     });
   });
 
@@ -269,7 +270,7 @@ describe("PersonaSection — mutations", () => {
     await user.type(input, "Ácido");
     await user.click(screen.getByRole("button", { name: "Salvar Humor" }));
     expect(apiMock.patch).toHaveBeenCalledWith("/api/characters/c1/persona", {
-      traits: [{ key: "humor", value: "Ácido" }],
+      traits: [{ key: "humor", value: "Ácido", context: "ON_TRACK" }],
     });
   });
 
@@ -282,7 +283,7 @@ describe("PersonaSection — mutations", () => {
       screen.getByRole("button", { name: "Confirmar remoção de Humor" }),
     );
     expect(apiMock.remove).toHaveBeenCalledWith(
-      "/api/characters/c1/persona/traits/humor",
+      "/api/characters/c1/persona/traits/humor?context=ON_TRACK",
     );
   });
 
@@ -325,6 +326,36 @@ describe("PersonaSection — mutations", () => {
     expect(container.textContent).not.toContain("schemaVersion");
     expect(container.textContent).not.toContain("0.9");
     expect(container.textContent).not.toContain("0.7");
+  });
+
+  it("21) agrupa traços em pista e fora das pistas e remove com contexto", async () => {
+    personaFixture = makePersona({
+      traits: [
+        makeTrait({ id: "t1", key: "humor", value: "Seco", context: "ON_TRACK" }),
+        makeTrait({ id: "t3", key: "interests", value: "Vinho", context: "OFF_TRACK" }),
+      ],
+    });
+    const user = userEvent.setup();
+    renderSection();
+    await screen.findByText("Resumo atual da persona.");
+    expect(screen.getAllByText("Em pista").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Fora das pistas").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Remover Interesses" }));
+    await user.click(
+      screen.getByRole("button", { name: "Confirmar remoção de Interesses" }),
+    );
+    expect(apiMock.remove).toHaveBeenCalledWith(
+      "/api/characters/c1/persona/traits/interests?context=OFF_TRACK",
+    );
+  });
+
+  it("22) personalidade sem traços mostra mensagem de vazio", async () => {
+    personaFixture = makePersona({ traits: [] });
+    renderSection();
+    await screen.findByText("Resumo atual da persona.");
+    expect(
+      screen.getByText("Esta personalidade ainda não possui traços definidos."),
+    ).toBeDefined();
   });
 });
 

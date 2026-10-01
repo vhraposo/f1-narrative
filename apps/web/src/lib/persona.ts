@@ -2,6 +2,20 @@ import { get, patch, post, remove } from "./api";
 
 export type PersonaOrigin = "ORIGINAL" | "REAL_DRIVER" | "AI_CHARACTER";
 export type PersonaTraitSource = "MANUAL" | "EVIDENCE";
+export type PersonaTraitContext = "ON_TRACK" | "OFF_TRACK";
+
+export const PERSONA_TRAIT_CONTEXT_LABELS: Record<PersonaTraitContext, string> = {
+  ON_TRACK: "Em pista",
+  OFF_TRACK: "Fora das pistas",
+};
+
+export const PERSONA_TRAIT_CONTEXT_OPTIONS: Array<{
+  value: PersonaTraitContext;
+  label: string;
+}> = [
+  { value: "ON_TRACK", label: PERSONA_TRAIT_CONTEXT_LABELS.ON_TRACK },
+  { value: "OFF_TRACK", label: PERSONA_TRAIT_CONTEXT_LABELS.OFF_TRACK },
+];
 export type PersonaEvidenceStatus = "PROPOSED" | "APPROVED" | "REJECTED";
 export type PersonaEvidenceRole =
   | "AUTHORITATIVE"
@@ -85,6 +99,7 @@ export type PersonaTrait = {
   value: string;
   confidence: number;
   sourceKind: PersonaTraitSource;
+  context: PersonaTraitContext;
   evidenceId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -121,7 +136,7 @@ export type PersonaView = {
 
 export type UpdatePersonaInput = {
   summary?: string | null;
-  traits?: Array<{ key: PersonaTraitKey; value: string }>;
+  traits?: Array<{ key: PersonaTraitKey; value: string; context?: PersonaTraitContext }>;
 };
 
 export type CreatePersonaEvidenceInput = {
@@ -160,9 +175,10 @@ export function updatePersona(
 export function deletePersonaTrait(
   characterId: string,
   traitKey: string,
+  context: PersonaTraitContext = "ON_TRACK",
 ): Promise<PersonaView> {
   return remove<PersonaResponse>(
-    `/api/characters/${characterId}/persona/traits/${traitKey}`,
+    `/api/characters/${characterId}/persona/traits/${traitKey}?context=${context}`,
   ).then((r) => r.persona);
 }
 

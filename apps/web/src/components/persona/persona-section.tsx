@@ -26,6 +26,8 @@ import {
   PERSONA_EVIDENCE_ROLE_LABELS,
   PERSONA_EVIDENCE_STATUS_LABELS,
   PERSONA_EVIDENCE_TYPE_LABELS,
+  PERSONA_TRAIT_CONTEXT_LABELS,
+  PERSONA_TRAIT_CONTEXT_OPTIONS,
   PERSONA_TRAIT_KEYS,
   PERSONA_TRAIT_LABELS,
   personaEvidenceTypeLabel,
@@ -35,6 +37,7 @@ import {
   type PersonaEvidence,
   type PersonaEvidenceType,
   type PersonaTrait,
+  type PersonaTraitContext,
   type PersonaTraitKey,
 } from "@/lib/persona";
 import { useSession } from "@/providers/session-provider";
@@ -469,6 +472,7 @@ export function PersonaSection({
   const [summaryDraft, setSummaryDraft] = useState("");
   const [newTraitKey, setNewTraitKey] = useState<PersonaTraitKey>("humor");
   const [newTraitValue, setNewTraitValue] = useState("");
+  const [newTraitContext, setNewTraitContext] = useState<PersonaTraitContext>("ON_TRACK");
   const [showEvidenceForm, setShowEvidenceForm] = useState(false);
 
   function showActionError(err: unknown) {
@@ -478,8 +482,8 @@ export function PersonaSection({
   }
 
   const section = (children: ReactNode) => (
-    <section aria-label={`Persona de ${characterName}`} className="space-y-3">
-      <SectionHeading kicker="Narrativa" title="Persona" />
+    <section aria-label={`Personalidade de ${characterName}`} className="space-y-3">
+      <SectionHeading kicker="Narrativa" title="Personalidade" />
       {children}
     </section>
   );
@@ -539,7 +543,7 @@ export function PersonaSection({
     if (value.length === 0) return;
     setActionError(null);
     updateMutation.mutate(
-      { traits: [{ key: newTraitKey, value }] },
+      { traits: [{ key: newTraitKey, value, context: newTraitContext }] },
       {
         onSuccess: () => setNewTraitValue(""),
         onError: showActionError,
@@ -547,17 +551,17 @@ export function PersonaSection({
     );
   }
 
-  function saveTraitValue(key: string, value: string) {
+  function saveTraitValue(key: string, value: string, context: PersonaTraitContext) {
     setActionError(null);
     updateMutation.mutate(
-      { traits: [{ key: key as PersonaTraitKey, value }] },
+      { traits: [{ key: key as PersonaTraitKey, value, context }] },
       { onError: showActionError },
     );
   }
 
-  function removeTrait(key: string) {
+  function removeTrait(key: string, context: PersonaTraitContext) {
     setActionError(null);
-    deleteMutation.mutate(key, { onError: showActionError });
+    deleteMutation.mutate({ traitKey: key, context }, { onError: showActionError });
   }
 
   const summaryEditor = (
@@ -628,9 +632,20 @@ export function PersonaSection({
 
   const manualTraitKeys = new Set(
     persona.traits
-      .filter((trait) => trait.sourceKind === "MANUAL")
+      .filter((trait) => trait.sourceKind === "MANUAL" && trait.context === "ON_TRACK")
       .map((trait) => trait.key),
   );
+
+  const traitGroups: Array<{ context: PersonaTraitContext; traits: PersonaTrait[] }> = [
+    {
+      context: "ON_TRACK",
+      traits: persona.traits.filter((trait) => trait.context === "ON_TRACK"),
+    },
+    {
+      context: "OFF_TRACK",
+      traits: persona.traits.filter((trait) => trait.context === "OFF_TRACK"),
+    },
+  ];
 
   return section(
     <>
@@ -682,24 +697,39 @@ export function PersonaSection({
 
       <div className="rounded-xl border border-border bg-card p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          Traits
+          Personalidade
         </p>
         {persona.traits.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            Nenhum trait registrado. Traits descrevem tendências de comportamento.
+            Esta personalidade ainda não possui traços definidos.
           </p>
         ) : (
-          <ul className="mt-2 divide-y divide-border">
-            {persona.traits.map((trait) => (
-              <TraitItem
-                key={trait.key}
-                trait={trait}
-                isBusy={updateMutation.isPending || deleteMutation.isPending}
-                onSave={(value) => saveTraitValue(trait.key, value)}
-                onRemove={() => removeTrait(trait.key)}
-              />
+          <div className="mt-2 space-y-5">
+            {traitGroups.map((group) => (
+              <div key={group.context}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {PERSONA_TRAIT_CONTEXT_LABELS[group.context]}
+                </p>
+                {group.traits.length === 0 ? (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Nenhum traço registrado em {PERSONA_TRAIT_CONTEXT_LABELS[group.context].toLowerCase()}.
+                  </p>
+                ) : (
+                  <ul className="mt-1 divide-y divide-border">
+                    {group.traits.map((trait) => (
+                      <TraitItem
+                        key={`${trait.context}:${trait.key}`}
+                        trait={trait}
+                        isBusy={updateMutation.isPending || deleteMutation.isPending}
+                        onSave={(value) => saveTraitValue(trait.key, value, trait.context)}
+                        onRemove={() => removeTrait(trait.key, trait.context)}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         )}
         <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-end">
           <div className="w-full space-y-1.5 sm:max-w-56">
@@ -710,6 +740,19 @@ export function PersonaSection({
               options={traitOptions}
             >
               <SelectTrigger aria-labelledby="new-trait-label">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent />
+            </Select>
+          </div>
+          <div className="w-full space-y-1.5 sm:max-w-44">
+            <Label id="new-trait-context-label">Contexto</Label>
+            <Select
+              value={newTraitContext}
+              onValueChange={(value) => setNewTraitContext(value as PersonaTraitContext)}
+              options={PERSONA_TRAIT_CONTEXT_OPTIONS}
+            >
+              <SelectTrigger aria-labelledby="new-trait-context-label">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent />

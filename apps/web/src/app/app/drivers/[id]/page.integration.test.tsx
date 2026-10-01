@@ -232,14 +232,14 @@ describe("Driver detail page", () => {
     ).toBeDefined();
   });
 
-  it("mostra a seção Persona com superfície de evidências do piloto", async () => {
+  it("mostra a seção Personalidade com superfície de evidências do piloto", async () => {
     const user = userEvent.setup();
     renderWithClient(<DriverDetailPage />);
     await screen.findByRole("heading", { level: 1, name: "Sergio Pérez" });
 
-    await user.click(screen.getByRole("tab", { name: "Persona" }));
+    await user.click(screen.getByRole("tab", { name: "Personalidade" }));
     expect(
-      await screen.findByRole("region", { name: "Persona de Sergio Pérez" }),
+      await screen.findByRole("region", { name: "Personalidade de Sergio Pérez" }),
     ).toBeDefined();
     expect(await screen.findByText("Nenhuma persona registrada")).toBeDefined();
     await user.click(screen.getByRole("button", { name: /Criar persona/ }));
