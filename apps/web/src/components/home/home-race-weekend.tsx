@@ -8,6 +8,7 @@ import { SectionHeading } from "@/components/home/section-heading";
 import { Button } from "@/components/ui/button";
 import { useNextRace } from "@/hooks/use-next-race";
 import { useRaceWeekend, useRunWeekendSession } from "@/hooks/use-race-weekend";
+import { API_BASE } from "@/lib/api";
 import { RACE_SESSION_LABELS, type RaceSession } from "@/lib/world";
 import type { WeekendSessionView } from "@/lib/weekend";
 import { cn } from "@/lib/utils";
@@ -153,17 +154,25 @@ export function HomeRaceWeekend() {
                             maximumFractionDigits: 3,
                           })} km`
                         : null,
+                      race.circuit.turns !== null ? `${race.circuit.turns} curvas` : null,
                     ]
                       .filter(Boolean)
                       .join(" — ")}
                   </p>
                 ) : null}
                 {race.circuit?.layoutUrl ? (
-                  <img
-                    src={race.circuit.layoutUrl}
-                    alt={`Layout do circuito ${race.circuit.name}`}
-                    className="mt-3 h-24 w-full max-w-xs rounded-sm border border-border object-contain"
-                  />
+                  <figure className="mt-3 space-y-1">
+                    <img
+                      src={`${API_BASE}${race.circuit.layoutUrl}`}
+                      alt={`Layout do circuito ${race.circuit.name}`}
+                      className="h-24 w-full max-w-xs rounded-sm border border-border bg-white object-contain p-1"
+                    />
+                    {race.circuit.layoutAttribution ? (
+                      <figcaption className="text-[10px] text-muted-foreground">
+                        {race.circuit.layoutAttribution}
+                      </figcaption>
+                    ) : null}
+                  </figure>
                 ) : null}
                 {race.date ? (
                   <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">

@@ -22,6 +22,10 @@ const layoutQuerySchema = z
   .object({ style: z.enum(["black-outline", "white-outline"]).optional() })
   .strict();
 
+const f1dbLayoutParamsSchema = z.object({
+  circuitKey: z.string().regex(/^[a-z0-9][a-z0-9-]{1,59}$/),
+});
+
 export const circuitCatalogRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/api/external/circuits",
@@ -59,6 +63,36 @@ export const circuitCatalogRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: "Circuito não encontrado", code: "CIRCUIT_NOT_FOUND" });
       }
       return reply.send({ circuit });
+    },
+  );
+
+  fastify.get(
+    "/api/external/circuits/f1db/:circuitKey/layout.svg",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = f1dbLayoutParamsSchema.safeParse(request.params);
+      const query = layoutQuerySchema.safeParse(request.query ?? {});
+      if (!params.success || !query.success) {
+        return reply
+          .code(404)
+          .send({ error: "Layout não encontrado", code: "CIRCUIT_LAYOUT_NOT_FOUND" });
+      }
+      const layout = resolveCircuitSvg({
+        externalId: params.data.circuitKey,
+        name: "",
+        ...(query.data.style ? { style: query.data.style } : {}),
+      });
+      if (!layout) {
+        return reply
+          .code(404)
+          .send({ error: "Layout não encontrado", code: "CIRCUIT_LAYOUT_NOT_FOUND" });
+      }
+      return reply
+        .header("Content-Type", "image/svg+xml; charset=utf-8")
+        .header("Cache-Control", "public, max-age=86400")
+        .header("X-Circuit-Layout", layout.layoutId)
+        .header("X-Attribution", layout.attribution.replace(/[^\x20-\x7E]/g, "-"))
+        .send(layout.svg);
     },
   );
 

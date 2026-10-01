@@ -172,4 +172,30 @@ describe("Next Race — estado do Universe", () => {
     expect(resultB.totalRounds).toBe(2);
     expect(resultB.next?.raceId).toBe(b.raceIds[1]);
   });
+
+  it("enriquece o circuito com F1DB real e expõe o layout SVG", async () => {
+    const fx = await setup("f1db", ["UPCOMING"]);
+    await prisma.circuit.update({
+      where: { id: fx.circuitId },
+      data: {
+        name: "Autódromo José Carlos Pace",
+        locality: null,
+        country: "Brazil",
+        lengthMeters: null,
+        turns: null,
+      },
+    });
+
+    const result = await getNextRaceForUniverse(fx.universeId);
+    const circuit = result.next?.circuit ?? null;
+    expect(circuit?.fullName).toBe("Autódromo José Carlos Pace");
+    expect(circuit?.locality).toBe("São Paulo");
+    expect(circuit?.lengthMeters).toBe(4309);
+    expect(circuit?.turns).toBe(15);
+    expect(circuit?.lengthSource).toBe("F1DB");
+    expect(circuit?.layoutUrl).toBe(
+      "/api/external/circuits/f1db/interlagos/layout.svg",
+    );
+    expect(circuit?.layoutAttribution).toContain("CC BY 4.0");
+  });
 });

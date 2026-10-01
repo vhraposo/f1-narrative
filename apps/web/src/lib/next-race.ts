@@ -3,6 +3,9 @@ import { get } from "./api";
 export type NextRaceCircuit = {
   id: string;
   name: string;
+  fullName: string | null;
+  type: string | null;
+  direction: string | null;
   locality: string | null;
   country: string | null;
   latitude: number | null;
@@ -12,6 +15,9 @@ export type NextRaceCircuit = {
   layoutKey: string | null;
   layoutUrl: string | null;
   photoUrl: string | null;
+  layoutSource: string | null;
+  layoutAttribution: string | null;
+  lengthSource: "F1DB" | "UNIVERSE" | null;
 };
 
 export type NextRaceEntry = {

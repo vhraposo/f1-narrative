@@ -323,5 +323,23 @@ describe("catálogo externo de circuitos", () => {
     expect(String(svg.headers["x-attribution"])).toContain("CC BY 4.0");
     expect(svg.body.startsWith("<svg")).toBe(true);
     expect(svg.body.includes("<script")).toBe(false);
+
+    const byKey = await app.inject({
+      method: "GET",
+      url: "/api/external/circuits/f1db/interlagos/layout.svg",
+      headers: { cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect(byKey.statusCode).toBe(200);
+    expect(byKey.headers["content-type"]).toContain("image/svg+xml");
+    expect(String(byKey.headers["x-circuit-layout"])).toBe("interlagos-2");
+
+    const unknown = await app.inject({
+      method: "GET",
+      url: "/api/external/circuits/f1db/circuito-inventado/layout.svg",
+      headers: { cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect(unknown.statusCode).toBe(404);
   });
 });

@@ -54,15 +54,21 @@ const NEXT_RACE: NextRaceResult = {
     circuit: {
       id: "c1",
       name: "Autódromo José Carlos Pace",
+      fullName: "Autódromo José Carlos Pace",
+      type: "RACE",
+      direction: "ANTI_CLOCKWISE",
       locality: "São Paulo",
       country: "Brazil",
       latitude: null,
       longitude: null,
-      lengthMeters: null,
-      turns: null,
-      layoutKey: null,
-      layoutUrl: null,
+      lengthMeters: 4309,
+      turns: 15,
+      layoutKey: "interlagos-2",
+      layoutUrl: "/api/external/circuits/f1db/interlagos/layout.svg",
       photoUrl: null,
+      layoutSource: "f1db-circuits-svg",
+      layoutAttribution: "f1-circuits-svg by ROY Jules - CC BY 4.0",
+      lengthSource: "F1DB",
     },
   },
   reason: null,
@@ -157,6 +163,15 @@ describe("HomeRaceWeekend — Next Race do Universe", () => {
     expect(screen.getByText("R5/24")).toBeDefined();
     expect(screen.getByText(/Autódromo José Carlos Pace/)).toBeDefined();
     expect(screen.getByText(/São Paulo, Brazil/)).toBeDefined();
+    expect(screen.getByText(/4,309 km/)).toBeDefined();
+    expect(screen.getByText(/15 curvas/)).toBeDefined();
+    const layout = screen.getByAltText(
+      "Layout do circuito Autódromo José Carlos Pace",
+    ) as HTMLImageElement;
+    expect(layout.getAttribute("src")).toBe(
+      "http://localhost:3001/api/external/circuits/f1db/interlagos/layout.svg",
+    );
+    expect(screen.getByText(/CC BY 4\.0/)).toBeDefined();
     expect(
       screen.getByRole("link", { name: /Ver evento/ }).getAttribute("href"),
     ).toBe("/app/championship");

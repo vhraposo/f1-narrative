@@ -1,8 +1,18 @@
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { getF1dbCircuitInfo, resolveF1dbCircuitId } from "../f1db/f1db.circuits.js";
 
 const WORLD_KEY = "default";
 
-export interface NextRaceCircuit {
+export interface NextRaceCircuit extends CircuitBase {
+  fullName: string | null;
+  type: string | null;
+  direction: string | null;
+  layoutSource: string | null;
+  layoutAttribution: string | null;
+  lengthSource: "F1DB" | "UNIVERSE" | null;
+}
+
+type CircuitBase = {
   id: string;
   name: string;
   locality: string | null;
@@ -14,7 +24,7 @@ export interface NextRaceCircuit {
   layoutKey: string | null;
   layoutUrl: string | null;
   photoUrl: string | null;
-}
+};
 
 export interface NextRaceEntry {
   raceId: string;
@@ -68,8 +78,48 @@ type RaceRow = {
   status: string;
   sprintOverride: boolean | null;
   sprintExternal: boolean | null;
-  circuitRef: NextRaceCircuit | null;
+  circuitRef: CircuitBase | null;
 };
+
+function enrichCircuit(circuit: CircuitBase | null): NextRaceCircuit | null {
+  if (!circuit) return null;
+  const f1dbId = resolveF1dbCircuitId({ externalId: null, name: circuit.name });
+  const info = f1dbId ? getF1dbCircuitInfo(f1dbId) : null;
+  if (!info) {
+    return {
+      ...circuit,
+      fullName: null,
+      type: null,
+      direction: null,
+      layoutSource: null,
+      layoutAttribution: null,
+      lengthSource: circuit.lengthMeters !== null ? "UNIVERSE" : null,
+    };
+  }
+  return {
+    ...circuit,
+    fullName: info.circuit.fullName,
+    type: info.circuit.type,
+    direction: info.circuit.direction,
+    locality: circuit.locality ?? info.circuit.placeName ?? null,
+    latitude: circuit.latitude ?? info.circuit.latitude,
+    longitude: circuit.longitude ?? info.circuit.longitude,
+    lengthMeters:
+      circuit.lengthMeters ??
+      (info.circuit.lengthKm !== null ? Math.round(info.circuit.lengthKm * 1000) : null),
+    turns: circuit.turns ?? info.circuit.turns,
+    layoutKey: info.effectiveLayout?.id ?? circuit.layoutKey,
+    layoutUrl: `/api/external/circuits/f1db/${info.circuit.id}/layout.svg`,
+    layoutSource: "f1db-circuits-svg",
+    layoutAttribution: "f1db-circuits-svg by ROY Jules - CC BY 4.0",
+    lengthSource:
+      circuit.lengthMeters !== null
+        ? "UNIVERSE"
+        : info.circuit.lengthKm !== null
+          ? "F1DB"
+          : null,
+  };
+}
 
 function toEntry(race: RaceRow): NextRaceEntry {
   return {
@@ -79,7 +129,7 @@ function toEntry(race: RaceRow): NextRaceEntry {
     date: race.date,
     status: race.status,
     hasSprint: race.sprintOverride ?? race.sprintExternal ?? false,
-    circuit: race.circuitRef,
+    circuit: enrichCircuit(race.circuitRef),
   };
 }
 
