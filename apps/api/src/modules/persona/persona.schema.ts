@@ -14,6 +14,8 @@ export const personaEvidenceParamsSchema = z.object({
   evidenceId: z.string().uuid("Identificador de evidência inválido"),
 });
 
+export const personaTraitContextSchema = z.enum(["ON_TRACK", "OFF_TRACK"]);
+
 const personaTraitUpdateSchema = z
   .object({
     key: z.enum(PERSONA_TRAIT_KEYS),
@@ -22,6 +24,13 @@ const personaTraitUpdateSchema = z
       .trim()
       .min(1, "Informe o valor do trait")
       .max(200, "Valor do trait muito longo (máx. 200 caracteres)"),
+    context: personaTraitContextSchema.default("ON_TRACK"),
+  })
+  .strict();
+
+export const personaTraitQuerySchema = z
+  .object({
+    context: personaTraitContextSchema.default("ON_TRACK"),
   })
   .strict();
 
@@ -36,7 +45,8 @@ export const updatePersonaBodySchema = z
       .array(personaTraitUpdateSchema)
       .refine(
         (traits) =>
-          new Set(traits.map((trait) => trait.key)).size === traits.length,
+          new Set(traits.map((trait) => `${trait.key}:${trait.context}`)).size ===
+          traits.length,
         { message: "Trait duplicado no payload" },
       )
       .optional(),

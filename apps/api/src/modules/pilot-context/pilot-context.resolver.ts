@@ -133,7 +133,7 @@ export async function resolvePilotContext(
       driverProfile: { select: { id: true } },
       persona: {
         include: {
-          traits: true,
+          traits: { where: { context: "ON_TRACK" } },
           traitEvolutions: {
             include: { sourceExperience: { select: { status: true } } },
           },

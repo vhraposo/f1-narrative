@@ -915,7 +915,10 @@ async function loadSpeakerPersona(
     where: { characterId: speakerCharacterId },
     select: {
       summary: true,
-      traits: { select: { key: true, value: true, confidence: true } },
+      traits: {
+        where: { context: "ON_TRACK" },
+        select: { key: true, value: true, confidence: true },
+      },
     },
   });
   if (!persona) return null;

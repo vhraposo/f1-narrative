@@ -13,6 +13,7 @@ import {
   personaCharacterParamsSchema,
   personaEvidenceParamsSchema,
   personaTraitParamsSchema,
+  personaTraitQuerySchema,
   reviewPersonaEvidenceBodySchema,
   updatePersonaBodySchema,
 } from "./persona.schema.js";
@@ -100,11 +101,15 @@ export const personaRoutes: FastifyPluginAsync = async (fastify) => {
       const params = personaTraitParamsSchema.safeParse(request.params);
       if (!params.success) return sendInvalidParams(reply);
 
+      const query = personaTraitQuerySchema.safeParse(request.query ?? {});
+      if (!query.success) return sendInvalidParams(reply);
+
       try {
         const persona = await deletePersonaTrait(
           request.user!.id,
           params.data.characterId,
           params.data.traitKey,
+          query.data.context,
         );
         return reply.send({ persona });
       } catch (error) {

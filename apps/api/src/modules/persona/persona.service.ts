@@ -66,12 +66,15 @@ export function resolvePersonaOrigin(input: PersonaOriginInput): PersonaOrigin |
   return input.hasExternalBinding ? "REAL_DRIVER" : "AI_CHARACTER";
 }
 
+export type PersonaTraitContext = "ON_TRACK" | "OFF_TRACK";
+
 export type PersonaTraitView = {
   readonly id: string;
   readonly key: string;
   readonly value: string;
   readonly confidence: number;
   readonly sourceKind: PersonaTraitSource;
+  readonly context: PersonaTraitContext;
   readonly evidenceId: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -195,6 +198,7 @@ function buildTraitViews(traits: readonly PersonaTraitRow[]): PersonaTraitView[]
     value: trait.value,
     confidence: trait.confidence,
     sourceKind: trait.sourceKind,
+    context: trait.context,
     evidenceId: trait.evidenceId,
     createdAt: trait.createdAt,
     updatedAt: trait.updatedAt,
@@ -385,6 +389,7 @@ export async function ensurePersona(
 export type ManualPersonaTraitInput = {
   readonly key: string;
   readonly value: string;
+  readonly context?: PersonaTraitContext;
 };
 
 export type UpdatePersonaManuallyInput = {
@@ -493,13 +498,15 @@ export async function updatePersonaManually(
       }
 
       for (const trait of traits) {
+        const context = trait.context ?? "ON_TRACK";
         await tx.personaTrait.upsert({
-          where: { personaId_key_context: { personaId: persona.id, key: trait.key, context: "ON_TRACK" } },
+          where: { personaId_key_context: { personaId: persona.id, key: trait.key, context } },
           update: { value: trait.value, ...manual },
           create: {
             personaId: persona.id,
             key: trait.key,
             value: trait.value,
+            context,
             ...manual,
           },
         });
@@ -519,6 +526,7 @@ export async function deletePersonaTrait(
   userId: string,
   characterId: string,
   traitKey: string,
+  context: PersonaTraitContext = "ON_TRACK",
 ): Promise<PersonaView> {
   const keyIssue = inspectPersonaTraitKey(traitKey);
   if (keyIssue) {
@@ -537,7 +545,7 @@ export async function deletePersonaTrait(
   if (!persona) throw notFoundError();
 
   const trait = await prisma.personaTrait.findUnique({
-      where: { personaId_key_context: { personaId: persona.id, key: traitKey, context: "ON_TRACK" } },
+      where: { personaId_key_context: { personaId: persona.id, key: traitKey, context } },
     select: { id: true },
   });
   if (!trait) throw traitNotFoundError();

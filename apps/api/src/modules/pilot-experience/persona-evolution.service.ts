@@ -95,7 +95,7 @@ async function loadContext(universeId: string, characterId: string) {
       driverProfile: { select: { id: true } },
       persona: {
         include: {
-          traits: true,
+          traits: { where: { context: "ON_TRACK" } },
           traitEvolutions: {
             include: { sourceExperience: { select: { status: true } } },
           },
@@ -305,7 +305,7 @@ export async function applyPersonaEvolution(
           schemaVersion: "persona.v1",
         },
         include: {
-          traits: true,
+          traits: { where: { context: "ON_TRACK" } },
           traitEvolutions: { include: { sourceExperience: { select: { status: true } } } },
         },
       }));
@@ -456,7 +456,7 @@ async function loadContextWithin(
       driverProfile: { select: { id: true } },
       persona: {
         include: {
-          traits: true,
+          traits: { where: { context: "ON_TRACK" } },
           traitEvolutions: {
             include: { sourceExperience: { select: { status: true } } },
           },
