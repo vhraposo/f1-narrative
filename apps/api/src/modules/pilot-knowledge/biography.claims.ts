@@ -77,6 +77,7 @@ export type BiographyClaim = {
   readonly sourceVersion: string | null;
   readonly attribution: string | null;
   readonly sourceRef: BiographyClaimSourceRef | null;
+  readonly context: "ON_TRACK" | "OFF_TRACK" | null;
 };
 
 export type ApprovedClaimSet = {
@@ -103,6 +104,7 @@ type ClaimDraft = {
   readonly sourceVersion: string | null;
   readonly attribution?: string | null;
   readonly sourceRef?: BiographyClaimSourceRef | null;
+  readonly context?: "ON_TRACK" | "OFF_TRACK" | null;
 };
 
 const KEY_CATEGORY: Record<string, BiographyEvidenceCategory> = {
@@ -463,6 +465,7 @@ export function buildApprovedBiographyClaims(input: {
       provider: source.provider,
       sourceVersion: input.f1dbSourceVersion,
       attribution: claim.attribution,
+      context: claim.context,
       sourceRef: {
         provider: source.provider,
         sourceType: source.sourceType,
@@ -484,6 +487,7 @@ export function buildApprovedBiographyClaims(input: {
     ...draft,
     category: draft.category ?? categoryForKey(draft.key),
     attribution: draft.attribution ?? null,
+    context: draft.context ?? null,
     sourceRef: draft.sourceRef ?? null,
     id: `CLAIM-${String(index + 1).padStart(3, "0")}`,
     status: "APPROVED" as const,

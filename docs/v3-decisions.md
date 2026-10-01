@@ -427,3 +427,7 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 ## D-103 - Personality semeada de evidence curada preservando override manual
 - **Decisao (V3.24.4):** o enrichment cria PersonaEvidence aprovada e PersonaTrait EVIDENCE por contexto (PUBLIC_PERSONALITY -> ON_TRACK; INTERESTS/PROJECTS -> OFF_TRACK) para characters com binding externo; traits MANUAL existentes nunca sao sobrescritos e a execucao e idempotente.
 - **Consequencia:** Personalidade tem conteudo real com provenance em 46 personagens (62 ON_TRACK, 40 OFF_TRACK) sem inventar tracos.
+
+## D-104 - Personality somente de PUBLIC_PERSONALITY com contexto
+- **Decisao (V3.24.5):** INTERESTS e PROJECTS nunca geram PersonaTrait automaticamente; permanecem no Public Profile e na Biography. Somente claims PUBLIC_PERSONALITY com context explicito (ON_TRACK/OFF_TRACK) na propria evidence geram traits EVIDENCE, via reconciliacao deterministica que remove traits/evidencias auto-geradas fora do conjunto desejado e preserva MANUAL.
+- **Consequencia:** a aba Personalidade mostra apenas comportamento sustentado por evidence; hobbies e projetos deixam de aparecer como tracos; AI context e evolution seguem restritos a ON_TRACK.

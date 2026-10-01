@@ -835,7 +835,8 @@
           "value": "signum-crucis",
           "display": "em suas aparições públicas, costuma fazer o sinal da cruz antes das corridas, uma rotina documentada em sua trajetória",
           "sourceRef": "wikipedia-gasly",
-          "authority": "SECONDARY"
+          "authority": "SECONDARY",
+          "context": "ON_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -1032,7 +1033,8 @@
           "display": "em entrevista à Fórmula 1, descreveu a competitividade como uma das coisas que mais o atrai nas corridas, dentro e fora da pista",
           "sourceRef": "f1-norris-sim",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em entrevista à Fórmula 1"
+          "attribution": "Em entrevista à Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -1050,7 +1052,8 @@
           "display": "tornou-se uma das vozes mais abertas da geração ao falar publicamente sobre saúde mental e pressão na Fórmula 1",
           "sourceRef": "f1-norris-hof",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Perfil oficial da Fórmula 1"
+          "attribution": "Perfil oficial da Fórmula 1",
+          "context": "OFF_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -1341,7 +1344,8 @@
           "display": "em declaração reproduzida pelo perfil oficial da Red Bull, afirmou que a equipe é como uma segunda família para ele",
           "sourceRef": "redbull-max",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em declaração reproduzida pelo perfil oficial da Red Bull"
+          "attribution": "Em declaração reproduzida pelo perfil oficial da Red Bull",
+          "context": "OFF_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -1563,7 +1567,8 @@
           "display": "tem como lema 'em caso de dúvida, acelere até o fim', frase que resume seu estilo agressivo nas pistas",
           "sourceRef": "f1-george-russell",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -1572,7 +1577,8 @@
           "display": "afirmou em seu perfil oficial na Mercedes que se sente no melhor momento mental de sua carreira até aqui",
           "sourceRef": "mercedes-russell",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil no site oficial da Mercedes"
+          "attribution": "Em seu perfil no site oficial da Mercedes",
+          "context": "ON_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -1768,7 +1774,8 @@
           "display": "contou em entrevista ao site da Mercedes que fica extremamente competitivo até em paintball ou boliche com os amigos",
           "sourceRef": "mercedes-kimi-interview",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em entrevista ao site oficial da Mercedes"
+          "attribution": "Em entrevista ao site oficial da Mercedes",
+          "context": "OFF_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -1924,7 +1931,8 @@
           "display": "é descrito pela Fórmula 1 como modesto e reflexivo fora dos carros, com uma missão pessoal bem definida na carreira",
           "sourceRef": "f1-charles-leclerc",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "OFF_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -1933,7 +1941,8 @@
           "display": "afirma em seu site oficial que 'é a mente que faz a diferença', lema que resume sua preparação física e mental",
           "sourceRef": "leclerc-official",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu site oficial"
+          "attribution": "Em seu site oficial",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -2192,7 +2201,8 @@
           "display": "é descrito pela Fórmula 1 como um modelo inspirador por seu talento e personalidade dentro e fora das pistas",
           "sourceRef": "f1-hamilton-hof",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil no Hall da Fama da Fórmula 1"
+          "attribution": "Em seu perfil no Hall da Fama da Fórmula 1",
+          "context": "OFF_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -2408,7 +2418,8 @@
           "display": "é descrito pela McLaren como alguém que exala calma e aprende rápido, características que marcam sua adaptação à Fórmula 1",
           "sourceRef": "mclaren-piastri",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil oficial na McLaren"
+          "attribution": "Em seu perfil oficial na McLaren",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -2417,7 +2428,8 @@
           "display": "definiu seu estilo de pilotagem como metódico e sua postura no cockpit como calma, em respostas publicadas pela McLaren",
           "sourceRef": "mclaren-piastri",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em respostas publicadas pela McLaren"
+          "attribution": "Em respostas publicadas pela McLaren",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -2645,7 +2657,8 @@
           "display": "descreve-se como alguém que lutou para chegar à Fórmula 1 pelo caminho mais difícil, segundo seu perfil oficial",
           "sourceRef": "f1-isack-hadjar",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         }
       ]
     },
@@ -2785,7 +2798,8 @@
           "display": "afirma que não está no grid para fazer amigos e que seu foco é vencer corridas",
           "sourceRef": "f1-liam-lawson",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -3094,7 +3108,8 @@
           "display": "afirma que dará tudo de si para entregar os melhores resultados possíveis na equipe",
           "sourceRef": "f1-franco-colapinto",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PROJECTS",
@@ -3289,7 +3304,8 @@
           "display": "diz que corridas disputadas lado a lado e no limite são o que ele considera o verdadeiro espírito do esporte",
           "sourceRef": "f1-esteban-ocon",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -3490,7 +3506,8 @@
           "display": "declarou em seu perfil na Fórmula 1 que é um competidor nato e gosta de ser bom em tudo o que faz",
           "sourceRef": "f1-oliver-bearman",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -3650,7 +3667,8 @@
           "display": "Em seu site oficial, se descreve como alguém que não se leva a sério, mantendo o bom humor também sob pressão",
           "sourceRef": "hulkenberg-official",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu site oficial"
+          "attribution": "Em seu site oficial",
+          "context": "OFF_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -3659,7 +3677,8 @@
           "display": "o perfil da Fórmula 1 o descreve como uma pessoa pé no chão, que segura o próprio guarda-chuva a caminho do grid",
           "sourceRef": "f1-nico-hulkenberg",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "OFF_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -3984,7 +4003,8 @@
           "display": "Em seu perfil na Fórmula 1, é descrito como um piloto tenaz, que coloca o carro no limite e ganhou o apelido de Chilli",
           "sourceRef": "f1-carlos-sainz",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -3993,7 +4013,8 @@
           "display": "o perfil oficial da Fórmula 1 destaca seu temperamento calmo, que o mantém sereno mesmo sob a pressão de um sobrenome famoso",
           "sourceRef": "f1-carlos-sainz",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -4002,7 +4023,8 @@
           "display": "também é descrito como inteligente e instintivo, capaz de pensar a corrida enquanto avança pelo pelotão",
           "sourceRef": "f1-carlos-sainz",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PROJECTS",
@@ -4177,7 +4199,8 @@
           "display": "Em seu perfil na Fórmula 1, é descrito como descontraído, alegre e dono de um sorriso maroto, além de popular entre os rivais",
           "sourceRef": "f1-alexander-albon",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "OFF_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -4186,7 +4209,8 @@
           "display": "declarou em seu perfil na Fórmula 1 que está pronto para vencer corridas e brigar por um campeonato",
           "sourceRef": "f1-alexander-albon",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -4410,7 +4434,8 @@
           "display": "declarou em seu perfil na Fórmula 1 que se avalia como 9/10 em tudo, tamanha é a sua autoconfiança",
           "sourceRef": "f1-fernando-alonso",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -4419,7 +4444,8 @@
           "display": "disse em seu perfil na Fórmula 1 que não se arrepende de nada, lema que resume a sua postura na carreira",
           "sourceRef": "f1-fernando-alonso",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil na Fórmula 1"
+          "attribution": "Em seu perfil na Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -4428,7 +4454,8 @@
           "display": "afirmou em seu perfil na Aston Martin que tudo na vida exige competitividade e fome de ser o melhor",
           "sourceRef": "aston-fernando-alonso",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil oficial na Aston Martin"
+          "attribution": "Em seu perfil oficial na Aston Martin",
+          "context": "ON_TRACK"
         },
         {
           "category": "INTERESTS",
@@ -4610,7 +4637,8 @@
           "display": "é descrito pela Aston Martin como um dos talentos mais imprevisíveis da F1, capaz de atuações muito acima do normal",
           "sourceRef": "aston-lance-stroll",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em seu perfil oficial na Aston Martin"
+          "attribution": "Em seu perfil oficial na Aston Martin",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -4782,7 +4810,8 @@
           "value": "combatente e estrategista",
           "display": "a Fórmula 1 o define como um combatente duro nas disputas e, ao mesmo tempo, um mestre na gestão de pneus",
           "sourceRef": "f1-sergio-perez",
-          "authority": "PRIMARY_OFFICIAL"
+          "authority": "PRIMARY_OFFICIAL",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -4790,7 +4819,8 @@
           "value": "duro com companheiros",
           "display": "é conhecido por não aliviar nas disputas, a ponto de companheiros de equipe já terem sentido seu calor na pista",
           "sourceRef": "f1-sergio-perez",
-          "authority": "PRIMARY_OFFICIAL"
+          "authority": "PRIMARY_OFFICIAL",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -4969,7 +4999,8 @@
           "value": "reservado e calmo",
           "display": "a Fórmula 1 o descreve como reservado, diligente e calmo, características que fazem a pressão do grid não abalá-lo",
           "sourceRef": "f1-valtteri-bottas",
-          "authority": "PRIMARY_OFFICIAL"
+          "authority": "PRIMARY_OFFICIAL",
+          "context": "OFF_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -5174,7 +5205,8 @@
           "display": "admitiu à Fórmula 1 que o controle emocional era seu ponto fraco no início e que quase teve de mudar de personalidade",
           "sourceRef": "f1-tsunoda-exclusive",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em entrevista à Fórmula 1"
+          "attribution": "Em entrevista à Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",
@@ -5183,7 +5215,8 @@
           "display": "resumiu à Fórmula 1 sua situação como reserva dizendo que estava morrendo de vontade de estar de volta ao carro",
           "sourceRef": "f1-tsunoda-return",
           "authority": "PRIMARY_OFFICIAL",
-          "attribution": "Em entrevista à Fórmula 1"
+          "attribution": "Em entrevista à Fórmula 1",
+          "context": "ON_TRACK"
         },
         {
           "category": "PUBLIC_PERSONALITY",

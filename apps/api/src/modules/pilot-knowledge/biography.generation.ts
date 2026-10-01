@@ -216,7 +216,11 @@ async function executeGenerationRun(runId: string, options: GenerationOptions): 
         : metadata.mode === "FALLBACK"
           ? "COMPACT_FALLBACK"
           : null;
-    const mode = result.biography ? modeFromProvision(result.biography.mode) : (storedMode ?? "COMPACT_FALLBACK");
+    const reportedMode = result.biography?.mode;
+    const mode =
+      reportedMode && reportedMode !== "NOT_REQUESTED"
+        ? modeFromProvision(reportedMode)
+        : (storedMode ?? "COMPACT_FALLBACK");
     const success = mode === "LLM" ? "SUCCEEDED" : "SUCCEEDED_FALLBACK";
 
     await prisma.biographyGenerationRun.update({

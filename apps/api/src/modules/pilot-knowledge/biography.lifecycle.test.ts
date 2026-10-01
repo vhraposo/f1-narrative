@@ -14,6 +14,8 @@ let userId: string;
 let universeId: string;
 let seasonId: string;
 let characterIds: string[] = [];
+const extraUniverseIds: string[] = [];
+const extraUserIds: string[] = [];
 let pilotNumber = 30;
 
 function remoteAddress(): string {
@@ -68,13 +70,13 @@ function stubGenerationProvider(): {
   };
 }
 
-async function createPilot(label: string) {
+async function createPilot(label: string, driverName?: string) {
   pilotNumber += 1;
   const driver = await prisma.externalDriver.create({
     data: {
       source: "f1db",
       externalId: `${PREFIX}-${label}`,
-      name: `Piloto ${label}`,
+      name: driverName ?? `Piloto ${label}`,
       nationality: "NED",
       number: pilotNumber,
       contentHash: `hash-${label}`,
@@ -84,7 +86,7 @@ async function createPilot(label: string) {
     data: {
       universeId,
       controlledBy: "AI",
-      name: `PK ${label}`,
+      name: driverName ?? `PK ${label}`,
       nationality: "NED",
       birthDate: new Date("1997-09-30T00:00:00.000Z"),
       driverProfile: { create: { number: pilotNumber } },
@@ -170,6 +172,18 @@ afterAll(async () => {
   await prisma.externalDriver.deleteMany({ where: { externalId: { startsWith: PREFIX } } });
   await prisma.season.deleteMany({ where: { id: seasonId } });
   await prisma.worldState.deleteMany({ where: { universeId } });
+  if (extraUniverseIds.length > 0) {
+    await prisma.externalBindingDriver.deleteMany({
+      where: { universeId: { in: extraUniverseIds } },
+    });
+    await prisma.character.deleteMany({
+      where: { universeId: { in: extraUniverseIds } },
+    });
+    await prisma.universe.deleteMany({ where: { id: { in: extraUniverseIds } } });
+  }
+  if (extraUserIds.length > 0) {
+    await prisma.user.deleteMany({ where: { id: { in: extraUserIds } } });
+  }
   await prisma.externalKnowledgeSource.deleteMany({
     where: {
       createdAt: { gte: TEST_STARTED_AT },
@@ -377,5 +391,68 @@ describe("biography lifecycle e backfill", () => {
     expect(sanitized.systemPrompt).not.toContain("minha-chave-secreta");
     expect(sanitized.systemPrompt).toContain("[REDACTED]");
     expect(sanitized.userPrompt).not.toContain("sk-1234567890abcdef");
+  });
+
+  it("7) perfis compartilhados: segundo character herda o modo persistido do perfil", async () => {
+    const first = await createPilot("shared-a", "George Russell");
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/pilot-knowledge/drivers/${first.id}/biography/generation`,
+      headers: { cookie },
+      remoteAddress: remoteAddress(),
+    });
+    const firstRunId = (created.json() as { generation: { runId: string } }).generation.runId;
+    await waitTerminal(firstRunId);
+    const firstRun = await prisma.biographyGenerationRun.findUniqueOrThrow({
+      where: { id: firstRunId },
+    });
+    expect(firstRun.mode).toBe("RICH_DETERMINISTIC");
+
+    const binding = await prisma.externalBindingDriver.findFirstOrThrow({
+      where: { characterId: first.id },
+      select: { externalDriverId: true },
+    });
+    const secondUser = await prisma.user.create({
+      data: {
+        name: "Bio Life 2",
+        email: `${PREFIX}-2-${Date.now()}@f1nw.test`,
+        password: null,
+        emailVerified: true,
+        role: "USER",
+      },
+    });
+    extraUserIds.push(secondUser.id);
+    const secondUniverse = await prisma.universe.create({
+      data: { userId: secondUser.id, status: "READY" },
+    });
+    extraUniverseIds.push(secondUniverse.id);
+    pilotNumber += 1;
+    const second = await prisma.character.create({
+      data: {
+        universeId: secondUniverse.id,
+        controlledBy: "AI",
+        name: "George Russell",
+        nationality: "GBR",
+        birthDate: new Date("1998-02-15T00:00:00.000Z"),
+        driverProfile: { create: { number: pilotNumber } },
+      },
+    });
+    characterIds.push(second.id);
+    await prisma.externalBindingDriver.create({
+      data: {
+        universeId: secondUniverse.id,
+        externalDriverId: binding.externalDriverId,
+        characterId: second.id,
+      },
+    });
+
+    const { requestBiographyGeneration } = await import("./biography.generation.js");
+    const secondRequest = await requestBiographyGeneration(second.id);
+    await waitTerminal(secondRequest.runId);
+    const secondRun = await prisma.biographyGenerationRun.findUniqueOrThrow({
+      where: { id: secondRequest.runId },
+    });
+    expect(secondRun.mode).toBe("RICH_DETERMINISTIC");
+    expect(secondRun.evidenceVersion).toBe(firstRun.evidenceVersion);
   });
 });

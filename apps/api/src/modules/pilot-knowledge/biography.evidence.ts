@@ -26,6 +26,7 @@ export type CuratedEvidenceClaim = {
   readonly status: "APPROVED";
   readonly sourceRef: string;
   readonly attribution: string | null;
+  readonly context: "ON_TRACK" | "OFF_TRACK" | null;
 };
 
 export type CuratedEvidenceBundle = {
@@ -63,6 +64,7 @@ type RawClaim = {
   authority?: unknown;
   sourceRef?: unknown;
   attribution?: unknown;
+  context?: unknown;
 };
 
 function toStringOrNull(value: unknown): string | null {
@@ -131,6 +133,10 @@ export function getCuratedEvidenceDataset(): CuratedEvidenceDataset | null {
           status: "APPROVED",
           sourceRef,
           attribution: toStringOrNull(item.attribution),
+          context:
+            item.context === "ON_TRACK" || item.context === "OFF_TRACK"
+              ? item.context
+              : null,
         });
       }
       drivers.set(driverKey, { driverKey, claims, sources });
