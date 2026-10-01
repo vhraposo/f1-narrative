@@ -50,7 +50,7 @@ describe("circuit photo provider (Wikimedia Commons)", () => {
   });
 
   it("3) rejeita imagem sem licença reutilizável", () => {
-    const nonFree = structuredClone(PAYLOAD);
+    const nonFree = JSON.parse(JSON.stringify(PAYLOAD)) as typeof PAYLOAD;
     nonFree.query.pages["1"].imageinfo[0].extmetadata.LicenseShortName.value =
       "CC BY-NC 4.0";
     expect(parseCommonsImageInfo(nonFree)).toBeNull();
