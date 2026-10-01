@@ -74,6 +74,42 @@
       "sourceType": "OFFICIAL_PROFILE",
       "title": "Lando Norris — site oficial",
       "url": "https://landonorris.com/"
+    },
+    "redbull-max": {
+      "provider": "TEAM_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "Red Bull — perfil de atleta Max Verstappen",
+      "url": "https://www.redbull.com/us-en/athlete/max-verstappen"
+    },
+    "rbr-max": {
+      "provider": "TEAM_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "Oracle Red Bull Racing — perfil de Max Verstappen",
+      "url": "https://www.redbullracing.com/int-en/drivers/max-verstappen"
+    },
+    "rbr-max-facts": {
+      "provider": "TEAM_OFFICIAL",
+      "sourceType": "BIOGRAPHY_PAGE",
+      "title": "Oracle Red Bull Racing — tudo sobre Max Verstappen",
+      "url": "https://www.redbullracing.com/int-en/everything-to-know-about-max-verstappen-2026"
+    },
+    "verstappen-about": {
+      "provider": "DRIVER_OFFICIAL",
+      "sourceType": "OFFICIAL_PROFILE",
+      "title": "Verstappen.com — About Max Verstappen",
+      "url": "https://news.verstappen.com/en/about"
+    },
+    "verstappen-2013": {
+      "provider": "DRIVER_OFFICIAL",
+      "sourceType": "BIOGRAPHY_PAGE",
+      "title": "Verstappen.com — campeão mundial de kart 2013 (FIA gala)",
+      "url": "https://news.verstappen.com/en/article/1664"
+    },
+    "redbull-max100": {
+      "provider": "TEAM_OFFICIAL",
+      "sourceType": "INTERVIEW",
+      "title": "Red Bull — Max Verstappen e o desafio Max vs 100",
+      "url": "https://www.redbull.com/int-en/max-verstappen-no-extra-practice-max-vs-100"
     }
   },
   "drivers": {
@@ -138,6 +174,44 @@
         { "category": "PROJECTS", "key": "LN_RACING_KART", "value": "LN Racing Kart", "display": "é fundador da LN Racing Kart, iniciativa voltada ao karting", "sourceRef": "norris-official", "authority": "PRIMARY_OFFICIAL" },
         { "category": "PROJECTS", "key": "JUNIOR_TEAM", "value": "junior-single-seater-team", "display": "cofundou uma equipe júnior de monopostos, noticiada no site oficial da Fórmula 1", "sourceRef": "f1-norris", "authority": "PRIMARY_OFFICIAL" },
         { "category": "CURRENT_CONTEXT", "key": "CURRENT_TEAM", "value": "McLaren", "display": "segue na McLaren como piloto titular na temporada 2026", "year": 2026, "sourceRef": "f1-norris", "authority": "PRIMARY_OFFICIAL" }
+      ]
+    },
+    "max-verstappen": {
+      "claims": [
+        { "category": "IDENTITY", "key": "FULL_NAME", "value": "Max Emilian Verstappen", "display": "Max Emilian Verstappen", "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "IDENTITY", "key": "COUNTRY", "value": "Netherlands", "display": "Países Baixos", "sourceRef": "redbull-max", "authority": "STRUCTURED_CANONICAL" },
+        { "category": "ORIGIN", "key": "MOTORSPORT_FAMILY", "value": "jos-verstappen-sophie-kumpen", "display": "cresceu em uma família profundamente ligada ao automobilismo: o pai, Jos Verstappen, disputou a Fórmula 1, e a mãe, Sophie Kumpen, foi uma karter de destaque internacional", "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "ORIGIN", "key": "FIRST_KART_AGE", "value": "4", "display": "começou a andar de kart aos quatro anos, em 2003", "year": 2003, "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "ORIGIN", "key": "TRACK_ENVIRONMENT", "value": "trackside-childhood", "display": "cresceu cercado pelo ambiente das pistas e pelo trabalho do pai no automobilismo", "sourceRef": "redbull-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "INTERNATIONAL_START_AGE", "value": "12", "display": "fez sua primeira competição internacional aos 12 anos, depois de vencer seguidamente na Bélgica e nos Países Baixos", "year": 2009, "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "TITLES_2013", "value": "KZ-world-plus-double-european", "display": "em 2013, aos 15 anos, conquistou simultaneamente os títulos europeus de KZ e KF e o campeonato mundial de KZ, feito inédito na história do kart", "year": 2013, "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "EQUIPMENT", "value": "CRG-TM", "display": "naquele período competia com karts CRG equipados com motores TM, com o pai preparando os motores", "year": 2013, "sourceRef": "verstappen-2013", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "WSK_TITLES", "value": "WSK-KZ1-KZ2", "display": "também venceu a WSK Euro Series KZ1, a WSK Master Series KZ2 e a Winter Cup KF2", "year": 2013, "sourceRef": "verstappen-2013", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "KARTING", "key": "WORLD_CROWNING", "value": "FIA-gala-2013", "display": "foi coroado campeão mundial de kart pela FIA em cerimônia realizada em Paris, em dezembro de 2013", "year": 2013, "sourceRef": "verstappen-2013", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "SINGLE_SEATER_DEBUT", "value": "2014", "display": "estreou nos monopostos em 2014, após a fase de kart", "year": 2014, "sourceRef": "verstappen-about", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "F3_EUROPEAN", "value": "2014", "display": "disputou a Fórmula 3 Europeia em 2014, aos 16 anos, chamando a atenção da estrutura da Red Bull", "year": 2014, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "JUNIOR_CAREER", "key": "PROGRESSION", "value": "single-seater-to-f1", "display": "a passagem rápida pelos monopostos abriu caminho para a promoção à Fórmula 1 já em 2015", "sourceRef": "verstappen-about", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ENTRY", "key": "F1_DEBUT", "value": "2015", "display": "estreou na Fórmula 1 em 2015, pela Scuderia Toro Rosso, no Grande Prêmio da Austrália", "year": 2015, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ENTRY", "key": "YOUNGEST_DRIVER", "value": "f1-youngest-driver", "display": "tornou-se o piloto mais jovem da história a disputar uma corrida de Fórmula 1, aos 17 anos", "year": 2015, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ENTRY", "key": "PROMOTION_2016", "value": "red-bull-racing-2016", "display": "em 2016 foi promovido à Red Bull Racing a partir do Grande Prêmio da Espanha", "year": 2016, "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "TEAM_HISTORY", "key": "TORO_ROSSO", "value": "2015", "display": "defendeu a Scuderia Toro Rosso em 2015, em sua temporada de estreia", "year": 2015, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "TEAM_HISTORY", "key": "RED_BULL_RACING", "value": "2016-", "display": "corre pela Red Bull Racing desde 2016, quando substituiu a dupla anterior no meio da temporada", "year": 2016, "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "FIRST_WIN", "value": "2016", "display": "venceu em sua estreia pela Red Bull Racing, no Grande Prêmio da Espanha de 2016, tornando-se o mais jovem vencedor de um Grande Prêmio na época", "year": 2016, "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "RUN_OF_PODIUMS", "value": "2016-2020", "display": "entre 2016 e 2020 acumulou vitórias e pódios regulares, consolidando-se como presença constante no topo do grid", "year": 2016, "endYear": 2020, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "CHAMPIONSHIP_2021", "value": "2021", "display": "conquistou o primeiro título mundial em 2021, com 10 vitórias, 10 poles e 18 pódios, decidido na última volta do GP de Abu Dhabi", "year": 2021, "sourceRef": "redbull-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "CHAMPIONSHIP_2022", "value": "2022", "display": "em 2022 conquistou o segundo título com um recorde de 15 vitórias em uma única temporada", "year": 2022, "sourceRef": "verstappen-about", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "CHAMPIONSHIP_2023", "value": "2023", "display": "em 2023 somou o terceiro título, com 19 vitórias, 10 consecutivas entre Miami e Monza e 575 pontos na temporada", "year": 2023, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "CHAMPIONSHIP_2024", "value": "2024", "display": "conquistou o quarto título consecutivo em 2024", "year": 2024, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "F1_ACHIEVEMENTS", "key": "RUNNER_UP_2025", "value": "2025", "display": "em 2025 terminou como vice-campeão, ficando a dois pontos do título após uma temporada decidida na última corrida", "year": 2025, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PUBLIC_PERSONALITY", "key": "TEAM_AS_FAMILY", "value": "second-family", "display": "em declaração reproduzida pelo perfil oficial da Red Bull, afirmou que a equipe é como uma segunda família para ele", "sourceRef": "redbull-max", "authority": "PRIMARY_OFFICIAL", "attribution": "Em declaração reproduzida pelo perfil oficial da Red Bull" },
+        { "category": "PUBLIC_PERSONALITY", "key": "SIM_RACING_PASSION", "value": "happy-place", "display": "o perfil oficial da Red Bull descreve o sim racing como seu 'lugar feliz' fora do cockpit", "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL", "attribution": "Perfil oficial da Red Bull Racing" },
+        { "category": "INTERESTS", "key": "SIM_RACING", "value": "sim racing", "display": "mantém o sim racing como principal interesse fora das pistas, usando simuladores como preparação e lazer", "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "INTERESTS", "key": "GT_ENDURANCE", "value": "gt-endurance", "display": "tem demonstrado interesse crescente por corridas de GT e endurance fora da Fórmula 1", "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PROJECTS", "key": "VERSTAPPEN_RACING", "value": "Verstappen Racing", "display": "fundou em 2022 a Verstappen.com Racing, hoje Verstappen Racing, equipe que competiu em rali, GT e provas de endurance", "year": 2022, "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PROJECTS", "key": "NURBURGRING_24H", "value": "2026", "display": "em 2026 disputou pela primeira vez as 24 Horas de Nürburgring, em um Mercedes-AMG GT3 com pintura especial da Red Bull, liderando parte da prova antes de uma falha mecânica", "year": 2026, "sourceRef": "rbr-max-facts", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "PROJECTS", "key": "MAX_VS_100", "value": "Max vs 100", "display": "em 2026 encarou o desafio Max vs 100, correndo de kart contra cem pilotos em uma mesma prova", "year": 2026, "sourceRef": "redbull-max100", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "CURRENT_CONTEXT", "key": "CURRENT_TEAM", "value": "Red Bull Racing", "display": "segue na Oracle Red Bull Racing como piloto titular na temporada 2026", "year": 2026, "sourceRef": "rbr-max", "authority": "PRIMARY_OFFICIAL" },
+        { "category": "CURRENT_CONTEXT", "key": "CONTRACT", "value": "until-2030", "display": "teve contrato estendido com a Red Bull Racing até o fim de 2030, anunciado em 2026", "year": 2026, "sourceRef": "redbull-max", "authority": "PRIMARY_OFFICIAL" }
       ]
     }
   }
