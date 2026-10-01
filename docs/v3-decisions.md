@@ -377,6 +377,19 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 - **Decisão (V3.24):** `circuit-photo.provider.ts` consulta a API do Commons com `fetch` injetável, aceita somente CC0/CC BY/CC BY-SA (rejeita NC/ND/all rights reserved), registra author/license/licenseUrl/attribution/retrievedAt, cacheia por circuito, tem timeout e degrada para null. Fica **desabilitado por padrão** (`WIKIMEDIA_COMMONS_ENABLED=false`) e é exercitado apenas com mock nos testes; nenhuma imagem é persistida sem metadata. Recorde oficial de volta permanece separado de volta mais rápida em corrida e só ganha o rótulo “oficial” com fonte que o sustente.
 - **Consequência:** foto licenciada entra quando habilitada, sem scraping e sem placeholders mentirosos; a ausência continua sendo exibida honestamente.
 
+## D-093 — Evidence biográfica curada como fatos estruturados com sourceRef, nunca texto pronto
+- **Decisão (V3.24.1):** `data/external/biography/curated-evidence.json` guarda apenas claims (`category`, `key`, `value`, `display`, ano/período, `authority`, `sourceRef`) com URLs reais de fontes oficiais/secundárias. Nenhum parágrafo de biografia é armazenado; o composer/fallback continua responsável pela narrativa. O ledger permanece `ExternalKnowledgeSource` (registrado na persistência) e `evidenceVersion` (hash do arquivo + release F1DB) entra no fingerprint e no metadata.
+- **Consequência:** riqueza editorial sem cópia de prosa e sem segundo mecanismo de provenance; atualizar a curadoria regenera biografias automaticamente.
+
+## D-094 — Coverage validator e rich mode por áreas relevantes
+- **Decisão (V3.24.1):** `evaluateBiographyCoverage` conta claims aprovados por categoria; rich mode exige ≥5 áreas relevantes (IDENTITY e CURRENT_CONTEXT não contam). O `planner` distribui os claims em até 8 blocos editoriais sem repetição; áreas sem evidência são omitidas. Sparse continua suportado e nunca é forçado a parecer rico.
+- **Consequência:** a profundidade da biografia é decidida pela evidência, nunca por meta de parágrafos; o relatório de cobertura do catálogo expõe lacunas reais.
+
+## D-095 — Composer v3 por parágrafos com fallback rico determinístico
+- **Decisão (V3.24.1):** o contrato do LLM passa a `paragraphs[].sentences[].{text,claimIds}` (1–8 parágrafos), com prompt narrativo (contextualizar kart→F1, hobbies/projetos naturais, atribuição de personalidade). Quando o coverage é rich e o LLM falha/está ausente, o fallback determinístico também produz narrativa multi-parágrafo com templates por categoria (nomes preservados, capitalização correta, sem HTML/markdown/URLs). Quality validator ganha checagem de parágrafos, `too-few-paragraphs` para rich raso e anos citados nos displays como permitidos. Claims derivados duplicados por `key` (e `TEAM_SEASON` quando há `TEAM_HISTORY` curado) são substituídos pela versão curada.
+- **Consequência:** o produto entrega biografia rica mesmo sem LLM (Ollama local não satisfaz o contrato estrito), e nenhuma garantia factual da V3.24 foi relaxada.
+
+
 
 
 

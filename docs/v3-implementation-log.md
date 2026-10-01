@@ -1061,6 +1061,17 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **QA:** API 2505/2505 (165 arquivos) ×2; Web 497/497 (65 arquivos) ×2; typecheck/lint/build 0/0; TEST 0 resíduos; DEV preservado (37 migrations, 23 bios limpas, 0 "campeão 2026", backup `f1narrative_dev_pre_v324.dump`).
 - **Docs:** `v3.24-biography-quality.md`, D-089..D-092.
 
+### V3.24.1 — Rich Biography Evidence & Narrative Depth
+- **Evidência curada com provenance:** `curated-evidence.json` (fatos estruturados com `sourceRef`, autoridade, anos; fontes reais: F1 oficial, Alpine, McLaren, Honda, Red Bull, sites oficiais, entrevista F1; sem prosa copiada) + `biography.evidence.ts` com versionamento e cache (D-093).
+- **Categorias editoriais:** ORIGIN, KARTING, JUNIOR_CAREER, F1_ENTRY, TEAM_HISTORY, F1_ACHIEVEMENTS, PUBLIC_PERSONALITY, INTERESTS, PROJECTS, CURRENT_CONTEXT; dedupe curado sobre derivado (inclui TEAM_SEASON vs TEAM_HISTORY); fingerprints com `evidenceVersion`.
+- **Coverage + planner:** rich mode ≥5 áreas relevantes; 8 blocos editoriais sem repetição de claims; sparse preservado (D-094).
+- **Composer v3 + fallback rico:** contrato `paragraphs[].sentences[].{text,claimIds}`; prompt narrativo; fallback determinístico multi-parágrafo por categoria; quality validator com parágrafos/anos citados/`too-few-paragraphs` (D-095). UI renderiza parágrafos.
+- **Resultado real (DEV):** Gasly e Norris saíram de 1 parágrafo estatístico para **8 parágrafos narrativos** com kart, base, F1, conquistas, personalidade atribuída, interesses e projetos; demais 21 perfis re-materializados; 0 corrupções; backup `f1narrative_dev_pre_v3241.dump`.
+- **Cobertura do catálogo:** `v3.24.1-driver-coverage.md` (47 bindings) — só Gasly/Norris rich; lacunas reais documentadas, sem cobertura inventada.
+- **QA:** pilot-knowledge 136/136 + suíte completa ×2 + Web ×2; lint/build 0; TEST limpo.
+- **Docs:** `v3.24.1-rich-biography.md`, D-093..D-095.
+
+
 
 
 
