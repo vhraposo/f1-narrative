@@ -14,6 +14,7 @@ type RaceCardProps = {
   onEdit: (race: Race) => void;
   onRemove: (race: Race) => void;
   onViewResults: (race: Race) => void;
+  onViewWeekend?: (race: Race) => void;
   isRemoving: boolean;
   removeError: string | null;
 };
@@ -33,6 +34,7 @@ export function RaceCard({
   onEdit,
   onRemove,
   onViewResults,
+  onViewWeekend,
   isRemoving,
   removeError,
 }: RaceCardProps) {
@@ -74,6 +76,11 @@ export function RaceCard({
                 Atual
               </span>
             )}
+            {race.hasSprint && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
+                Sprint
+              </span>
+            )}
             <span
               className={
                 race.status === "FINISHED"
@@ -94,6 +101,15 @@ export function RaceCard({
         >
           Resultados
         </Button>
+        {onViewWeekend ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onViewWeekend(race)}
+          >
+            Fim de semana
+          </Button>
+        ) : null}
         <Button variant="outline" size="sm" onClick={() => onEdit(race)}>
           <Pencil className="mr-1.5 h-3.5 w-3.5" />
           Editar

@@ -37,6 +37,33 @@ const envSchema = z.object({
     .default("https://f1nw.invalid/opening-grid/"),
   OPENING_GRID_TIMEOUT_MS: z.coerce.number().int().min(1).default(30000),
   OPENING_GRID_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(1),
+  STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+  STORAGE_LOCAL_ROOT: z
+    .string()
+    .min(1)
+    .default(path.resolve(process.cwd(), ".storage")),
+  STORAGE_MAX_UPLOAD_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .default(5 * 1024 * 1024),
+  S3_ENDPOINT: z.string().url("S3_ENDPOINT inválida").optional(),
+  S3_BUCKET: z.string().min(1).optional(),
+  S3_REGION: z.string().min(1).optional(),
+  S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  S3_FORCE_PATH_STYLE: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  F1DB_DATA_DIR: z.string().min(1).optional(),
+  F1DB_CIRCUITS_SVG_DIR: z.string().min(1).optional(),
+  BIOGRAPHY_EVIDENCE_DIR: z.string().min(1).optional(),
+  WIKIMEDIA_COMMONS_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  WIKIMEDIA_COMMONS_TIMEOUT_MS: z.coerce.number().int().min(500).default(5000),
 });
 
 const parsed = envSchema.safeParse(process.env);

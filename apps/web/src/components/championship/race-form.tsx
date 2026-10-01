@@ -23,6 +23,12 @@ import {
 
 const RACE_STATUSES = ["UPCOMING", "QUALIFYING", "RACE", "FINISHED"] as const;
 
+const SPRINT_OPTIONS = [
+  { value: "AUTO", label: "Automático (fonte externa)" },
+  { value: "YES", label: "Com Sprint" },
+  { value: "NO", label: "Sem Sprint" },
+] as const;
+
 const raceFormSchema = z.object({
   name: z.string().trim().min(1, "Informe o nome da corrida"),
   circuit: z.string().trim().max(120, "Circuito muito longo (máx. 120)"),
@@ -30,6 +36,7 @@ const raceFormSchema = z.object({
   date: z.string().optional(),
   round: z.string().optional(),
   status: z.enum(RACE_STATUSES),
+  sprint: z.enum(["AUTO", "YES", "NO"]),
 });
 
 type RaceFormValues = z.infer<typeof raceFormSchema>;
@@ -41,6 +48,7 @@ type RaceValues = {
   date: string | null;
   round: number | null;
   status: string;
+  sprintOverride: boolean | null;
 };
 
 function toInput(values: RaceFormValues): RaceValues {
@@ -60,6 +68,8 @@ function toInput(values: RaceFormValues): RaceValues {
     date,
     round,
     status: values.status,
+    sprintOverride:
+      values.sprint === "YES" ? true : values.sprint === "NO" ? false : null,
   };
 }
 
@@ -71,6 +81,7 @@ type RaceFormProps = {
     date: string | null;
     round: number | null;
     status: string;
+    sprintOverride?: boolean | null;
   };
   isSubmitting: boolean;
   error: string | null;
@@ -100,6 +111,7 @@ export function RaceForm({
       date: initial?.date ?? "",
       round: initial?.round != null ? String(initial.round) : undefined,
       status: initial?.status as RaceFormValues["status"] ?? "UPCOMING",
+      sprint: initial?.sprintOverride === true ? "YES" : initial?.sprintOverride === false ? "NO" : "AUTO",
     },
   });
 
@@ -111,6 +123,7 @@ export function RaceForm({
       date: initial?.date ?? "",
       round: initial?.round != null ? String(initial.round) : undefined,
       status: initial?.status as RaceFormValues["status"] ?? "UPCOMING",
+      sprint: initial?.sprintOverride === true ? "YES" : initial?.sprintOverride === false ? "NO" : "AUTO",
     });
   }, [initial, reset]);
 
@@ -216,6 +229,31 @@ export function RaceForm({
             {errors.status && (
               <p className="text-sm text-destructive">{errors.status.message}</p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="race-sprint">Sprint</Label>
+            <Controller
+              control={control}
+              name="sprint"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={SPRINT_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                >
+                  <SelectTrigger id="race-sprint" onBlur={field.onBlur} />
+                  <SelectContent />
+                </Select>
+              )}
+            />
+            <p className="text-xs text-muted-foreground">
+              Automático usa a fonte externa quando existir; a escolha manual
+              prevalece.
+            </p>
           </div>
 
           {error && (

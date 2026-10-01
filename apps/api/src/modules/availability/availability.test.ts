@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
@@ -91,7 +92,7 @@ describe("Availability - auth 401", () => {
   it("GET retorna 401 sem sessão", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/characters/${crypto.randomUUID()}/availability`,
+      url: `/api/characters/${randomUUID()}/availability`,
     });
     expect(res.statusCode).toBe(401);
   });
@@ -99,7 +100,7 @@ describe("Availability - auth 401", () => {
   it("PATCH retorna 401 sem sessão", async () => {
     const res = await app.inject({
       method: "PATCH",
-      url: `/api/characters/${crypto.randomUUID()}/availability`,
+      url: `/api/characters/${randomUUID()}/availability`,
       payload: { status: "BUSY" },
     });
     expect(res.statusCode).toBe(401);
@@ -124,7 +125,7 @@ describe("Availability - ownership e validação de character", () => {
   it("character inexistente -> 404", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/characters/${crypto.randomUUID()}/availability`,
+      url: `/api/characters/${randomUUID()}/availability`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);

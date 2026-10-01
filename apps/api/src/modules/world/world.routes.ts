@@ -3,6 +3,8 @@ import { prisma } from "../../infrastructure/database/prisma.js";
 import { ensureUniverse } from "../universe/universe.service.js";
 import { rosterService } from "../roster/roster.service.js";
 import { updateWorldSchema } from "./world.schema.js";
+import { progressWorldState } from "./world-progression.service.js";
+import { lockUniverseTimeline } from "../timeline/timeline.service.js";
 
 const WORLD_KEY = "default";
 
@@ -69,6 +71,19 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  fastify.post(
+    "/api/world/progress",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const result = await progressWorldState(request.user!.id);
+      return reply.send({
+        world: result.world,
+        changed: result.changed,
+        transition: result.transition,
+      });
+    },
+  );
+
   fastify.patch(
     "/api/world",
     { preHandler: [fastify.authenticate] },
@@ -95,39 +110,42 @@ export const worldRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const world = await prisma.worldState.upsert({
-        where: { universeId_key: { universeId: universe.id, key: WORLD_KEY } },
-        update: {
-          ...(parsed.data.currentDate !== undefined
-            ? { currentDate: new Date(parsed.data.currentDate) }
-            : {}),
-          ...(parsed.data.currentSeasonId !== undefined
-            ? { currentSeasonId: parsed.data.currentSeasonId }
-            : {}),
-          ...(parsed.data.currentRaceId !== undefined
-            ? { currentRaceId: parsed.data.currentRaceId }
-            : {}),
-          ...(parsed.data.currentSession !== undefined
-            ? { currentSession: parsed.data.currentSession }
-            : {}),
-        },
-        create: {
-          universeId: universe.id,
-          key: WORLD_KEY,
-          ...(parsed.data.currentDate !== undefined
-            ? { currentDate: new Date(parsed.data.currentDate) }
-            : {}),
-          ...(parsed.data.currentSeasonId !== undefined
-            ? { currentSeasonId: parsed.data.currentSeasonId }
-            : {}),
-          ...(parsed.data.currentRaceId !== undefined
-            ? { currentRaceId: parsed.data.currentRaceId }
-            : {}),
-          ...(parsed.data.currentSession !== undefined
-            ? { currentSession: parsed.data.currentSession }
-            : {}),
-        },
-        select: worldSelect,
+      const world = await prisma.$transaction(async (tx) => {
+        await lockUniverseTimeline(tx, universe.id);
+        return tx.worldState.upsert({
+          where: { universeId_key: { universeId: universe.id, key: WORLD_KEY } },
+          update: {
+            ...(parsed.data.currentDate !== undefined
+              ? { currentDate: new Date(parsed.data.currentDate) }
+              : {}),
+            ...(parsed.data.currentSeasonId !== undefined
+              ? { currentSeasonId: parsed.data.currentSeasonId }
+              : {}),
+            ...(parsed.data.currentRaceId !== undefined
+              ? { currentRaceId: parsed.data.currentRaceId }
+              : {}),
+            ...(parsed.data.currentSession !== undefined
+              ? { currentSession: parsed.data.currentSession }
+              : {}),
+          },
+          create: {
+            universeId: universe.id,
+            key: WORLD_KEY,
+            ...(parsed.data.currentDate !== undefined
+              ? { currentDate: new Date(parsed.data.currentDate) }
+              : {}),
+            ...(parsed.data.currentSeasonId !== undefined
+              ? { currentSeasonId: parsed.data.currentSeasonId }
+              : {}),
+            ...(parsed.data.currentRaceId !== undefined
+              ? { currentRaceId: parsed.data.currentRaceId }
+              : {}),
+            ...(parsed.data.currentSession !== undefined
+              ? { currentSession: parsed.data.currentSession }
+              : {}),
+          },
+          select: worldSelect,
+        });
       });
 
       if (parsed.data.currentSeasonId !== undefined) {

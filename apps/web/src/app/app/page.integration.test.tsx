@@ -130,6 +130,14 @@ beforeEach(() => {
       return { races: [] };
     }
     if (path.startsWith("/api/events")) return { events: [] };
+    if (path.startsWith("/api/news")) {
+      return {
+        news: [],
+        context: { season: null, race: null },
+        hasMore: false,
+        nextOffset: null,
+      };
+    }
     if (path.startsWith("/api/relationships")) return { relationships: [] };
     if (path.startsWith("/api/conversations")) return { conversations: [] };
     throw new ApiError("Não encontrado", 404);

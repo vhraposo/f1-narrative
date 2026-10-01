@@ -17,6 +17,12 @@ import {
   formatDnaLines,
   normalizeCharacterDna,
 } from "../context/dna-contract.js";
+import {
+  composePersonaPromptBlock,
+  type SpeakerPersonaPromptInput,
+} from "../persona/persona.prompt.js";
+import { composePilotContextPromptBlock } from "../pilot-context/pilot-context.prompt.js";
+import { loadSpeakerPilotContext } from "../pilot-context/pilot-context.resolver.js";
 import { readConversationRag } from "../context/conversation-rag-read.js";
 import {
   resolveGenerationRagContext,
@@ -75,12 +81,31 @@ export interface ContextGenerationRequest {
   targetCharacterId?: string;
   ragFrameId?: string;
   turnContext?: TurnContext;
+  stream?: {
+    onDelta?: (delta: string) => void;
+    signal?: ProviderAbortSignal;
+  };
 }
 
 export interface GenerationProvider {
   readonly name: string;
   run(input: ProviderInput): Promise<ProviderOutput>;
+  runStream?(
+    input: ProviderInput,
+    handlers: ProviderStreamHandlers,
+  ): Promise<ProviderOutput>;
 }
+
+export interface ProviderStreamHandlers {
+  onDelta: (delta: string) => void;
+  signal?: ProviderAbortSignal;
+}
+
+export type ProviderAbortSignal = {
+  readonly aborted: boolean;
+  addEventListener(type: "abort", listener: () => void): void;
+  removeEventListener(type: "abort", listener: () => void): void;
+};
 
 export interface ProviderInput {
   context: AssembledContext;
@@ -149,6 +174,7 @@ export const SECTION_IDS = [
   "ACTIVE_SPEAKER",
   "CURRENT_TURN",
   "CHARACTER_DNA",
+  "PILOT_CONTEXT",
   "WORLD_STATE",
   "MEMORIES",
   "RELATIONSHIPS",
@@ -278,7 +304,11 @@ function formatDimensions(dimensions: Prisma.JsonValue | undefined): string {
 function sectionCharacterDna(
   context: AssembledContext,
   speakerCharacterId: string,
+  speakerPersonaText?: string,
 ): string {
+  if (speakerPersonaText !== undefined && speakerPersonaText.length > 0) {
+    return speakerPersonaText;
+  }
   const speaker = context.participants.find(
     (p) => p.characterId === speakerCharacterId,
   );
@@ -651,6 +681,8 @@ export function composeSystemPrompt(
   context: AssembledContext,
   speakerCharacterId?: string,
   turnContext?: TurnContext,
+  speakerPersonaText?: string,
+  speakerPilotContextText?: string,
 ): string {
   const blocks: Array<[SectionId, string]> = [
     ["GLOBAL_RULES", sectionGlobalRules()],
@@ -665,10 +697,18 @@ export function composeSystemPrompt(
   }
 
   if (speakerCharacterId !== undefined) {
-    const dnaSection = sectionCharacterDna(context, speakerCharacterId);
+    const dnaSection = sectionCharacterDna(
+      context,
+      speakerCharacterId,
+      speakerPersonaText,
+    );
     if (dnaSection.length > 0) {
       blocks.push(["CHARACTER_DNA", dnaSection]);
     }
+  }
+
+  if (speakerCharacterId !== undefined && speakerPilotContextText && speakerPilotContextText.length > 0) {
+    blocks.push(["PILOT_CONTEXT", speakerPilotContextText]);
   }
 
   blocks.push(
@@ -768,10 +808,37 @@ export async function assembleGenerationBundle(
     rag = resolveGenerationRagContext(readResult, request.ragFrameId);
   }
   const contextWithRag = rag === null ? context : withExternalRag(context, rag);
+
+  const speakerPersona = await loadSpeakerPersona(db, speakerCharacterId);
+  const personaBlock =
+    speakerPersona === null ? null : composePersonaPromptBlock(speakerPersona);
+  if (personaBlock !== null && personaBlock.omittedReasons.length > 0) {
+    contextWithRag.omitted.reasons.push(...personaBlock.omittedReasons);
+  }
+  const speakerPersonaText =
+    personaBlock !== null && personaBlock.text.length > 0
+      ? personaBlock.text
+      : undefined;
+
+  const pilotContext = await loadSpeakerPilotContext(speakerCharacterId, {
+    topic: request.userPrompt ?? null,
+  });
+  const pilotContextBlock =
+    pilotContext === null ? null : composePilotContextPromptBlock(pilotContext);
+  if (pilotContextBlock !== null && pilotContextBlock.omittedReasons.length > 0) {
+    contextWithRag.omitted.reasons.push(...pilotContextBlock.omittedReasons);
+  }
+  const speakerPilotContextText =
+    pilotContextBlock !== null && pilotContextBlock.text.length > 0
+      ? pilotContextBlock.text
+      : undefined;
+
   const systemPrompt = composeSystemPrompt(
     contextWithRag,
     speakerCharacterId,
     request.turnContext,
+    speakerPersonaText,
+    speakerPilotContextText,
   );
 
   const providerUserPrompt = request.providerUserPrompt ?? request.userPrompt;
@@ -787,7 +854,7 @@ export async function assembleGenerationBundle(
     ...(providerUserPrompt !== undefined ? { userPrompt: providerUserPrompt } : {}),
   };
 
-  const output = await provider.run(providerInput);
+  const output = await runProvider(provider, providerInput, request.stream);
 
   const meta: GenerationResult["meta"] = {
     provider: output.provider,
@@ -819,6 +886,43 @@ export async function assembleGenerationBundle(
     ...(output.mode === "generated" ? { text: output.text } : {}),
     ...(speakerCharacterId !== undefined ? { speakerCharacterId } : {}),
   };
+}
+
+async function runProvider(
+  provider: GenerationProvider,
+  input: ProviderInput,
+  stream: ContextGenerationRequest["stream"],
+): Promise<ProviderOutput> {
+  if (stream?.onDelta && typeof provider.runStream === "function") {
+    return provider.runStream(input, {
+      onDelta: stream.onDelta,
+      ...(stream.signal !== undefined ? { signal: stream.signal } : {}),
+    });
+  }
+  const output = await provider.run(input);
+  if (stream?.onDelta && output.mode === "generated" && output.text.length > 0) {
+    stream.onDelta(output.text);
+  }
+  return output;
+}
+
+async function loadSpeakerPersona(
+  db: DbDeps,
+  speakerCharacterId: string | undefined,
+): Promise<SpeakerPersonaPromptInput | null> {
+  if (speakerCharacterId === undefined) return null;
+  const persona = await db.characterPersona.findUnique({
+    where: { characterId: speakerCharacterId },
+    select: {
+      summary: true,
+      traits: {
+        where: { context: "ON_TRACK" },
+        select: { key: true, value: true, confidence: true },
+      },
+    },
+  });
+  if (!persona) return null;
+  return { summary: persona.summary, traits: persona.traits };
 }
 
 async function resolveGenerationSpeaker(
@@ -887,6 +991,7 @@ type DbDeps = Pick<
   | "championshipStanding"
   | "newsItem"
   | "universe"
+  | "characterPersona"
 >;
 
 export async function generateGeneration(
@@ -957,7 +1062,12 @@ export function assertGenerationContract(result: GenerationResult): boolean {
     pos = m.index;
     found.push(beginId);
   }
-  const optionalSections = new Set(["EXTERNAL_CONTEXT", "CHARACTER_DNA", "CURRENT_TURN"]);
+  const optionalSections = new Set([
+    "EXTERNAL_CONTEXT",
+    "CHARACTER_DNA",
+    "CURRENT_TURN",
+    "PILOT_CONTEXT",
+  ]);
   const expectedIds = SECTION_IDS.filter(
     (id) => found.includes(id) || !optionalSections.has(id),
   );

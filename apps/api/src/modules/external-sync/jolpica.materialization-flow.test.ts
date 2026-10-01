@@ -116,7 +116,6 @@ class JolpicaFixtureServer {
     }
     if (filename === "results.json") {
       const round = Number(parts[parts.length - 2]);
-      const lauda = this.drivers[0];
       const race: JolpicaRaceWithResultsRaw = {
         season: String(this.year),
         round: String(round),

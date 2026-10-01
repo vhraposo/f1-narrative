@@ -225,7 +225,12 @@ async function postRestoreSource(actor: User, seasonId: string, teamId: string) 
   });
 }
 
-async function assertSeat(seat: any, expected: {
+async function assertSeat(seat: {
+  status: string;
+  canRestore?: boolean;
+  source?: { name?: string | null } | null;
+  universe?: { characterName?: string | null } | null;
+}, expected: {
   status: string;
   canRestore?: boolean;
   sourceName?: string | null;

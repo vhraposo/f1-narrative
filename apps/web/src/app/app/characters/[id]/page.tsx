@@ -6,9 +6,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { AvailabilityCard } from "@/components/availability/availability-card";
+import { AiBehaviorPanel } from "@/components/ai-behavior/ai-behavior-panel";
 import { CharacterIdentity } from "@/components/characters/character-identity";
 import { DriverProfileForm } from "@/components/drivers/driver-profile-form";
 import { MemorySection } from "@/components/memory/memory-section";
+import { PersonaSection } from "@/components/persona/persona-section";
 import { RelationshipConnection } from "@/components/relationships/relationship-connection";
 import { SectionHeading } from "@/components/home/section-heading";
 import { ScheduleCard } from "@/components/schedule/schedule-card";
@@ -156,6 +158,8 @@ export default function CharacterDetailPage() {
           </div>
         </dl>
       </section>
+
+      <PersonaSection characterId={character.id} characterName={character.name} />
 
       <section aria-label="Perfil de piloto" className="space-y-3">
         <SectionHeading kicker="Papel" title="Perfil de piloto" />
@@ -314,6 +318,13 @@ export default function CharacterDetailPage() {
           </ul>
         )}
       </section>
+
+      {character.controlledBy === "AI" ? (
+        <AiBehaviorPanel
+          characterId={character.id}
+          characterName={character.name}
+        />
+      ) : null}
 
       <MemorySection characterId={character.id} characterName={character.name} />
 

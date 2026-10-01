@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
@@ -136,6 +137,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.memory.deleteMany({
+    where: { participants: { some: { characterId: { in: createdCharacterIds } } } },
+  });
   await prisma.memoryCharacter.deleteMany({
     where: { memoryId: { in: createdMemoryIds } },
   });
@@ -251,7 +255,7 @@ describe("Memory - validação e ownership da criação", () => {
   it("character inexistente -> 404", async () => {
     const res = await createMemory(owner, {
       content: "X",
-      characterIds: [crypto.randomUUID()],
+      characterIds: [randomUUID()],
     });
     expect(res.statusCode).toBe(404);
   });
@@ -277,7 +281,7 @@ describe("Memory - validação e ownership da criação", () => {
   it("GET /api/characters/:id/memories em character inexistente -> 404", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/characters/${crypto.randomUUID()}/memories`,
+      url: `/api/characters/${randomUUID()}/memories`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);
@@ -448,6 +452,89 @@ describe("Memory - ownership vs participação (Characters USER e AI)", () => {
     });
     expect(addParticipant.statusCode).toBe(404);
   });
+
+  it("F) outsider não consegue anexar Character USER de outro usuário (404 leak-safe)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      headers: { cookie: outsider.cookie },
+      payload: {
+        content: "Tentativa de sequestrar personagem alheio",
+        characterIds: [aiB.id, charA.id],
+        importance: "LOW",
+        source: "USER_DEFINED",
+      },
+      remoteAddress: "10.77.1.1",
+    });
+    expect(res.statusCode).toBe(404);
+
+    const ownerMemories = await app.inject({
+      method: "GET",
+      url: "/api/memories",
+      headers: { cookie: owner.cookie },
+      remoteAddress: "10.77.1.2",
+    });
+    const contents = (ownerMemories.json().memories as Memory[]).map((m) => m.content);
+    expect(contents).not.toContain("Tentativa de sequestrar personagem alheio");
+  });
+
+  it("G) participantes não expõem userId interno", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      headers: { cookie: owner.cookie },
+      payload: {
+        content: "Memória sem leak de userId",
+        characterIds: [charA.id],
+        importance: "LOW",
+        source: "USER_DEFINED",
+      },
+      remoteAddress: "10.77.1.3",
+    });
+    expect(res.statusCode).toBe(201);
+    const memoryId = (res.json().memory as Memory).id;
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/memories/${memoryId}`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: "10.77.1.4",
+    });
+    const participants = detail.json().memory.participants as Array<Record<string, unknown>>;
+    expect(participants.length).toBeGreaterThan(0);
+    for (const participant of participants) {
+      expect(participant).not.toHaveProperty("userId");
+      expect(participant).toHaveProperty("controlledBy");
+    }
+  });
+
+  it("H) rejeita campos desconhecidos no POST e no PATCH (strict)", async () => {
+    const post = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { content: "X", characterIds: [charA.id], ownerId: "hack" },
+      remoteAddress: "10.77.2.1",
+    });
+    expect(post.statusCode).toBe(400);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { content: "Base strict", characterIds: [charA.id] },
+      remoteAddress: "10.77.2.2",
+    });
+    expect(created.statusCode).toBe(201);
+    const memoryId = (created.json().memory as Memory).id;
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/api/memories/${memoryId}`,
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { content: "Editado", importance: "HIGH", universeId: "00000000-0000-4000-8000-000000000000" },
+      remoteAddress: "10.77.2.3",
+    });
+    expect(patch.statusCode).toBe(400);
+  });
 });
 
 describe("Memory - CRUD", () => {
@@ -503,7 +590,7 @@ describe("Memory - CRUD", () => {
     const res = await createMemory(owner, {
       content: "X",
       characterIds: [charA.id],
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
     });
     expect(res.statusCode).toBe(404);
   });
@@ -553,7 +640,7 @@ describe("Memory - CRUD", () => {
   it("GET /api/memories/:id inexistente -> 404", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/api/memories/${crypto.randomUUID()}`,
+      url: `/api/memories/${randomUUID()}`,
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(404);
@@ -607,7 +694,7 @@ describe("Memory - CRUD", () => {
       method: "PATCH",
       url: `/api/memories/${memoryId}`,
       headers: { cookie: owner.cookie },
-      payload: { eventId: crypto.randomUUID() },
+      payload: { eventId: randomUUID() },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -693,12 +780,12 @@ describe("Memory - participants (MemoryCharacter)", () => {
   });
 
   it("Character inexistente -> 404", async () => {
-    const res = await addMemoryCharacter(owner, memozinhaId, crypto.randomUUID());
+    const res = await addMemoryCharacter(owner, memozinhaId, randomUUID());
     expect(res.statusCode).toBe(404);
   });
 
   it("Memory inexistente -> 404", async () => {
-    const res = await addMemoryCharacter(owner, crypto.randomUUID(), charA.id);
+    const res = await addMemoryCharacter(owner, randomUUID(), charA.id);
     expect(res.statusCode).toBe(404);
   });
 

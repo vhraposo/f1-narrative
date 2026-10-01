@@ -3,11 +3,13 @@ import {
   Flag,
   Globe,
   HeartHandshake,
+  History,
   MessagesSquare,
   Newspaper,
   Rocket,
   Shield,
   Trophy,
+  User,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -54,7 +56,16 @@ export const NAV_GROUPS: NavGroupDef[] = [
         label: "Conversas",
         Icon: MessagesSquare,
       },
+      {
+        href: "/app/timeline",
+        label: "Linha do Tempo",
+        Icon: History,
+      },
     ],
+  },
+  {
+    label: "Conta",
+    items: [{ href: "/app/profile", label: "Perfil", Icon: User }],
   },
   {
     label: "Externo",

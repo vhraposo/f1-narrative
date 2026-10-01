@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectTrigger } from "@/components/ui/select";
 import {
   useConversationParticipants,
   useCreateMessage,
-  useTurnMessage,
+  useStreamingTurn,
 } from "@/hooks/use-conversations";
 import { ApiError } from "@/lib/api";
 import type { TurnResponse } from "@/lib/conversations";
@@ -21,7 +21,7 @@ type MessageComposerProps = {
 export function MessageComposer({ conversationId, onError }: MessageComposerProps) {
   const participantsQuery = useConversationParticipants(conversationId);
   const createMutation = useCreateMessage(conversationId);
-  const turnMutation = useTurnMessage(conversationId);
+  const turnMutation = useStreamingTurn(conversationId);
 
   const [content, setContent] = useState("");
   const [senderCharacterId, setSenderCharacterId] = useState("");

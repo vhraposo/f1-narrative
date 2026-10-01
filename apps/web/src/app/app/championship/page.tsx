@@ -11,6 +11,8 @@ import { SeasonCard } from "@/components/championship/season-card";
 import { SeasonForm } from "@/components/championship/season-form";
 import { StandingsPanel } from "@/components/championship/standings-panel";
 import { SectionHeading } from "@/components/home/section-heading";
+import { SeasonNewsFeed } from "@/components/news/season-news-feed";
+import { RaceWeekendDialog } from "@/components/championship/race-weekend-dialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -91,6 +93,10 @@ export default function ChampionshipPage() {
     Record<string, string>
   >({});
   const [openRaceResults, setOpenRaceResults] = useState<string | null>(null);
+  const [weekendRace, setWeekendRace] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const seasonSubmitting =
     createSeasonMutation.isPending || updateSeasonMutation.isPending;
@@ -407,6 +413,7 @@ export default function ChampionshipPage() {
                     }}
                     onRemove={handleRemoveRace}
                     onViewResults={handleViewResults}
+                    onViewWeekend={(r) => setWeekendRace({ id: r.id, name: r.name })}
                     isRemoving={removingRaceId === race.id}
                     removeError={raceDeleteErrors[race.id] ?? null}
                   />
@@ -434,6 +441,18 @@ export default function ChampionshipPage() {
                 );
               })()}
           </section>
+
+          <SeasonNewsFeed
+            seasonId={activeSeasonId || null}
+            kicker="Cobertura"
+            title="Notícias da temporada"
+            emptyDescription="As notícias aparecem quando as corridas desta temporada forem processadas na narrativa."
+          />
+
+          <RaceWeekendDialog
+            race={weekendRace}
+            onClose={() => setWeekendRace(null)}
+          />
         </>
       )}
     </div>

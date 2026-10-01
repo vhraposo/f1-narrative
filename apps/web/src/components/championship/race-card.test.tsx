@@ -24,6 +24,7 @@ function makeRace(overrides: Partial<Race> = {}): Race {
 function renderCard(overrides: {
   current?: boolean;
   onViewResults?: (race: Race) => void;
+  onViewWeekend?: (race: Race) => void;
   onEdit?: (race: Race) => void;
   onRemove?: (race: Race) => void;
 } = {}) {
@@ -31,6 +32,7 @@ function renderCard(overrides: {
     race: makeRace(),
     current: false,
     onViewResults: vi.fn(),
+    onViewWeekend: vi.fn(),
     onEdit: vi.fn(),
     onRemove: vi.fn(),
     isRemoving: false,
@@ -81,6 +83,15 @@ describe("RaceCard", () => {
     const { props } = renderCard();
     await user.click(screen.getByRole("button", { name: /Resultados/ }));
     expect(props.onViewResults).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "r1" }),
+    );
+  });
+
+  it("abre o fim de semana pelo botão dedicado", async () => {
+    const user = userEvent.setup();
+    const { props } = renderCard();
+    await user.click(screen.getByRole("button", { name: /Fim de semana/ }));
+    expect(props.onViewWeekend).toHaveBeenCalledWith(
       expect.objectContaining({ id: "r1" }),
     );
   });

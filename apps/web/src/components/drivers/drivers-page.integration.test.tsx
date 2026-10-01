@@ -260,6 +260,7 @@ describe("Drivers Page — ordenação e cards (STEP 107.14)", () => {
         characterId: "c3",
         number: 1,
         teamId: null,
+        headshotUrl: null,
         team: null,
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
@@ -286,6 +287,7 @@ describe("Drivers Page — ordenação e cards (STEP 107.14)", () => {
         characterId: "c-tsu",
         number: 22,
         teamId: "t-rb",
+        headshotUrl: null,
         team: {
           id: "t-rb",
           name: "Racing Bulls",

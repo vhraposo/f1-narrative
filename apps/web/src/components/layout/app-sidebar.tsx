@@ -3,10 +3,17 @@
 import { AppBrand } from "@/components/layout/app-brand";
 import { NAV_GROUPS } from "@/components/layout/nav-groups";
 import { NavLink } from "@/components/layout/nav-link";
+import { CharacterAvatar } from "@/components/conversations/character-avatar";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
-export function AppSidebar({ userName }: { userName: string }) {
+export function AppSidebar({
+  userName,
+  userImage,
+}: {
+  userName: string;
+  userImage: string | null;
+}) {
   return (
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-border bg-background lg:flex">
       <div className="flex h-16 items-center border-b border-border px-6">
@@ -33,8 +40,11 @@ export function AppSidebar({ userName }: { userName: string }) {
       </nav>
       <div className="space-y-4 border-t border-border px-4 py-4">
         <div className="flex items-center justify-between gap-3 px-1">
-          <span className="truncate text-sm font-medium text-foreground">
-            {userName}
+          <span className="flex min-w-0 items-center gap-2">
+            <CharacterAvatar name={userName} imageUrl={userImage} size="sm" />
+            <span className="truncate text-sm font-medium text-foreground">
+              {userName}
+            </span>
           </span>
           <ThemeToggle />
         </div>

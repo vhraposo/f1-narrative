@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { driverNumberSchema } from "../drivers/driver-number.rules.js";
 
 // Esquemas de validação para o domínio de Roster (escalação por temporada).
 
@@ -10,11 +11,7 @@ export const driverRoleSchema = z.enum(["RACE_SEAT", "RESERVE"]);
 
 export const seatSchema = z.union([z.literal(1), z.literal(2)]);
 
-export const numberSchema = z
-  .number()
-  .int("Número deve ser inteiro")
-  .min(1, "Número mínimo 1")
-  .max(99, "Número máximo 99");
+export const numberSchema = driverNumberSchema;
 
 export const assignDriverSchema = z.object({
   seasonId: z.string().uuid("Identificador de temporada inválido"),

@@ -17,22 +17,34 @@ export type RaceRun = {
   incidents: Array<{ driverProfileId: string; type: "RETIREMENT" }>;
 };
 
-export async function simulateRaceForRace(
-  db: PrismaClient,
-  raceId: string,
-): Promise<RaceRun | null> {
-  const race = await db.race.findUnique({
-    where: { id: raceId },
-    select: { id: true, seasonId: true, status: true },
-  });
+type RaceDb = {
+  raceResult: PrismaClient["raceResult"];
+  seasonDriverEntry: PrismaClient["seasonDriverEntry"];
+  driverAttribute: PrismaClient["driverAttribute"];
+  teamPerformance: PrismaClient["teamPerformance"];
+  driverProfile: PrismaClient["driverProfile"];
+  team: PrismaClient["team"];
+};
 
-  if (!race) return null;
-
-  const gridRows = await db.raceResult.findMany({
-    where: { raceId, grid: { not: null } },
-    orderBy: { grid: "asc" },
-    select: { grid: true, driverProfileId: true },
-  });
+export async function computeRaceRun(
+  db: RaceDb,
+  race: { id: string; seasonId: string },
+  options: {
+    grid?: Array<{ driverProfileId: string; grid: number }>;
+    seedSuffix?: string;
+  } = {},
+): Promise<RaceRun> {
+  const gridRows =
+    options.grid !== undefined
+      ? options.grid.map((row) => ({
+          grid: row.grid,
+          driverProfileId: row.driverProfileId,
+        }))
+      : await db.raceResult.findMany({
+          where: { raceId: race.id, grid: { not: null } },
+          orderBy: { grid: "asc" },
+          select: { grid: true, driverProfileId: true },
+        });
 
   const gridById = new Map(
     gridRows.map((row) => [row.driverProfileId, row.grid as number]),
@@ -117,10 +129,12 @@ export async function simulateRaceForRace(
     ];
   });
 
-  const seed = hashString(`${race.id}:${race.seasonId}:race`);
+  const seed = hashString(
+    `${race.id}:${race.seasonId}:race${options.seedSuffix ?? ""}`,
+  );
   const simulation = simulateRace(contenders, seed);
 
-  const run: RaceRun = {
+  return {
     results: simulation.results.map((row) => ({
       ...row,
       driverName: nameById.get(row.driverProfileId) ?? "Contender",
@@ -128,6 +142,20 @@ export async function simulateRaceForRace(
     })),
     incidents: simulation.incidents,
   };
+}
+
+export async function simulateRaceForRace(
+  db: PrismaClient,
+  raceId: string,
+): Promise<RaceRun | null> {
+  const race = await db.race.findUnique({
+    where: { id: raceId },
+    select: { id: true, seasonId: true, status: true },
+  });
+
+  if (!race) return null;
+
+  const run = await computeRaceRun(db, race);
 
   for (const row of run.results) {
     await db.raceResult.upsert({

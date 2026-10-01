@@ -1,25 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { ensureUniverse } from "../universe/universe.service.js";
+import { lockUniverseTimeline } from "../timeline/timeline.service.js";
 import {
   raceIdPathParamsSchema,
   seasonIdPathParamsSchema,
 } from "./championship.schema.js";
-import { pointsForPosition } from "./championship-progression.engine.js";
-
-type StandingAggregate = {
-  driverProfileId: string;
-  points: number;
-  wins: number;
-  podiums: number;
-  rankName: string | null;
-  teamId: string | null;
-};
-
-function applyRacePoints(
-  position: number | null | undefined,
-): number {
-  return pointsForPosition(position);
-}
+import { finalizeRaceInTx } from "./championship-progression.service.js";
 
 export const championshipProgressionRoutes: FastifyPluginAsync = async (
   fastify,
@@ -48,7 +35,7 @@ export const championshipProgressionRoutes: FastifyPluginAsync = async (
       }
       const season = await prisma.season.findUnique({
         where: { id: race.seasonId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, universeId: true },
       });
       if (!season) {
         return reply.code(404).send({
@@ -57,120 +44,24 @@ export const championshipProgressionRoutes: FastifyPluginAsync = async (
         });
       }
 
-      const [seasonResults, seasonRaces] = await Promise.all([
-        prisma.raceResult.findMany({
-          where: { race: { seasonId: season.id } },
-          select: {
-            driverProfileId: true,
-            position: true,
-            points: true,
-            driverProfile: {
-              select: {
-                teamId: true,
-                character: { select: { name: true } },
-              },
-            },
-          },
-        }),
-        prisma.race.findMany({
-          where: { seasonId: season.id },
-          select: { id: true, status: true },
-        }),
-      ]);
-
-      const otherRacesFinished = seasonRaces
-        .filter((scheduled) => scheduled.id !== race.id)
-        .every((scheduled) => scheduled.status === "FINISHED");
-      const nextSeasonStatus = otherRacesFinished ? "FINISHED" : "ACTIVE";
-
-      const byDriver = new Map<string, StandingAggregate>();
-      const pointsByRaceRow: Array<{
-        driverProfileId: string;
-        points: number;
-      }> = [];
-
-      for (const result of seasonResults) {
-        const earned = applyRacePoints(result.position);
-        pointsByRaceRow.push({
-          driverProfileId: result.driverProfileId,
-          points: earned,
+      const universe = await ensureUniverse(request.user!.id);
+      if (season.universeId !== universe.id) {
+        return reply.code(404).send({
+          error: "Corrida não encontrada",
+          code: "NOT_FOUND",
         });
-
-        const current =
-          byDriver.get(result.driverProfileId) ??
-          ({
-            driverProfileId: result.driverProfileId,
-            points: 0,
-            wins: 0,
-            podiums: 0,
-            rankName: result.driverProfile.character.name,
-            teamId: result.driverProfile.teamId,
-          } satisfies StandingAggregate);
-        current.points += earned;
-        if (result.position === 1) current.wins += 1;
-        if (
-          result.position !== null &&
-          result.position >= 1 &&
-          result.position <= 3
-        ) {
-          current.podiums += 1;
-        }
-        byDriver.set(result.driverProfileId, current);
       }
 
-      const aggregates = [...byDriver.values()].sort(
-        (a, b) =>
-          b.points - a.points ||
-          b.wins - a.wins ||
-          b.podiums - a.podiums ||
-          (a.rankName ?? "").localeCompare(b.rankName ?? "pt", "pt"),
+      const { seasonStatus: nextSeasonStatus } = await prisma.$transaction(
+        async (tx) => {
+          await lockUniverseTimeline(tx, universe.id);
+          return finalizeRaceInTx(tx, {
+            raceId: race.id,
+            seasonId: season.id,
+            universeId: season.universeId,
+          });
+        },
       );
-
-      const standingsToSave = aggregates.map((entry, index) => ({
-        seasonId: season.id,
-        driverProfileId: entry.driverProfileId,
-        points: entry.points,
-        wins: entry.wins,
-        podiums: entry.podiums,
-        position: index + 1,
-      }));
-
-      await prisma.$transaction([
-        ...pointsByRaceRow.map((row) =>
-          prisma.raceResult.updateMany({
-            where: {
-              raceId: race.id,
-              driverProfileId: row.driverProfileId,
-            },
-            data: { points: row.points },
-          }),
-        ),
-        ...standingsToSave.map((standing) =>
-          prisma.championshipStanding.upsert({
-            where: {
-              seasonId_driverProfileId: {
-                seasonId: standing.seasonId,
-                driverProfileId: standing.driverProfileId,
-              },
-            },
-            create: standing,
-            update: {
-              points: standing.points,
-              wins: standing.wins,
-              podiums: standing.podiums,
-              position: standing.position,
-            },
-          }),
-        ),
-        prisma.race.update({
-          where: { id: race.id },
-          data: { status: "FINISHED" },
-        }),
-        prisma.season.update({
-          where: { id: season.id },
-          data: { status: nextSeasonStatus },
-        }),
-      ]);
 
       const saved = await prisma.championshipStanding.findMany({
         where: { seasonId: season.id },

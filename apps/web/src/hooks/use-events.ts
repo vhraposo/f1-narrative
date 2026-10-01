@@ -19,6 +19,12 @@ import {
 
 export const eventsKey = ["events"] as const;
 
+export const newsKey = ["news"] as const;
+
+function invalidateNews(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: newsKey });
+}
+
 export function eventKey(id: string) {
   return ["events", id] as const;
 }
@@ -68,6 +74,7 @@ export function useCreateEvent() {
     mutationFn: (input: CreateEventInput) => createEvent(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: eventsKey });
+      invalidateNews(queryClient);
     },
   });
 }
@@ -84,6 +91,7 @@ export function useUpdateEvent() {
       void queryClient.invalidateQueries({
         queryKey: eventNewsKey(vars.id),
       });
+      invalidateNews(queryClient);
     },
   });
 }
@@ -99,6 +107,7 @@ export function useDeleteEvent() {
         queryKey: eventParticipantsKey(id),
       });
       void queryClient.removeQueries({ queryKey: eventNewsKey(id) });
+      invalidateNews(queryClient);
     },
   });
 }
@@ -116,6 +125,7 @@ export function useAddParticipant() {
       void queryClient.invalidateQueries({
         queryKey: eventNewsKey(vars.eventId),
       });
+      invalidateNews(queryClient);
     },
   });
 }
@@ -133,6 +143,7 @@ export function useRemoveParticipant() {
       void queryClient.invalidateQueries({
         queryKey: eventNewsKey(vars.eventId),
       });
+      invalidateNews(queryClient);
     },
   });
 }

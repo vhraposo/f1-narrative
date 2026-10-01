@@ -1,6 +1,11 @@
 import { get, patch } from "./api";
 
-export type RaceSession = "PRACTICE" | "QUALIFYING" | "RACE";
+export type RaceSession =
+  | "PRACTICE"
+  | "SPRINT_QUALIFYING"
+  | "SPRINT"
+  | "QUALIFYING"
+  | "RACE";
 
 export type WorldState = {
   id: string;
@@ -24,6 +29,8 @@ type WorldResponse = { world: WorldState };
 
 export const RACE_SESSION_LABELS: Record<RaceSession, string> = {
   PRACTICE: "Treino",
+  SPRINT_QUALIFYING: "Classificação Sprint",
+  SPRINT: "Sprint",
   QUALIFYING: "Classificação",
   RACE: "Corrida",
 };

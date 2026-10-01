@@ -1,0 +1,25 @@
+{
+  "dataset": "F1DB CSV release (subset)",
+  "source": "https://github.com/f1db/f1db",
+  "release": "v2026.15.1",
+  "releaseUrl": "https://github.com/f1db/f1db/releases/tag/v2026.15.1",
+  "asset": "f1db-csv.zip",
+  "assetSha256": "56c42ec173ee25d88457acf2378cbfbdd3aafbf97724f0d4eafbe71ae4b1f133",
+  "license": "CC BY 4.0",
+  "attribution": "F1DB — CC BY 4.0",
+  "retrievedAt": "2026-09-30T00:00:00.000Z",
+  "generatorVersion": "f1db-release-subset/v1",
+  "files": [
+    "f1db-circuits.csv",
+    "f1db-circuits-layouts.csv",
+    "f1db-grands-prix.csv",
+    "f1db-drivers.csv",
+    "f1db-constructors.csv",
+    "f1db-seasons.csv",
+    "f1db-seasons-driver-standings.csv",
+    "f1db-seasons-entrants-drivers.csv",
+    "f1db-races.csv",
+    "f1db-races-race-results.csv"
+  ],
+  "notes": "Subset versionado para uso offline (circuitos, pilotos, calendário e resultados) com checksums do release completo preservados em checksums_sha256.txt. Nenhum conteúdo de artigo/prosa é incluído."
+}

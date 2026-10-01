@@ -1,0 +1,13 @@
+{
+  "dataset": "f1-circuits-svg (minimal black-outline + white-outline)",
+  "source": "https://github.com/f1db/f1-circuits-svg",
+  "commit": "c1bcd6fcb1b6fdb662136daa6bc19f3a2f870f65",
+  "license": "CC BY 4.0 (Attribution 4.0 International)",
+  "copyright": "Copyright © 2024-2026 ROY Jules",
+  "attribution": "f1-circuits-svg by ROY Jules — CC BY 4.0",
+  "retrievedAt": "2026-09-30T00:00:00.000Z",
+  "generatorVersion": "f1-circuits-svg-vendor/v1",
+  "files": ["circuits.json", "minimal/black-outline/*.svg", "minimal/white-outline/*.svg", "LICENSE"],
+  "fileCount": 322,
+  "notes": "Assets SVG servidos localmente e sanitizados em runtime (sem script/foreignObject/event handlers). Proveniência por circuito em circuits.json (layoutId + temporadas de uso)."
+}

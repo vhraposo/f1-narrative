@@ -15,6 +15,11 @@ import {
   type OpeningGridResolution,
 } from "../opening-grid/opening-grid.resolver.js";
 import { OPENING_GRID_SOURCE } from "../opening-grid/opening-grid.source.js";
+import { ensureCircuitForUniverse } from "../circuits/circuit.service.js";
+import {
+  appendTimelineEvent,
+  lockUniverseTimeline,
+} from "../timeline/timeline.service.js";
 
 type Db = Prisma.TransactionClient | PrismaClient;
 
@@ -80,6 +85,16 @@ export interface PlannedRace {
   status: "FINISHED" | "UPCOMING";
   bindingCreate: boolean;
   reason?: string;
+  date?: Date | null;
+  time?: string | null;
+  circuitName?: string | null;
+  circuitExternalId?: string | null;
+  externalCircuitId?: string | null;
+  locality?: string | null;
+  country?: string | null;
+  contentHash?: string;
+  change?: "CREATED" | "UPDATED" | "UNCHANGED";
+  hasSprint?: boolean | null;
 }
 
 export interface PlannedResult {
@@ -263,6 +278,17 @@ export class UniverseInitService {
     universeId?: string,
   ): Promise<InitReport> {
     return prisma.$transaction(async (tx) => {
+      const lockUniverseId =
+        universeId ??
+        (
+          await tx.season.findUnique({
+            where: { id: input.seasonId },
+            select: { universeId: true },
+          })
+        )?.universeId;
+      if (lockUniverseId) {
+        await lockUniverseTimeline(tx, lockUniverseId);
+      }
       const plan = await this.buildPlan(tx, actor, input, universeId);
       if (plan.conflicts.length > 0) {
         throw new UniverseInitError(
@@ -1085,6 +1111,15 @@ export class UniverseInitService {
         round: true,
         grandPrix: true,
         name: true,
+        date: true,
+        time: true,
+        circuitName: true,
+        circuitExternalId: true,
+        externalCircuitId: true,
+        locality: true,
+        country: true,
+        contentHash: true,
+        hasSprint: true,
         _count: { select: { results: true } },
       },
     });
@@ -1092,11 +1127,27 @@ export class UniverseInitService {
     for (const ext of races) {
       const label = ext.grandPrix ?? ext.name ?? `Rodada ${ext.round}`;
       const status: "FINISHED" | "UPCOMING" = ext._count.results > 0 ? "FINISHED" : "UPCOMING";
+      const external = {
+        date: ext.date,
+        time: ext.time,
+        circuitName: ext.circuitName,
+        circuitExternalId: ext.circuitExternalId,
+        externalCircuitId: ext.externalCircuitId,
+        locality: ext.locality,
+        country: ext.country,
+        contentHash: ext.contentHash,
+        hasSprint: ext.hasSprint ?? null,
+      };
       const binding = await db.externalBindingRace.findUnique({
         where: {
           universeId_externalRaceId: { universeId, externalRaceId: ext.id },
         },
-        select: { raceId: true, confidence: true, race: { select: { seasonId: true } } },
+        select: {
+          raceId: true,
+          confidence: true,
+          contentHash: true,
+          race: { select: { seasonId: true } },
+        },
       });
       if (binding) {
         if (binding.confidence !== "CONFIRMED") {
@@ -1115,6 +1166,8 @@ export class UniverseInitService {
           universeRaceId: binding.raceId,
           status,
           bindingCreate: false,
+          change: binding.contentHash === ext.contentHash ? "UNCHANGED" : "UPDATED",
+          ...external,
         });
         continue;
       }
@@ -1131,6 +1184,8 @@ export class UniverseInitService {
           universeRaceId: byRound.id,
           status,
           bindingCreate: true,
+          change: "UNCHANGED",
+          ...external,
         });
       } else {
         plan.push({
@@ -1141,6 +1196,8 @@ export class UniverseInitService {
           universeRaceId: randomUUID(),
           status,
           bindingCreate: true,
+          change: "CREATED",
+          ...external,
         });
       }
     }
@@ -1532,19 +1589,31 @@ export class UniverseInitService {
       }
     }
 
+    await lockUniverseTimeline(tx, universeId);
+
     for (const race of plan.races) {
+      const externalSnapshot = {
+        name: race.name,
+        date: race.date ? race.date.toISOString() : null,
+        circuit: race.circuitName ?? null,
+        country: race.country ?? null,
+      };
+      const worldDate = race.date ?? new Date(Date.UTC(plan.season.year, 0, 1));
       if (race.action === "CREATED" && race.universeRaceId) {
+        const circuitId = await this.resolveCircuitId(tx, universeId, race);
         await tx.race.create({
           data: {
             id: race.universeRaceId,
             seasonId: input.seasonId,
             name: race.name ?? `Rodada ${race.round}`,
-            circuit: await this.circuitName(tx, race.externalRaceId),
-            country: null,
-            date: await this.raceDate(tx, race.externalRaceId),
+            circuit: race.circuitName ?? null,
+            country: race.country ?? null,
+            circuitId,
+            date: race.date ?? null,
             round: race.round,
             status: race.status,
             provenance: "IMPORTED",
+            sprintExternal: race.hasSprint ?? null,
           },
         });
         await tx.externalBindingRace.create({
@@ -1554,9 +1623,24 @@ export class UniverseInitService {
             raceId: race.universeRaceId,
             confidence: "CONFIRMED",
             boundBy: actor.role ?? null,
+            contentHash: race.contentHash ?? null,
+            externalSnapshot: externalSnapshot as Prisma.InputJsonValue,
           },
+        });
+        await appendTimelineEvent(tx, universeId, {
+          kind: "RACE_SCHEDULED",
+          worldDate,
+          payload: this.raceEventPayload(race),
+          causedBy: "SYNC",
         });
       } else if (race.bindingCreate && race.universeRaceId) {
+        const circuitId = await this.resolveCircuitId(tx, universeId, race);
+        if (circuitId) {
+          await tx.race.updateMany({
+            where: { id: race.universeRaceId, circuitId: null },
+            data: { circuitId },
+          });
+        }
         await tx.externalBindingRace.create({
           data: {
             universeId,
@@ -1564,7 +1648,29 @@ export class UniverseInitService {
             raceId: race.universeRaceId,
             confidence: "CONFIRMED",
             boundBy: actor.role ?? null,
+            contentHash: race.contentHash ?? null,
+            externalSnapshot: externalSnapshot as Prisma.InputJsonValue,
           },
+        });
+      } else if (race.change === "UPDATED" && race.universeRaceId) {
+        await this.applyExternalRaceUpdate(tx, universeId, race);
+        await tx.externalBindingRace.update({
+          where: {
+            universeId_externalRaceId: {
+              universeId,
+              externalRaceId: race.externalRaceId,
+            },
+          },
+          data: {
+            contentHash: race.contentHash ?? null,
+            externalSnapshot: externalSnapshot as Prisma.InputJsonValue,
+          },
+        });
+        await appendTimelineEvent(tx, universeId, {
+          kind: "RACE_UPDATED",
+          worldDate,
+          payload: this.raceEventPayload(race),
+          causedBy: "SYNC",
         });
       }
     }
@@ -1702,6 +1808,86 @@ export class UniverseInitService {
       select: { date: true },
     });
     return race?.date ?? null;
+  }
+
+  private async resolveCircuitId(
+    tx: Prisma.TransactionClient,
+    universeId: string,
+    race: PlannedRace,
+  ): Promise<string | null> {
+    if (!race.externalCircuitId) return null;
+    return ensureCircuitForUniverse(tx, universeId, race.externalCircuitId);
+  }
+
+  private raceEventPayload(race: PlannedRace): Prisma.InputJsonValue {
+    return {
+      raceId: race.universeRaceId ?? null,
+      externalRaceId: race.externalRaceId,
+      round: race.round,
+      name: race.name,
+      date: race.date ? race.date.toISOString() : null,
+      circuitExternalId: race.circuitExternalId ?? null,
+      circuitName: race.circuitName ?? null,
+      country: race.country ?? null,
+      hasSprint: race.hasSprint ?? null,
+    } as Prisma.InputJsonValue;
+  }
+
+  private async applyExternalRaceUpdate(
+    tx: Prisma.TransactionClient,
+    universeId: string,
+    race: PlannedRace,
+  ): Promise<void> {
+    const binding = await tx.externalBindingRace.findUniqueOrThrow({
+      where: {
+        universeId_externalRaceId: {
+          universeId,
+          externalRaceId: race.externalRaceId,
+        },
+      },
+      select: { raceId: true, externalSnapshot: true },
+    });
+    const current = await tx.race.findUniqueOrThrow({
+      where: { id: binding.raceId },
+      select: {
+        name: true,
+        date: true,
+        circuit: true,
+        country: true,
+        circuitId: true,
+      },
+    });
+    const snapshot = (binding.externalSnapshot ?? null) as {
+      name: string | null;
+      date: string | null;
+      circuit: string | null;
+      country: string | null;
+    } | null;
+
+    const data: Prisma.RaceUncheckedUpdateInput = {};
+    if (!snapshot || current.name === (snapshot.name ?? current.name)) {
+      data.name = race.name ?? `Rodada ${race.round}`;
+    }
+    if (
+      !snapshot ||
+      (current.date ? current.date.toISOString() : null) === snapshot.date
+    ) {
+      data.date = race.date ?? null;
+    }
+    if (!snapshot || current.circuit === snapshot.circuit) {
+      data.circuit = race.circuitName ?? null;
+    }
+    if (!snapshot || current.country === snapshot.country) {
+      data.country = race.country ?? null;
+    }
+    if (!current.circuitId) {
+      const circuitId = await this.resolveCircuitId(tx, universeId, race);
+      if (circuitId) data.circuitId = circuitId;
+    }
+    data.sprintExternal = race.hasSprint ?? null;
+    if (Object.keys(data).length > 0) {
+      await tx.race.update({ where: { id: binding.raceId }, data });
+    }
   }
 }
 

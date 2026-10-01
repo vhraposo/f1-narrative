@@ -33,24 +33,26 @@ const payloadSchema = z
     message: "Payload deve ser um objeto JSON",
   });
 
-export const createEventSchema = z.object({
-  type: eventTypeSchema,
-  title: z
-    .string()
-    .trim()
-    .min(1, "Informe o título do evento")
-    .max(140, "Título muito longo (máx. 140 caracteres)"),
-  description: z
-    .string()
-    .max(2000, "Descrição muito longa (máx. 2000 caracteres)")
-    .optional()
-    .nullable()
-    .transform((value) => (value ? value : null)),
-  importance: eventImportanceSchema.optional(),
-  source: eventSourceSchema.optional(),
-  worldDate: z.string().datetime({ offset: true }).optional().nullable(),
-  payload: payloadSchema.optional().nullable(),
-});
+export const createEventSchema = z
+  .object({
+    type: eventTypeSchema,
+    title: z
+      .string()
+      .trim()
+      .min(1, "Informe o título do evento")
+      .max(140, "Título muito longo (máx. 140 caracteres)"),
+    description: z
+      .string()
+      .max(2000, "Descrição muito longa (máx. 2000 caracteres)")
+      .optional()
+      .nullable()
+      .transform((value) => (value ? value : null)),
+    importance: eventImportanceSchema.optional(),
+    source: eventSourceSchema.optional(),
+    worldDate: z.string().datetime({ offset: true }).optional().nullable(),
+    payload: payloadSchema.optional().nullable(),
+  })
+  .strict();
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
@@ -64,9 +66,11 @@ export const eventIdParamSchema = z.object({
 });
 
 // Vínculo N:N Event <-> Character (participantes).
-export const addParticipantSchema = z.object({
-  characterId: z.string().uuid("Identificador de personagem inválido"),
-});
+export const addParticipantSchema = z
+  .object({
+    characterId: z.string().uuid("Identificador de personagem inválido"),
+  })
+  .strict();
 
 export type AddParticipantInput = z.infer<typeof addParticipantSchema>;
 

@@ -5,6 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { DriverProfileForm } from "@/components/drivers/driver-profile-form";
+import { SeasonNumberPicker } from "@/components/drivers/season-number-picker";
+import { PersonaSection } from "@/components/persona/persona-section";
+import {
+  PilotKnowledgeSection,
+  type PilotKnowledgeSectionKind,
+} from "@/components/pilot-knowledge/pilot-knowledge-panels";
+import {
+  PilotEvolutionCard,
+  PilotMemoriesPanel,
+} from "@/components/pilot-knowledge/pilot-experience-panels";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,18 +25,22 @@ import {
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { useDriver, useUpdateDriver } from "@/hooks/use-driver-profiles";
+import { useWorld } from "@/hooks/use-world";
 import { formatBirthDate } from "@/lib/characters";
 import { formatDriverNumber } from "@/lib/driver-profiles";
+import { localizeNationalityPtBr } from "@/lib/nationality-pt-br";
 
 export default function DriverDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data: driver, isLoading, isError, error } = useDriver(id);
+  const { data: world } = useWorld();
   const updateMutation = useUpdateDriver(id);
 
   const [showForm, setShowForm] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [tab, setTab] = useState<PilotKnowledgeSectionKind | "memories">("overview");
 
   const displayHeadshotUrl = driver?.displayHeadshotUrl ?? driver?.headshotUrl ?? null;
 
@@ -76,7 +90,7 @@ export default function DriverDetailPage() {
   const rows = [
     { label: "Número", value: formatDriverNumber(driver.number) },
     { label: "Equipe", value: driver.team?.name ?? "—" },
-    { label: "Nacionalidade", value: driver.character.nationality },
+    { label: "Nacionalidade", value: localizeNationalityPtBr(driver.character.nationality) ?? "—" },
     {
       label: "Nascimento",
       value: driver.character.birthDate
@@ -100,115 +114,178 @@ export default function DriverDetailPage() {
         }
       />
 
-      {showForm && (
-        <DriverProfileForm
-          characterName={driver.character.name}
-          intro="Editar o número base e a imagem do piloto."
-          initialNumber={driver.number}
-          showImage
-          initialHeadshotUrl={driver.customHeadshotUrl ?? null}
-          isSubmitting={updateMutation.isPending}
-          error={submitError}
-          onSubmit={handleSave}
-          onCancel={() => {
-            setShowForm(false);
-            setSubmitError(null);
-          }}
-        />
-      )}
+      <div
+        role="tablist"
+        aria-label="Seções do piloto"
+        className="flex flex-wrap gap-2 border-b border-border pb-2"
+      >
+        {(
+          [
+            ["overview", "Visão geral"],
+            ["persona", "Personalidade"],
+            ["history", "Histórico"],
+            ["relationships", "Relacionamentos"],
+            ["memories", "Memórias"],
+          ] as const
+        ).map(([value, label]) => (
+          <Button
+            key={value}
+            role="tab"
+            aria-selected={tab === value}
+            variant={tab === value ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setTab(value)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
 
-      <Card>
-        <CardContent className="flex flex-col items-center gap-5 pt-6 sm:flex-row">
-          {displayHeadshotUrl && !imageFailed ? (
-            <img
-              src={displayHeadshotUrl}
-              alt={driver.character.name}
-              className="h-32 w-32 shrink-0 rounded-xl border border-border object-cover"
-              onError={() => setImageFailed(true)}
+      {tab === "overview" && (
+        <>
+          {showForm && (
+            <DriverProfileForm
+              characterName={driver.character.name}
+              intro="Editar o número base e a imagem do piloto."
+              initialNumber={driver.number}
+              showImage
+              initialHeadshotUrl={driver.customHeadshotUrl ?? null}
+              isSubmitting={updateMutation.isPending}
+              error={submitError}
+              onSubmit={handleSave}
+              onCancel={() => {
+                setShowForm(false);
+                setSubmitError(null);
+              }}
             />
-          ) : (
-            <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <span
-                aria-hidden="true"
-                className="text-4xl font-black uppercase text-muted-foreground/40"
-              >
-                {driver.character.name.trim().charAt(0) || "?"}
-              </span>
-            </div>
           )}
-          <div className="min-w-0 text-center sm:text-left">
-            <h2 className="truncate text-2xl font-black tracking-tight text-foreground">
-              {driver.character.name}
-            </h2>
-            <p className="mt-1 text-3xl font-black tabular-nums text-foreground">
-              {formatDriverNumber(driver.number)}
-            </p>
-            {driver.team && (
-              <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                {driver.team.name}
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Dados do piloto</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="divide-y divide-border">
-            {rows.map((row) => (
-              <div
-                key={row.label}
-                className="flex items-baseline justify-between gap-4 py-3 first:pt-0 last:pb-0"
-              >
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  {row.label}
-                </dt>
-                <dd className="min-w-0 truncate text-right text-sm font-semibold text-foreground">
-                  {row.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          {driver.character.biography && (
-            <p className="mt-4 border-t border-border pt-4 text-sm leading-relaxed text-muted-foreground">
-              {driver.character.biography}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {driver.attributes && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Atributos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {(
-                [
-                  ["Velocidade", driver.attributes.speed],
-                  ["Consistência", driver.attributes.consistency],
-                  ["Corrida", driver.attributes.racecraft],
-                  ["Agressividade", driver.attributes.aggression],
-                ] as const
-              ).map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {label}
-                  </dt>
-                  <dd className="mt-1 text-2xl font-black tabular-nums text-foreground">
-                    {value}
-                  </dd>
+          <Card>
+            <CardContent className="flex flex-col items-center gap-5 pt-6 sm:flex-row">
+              {displayHeadshotUrl && !imageFailed ? (
+                <img
+                  src={displayHeadshotUrl}
+                  alt={driver.character.name}
+                  className="h-32 w-32 shrink-0 rounded-xl border border-border object-cover"
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-xl bg-muted">
+                  <span
+                    aria-hidden="true"
+                    className="text-4xl font-black uppercase text-muted-foreground/40"
+                  >
+                    {driver.character.name.trim().charAt(0) || "?"}
+                  </span>
                 </div>
-              ))}
-            </dl>
-          </CardContent>
-        </Card>
+              )}
+              <div className="min-w-0 text-center sm:text-left">
+                <h2 className="truncate text-2xl font-black tracking-tight text-foreground">
+                  {driver.character.name}
+                </h2>
+                <p className="mt-1 text-3xl font-black tabular-nums text-foreground">
+                  {formatDriverNumber(driver.number)}
+                </p>
+                {driver.team && (
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                    {driver.team.name}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Dados do piloto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="divide-y divide-border">
+                {rows.map((row) => (
+                  <div
+                    key={row.label}
+                    className="flex items-baseline justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                  >
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {row.label}
+                    </dt>
+                    <dd className="min-w-0 truncate text-right text-sm font-semibold text-foreground">
+                      {row.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              {driver.character.biography && (
+                <p className="mt-4 border-t border-border pt-4 text-sm leading-relaxed text-muted-foreground">
+                  {driver.character.biography}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <PilotKnowledgeSection characterId={driver.characterId} section="overview" />
+
+          {world?.currentSeasonId ? (
+            <SeasonNumberPicker
+              seasonId={world.currentSeasonId}
+              driverProfileId={driver.id}
+              currentNumber={driver.number}
+            />
+          ) : null}
+
+          {driver.attributes && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Atributos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  {(
+                    [
+                      ["Velocidade", driver.attributes.speed],
+                      ["Consistência", driver.attributes.consistency],
+                      ["Corrida", driver.attributes.racecraft],
+                      ["Agressividade", driver.attributes.aggression],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {label}
+                      </dt>
+                      <dd className="mt-1 text-2xl font-black tabular-nums text-foreground">
+                        {value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
+
+      {tab === "persona" && (
+        <>
+          <PersonaSection
+            characterId={driver.characterId}
+            characterName={driver.character.name}
+            showEvidence
+          />
+          <PilotKnowledgeSection characterId={driver.characterId} section="persona" />
+          <PilotEvolutionCard characterId={driver.characterId} />
+        </>
+      )}
+
+      {tab === "history" && (
+        <PilotKnowledgeSection characterId={driver.characterId} section="history" />
+      )}
+
+      {tab === "relationships" && (
+        <PilotKnowledgeSection characterId={driver.characterId} section="relationships" />
+      )}
+
+      {tab === "memories" && <PilotMemoriesPanel characterId={driver.characterId} />}
     </div>
   );
 }

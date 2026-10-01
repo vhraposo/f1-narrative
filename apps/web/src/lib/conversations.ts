@@ -1,4 +1,6 @@
-import { get, patch, post, remove } from "./api";
+import { z } from "zod";
+
+import { ApiError, API_BASE, get, patch, post, remove } from "./api";
 
 export type ConversationType = "GROUP" | "DM";
 
@@ -241,6 +243,198 @@ export function turnMessage(
     `/api/conversations/${conversationId}/turn`,
     input,
   );
+}
+
+export const GENERATION_STREAM_EVENTS = [
+  "generation.started",
+  "generation.delta",
+  "generation.completed",
+  "generation.error",
+] as const;
+
+export type GenerationStreamEventName = (typeof GENERATION_STREAM_EVENTS)[number];
+
+export type GenerationStreamEvent =
+  | {
+      type: "generation.started";
+      requestId: string;
+      conversationId: string;
+      speakers: string[];
+    }
+  | {
+      type: "generation.delta";
+      requestId: string;
+      characterId: string;
+      delta: string;
+    }
+  | {
+      type: "generation.completed";
+      requestId: string;
+      userMessage: Message;
+      messages: Message[];
+      failedSpeakers: TurnFailedSpeaker[];
+    }
+  | {
+      type: "generation.error";
+      requestId: string;
+      code: string;
+      message: string;
+    };
+
+export class GenerationStreamError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string = "STREAM_FAILED",
+  ) {
+    super(message);
+    this.name = "GenerationStreamError";
+  }
+}
+
+const messageStreamSchema = z.object({
+  id: z.string(),
+  conversationId: z.string(),
+  senderType: z.enum(["USER_CHARACTER", "AI_CHARACTER", "SYSTEM"]),
+  characterId: z.string().nullable(),
+  content: z.string(),
+  contextJson: z.unknown().nullable().optional(),
+  createdAt: z.string(),
+});
+
+const streamEventSchemas = {
+  "generation.started": z.object({
+    requestId: z.string(),
+    conversationId: z.string(),
+    speakers: z.array(z.string()),
+  }),
+  "generation.delta": z.object({
+    requestId: z.string(),
+    characterId: z.string(),
+    delta: z.string(),
+  }),
+  "generation.completed": z.object({
+    requestId: z.string(),
+    userMessage: messageStreamSchema,
+    messages: z.array(messageStreamSchema),
+    failedSpeakers: z.array(
+      z.object({ characterId: z.string(), error: z.string() }),
+    ),
+  }),
+  "generation.error": z.object({
+    requestId: z.string(),
+    code: z.string(),
+    message: z.string(),
+  }),
+} as const;
+
+type ParsedSseFrame = { event: string; data: unknown };
+
+function parseSseFrame(frame: string): ParsedSseFrame | null {
+  let event = "";
+  const dataLines: string[] = [];
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  }
+  if (!event || dataLines.length === 0) return null;
+  try {
+    return { event, data: JSON.parse(dataLines.join("\n")) };
+  } catch {
+    return null;
+  }
+}
+
+function toGenerationStreamEvent(frame: ParsedSseFrame): GenerationStreamEvent | null {
+  if (!(frame.event in streamEventSchemas)) return null;
+  const name = frame.event as GenerationStreamEventName;
+  const schema = streamEventSchemas[name];
+  const parsed = schema.safeParse(frame.data);
+  if (!parsed.success) {
+    if (name === "generation.started") return null;
+    if (name === "generation.delta") return null;
+    return null;
+  }
+  return { type: name, ...(parsed.data as object) } as GenerationStreamEvent;
+}
+
+export async function streamTurnMessage(
+  conversationId: string,
+  input: TurnMessageInput,
+  handlers: {
+    onEvent?: (event: GenerationStreamEvent) => void;
+    signal?: AbortSignal;
+  } = {},
+): Promise<TurnResponse> {
+  const res = await fetch(
+    `${API_BASE}/api/conversations/${conversationId}/turn/stream`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify(input),
+      signal: handlers.signal,
+    },
+  );
+
+  if (!res.ok) {
+    let message = "Falha ao iniciar o streaming da resposta.";
+    let code: string | undefined;
+    try {
+      const data = (await res.json()) as { error?: unknown; code?: unknown };
+      if (typeof data?.error === "string") message = data.error;
+      if (typeof data?.code === "string") code = data.code;
+    } catch {
+      // corpo não-JSON: mantém mensagem padrão
+    }
+    throw new ApiError(message, res.status, code);
+  }
+  if (!res.body) {
+    throw new GenerationStreamError("Resposta de streaming sem corpo.");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let completed: TurnResponse | null = null;
+  let streamError: { code: string; message: string } | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let index: number;
+    while ((index = buffer.indexOf("\n\n")) >= 0) {
+      const frame = buffer.slice(0, index);
+      buffer = buffer.slice(index + 2);
+      const parsed = parseSseFrame(frame);
+      if (!parsed) continue;
+      const event = toGenerationStreamEvent(parsed);
+      if (!event) {
+        throw new GenerationStreamError("Evento de streaming inválido.", "MALFORMED_EVENT");
+      }
+      handlers.onEvent?.(event);
+      if (event.type === "generation.completed") {
+        completed = {
+          userMessage: event.userMessage as Message,
+          messages: event.messages as Message[],
+          failedSpeakers: event.failedSpeakers,
+        };
+      } else if (event.type === "generation.error") {
+        streamError = { code: event.code, message: event.message };
+      }
+    }
+  }
+
+  if (streamError) {
+    throw new GenerationStreamError(streamError.message, streamError.code);
+  }
+  if (!completed) {
+    throw new GenerationStreamError("Streaming terminou sem resultado final.");
+  }
+  return completed;
 }
 
 export const DEFAULT_GROUP_NAME = "Grupo dos Pilotos";

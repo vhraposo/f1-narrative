@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { applyEventEvolution } from "../events/event-evolution.js";
+import { syncNewsForEvent } from "../events/news.js";
 import { pointsForPosition } from "../championship/championship-progression.engine.js";
 
 export const RACE_NARRATIVE_ORIGIN = "RACE_RESULT";
@@ -380,6 +381,7 @@ export async function processRaceNarrative(
         });
       }
       await applyEventEvolution(tx, createdEvent.id);
+      await syncNewsForEvent(tx, createdEvent.id);
       return createdEvent;
     });
 

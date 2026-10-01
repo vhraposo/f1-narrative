@@ -28,6 +28,7 @@ import scheduleRoutes from "./modules/schedule/schedule.routes.js";
 import memoryRoutes from "./modules/memory/memory.routes.js";
 import conversationRoutes from "./modules/conversation/conversation.routes.js";
 import conversationTurnRoutes from "./modules/conversation/conversation-turn.routes.js";
+import conversationTurnStreamRoutes from "./modules/conversation/conversation-turn-stream.routes.js";
 import contextRoutes from "./modules/context/context.routes.js";
 import conversationRagRoutes from "./modules/context/conversation-rag.routes.js";
 import conversationRagMaterializeRoutes, {
@@ -54,9 +55,25 @@ import jolpicaSyncRoutes, {
 } from "./modules/external-sync/jolpica.routes.js";
 import reconciliationRoutes from "./modules/reconciliation/reconciliation.routes.js";
 import universeRoutes from "./modules/universe/universe.routes.js";
+import timelineRoutes from "./modules/timeline/timeline.routes.js";
+import nextRaceRoutes from "./modules/calendar/next-race.routes.js";
+import { circuitCatalogRoutes } from "./modules/circuits/circuit-catalog.routes.js";
+import driverNumberRoutes from "./modules/drivers/driver-number.routes.js";
 import universeInitRoutes from "./modules/universe-init/universe-init.routes.js";
+import { profileRoutes } from "./modules/profile/profile.routes.js";
+import { mediaRoutes } from "./modules/media/media.routes.js";
+import newsRoutes from "./modules/news/news.routes.js";
+import aiBehaviorRoutes from "./modules/ai-behavior/ai-behavior.routes.js";
+import evolutionRoutes from "./modules/evolution/evolution.routes.js";
+import raceWeekendRoutes from "./modules/race-weekend/race-weekend.routes.js";
+import type { StorageProvider } from "./infrastructure/storage/storage-provider.js";
 import playerEntryRoutes from "./modules/player-entry/player-entry.routes.js";
 import universeEditorRoutes from "./modules/universe-editor/universe-editor.routes.js";
+import {
+  pilotKnowledgeRoutes,
+  type PilotKnowledgeRoutesOptions,
+} from "./modules/pilot-knowledge/pilot-knowledge.routes.js";
+import { pilotExperienceRoutes } from "./modules/pilot-experience/pilot-experience.routes.js";
 import {
   OpeningGridClient,
 } from "./modules/opening-grid/opening-grid.client.js";
@@ -65,10 +82,10 @@ import openingGridRoutes, {
   type OpeningGridRoutesOptions,
 } from "./modules/opening-grid/opening-grid.routes.js";
 import { OpenF1Client } from "./modules/external-openf1/openf1.client.js";
-import { OpenF1Transport } from "./modules/external-openf1/openf1.transport.js";
 import openF1EnrichmentRoutes, {
   type OpenF1EnrichmentRoutesOptions,
 } from "./modules/external-openf1/openf1.routes.js";
+import personaRoutes from "./modules/persona/persona.routes.js";
 
 function defaultRagProvider(): EmbeddingProviderWithInputType {
   const apiKey = process.env.COHERE_API_KEY;
@@ -92,6 +109,8 @@ export function buildApp(
   jolpicaClient?: JolpicaClient,
   openingGridClient?: OpeningGridClient,
   openF1Client?: OpenF1Client,
+  storageProvider?: StorageProvider,
+  pilotKnowledgeOptions?: PilotKnowledgeRoutesOptions,
 ): FastifyInstance {
   const app = Fastify({
     logger: {
@@ -101,13 +120,14 @@ export function buildApp(
 
   void app.register(helmet, {
     contentSecurityPolicy: false,
+    crossOriginResourcePolicy: false,
   });
 
   void app.register(cors, {
     origin: [env.CLIENT_ORIGIN],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Filename"],
     maxAge: 86400,
   });
 
@@ -125,9 +145,22 @@ export function buildApp(
   void app.register(healthRoutes);
   void app.register(authRoutes);
   void app.register(charactersRoutes);
+  void app.register(personaRoutes);
   void app.register(characterHeadshotMaterializationRoutes);
   void app.register(driversRoutes);
   void app.register(teamsRoutes);
+  void app.register(timelineRoutes);
+  void app.register(nextRaceRoutes);
+  void app.register(circuitCatalogRoutes);
+  void app.register(driverNumberRoutes);
+  void app.register(profileRoutes, { storageProvider });
+  void app.register(mediaRoutes, { storageProvider });
+  void app.register(newsRoutes);
+  void app.register(aiBehaviorRoutes, {
+    provider: generationProvider ?? nullProvider,
+  });
+  void app.register(evolutionRoutes);
+  void app.register(raceWeekendRoutes);
   void app.register(teamPerformanceRoutes);
   void app.register(driverAttributeRoutes);
   void app.register(simulationRoutes);
@@ -144,6 +177,10 @@ export function buildApp(
   void app.register(memoryRoutes);
   void app.register(conversationRoutes);
   void app.register(conversationTurnRoutes, {
+    provider: generationProvider ?? nullProvider,
+    ragProvider: ragProvider ?? defaultRagProvider(),
+  });
+  void app.register(conversationTurnStreamRoutes, {
     provider: generationProvider ?? nullProvider,
     ragProvider: ragProvider ?? defaultRagProvider(),
   });
@@ -197,6 +234,12 @@ export function buildApp(
   void app.register(universeInitRoutes);
   void app.register(playerEntryRoutes);
   void app.register(universeEditorRoutes);
+  void app.register(pilotKnowledgeRoutes, {
+    ...(pilotKnowledgeOptions ?? {}),
+    biographyProvider:
+      pilotKnowledgeOptions?.biographyProvider ?? generationProvider ?? undefined,
+  });
+  void app.register(pilotExperienceRoutes);
 
   return app;
 }

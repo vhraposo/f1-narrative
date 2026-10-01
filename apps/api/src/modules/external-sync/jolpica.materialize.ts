@@ -1,4 +1,3 @@
-import type { Role } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import {
   JOLPICA_SOURCE,

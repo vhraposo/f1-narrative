@@ -41,6 +41,9 @@ enum SeasonStatus {
 
 enum RaceStatus {
   UPCOMING
+  PRACTICE
+  SPRINT_QUALIFYING
+  SPRINT
   QUALIFYING
   RACE
   FINISHED
@@ -49,6 +52,8 @@ enum RaceStatus {
 /// Sessão ativa do fim de semana de corrida.
 enum RaceSession {
   PRACTICE
+  SPRINT_QUALIFYING
+  SPRINT
   QUALIFYING
   RACE
 }
@@ -188,7 +193,18 @@ model User {
   teams           Team[]
   externalSources ExternalSource[]
 
+  profile     UserProfile?
+  mediaAssets MediaAsset[]
+
   universeEditorDecisions UniverseEditorDecision[]
+
+  createdPersonas         CharacterPersona[] @relation("PersonaCreatedBy")
+  createdPersonaEvidence  PersonaEvidence[]  @relation("PersonaEvidenceCreatedBy")
+  reviewedPersonaEvidence PersonaEvidence[]  @relation("PersonaEvidenceReviewedBy")
+
+  createdUniverseDriverRelationships UniverseDriverRelationship[] @relation("UniverseDriverRelationshipCreatedBy")
+
+  createdEvents Event[] @relation("EventCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -207,15 +223,25 @@ model Universe {
   seasons     Season[]
   teams       Team[]
   characters  Character[]
+  circuits    Circuit[]
   worldStates WorldState[]
+  timelineEvents TimelineEvent[]
+  worldSnapshots WorldSnapshot[]
 
   bindingDrivers       ExternalBindingDriver[]
   bindingTeams         ExternalBindingTeam[]
   bindingSeasons       ExternalBindingSeason[]
   bindingRaces         ExternalBindingRace[]
+  bindingCircuits      ExternalBindingCircuit[]
+  aiDecisions          AiDecision[]
   bindingDriverSeasons ExternalBindingDriverSeason[]
   bindingResults       ExternalBindingResult[]
   bindingStandings     ExternalBindingStanding[]
+
+  driverRelationships UniverseDriverRelationship[]
+  memories            Memory[]
+  pilotExperiences    PilotExperience[]
+  historicalChampionOverrides HistoricalChampionOverride[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -296,17 +322,23 @@ model Character {
 
   // Perfil esportivo opcional (caso seja piloto)
   driverProfile DriverProfile?
+  persona       CharacterPersona?
 
   externalDriverBindings ExternalBindingDriver[]
 
   relationshipsA           Relationship[]            @relation("characterA")
   relationshipsB           Relationship[]            @relation("characterB")
+  driverRelationships       UniverseDriverRelationship[] @relation("UniverseRelationshipSubject")
+  driverRelationshipsTarget UniverseDriverRelationship[] @relation("UniverseRelationshipTarget")
+  pilotExperiences          PilotExperience[]
+  biographyGenerationRuns   BiographyGenerationRun[]
   availability             CharacterAvailability?
   schedules                CharacterSchedule[]
   conversationParticipants ConversationParticipant[]
   messages                 Message[]
   memoryMemberships        MemoryCharacter[]
   eventMemberships         EventCharacter[]
+  aiDecisions              AiDecision[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -331,11 +363,35 @@ model DriverProfile {
   championshipStandings ChampionshipStanding[]
   seasonDriverEntries   SeasonDriverEntry[]
   driverAttributes      DriverAttribute[]
+  sessionResults        RaceSessionResult[]
+  historicalChampionOverrides HistoricalChampionOverride[]
+
+  favoritedByProfiles UserProfile[] @relation("UserProfileFavoriteDriver")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([teamId])
+}
+
+/// Override histórico de campeão pertencente ao Universe: permite divergir do
+/// External Mirror em temporadas sem Season materializada. Projeção mantida por
+/// TimelineEvents HISTORICAL_CHAMPION_OVERRIDE_SET/CLEARED (auditável/suprimível);
+/// nunca escreve no espelho externo.
+model HistoricalChampionOverride {
+  id              String        @id @default(uuid()) @db.Uuid
+  universeId      String        @db.Uuid
+  universe        Universe      @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  year            Int
+  driverProfileId String        @db.Uuid
+  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  timelineEventId String?       @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universeId, year])
+  @@index([universeId])
 }
 
 /// Equipe esportiva (vínculo feito via perfil de piloto).
@@ -351,12 +407,16 @@ model Team {
   visualIdentity Json?
   driverProfiles DriverProfile[]
 
+  sessionResults RaceSessionResult[]
+
   seasonDriverEntries  SeasonDriverEntry[]
   externalTeamBindings ExternalBindingTeam[]
 
   universeEditorDecisions UniverseEditorDecision[]
 
   teamPerformances TeamPerformance[]
+
+  favoritedByProfiles UserProfile[] @relation("UserProfileFavoriteTeam")
 
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -393,6 +453,7 @@ model Season {
   universeEditorDecisions UniverseEditorDecision[]
   teamPerformances         TeamPerformance[]
   driverAttributes         DriverAttribute[]
+  pilotExperiences         PilotExperience[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -414,16 +475,25 @@ model Race {
   round   Int?
   status  RaceStatus @default(UPCOMING)
 
+  sprintOverride Boolean?
+  sprintExternal Boolean?
+
+  circuitId String?  @db.Uuid
+  circuitRef Circuit? @relation(fields: [circuitId], references: [id], onDelete: SetNull)
+
   provenance Provenance @default(CANONICAL)
 
   results              RaceResult[]
+  sessionResults       RaceSessionResult[]
   externalRaceBindings ExternalBindingRace[]
+  pilotExperiences     PilotExperience[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([seasonId])
   @@index([status])
+  @@index([circuitId])
 }
 
 /// Resultado esportivo determinístico de um piloto em uma corrida.
@@ -450,6 +520,37 @@ model RaceResult {
 
   @@unique([raceId, driverProfileId])
   @@index([raceId])
+  @@index([driverProfileId])
+}
+
+/// Resultado de sessão do fim de semana (Practice/Sprint Qualifying/Sprint/
+/// Qualifying). Race continua exclusivamente em RaceResult.
+model RaceSessionResult {
+  id      String @id @default(uuid()) @db.Uuid
+  raceId  String @db.Uuid
+  race    Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+
+  driverProfileId String        @db.Uuid
+  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  teamId          String?       @db.Uuid
+  team            Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  session RaceSession
+
+  position Int?
+  laps     Int?
+  status   String?
+  timeMs   Int?
+  points   Float      @default(0)
+  metadata Json?
+  provenance Provenance @default(CANONICAL)
+  sourceHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([raceId, driverProfileId, session])
+  @@index([raceId, session])
   @@index([driverProfileId])
 }
 
@@ -501,6 +602,7 @@ model SeasonDriverEntry {
 
   @@unique([seasonId, driverProfileId])
   @@unique([seasonId, teamId, seat])
+  @@unique([seasonId, number])
   @@index([seasonId])
   @@index([driverProfileId])
   @@index([teamId, status])
@@ -600,6 +702,11 @@ nationality String?
   externalStandings ExternalStanding[]
   bindings          ExternalBindingDriver[]
 
+  knowledgeProfile      ExternalDriverProfile?
+  knowledgeEvents       ExternalDriverEvent[]
+  relationshipsFrom     ExternalDriverRelationship[] @relation("ExternalDriverRelationshipSubject")
+  relationshipsTo       ExternalDriverRelationship[] @relation("ExternalDriverRelationshipTarget")
+
   @@unique([source, externalId])
   @@index([source, name])
 }
@@ -658,26 +765,145 @@ model ExternalSeason {
   @@unique([source, year])
 }
 
-model ExternalRace {
-  id            String    @id @default(uuid()) @db.Uuid
+/// Circuito factual do espelho externo (Jolpica e futuras fontes). Não pertence
+/// a nenhum Universe — o Circuit do universo é materializado a partir daqui.
+model ExternalCircuit {
+  id            String   @id @default(uuid()) @db.Uuid
   source        String
-  seasonYear    Int
-  round         Int
-  grandPrix     String?
-  name          String?
-  circuitName   String?
-  date          DateTime?
-  status        String?
+  externalId    String
+  name          String
+  url           String?
+  locality      String?
+  country       String?
+  latitude      Float?
+  longitude     Float?
+  lengthMeters  Int?
+  turns         Int?
+  direction     String?
+  layoutKey     String?
   contentHash   String
   sourceRecord  Json?
-  firstSyncedAt DateTime  @default(now())
-  lastSyncedAt  DateTime  @default(now())
+  firstSyncedAt DateTime @default(now())
+  lastSyncedAt  DateTime @default(now())
+
+  races    ExternalRace[]
+  bindings ExternalBindingCircuit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([source, name])
+}
+
+/// Circuito do universo do usuário: entidade própria, independente do espelho.
+model Circuit {
+  id         String   @id @default(uuid()) @db.Uuid
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
+  name         String
+  shortName    String?
+  locality     String?
+  country      String?
+  latitude     Float?
+  longitude    Float?
+  lengthMeters Int?
+  turns        Int?
+  direction    String?
+  layoutKey    String?
+  layoutUrl    String?
+  photoUrl     String?
+
+  provenance Provenance @default(CANONICAL)
+
+  races    Race[]
+  bindings ExternalBindingCircuit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universeId, name])
+  @@index([universeId])
+}
+
+model ExternalBindingCircuit {
+  id                String            @id @default(uuid()) @db.Uuid
+  universeId        String            @db.Uuid
+  universe          Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  externalCircuitId String            @db.Uuid
+  externalCircuit   ExternalCircuit   @relation(fields: [externalCircuitId], references: [id], onDelete: Cascade)
+  circuitId         String            @unique @db.Uuid
+  circuit           Circuit           @relation(fields: [circuitId], references: [id], onDelete: Cascade)
+  confidence        BindingConfidence @default(SUGGESTED)
+  boundAt           DateTime          @default(now())
+  boundBy           Role?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([universeId, externalCircuitId])
+}
+
+enum ExternalSyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+/// Registro de execução de sincronização externa (auditoria, lock e lastSyncAt).
+model ExternalSyncRun {
+  id            String             @id @default(uuid()) @db.Uuid
+  source        String
+  scope         String
+  seasonYear    Int?
+  status        ExternalSyncStatus @default(RUNNING)
+  startedAt     DateTime           @default(now())
+  finishedAt    DateTime?
+  lastSyncedAt  DateTime?
+  statistics    Json?
+  error         String?
+  triggeredById String?            @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([source, scope, seasonYear, startedAt])
+}
+
+model ExternalRace {
+  id                String           @id @default(uuid()) @db.Uuid
+  source            String
+  seasonYear        Int
+  round             Int
+  grandPrix         String?
+  name              String?
+  officialName      String?
+  circuitName       String?
+  circuitExternalId String?
+  locality          String?
+  country           String?
+  latitude          Float?
+  longitude         Float?
+  time              String?
+  url               String?
+  date              DateTime?
+  status            String?
+  hasSprint         Boolean?
+  contentHash       String
+  sourceRecord      Json?
+  firstSyncedAt     DateTime         @default(now())
+  lastSyncedAt      DateTime         @default(now())
+
+  externalCircuitId String?          @db.Uuid
+  externalCircuit   ExternalCircuit? @relation(fields: [externalCircuitId], references: [id], onDelete: SetNull)
 
   results  ExternalResult[]
   bindings ExternalBindingRace[]
+  knowledgeEvents ExternalDriverEvent[]
 
   @@unique([source, seasonYear, round])
   @@index([source, seasonYear])
+  @@index([externalCircuitId])
 }
 
 model ExternalResult {
@@ -688,15 +914,16 @@ model ExternalResult {
   externalDriverId String         @db.Uuid
   externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Restrict)
 
-  position      Int?
-  points        Float?
-  grid          Int?
-  fastestLap    Boolean?
-  status        String?
-  contentHash   String
-  sourceRecord  Json?
-  firstSyncedAt DateTime @default(now())
-  lastSyncedAt  DateTime @default(now())
+  position       Int?
+  points         Float?
+  grid           Int?
+  fastestLap     Boolean?
+  fastestLapTime String?
+  status         String?
+  contentHash    String
+  sourceRecord   Json?
+  firstSyncedAt  DateTime @default(now())
+  lastSyncedAt   DateTime @default(now())
 
   bindings ExternalBindingResult[]
 
@@ -789,6 +1016,8 @@ model ExternalBindingRace {
   confidence     BindingConfidence @default(SUGGESTED)
   boundAt        DateTime          @default(now())
   boundBy        Role?
+  contentHash    String?
+  externalSnapshot Json?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -908,6 +1137,23 @@ model Memory {
   eventId String? @db.Uuid
   event   Event?  @relation(fields: [eventId], references: [id])
 
+  universeId String?   @db.Uuid
+  universe   Universe? @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
+  memoryType PilotExperienceType?
+  derivation PilotMemoryDerivation @default(MANUAL)
+  status     PilotMemoryStatus     @default(ACTIVE)
+  revision   Int                   @default(1)
+
+  experienceId String?          @db.Uuid
+  experience   PilotExperience? @relation(fields: [experienceId], references: [id], onDelete: SetNull)
+
+  timelineEventId String?        @db.Uuid
+  timelineEvent   TimelineEvent? @relation(fields: [timelineEventId], references: [id], onDelete: SetNull)
+
+  derivedKey          String?
+  updatedByRevisionAt DateTime?
+
   importance      MemoryImportance  @default(LOW)
   source          CanonSource       @default(USER_DEFINED)
   content         String
@@ -921,6 +1167,10 @@ model Memory {
 
   @@index([importance])
   @@index([eventId])
+  @@index([universeId, status])
+  @@index([universeId, derivedKey])
+  @@index([experienceId])
+  @@index([timelineEventId])
 }
 
 /// Associação N:N entre Memory e Character (personagens aos quais a memória é relevante).
@@ -974,14 +1224,19 @@ model Event {
   worldDate   DateTime?
   payload     Json?
 
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
   participants EventCharacter[]
   memories     Memory[]
   newsItems    NewsItem[]
+  pilotExperiences PilotExperience[]
 
   createdAt DateTime @default(now())
 
   @@index([type])
   @@index([worldDate])
+  @@index([createdById])
 }
 
 /// Associação N:N entre Event e Character (personagens participantes).
@@ -1217,6 +1472,61 @@ model ConversationRagSnapshotItem {
 /// Estado temporal atual do universo. Mantém apenas referências escalares
 /// (sem @relation) para o Season/Race/Conversation ativos, evitando
 /// circularidade. O mundo existe independentemente do chat.
+enum TimelineEventKind {
+  WORLD_ADVANCED
+  RACE_RESULT_CORRECTED
+  RACE_SESSION_RESULT_CORRECTED
+  STANDING_CORRECTED
+  NUMBER_CORRECTED
+  RACE_SCHEDULED
+  RACE_UPDATED
+  ATTRIBUTE_EVOLVED
+  SESSION_COMPLETED
+  PERSONA_UPDATED
+  HISTORICAL_CHAMPION_OVERRIDE_SET
+  HISTORICAL_CHAMPION_OVERRIDE_CLEARED
+}
+
+/// Log append-only de mudanças temporais do Universe. Ordenação determinística
+/// por (worldDate, sequence); correções retroativas entram com worldDate passado
+/// e são aplicadas no ponto histórico correspondente durante o replay.
+model TimelineEvent {
+  id           String            @id @default(uuid()) @db.Uuid
+  universeId   String            @db.Uuid
+  universe     Universe          @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  sequence     Int
+  worldDate    DateTime
+  kind         TimelineEventKind
+  payload      Json
+  causedBy     String?
+  supersedesId String?           @db.Uuid
+  supersedes   TimelineEvent?    @relation("TimelineSupersession", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy TimelineEvent[]   @relation("TimelineSupersession")
+
+  pilotExperiences PilotExperience[]
+  memories         Memory[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([universeId, sequence])
+  @@index([universeId, worldDate, sequence])
+}
+
+/// Checkpoint materializado do estado do Universe em uma sequence da timeline.
+model WorldSnapshot {
+  id         String   @id @default(uuid()) @db.Uuid
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  sequence   Int
+  worldDate  DateTime
+  state      Json
+  createdAt  DateTime @default(now())
+
+  @@unique([universeId, sequence])
+  @@index([universeId, sequence])
+}
+
+/// Estado atual do mundo do universo (temporada/corrida/sessão correntes).
 model WorldState {
   id  String @id @default(uuid()) @db.Uuid
   key String @default("default")
@@ -1270,4 +1580,702 @@ model CharacterSchedule {
   createdAt DateTime @default(now())
 
   @@index([characterId, startsAt])
+}
+
+enum AiDecisionStatus {
+  NO_ACTION
+  DECIDED
+  EXECUTING
+  EXECUTED
+  REJECTED
+  FAILED
+}
+
+enum AiActionType {
+  NO_ACTION
+  SEND_MESSAGE
+  CREATE_EVENT
+}
+
+/// Auditoria de decisão comportamental de um Character AI (Universe-scoped).
+/// Sem prompts/contexto completo: apenas referência mínima e resultado.
+model AiDecision {
+  id          String    @id @default(uuid()) @db.Uuid
+  universeId  String    @db.Uuid
+  universe    Universe  @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  characterId String    @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  status      AiDecisionStatus
+  actionType  AiActionType     @default(NO_ACTION)
+  conversationId     String?   @db.Uuid
+  reason             String?
+  contextVersion     String
+  policyCode         String?
+  executedMessageId  String?   @db.Uuid
+  executedEventId    String?   @db.Uuid
+  metadata           Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([universeId, characterId, createdAt])
+  @@index([characterId, status, actionType, createdAt])
+}
+
+/// Preferências de domínio do usuário que não pertencem ao Better Auth
+/// (nome/imagem continuam em User, fonte única do modelo de autenticação).
+model UserProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  favoriteTeamId String?        @db.Uuid
+  favoriteTeam   Team?          @relation("UserProfileFavoriteTeam", fields: [favoriteTeamId], references: [id], onDelete: SetNull)
+  favoriteDriverId String?      @db.Uuid
+  favoriteDriver   DriverProfile? @relation("UserProfileFavoriteDriver", fields: [favoriteDriverId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([favoriteTeamId])
+  @@index([favoriteDriverId])
+}
+
+/// Tipo de mídia armazenada por um StorageProvider.
+enum MediaKind {
+  USER_AVATAR
+}
+
+/// Recurso de mídia armazenado (storageKey pertence ao provider; nunca
+/// exposto ao cliente). O domínio guarda apenas a referência.
+model MediaAsset {
+  id          String    @id @default(uuid()) @db.Uuid
+  ownerUserId String    @db.Uuid
+  owner       User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  kind        MediaKind @default(USER_AVATAR)
+
+  provider         String
+  storageKey       String  @unique
+  originalFilename String?
+  mimeType         String
+  byteSize         Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
+}
+
+enum PersonaOrigin {
+  ORIGINAL
+  REAL_DRIVER
+  AI_CHARACTER
+}
+
+enum PersonaTraitSource {
+  MANUAL
+  EVIDENCE
+}
+
+enum PersonaEvidenceType {
+  OFFICIAL_PROFILE
+  INTERVIEW
+  BIOGRAPHY
+  PUBLIC_STATEMENT
+  OTHER_APPROVED
+}
+
+enum PersonaEvidenceStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+}
+
+model CharacterPersona {
+  id          String    @id @default(uuid()) @db.Uuid
+  characterId String    @unique @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  origin        PersonaOrigin
+  summary       String?
+  schemaVersion String        @default("persona.v1")
+
+  evolutionRevision  Int       @default(0)
+  evolutionAppliedAt DateTime?
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("PersonaCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  traits          PersonaTrait[]
+  evidences       PersonaEvidence[]
+  traitEvolutions PersonaTraitEvolution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum BiographyGenerationStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  SUCCEEDED_FALLBACK
+  FAILED
+  CANCELLED
+}
+
+enum BiographyGenerationMode {
+  LLM
+  RICH_DETERMINISTIC
+  COMPACT_FALLBACK
+}
+
+/// Auditoria de geração de biografia: prompt final, versões, tempos e status.
+/// A biografia legível continua sendo BIOGRAPHY_PAGE (ExternalKnowledgeSource).
+model BiographyGenerationRun {
+  id               String    @id @default(uuid()) @db.Uuid
+  characterId      String    @db.Uuid
+  character        Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  externalDriverId String?   @db.Uuid
+
+  status           BiographyGenerationStatus @default(PENDING)
+  mode             BiographyGenerationMode?
+  provider         String?
+  model            String?
+  prompt           Json?
+  promptVersion    String
+  promptHash       String
+  evidenceVersion  String?
+  generatorVersion String
+  fingerprint      String?
+  fallbackReason   String?
+  failureReason    String?
+  outputSourceId   String?                   @db.Uuid
+  timings          Json?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([characterId, status])
+  @@index([status, startedAt])
+}
+
+model PersonaTrait {
+  id        String           @id @default(uuid()) @db.Uuid
+  personaId String           @db.Uuid
+  persona   CharacterPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  key        String
+  value      String
+  confidence Float
+  sourceKind PersonaTraitSource
+  context    PersonaTraitContext @default(ON_TRACK)
+
+  evidenceId String?          @db.Uuid
+  evidence   PersonaEvidence? @relation("TraitAuthoritativeEvidence", fields: [evidenceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([personaId, key, context])
+  @@index([personaId])
+  @@index([evidenceId])
+}
+
+enum PersonaTraitContext {
+  ON_TRACK
+  OFF_TRACK
+}
+
+model PersonaEvidence {
+  id        String           @id @default(uuid()) @db.Uuid
+  personaId String           @db.Uuid
+  persona   CharacterPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  traitKey      String
+  proposedValue String
+
+  sourceType  PersonaEvidenceType
+  title       String
+  url         String?
+  publishedAt DateTime?
+  excerpt     String
+  confidence  Float
+  status      PersonaEvidenceStatus @default(PROPOSED)
+
+  createdById  String?   @db.Uuid
+  createdBy    User?     @relation("PersonaEvidenceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  reviewedById String?   @db.Uuid
+  reviewedBy   User?     @relation("PersonaEvidenceReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+
+  authoritativeTraits PersonaTrait[] @relation("TraitAuthoritativeEvidence")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personaId, status])
+  @@index([personaId, traitKey])
+}
+
+// ---------------------------------------------------------------------------
+// V3.17 — Pilot Knowledge (External Driver Knowledge + Universe overrides)
+// External Knowledge != Universe Truth: nada aqui escreve o Universe.
+// ---------------------------------------------------------------------------
+
+enum ExternalKnowledgeProvider {
+  F1DB
+  WIKIDATA
+  F1_OFFICIAL
+  FIA_OFFICIAL
+  TEAM_OFFICIAL
+  DRIVER_OFFICIAL
+  REPUTABLE_NEWS
+  CURATED
+}
+
+enum ExternalKnowledgeSourceKind {
+  STRUCTURED_RELEASE
+  OFFICIAL_PROFILE
+  INTERVIEW
+  PRESS_CONFERENCE
+  BIOGRAPHY_PAGE
+  NEWS_REPORT
+  DATABASE_EXPORT
+  PUBLIC_STATEMENT
+}
+
+enum ExternalKnowledgeLicense {
+  CC_BY_4_0
+  CC0
+  CC_BY_SA_4_0
+  PROPRIETARY_REFERENCE_ONLY
+  UNKNOWN
+}
+
+enum ExternalRefreshStatus {
+  FRESH
+  STALE
+  UNKNOWN
+}
+
+enum ExternalClaimStatus {
+  SUPPORTED
+  UNCERTAIN
+  CONFLICT
+  UNKNOWN
+}
+
+enum ExternalPublicTraitSource {
+  DIRECT_SELF_DESCRIPTION
+  OBSERVED_PUBLIC_BEHAVIOR
+  INFERRED
+}
+
+enum ExternalPublicEvidenceType {
+  SELF_DESCRIPTION
+  OFFICIAL_INTERVIEW
+  FIA_TRANSCRIPT
+  TEAM_PROFILE
+  F1_PROFILE
+  DRIVER_OFFICIAL
+  REPUTABLE_NEWS
+  STRUCTURED_DATA
+}
+
+enum DriverRelationshipKind {
+  ROMANTIC_PARTNER
+  SPOUSE
+  PARENT
+  CHILD
+  SIBLING
+  TEAMMATE
+  TEAM_RELATION
+  MENTOR
+  OTHER_PUBLIC_RELATION
+}
+
+enum DriverRelationshipTarget {
+  DRIVER
+  PUBLIC_PERSON
+  CHARACTER
+}
+
+enum DriverRelationshipState {
+  ACTIVE
+  ENDED
+  UNKNOWN
+}
+
+enum ExternalDriverEventCategory {
+  F1_DEBUT
+  FIRST_POINT
+  FIRST_PODIUM
+  FIRST_POLE
+  FIRST_WIN
+  FIRST_FASTEST_LAP
+  FIRST_CHAMPIONSHIP
+  CHAMPIONSHIP
+  TEAM_CHANGE
+  MAJOR_CAREER_MILESTONE
+  SIGNIFICANT_RACE
+  CAREER_ENTRY
+}
+
+enum ExternalEventDerivation {
+  DERIVED_RESULTS
+  DERIVED_STANDINGS
+  CURATED_SOURCE
+}
+
+/// Ledger de proveniência/licença do conhecimento externo de piloto.
+/// Nunca armazena páginas/artigos/transcrições — apenas metadados + claims.
+model ExternalKnowledgeSource {
+  id       String                      @id @default(uuid()) @db.Uuid
+  provider ExternalKnowledgeProvider
+  sourceKind ExternalKnowledgeSourceKind
+  url      String?
+  title    String?
+
+  license                 ExternalKnowledgeLicense @default(UNKNOWN)
+  attributionRequirement  String?
+  attributionText         String?
+  publishedAt             DateTime?
+  retrievedAt             DateTime                @default(now())
+  sourceVersion           String?
+  metadata                Json?
+
+  driverProfiles       ExternalDriverProfile[]    @relation("ExternalDriverProfilePrimarySource")
+  biographyProfiles    ExternalDriverProfile[]    @relation("ExternalDriverProfileBiographySource")
+  personaEvidences     ExternalPersonaEvidence[]
+  driverRelationships  ExternalDriverRelationship[]
+  driverEvents         ExternalDriverEvent[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([provider, url])
+  @@index([provider, retrievedAt])
+}
+
+/// Identidade/biografia estruturada de um piloto externo (1:1 ExternalDriver).
+model ExternalDriverProfile {
+  id               String         @id @default(uuid()) @db.Uuid
+  externalDriverId String         @unique @db.Uuid
+  externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Cascade)
+
+  fullName           String?
+  publicName         String?
+  dateOfBirth        DateTime?
+  placeOfBirth       String?
+  nationality        String?
+  representedCountry String?
+  driverNumber       Int?
+  driverCode         String?
+  currentTeamName    String?
+  officialLinks      Json?
+
+  biographyDisplay  String?
+  biographyContext  String?
+  biographySourceId String?                 @db.Uuid
+  biographySource   ExternalKnowledgeSource? @relation("ExternalDriverProfileBiographySource", fields: [biographySourceId], references: [id], onDelete: SetNull)
+
+  wikidataQid  String? @unique
+  f1dbDriverId String? @unique
+
+  refreshStatus  ExternalRefreshStatus @default(UNKNOWN)
+  lastVerifiedAt DateTime?
+
+  sourceId String?                 @db.Uuid
+  source   ExternalKnowledgeSource? @relation("ExternalDriverProfilePrimarySource", fields: [sourceId], references: [id], onDelete: SetNull)
+
+  persona ExternalDriverPersona?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([refreshStatus, lastVerifiedAt])
+}
+
+/// Perfil público observável do piloto (baseline externa; não é a persona do Universe).
+model ExternalDriverPersona {
+  id        String               @id @default(uuid()) @db.Uuid
+  profileId String               @unique @db.Uuid
+  profile   ExternalDriverProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  schemaVersion  String              @default("external-persona.v1")
+  summary        String?
+  status         ExternalClaimStatus @default(UNKNOWN)
+  lastVerifiedAt DateTime?
+
+  traits    ExternalPersonaTrait[]
+  evidences ExternalPersonaEvidence[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ExternalPersonaTrait {
+  id        String                @id @default(uuid()) @db.Uuid
+  personaId String                @db.Uuid
+  persona   ExternalDriverPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  traitKey   String
+  value      String
+  sourceKind ExternalPublicTraitSource
+  status     ExternalClaimStatus       @default(SUPPORTED)
+  confidence Float?
+
+  evidenceId String?                 @db.Uuid
+  evidence   ExternalPersonaEvidence? @relation("ExternalTraitAuthoritativeEvidence", fields: [evidenceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([personaId, traitKey])
+  @@index([personaId])
+  @@index([evidenceId])
+}
+
+model ExternalPersonaEvidence {
+  id        String                @id @default(uuid()) @db.Uuid
+  personaId String                @db.Uuid
+  persona   ExternalDriverPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  traitKey      String
+  proposedValue String
+  evidenceType  ExternalPublicEvidenceType
+  sourceKind    ExternalPublicTraitSource    @default(OBSERVED_PUBLIC_BEHAVIOR)
+
+  sourceId String?                 @db.Uuid
+  source   ExternalKnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  summary      String
+  confidence   Float?
+  status       ExternalClaimStatus @default(SUPPORTED)
+  retrievedAt  DateTime            @default(now())
+
+  authoritativeTraits ExternalPersonaTrait[] @relation("ExternalTraitAuthoritativeEvidence")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personaId, traitKey])
+  @@index([personaId, status])
+}
+
+model ExternalDriverRelationship {
+  id               String         @id @default(uuid()) @db.Uuid
+  externalDriverId String         @db.Uuid
+  externalDriver   ExternalDriver @relation("ExternalDriverRelationshipSubject", fields: [externalDriverId], references: [id], onDelete: Cascade)
+
+  kind       DriverRelationshipKind
+  targetType DriverRelationshipTarget
+
+  targetExternalDriverId String?         @db.Uuid
+  targetExternalDriver   ExternalDriver? @relation("ExternalDriverRelationshipTarget", fields: [targetExternalDriverId], references: [id], onDelete: SetNull)
+  targetWikidataQid      String?
+
+  displayName String
+  state       DriverRelationshipState @default(UNKNOWN)
+  validFrom   DateTime?
+  validTo     DateTime?
+
+  sourceId       String?                 @db.Uuid
+  source         ExternalKnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  confidence     Float?
+  lastVerifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([externalDriverId, kind])
+  @@index([targetExternalDriverId])
+}
+
+/// Marco histórico resumido (não duplica RaceResult).
+model ExternalDriverEvent {
+  id               String         @id @default(uuid()) @db.Uuid
+  externalDriverId String         @db.Uuid
+  externalDriver   ExternalDriver @relation(fields: [externalDriverId], references: [id], onDelete: Cascade)
+
+  category ExternalDriverEventCategory
+  title    String
+
+  eventDate     DateTime?
+  seasonYear    Int?
+  externalRaceId String?        @db.Uuid
+  externalRace   ExternalRace?  @relation(fields: [externalRaceId], references: [id], onDelete: SetNull)
+
+  summary    String?
+  importance Int                @default(3)
+  derivation ExternalEventDerivation
+
+  sourceId String?                 @db.Uuid
+  source   ExternalKnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  dedupeKey String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([externalDriverId, dedupeKey])
+  @@index([externalDriverId, eventDate])
+}
+
+/// Override Universe-scoped de relacionamento público de um piloto (nunca toca o externo).
+model UniverseDriverRelationship {
+  id         String   @id @default(uuid()) @db.Uuid
+  universeId String   @db.Uuid
+  universe   Universe @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
+  characterId String    @db.Uuid
+  character   Character @relation("UniverseRelationshipSubject", fields: [characterId], references: [id], onDelete: Cascade)
+
+  kind       DriverRelationshipKind
+  targetType DriverRelationshipTarget
+
+  targetCharacterId String?    @db.Uuid
+  targetCharacter   Character? @relation("UniverseRelationshipTarget", fields: [targetCharacterId], references: [id], onDelete: SetNull)
+  targetWikidataQid String?
+
+  displayName String
+  state       DriverRelationshipState @default(UNKNOWN)
+  validFrom   DateTime?
+  validTo     DateTime?
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("UniverseDriverRelationshipCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([universeId, characterId, kind])
+  @@index([targetCharacterId])
+}
+
+// ---------------------------------------------------------------------------
+// V3.18 — Pilot Experience, Memory & Evolution
+// Experience é projeção determinística de fatos do Universe; Memory é a
+// representação durável; evolução de persona é baseline + efeitos append-only.
+// ---------------------------------------------------------------------------
+
+enum PilotExperienceType {
+  CAREER_MILESTONE
+  SPORTING_VICTORY
+  SPORTING_DEFEAT
+  CHAMPIONSHIP
+  TEAM_CHANGE
+  RELATIONSHIP_EVENT
+  CONFLICT
+  PERSONAL_MILESTONE
+  NARRATIVE_EVENT
+  SIGNIFICANT_RACE
+  OTHER_RELEVANT_EXPERIENCE
+}
+
+enum PilotExperienceSource {
+  RACE_RESULT
+  STANDING
+  TIMELINE_CORRECTION
+  UNIVERSE_EVENT
+  RELATIONSHIP
+  CURATED
+}
+
+enum PilotExperienceStatus {
+  ACTIVE
+  INVALIDATED
+  SUPERSEDED
+}
+
+enum PilotMemoryDerivation {
+  MANUAL
+  DERIVED
+  RULE_DERIVED
+}
+
+enum PilotMemoryStatus {
+  ACTIVE
+  ARCHIVED
+  SUPERSEDED
+  INVALIDATED
+}
+
+enum PilotEvolutionStatus {
+  ACTIVE
+  SUPERSEDED
+}
+
+/// Acontecimento vivenciado pelo piloto, derivado deterministicamente de fatos
+/// do Universe. Nunca substitui RaceResult/Event/TimelineEvent; é resumo/marco.
+model PilotExperience {
+  id               String         @id @default(uuid()) @db.Uuid
+  universeId       String         @db.Uuid
+  universe         Universe       @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  characterId      String         @db.Uuid
+  character        Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  experienceType PilotExperienceType
+  source         PilotExperienceSource
+  sourceKey      String
+
+  seasonYear Int?
+  seasonId   String?  @db.Uuid
+  season     Season?  @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  raceId     String?  @db.Uuid
+  race       Race?    @relation(fields: [raceId], references: [id], onDelete: SetNull)
+  eventId    String?  @db.Uuid
+  event      Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  timelineEventId String?        @db.Uuid
+  timelineEvent   TimelineEvent? @relation(fields: [timelineEventId], references: [id], onDelete: SetNull)
+
+  occurredAt DateTime?
+  salience   MemoryImportance @default(MEDIUM)
+  title      String
+  summary    String?
+
+  status             PilotExperienceStatus @default(ACTIVE)
+  invalidationReason String?
+  revision           Int                   @default(1)
+
+  memories        Memory[]
+  traitEvolutions PersonaTraitEvolution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universeId, characterId, source, sourceKey])
+  @@index([universeId, characterId, status])
+  @@index([universeId, seasonId])
+  @@index([universeId, raceId])
+}
+
+/// Efeito de evolução de persona (append-only). O valor efetivo é sempre
+/// baseline + soma dos efeitos ativos; nunca mutação cumulativa no trait.
+model PersonaTraitEvolution {
+  id        String           @id @default(uuid()) @db.Uuid
+  personaId String           @db.Uuid
+  persona   CharacterPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  traitKey  String
+  ruleCode  String
+  rulePriority Int
+  value     String?
+  confidenceDelta Float
+  reason    String
+
+  sourceExperienceId String?          @db.Uuid
+  sourceExperience   PilotExperience? @relation(fields: [sourceExperienceId], references: [id], onDelete: SetNull)
+
+  fingerprint String @unique
+  appliedAt   DateTime @default(now())
+  status      PilotEvolutionStatus @default(ACTIVE)
+
+  @@index([personaId, traitKey])
+  @@index([personaId, status])
+  @@index([sourceExperienceId])
 }

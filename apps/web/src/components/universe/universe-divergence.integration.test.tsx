@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import UniverseEditorPage from "@/app/app/universe/page";
 import { ApiError } from "@/lib/api";
 import type { PlayerEntrySeason, PlayerEntrySetup } from "@/lib/player-entry";
-import type { RosterComparison, UniverseDivergence } from "@/lib/universe";
+import type { RosterComparison, UniverseDivergence, UniverseSeat } from "@/lib/universe";
 import { renderWithClient } from "@/test/render-with-client";
 
 const apiMock = vi.hoisted(() => ({
@@ -61,7 +61,7 @@ const DIVERGENCE: UniverseDivergence = {
   readOnly: true,
 };
 
-const seat = (overrides: Partial<Record<string, unknown>> = {}) => ({
+const seat = (overrides: Partial<UniverseSeat> = {}): UniverseSeat => ({
   seat: 2,
   status: "DIVERGENCE",
   source: { externalDriverId: "e2", name: "Oscar Piastri", number: 81 },

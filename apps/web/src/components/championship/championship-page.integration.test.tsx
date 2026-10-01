@@ -166,6 +166,14 @@ beforeEach(() => {
     if (path === "/api/seasons/s2/standings") {
       return { standings: [] };
     }
+    if (path.startsWith("/api/news")) {
+      return {
+        news: [],
+        context: { season: null, race: null },
+        hasMore: false,
+        nextOffset: null,
+      };
+    }
     throw new ApiError("Não encontrado", 404);
   });
 

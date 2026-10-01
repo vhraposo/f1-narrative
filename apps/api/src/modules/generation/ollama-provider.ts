@@ -2,6 +2,7 @@ import {
   type GenerationProvider,
   type ProviderInput,
   type ProviderOutput,
+  type ProviderStreamHandlers,
   type TokenStats,
   countEmittedSections,
 } from "./generation.assembly.js";
@@ -172,6 +173,171 @@ export class OllamaProvider implements GenerationProvider {
   // -------------------------------------------------------------------------
   // Transport (fetch nativo + AbortController, padrão Cohere)
   // -------------------------------------------------------------------------
+
+  async runStream(
+    input: ProviderInput,
+    handlers: ProviderStreamHandlers,
+  ): Promise<ProviderOutput> {
+    if (
+      input.userPrompt === undefined ||
+      input.userPrompt.trim().length === 0
+    ) {
+      throw new OllamaProviderError(
+        "missing_user_prompt",
+        "Geração real requer um userPrompt explícito e não vazio.",
+      );
+    }
+
+    const text = await this.streamCompletion(
+      input.systemPrompt,
+      input.userPrompt,
+      handlers,
+    );
+
+    return {
+      provider: this.name,
+      mode: "generated",
+      text,
+      tokenStats: this.tokenStats(input.systemPrompt),
+    };
+  }
+
+  private async streamCompletion(
+    systemPrompt: string,
+    userPrompt: string,
+    handlers: ProviderStreamHandlers,
+  ): Promise<string> {
+    const endpoint = ollamaChatCompletionsUrl(this.baseUrl);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.timeoutMs);
+    const onExternalAbort = () => controller.abort();
+    handlers.signal?.addEventListener("abort", onExternalAbort);
+    try {
+      let res: Response;
+      try {
+        res = await this.fetchImpl(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify({
+            model: this.model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            stream: true,
+          }),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        throw this.transportError(err, timedOut);
+      }
+
+      if (!res.ok) {
+        throw new OllamaProviderError(
+          "http",
+          "Resposta não-2xx do servidor Ollama.",
+          res.status,
+        );
+      }
+      if (!res.body) {
+        throw new OllamaProviderError(
+          "malformed_response",
+          "Resposta de streaming sem corpo legível.",
+          undefined,
+        );
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new globalThis.TextDecoder();
+      let buffer = "";
+      let text = "";
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let newlineIndex: number;
+          while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
+            const line = buffer
+              .slice(0, newlineIndex)
+              .replace(/\r$/, "")
+              .trim();
+            buffer = buffer.slice(newlineIndex + 1);
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice("data:".length).trim();
+            if (payload.length === 0 || payload === "[DONE]") continue;
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(payload);
+            } catch {
+              throw new OllamaProviderError(
+                "malformed_response",
+                "Evento de streaming não é JSON válido.",
+                undefined,
+              );
+            }
+            const delta = this.extractDelta(parsed);
+            if (delta !== null && delta.length > 0) {
+              text += delta;
+              handlers.onDelta(delta);
+            }
+          }
+        }
+      } catch (err) {
+        if (err instanceof OllamaProviderError) throw err;
+        throw this.transportError(err, timedOut);
+      }
+
+      if (text.length === 0) {
+        throw new OllamaProviderError(
+          "missing_content",
+          "Streaming terminou sem conteúdo.",
+          undefined,
+        );
+      }
+      return text;
+    } finally {
+      clearTimeout(timer);
+      handlers.signal?.removeEventListener("abort", onExternalAbort);
+    }
+  }
+
+  private transportError(err: unknown, timedOut: boolean): OllamaProviderError {
+    if (err instanceof Error && err.name === "AbortError") {
+      if (timedOut) {
+        return new OllamaProviderError(
+          "timeout",
+          "A requisição atingiu o timeout e foi cancelada.",
+          undefined,
+        );
+      }
+      return new OllamaProviderError("abort", "A requisição foi abortada.", undefined);
+    }
+    return new OllamaProviderError(
+      "network",
+      "Falha de conexão/network ao acessar o servidor Ollama.",
+      undefined,
+    );
+  }
+
+  private extractDelta(chunk: unknown): string | null {
+    if (chunk === null || typeof chunk !== "object" || Array.isArray(chunk)) {
+      return null;
+    }
+    const choices = (chunk as { choices?: unknown }).choices;
+    if (!Array.isArray(choices) || choices.length === 0) return null;
+    const first = choices[0] as { delta?: { content?: unknown } } | null;
+    const content = first?.delta?.content;
+    return typeof content === "string" ? content : null;
+  }
+
   private async request(systemPrompt: string, userPrompt: string): Promise<OllamaChatCompletion> {
     const endpoint = ollamaChatCompletionsUrl(this.baseUrl);
     const controller = new AbortController();

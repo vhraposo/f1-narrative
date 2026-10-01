@@ -318,10 +318,20 @@ describe("JolpicaSyncService — sincronização determinística (f1_narrative_t
       await prisma.externalSeason.count({ where: { source: JOLPICA_SOURCE, year } }),
     ).toBe(1);
     expect(
-      await prisma.externalTeam.count({ where: { source: JOLPICA_SOURCE } }),
+      await prisma.externalTeam.count({
+        where: {
+          source: JOLPICA_SOURCE,
+          externalId: { in: ["ferrari", "mclaren"] },
+        },
+      }),
     ).toBe(2);
     expect(
-      await prisma.externalDriver.count({ where: { source: JOLPICA_SOURCE } }),
+      await prisma.externalDriver.count({
+        where: {
+          source: JOLPICA_SOURCE,
+          externalId: { in: ["lauda", "hunt", "donnelly"] },
+        },
+      }),
     ).toBe(3);
     expect(
       await prisma.externalDriverSeason.count({
@@ -455,7 +465,7 @@ describe("JolpicaSyncService — sincronização determinística (f1_narrative_t
     server.removeRound(2);
     const report = await service.sync(year, "RACES");
 
-    expect(report.counts.unchanged).toBe(1);
+    expect(report.counts.unchanged).toBe(2);
     expect(
       await prisma.externalRace.count({ where: { source: JOLPICA_SOURCE, seasonYear: year } }),
     ).toBe(2);
@@ -523,6 +533,13 @@ describe("JolpicaSync routes — endpoint admin-only", () => {
     await prisma.externalDriverSeason.deleteMany({ where: { source: JOLPICA_SOURCE, externalDriver: { externalId: { in: syncDriverIds } } } });
     await prisma.externalDriverSeason.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: { in: syncYears } } });
     await prisma.externalRace.deleteMany({ where: { source: JOLPICA_SOURCE, seasonYear: { in: syncYears } } });
+    await prisma.externalCircuit.deleteMany({
+      where: {
+        source: JOLPICA_SOURCE,
+        externalId: { in: ["buenos_aires", "interlagos"] },
+        races: { none: {} },
+      },
+    });
     await prisma.externalDriver.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: syncDriverIds } } });
     await prisma.externalTeam.deleteMany({ where: { source: JOLPICA_SOURCE, externalId: { in: ["mclaren", "ferrari"] } } });
     await prisma.externalSeason.deleteMany({ where: { source: JOLPICA_SOURCE, year: { in: syncYears } } });

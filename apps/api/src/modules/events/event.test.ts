@@ -310,7 +310,7 @@ describe("GET /api/events (global) — filtros", () => {
   });
 });
 
-describe("Event global — ownership compartilhado entre usuários", () => {
+describe("Event global — leitura compartilhada, mutação restrita ao dono/admin", () => {
   let sharedEventId: string;
 
   beforeAll(async () => {
@@ -318,7 +318,7 @@ describe("Event global — ownership compartilhado entre usuários", () => {
     sharedEventId = (json.event as EventRecord).id;
   });
 
-  it("usuário B consulta evento criado por A → 200", async () => {
+  it("usuário B consulta evento criado por A → 200 (leitura global preservada)", async () => {
     const res = await app.inject({
       method: "GET",
       url: `/api/events/${sharedEventId}`,
@@ -328,24 +328,45 @@ describe("Event global — ownership compartilhado entre usuários", () => {
     expect(res.json().event.title).toBe("Evento Global");
   });
 
-  it("usuário B edita evento criado por A → 200", async () => {
+  it("usuário B edita evento criado por A → 404 (leak-safe)", async () => {
     const res = await app.inject({
       method: "PATCH",
       url: `/api/events/${sharedEventId}`,
       headers: { cookie: intruder.cookie },
-      payload: { title: "Evento Global Editado" },
+      payload: { title: "Evento Invadido" },
     });
-    expect(res.statusCode).toBe(200);
-    expect(res.json().event.title).toBe("Evento Global Editado");
+    expect(res.statusCode).toBe(404);
+    const stored = await prisma.event.findUnique({ where: { id: sharedEventId } });
+    expect(stored?.title).toBe("Evento Global");
   });
 
-  it("usuário B exclui evento criado por A → 204", async () => {
+  it("usuário B exclui evento criado por A → 404 e nada é apagado", async () => {
     const res = await app.inject({
       method: "DELETE",
       url: `/api/events/${sharedEventId}`,
       headers: { cookie: intruder.cookie },
     });
-    expect(res.statusCode).toBe(204);
+    expect(res.statusCode).toBe(404);
+    const stored = await prisma.event.findUnique({ where: { id: sharedEventId } });
+    expect(stored).not.toBeNull();
+  });
+
+  it("dono edita e exclui o próprio evento", async () => {
+    const edit = await app.inject({
+      method: "PATCH",
+      url: `/api/events/${sharedEventId}`,
+      headers: { cookie: owner.cookie },
+      payload: { title: "Evento Global Editado" },
+    });
+    expect(edit.statusCode).toBe(200);
+    expect(edit.json().event.title).toBe("Evento Global Editado");
+
+    const remove = await app.inject({
+      method: "DELETE",
+      url: `/api/events/${sharedEventId}`,
+      headers: { cookie: owner.cookie },
+    });
+    expect(remove.statusCode).toBe(204);
   });
 });
 
@@ -426,6 +447,28 @@ describe("GET /api/events/:id, PATCH, DELETE", () => {
       headers: { cookie: owner.cookie },
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("rejeita campos desconhecidos no POST e no PATCH (strict)", async () => {
+    const post = await app.inject({
+      method: "POST",
+      url: "/api/events",
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { type: "SOCIAL", title: "Strict", ownerId: "hack" },
+      remoteAddress: "10.99.9.1",
+    });
+    expect(post.statusCode).toBe(400);
+
+    const { json } = await createEvent(owner, { type: "SOCIAL", title: "Strict ok" });
+    const id = (json.event as EventRecord).id;
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/api/events/${id}`,
+      headers: { cookie: owner.cookie, "content-type": "application/json" },
+      payload: { title: "Strict editado", createdById: "00000000-0000-4000-8000-000000000000" },
+      remoteAddress: "10.99.9.2",
+    });
+    expect(patch.statusCode).toBe(400);
   });
 });
 
