@@ -1593,8 +1593,11 @@ enum AiDecisionStatus {
 
 enum AiActionType {
   NO_ACTION
+  RESPOND
   SEND_MESSAGE
   CREATE_EVENT
+  CREATE_MEMORY
+  UPDATE_RELATIONSHIP
 }
 
 /// Auditoria de decisão comportamental de um Character AI (Universe-scoped).
