@@ -11,12 +11,20 @@ import {
   type BehaviorDecisionRequest,
 } from "./behavior.types.js";
 
+export type BehaviorLanguageOverride = {
+  readonly text: string;
+  readonly provider: string;
+  readonly model: string;
+  readonly fallback: boolean;
+};
+
 export type BehaviorCommandInput = {
   readonly tx: Prisma.TransactionClient;
   readonly request: BehaviorDecisionRequest;
   readonly context: BehaviorContextView;
   readonly candidate: BehaviorCandidate;
   readonly worldDate: Date;
+  readonly contentOverride?: BehaviorLanguageOverride;
 };
 
 export type BehaviorCommandResult = {
@@ -89,7 +97,11 @@ async function executeMessageCommand(
   }
   await requireTargetInUniverse(input.tx, input.request.universeId, input.candidate.targetCharacterId);
 
-  const content = deterministicTextFor(input.context, input.candidate.reasonCode);
+  const override = input.contentOverride;
+  const content = override ? override.text.trim() : deterministicTextFor(input.context, input.candidate.reasonCode);
+  if (content.length === 0 || content.length > 5000) {
+    throw new BehaviorError("PRECONDITION_FAILED", "Conteúdo de mensagem inválido", 400);
+  }
   const message = await input.tx.message.create({
     data: {
       conversationId,
@@ -102,6 +114,15 @@ async function executeMessageCommand(
           actionFingerprint: input.candidate.metadata.actionFingerprint ?? null,
           goalIds: input.candidate.goalIds,
         },
+        ...(override
+          ? {
+              language: {
+                provider: override.provider,
+                model: override.model,
+                fallback: override.fallback,
+              },
+            }
+          : {}),
       },
     },
     select: { id: true },

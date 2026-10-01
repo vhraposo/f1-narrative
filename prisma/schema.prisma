@@ -58,6 +58,13 @@ enum RaceSession {
   RACE
 }
 
+enum ConversationStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
 enum ConversationType {
   GROUP
   DM
@@ -1083,9 +1090,10 @@ model ExternalBindingStanding {
 
 /// Grupo ou conversa direta composta por Characters.
 model Conversation {
-  id    String           @id @default(uuid()) @db.Uuid
-  title String?
-  type  ConversationType @default(GROUP)
+  id     String             @id @default(uuid()) @db.Uuid
+  title  String?
+  type   ConversationType   @default(GROUP)
+  status ConversationStatus @default(ACTIVE)
 
   participants ConversationParticipant[]
   messages     Message[]

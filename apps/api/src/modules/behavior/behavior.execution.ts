@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
-import { commandForAction } from "./behavior.commands.js";
+import { commandForAction, type BehaviorLanguageOverride } from "./behavior.commands.js";
 import { buildBehaviorContext } from "./behavior.context.js";
 import {
   BehaviorError,
@@ -119,6 +119,7 @@ function candidateFromSummary(
 
 export async function executeBehaviorDecision(
   decisionId: string,
+  options: { readonly contentOverride?: BehaviorLanguageOverride } = {},
 ): Promise<BehaviorExecutionResult> {
   const decision = await prisma.aiDecision.findUnique({
     where: { id: decisionId },
@@ -284,12 +285,22 @@ export async function executeBehaviorDecision(
         context,
         candidate,
         worldDate: request.worldDate,
+        ...(options.contentOverride ? { contentOverride: options.contentOverride } : {}),
       });
       const execution = {
         command: candidate.actionType,
         actionFingerprint: fingerprint,
         executedAt: request.worldDate.toISOString(),
         latencyMs: Date.now() - startedAt,
+        ...(options.contentOverride
+          ? {
+              language: {
+                provider: options.contentOverride.provider,
+                model: options.contentOverride.model,
+                fallback: options.contentOverride.fallback,
+              },
+            }
+          : {}),
       };
       const mergedMetadata = {
         ...metadata,

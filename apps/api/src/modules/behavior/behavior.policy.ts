@@ -51,6 +51,7 @@ function hasRelationshipWith(context: BehaviorContextView, targetId: string | nu
 
 function isAvailabilityOpen(context: BehaviorContextView): boolean {
   const status = context.availability?.status;
+  if (!status) return true;
   return status === "AVAILABLE" || status === "RACE_WEEKEND";
 }
 
@@ -119,10 +120,16 @@ export function evaluateBehaviorPolicy(
   const bucket = worldDateBucket(request.worldDate);
   const drafts: CandidateDraft[] = [];
 
-  if (request.trigger === "MESSAGE_RECEIVED" && request.conversationId) {
+  if (
+    (request.trigger === "MESSAGE_RECEIVED" || request.trigger === "CONVERSATION_TURN_DUE") &&
+    request.conversationId
+  ) {
     drafts.push({
       actionType: "RESPOND",
-      reasonCode: "POLICY_RESPOND_TO_DIRECT_MESSAGE",
+      reasonCode:
+        request.trigger === "CONVERSATION_TURN_DUE"
+          ? "POLICY_CONTINUE_CONVERSATION_TURN"
+          : "POLICY_RESPOND_TO_DIRECT_MESSAGE",
       requiredContext: ["CONVERSATION", "PERSONALITY", "MEMORY"],
       preconditions: [
         "CONTROLLER_IS_AI",

@@ -14,6 +14,7 @@ export const BEHAVIOR_POLICY_CODE = "behavior-policy.v1";
 
 export type BehaviorTrigger =
   | "MESSAGE_RECEIVED"
+  | "CONVERSATION_TURN_DUE"
   | "EVENT_CREATED"
   | "RACE_SESSION_COMPLETED"
   | "RACE_FINISHED"
