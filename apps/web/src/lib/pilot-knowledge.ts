@@ -26,6 +26,51 @@ export type PilotBiographyView = {
   lastVerifiedAt: string | null;
 };
 
+export type BiographyLifecycleStatus =
+  | "MISSING"
+  | "READY"
+  | "READY_FALLBACK"
+  | "STALE"
+  | "GENERATING"
+  | "FAILED";
+
+export type PilotBiographyStatusView = {
+  status: BiographyLifecycleStatus;
+  display: string | null;
+  context: string | null;
+  origin: "UNIVERSE" | "EXTERNAL" | "NONE";
+  runId: string | null;
+  evidenceVersion: string | null;
+  generatorVersion: string | null;
+  fallbackReason: string | null;
+  lastVerifiedAt: string | null;
+};
+
+export type BiographyGenerationRunView = {
+  id: string;
+  status: string;
+  mode: string | null;
+  provider: string | null;
+  model: string | null;
+  fallbackReason: string | null;
+  evidenceVersion: string | null;
+  generatorVersion: string | null;
+  promptHash: string | null;
+  startedAt: string;
+  completedAt: string | null;
+};
+
+export type PilotKnowledgeResponse = {
+  pilot: PilotKnowledgeView;
+  biographyStatus?: PilotBiographyStatusView;
+  sync?: {
+    providersConfigured: boolean;
+    provisioned: boolean;
+    lastStatus: string | null;
+    lastAt: string | null;
+  };
+};
+
 export type PilotPersonaTraitView = {
   traitKey: string;
   label: string;
@@ -151,25 +196,21 @@ export const PILOT_ORIGIN_LABELS: Record<string, string> = {
 export function getPilotKnowledge(
   characterId: string,
   topic?: string,
-): Promise<{
-  pilot: PilotKnowledgeView;
-  sync?: {
-    providersConfigured: boolean;
-    provisioned: boolean;
-    lastStatus: string | null;
-    lastAt: string | null;
-  };
-}> {
+): Promise<PilotKnowledgeResponse> {
   const query = topic && topic.trim().length > 0 ? `?topic=${encodeURIComponent(topic.trim())}` : "";
-  return get<{
-    pilot: PilotKnowledgeView;
-    sync?: {
-      providersConfigured: boolean;
-      provisioned: boolean;
-      lastStatus: string | null;
-      lastAt: string | null;
-    };
-  }>(`/api/pilot-knowledge/drivers/${characterId}${query}`);
+  return get<PilotKnowledgeResponse>(`/api/pilot-knowledge/drivers/${characterId}${query}`);
+}
+
+export function requestBiographyGeneration(characterId: string): Promise<{
+  generation: { runId: string; status: string; reused: boolean; skipped?: boolean };
+}> {
+  return post(`/api/pilot-knowledge/drivers/${characterId}/biography/generation`, {});
+}
+
+export function getBiographyGenerationRun(characterId: string): Promise<{
+  generation: BiographyGenerationRunView | null;
+}> {
+  return get(`/api/pilot-knowledge/drivers/${characterId}/biography/generation`);
 }
 
 export function refreshPilotKnowledge(

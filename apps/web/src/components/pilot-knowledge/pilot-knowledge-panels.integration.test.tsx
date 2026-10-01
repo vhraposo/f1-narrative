@@ -373,4 +373,77 @@ describe("pilot knowledge panels", () => {
     );
     expect(biographyParagraphs.length).toBe(3);
   });
+
+  it("12) biografia MISSING dispara geração e mostra skeleton", async () => {
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path.endsWith("/biography/generation")) {
+        return { generation: null };
+      }
+      return {
+        pilot: {
+          ...AVAILABLE_PILOT,
+          profile: {
+            ...AVAILABLE_PILOT.profile,
+            biography: {
+              display: null,
+              context: null,
+              origin: "NONE",
+              lastVerifiedAt: null,
+            },
+          },
+        },
+        biographyStatus: {
+          status: "MISSING",
+          display: null,
+          context: null,
+          origin: "NONE",
+          runId: null,
+          evidenceVersion: null,
+          generatorVersion: null,
+          fallbackReason: null,
+          lastVerifiedAt: null,
+        },
+      };
+    });
+    apiMock.post.mockResolvedValue({
+      generation: { runId: "run-1", status: "PENDING", reused: false },
+    });
+    renderWithClient(<PilotKnowledgeSection characterId="c1" section="overview" />);
+    expect(await screen.findByText("Preparando biografia…")).toBeDefined();
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/pilot-knowledge/drivers/c1/biography/generation",
+      {},
+    );
+  });
+
+  it("13) biografia STALE mantém o texto antigo enquanto revalida", async () => {
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path.endsWith("/biography/generation")) {
+        return { generation: null };
+      }
+      return {
+        pilot: AVAILABLE_PILOT,
+        biographyStatus: {
+          status: "STALE",
+          display: "Biografia pública sintetizada.",
+          context: "Biografia curta.",
+          origin: "EXTERNAL",
+          runId: null,
+          evidenceVersion: "old:v1",
+          generatorVersion: "biography-composer.v1",
+          fallbackReason: null,
+          lastVerifiedAt: "2026-09-01T00:00:00.000Z",
+        },
+      };
+    });
+    apiMock.post.mockResolvedValue({
+      generation: { runId: "run-2", status: "PENDING", reused: false },
+    });
+    renderWithClient(<PilotKnowledgeSection characterId="c1" section="overview" />);
+    expect(await screen.findByText("Biografia pública sintetizada.")).toBeDefined();
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/pilot-knowledge/drivers/c1/biography/generation",
+      {},
+    );
+  });
 });

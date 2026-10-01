@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  useBiographyLifecycle,
   useCreateUniverseRelationship,
   useDeleteUniverseRelationship,
   usePilotKnowledge,
@@ -26,6 +27,7 @@ import {
   PILOT_CLASSIFICATION_LABELS,
   PILOT_ORIGIN_LABELS,
   PILOT_RELATIONSHIP_STATE_LABELS,
+  type PilotBiographyStatusView,
   type PilotKnowledgeView,
   type PilotRelationshipEntryView,
 } from "@/lib/pilot-knowledge";
@@ -105,7 +107,7 @@ function PilotUnavailable({
         <p className="text-xs">
           {sync?.providersConfigured
             ? "Use Sincronizar para buscar dados públicos deste piloto."
-            : "Nenhum provider externo está configurado neste ambiente; dados do espelho interno são provisionados ao abrir o piloto."}
+            : "Nenhum provider externo está configurado neste ambiente; a biografia é preparada automaticamente ao abrir o piloto."}
           {sync?.lastStatus === "FAILED" && " A última sincronização falhou."}
         </p>
       )}
@@ -116,9 +118,11 @@ function PilotUnavailable({
 function BiographyCard({
   characterId,
   pilot,
+  biographyStatus,
 }: {
   characterId: string;
   pilot: Extract<PilotKnowledgeView, { available: true }>;
+  biographyStatus?: PilotBiographyStatusView;
 }) {
   const biography = pilot.profile.biography;
   const refresh = pilot.profile.refresh;
@@ -127,6 +131,9 @@ function BiographyCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const status = biographyStatus?.status ?? "READY";
+  const generating = status === "GENERATING";
+  const preparing = status === "MISSING" && !biography.display;
 
   function startEditing() {
     setDraft(biography.display ?? "");
@@ -158,10 +165,33 @@ function BiographyCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Biografia</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>Biografia</CardTitle>
+          {generating && (
+            <span
+              role="status"
+              className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground"
+            >
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Atualizando biografia…
+            </span>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {editing ? (
+        {preparing && !editing ? (
+          <div
+            role="status"
+            aria-label="Preparando biografia"
+            aria-busy="true"
+            className="space-y-2"
+          >
+            <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-full animate-pulse rounded bg-muted" />
+            <div className="h-3 w-3/5 animate-pulse rounded bg-muted" />
+            <p className="pt-1 text-xs text-muted-foreground">Preparando biografia…</p>
+          </div>
+        ) : editing ? (
           <div className="space-y-2">
             <Label htmlFor="pilot-biography">Biografia do Universe</Label>
             <Textarea
@@ -259,9 +289,11 @@ function BiographyCard({
 function OverviewPanel({
   characterId,
   pilot,
+  biographyStatus,
 }: {
   characterId: string;
   pilot: Extract<PilotKnowledgeView, { available: true }>;
+  biographyStatus?: PilotBiographyStatusView;
 }) {
   const { profile, history } = pilot;
   const milestones = history.events
@@ -321,7 +353,11 @@ function OverviewPanel({
         </CardContent>
       </Card>
 
-      <BiographyCard characterId={characterId} pilot={pilot} />
+      <BiographyCard
+        characterId={characterId}
+        pilot={pilot}
+        {...(biographyStatus ? { biographyStatus } : {})}
+      />
 
       <Card>
         <CardHeader>
@@ -734,6 +770,7 @@ export function PilotKnowledgeSection({
 }) {
   const { data, isLoading, isError, error, refetch } = usePilotKnowledge(characterId);
   const [showRetry, setShowRetry] = useState(false);
+  useBiographyLifecycle(characterId, data?.biographyStatus);
 
   useEffect(() => {
     setShowRetry(false);
@@ -778,7 +815,14 @@ export function PilotKnowledgeSection({
     );
   }
 
-  if (section === "overview") return <OverviewPanel characterId={characterId} pilot={pilot} />;
+  if (section === "overview")
+    return (
+      <OverviewPanel
+        characterId={characterId}
+        pilot={pilot}
+        {...(data?.biographyStatus ? { biographyStatus: data.biographyStatus } : {})}
+      />
+    );
   if (section === "persona") return <PublicPersonaPanel pilot={pilot} />;
   if (section === "history") return <HistoryPanel pilot={pilot} />;
   return <RelationshipsPanel characterId={characterId} pilot={pilot} />;
