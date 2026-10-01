@@ -77,18 +77,26 @@ export async function composeBiographyFromClaims(input: {
     };
   }
 
-  let candidate: string | null = null;
+  let candidate: string | null | undefined = null;
   try {
     candidate = await input.composer({ claimSet: input.claimSet });
   } catch {
-    candidate = null;
+    candidate = undefined;
+  }
+  if (candidate === undefined) {
+    return {
+      ...base,
+      display: deterministic ?? "",
+      mode: "FALLBACK",
+      fallbackReason: "composer-error",
+    };
   }
   if (!candidate) {
     return {
       ...base,
       display: deterministic ?? "",
       mode: "FALLBACK",
-      fallbackReason: "composer-failed",
+      fallbackReason: "composer-parse-failed",
     };
   }
 
