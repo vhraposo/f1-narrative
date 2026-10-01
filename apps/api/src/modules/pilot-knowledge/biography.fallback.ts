@@ -21,19 +21,20 @@ function identityParagraph(
 ): string | null {
   const birthDate = claimByKey(claims, "BIRTH_DATE");
   const birthPlace = claimByKey(claims, "BIRTH_PLACE");
-  const country = claimByKey(claims, "COUNTRY");
+  const nationality = set.claims.find((claim) => claim.key === "NATIONALITY") ?? null;
   const name = set.subjectName;
   const parts: string[] = [];
   if (birthDate && birthPlace) {
     parts.push(
-      sentence(
-        `${name} nasceu em ${birthPlace.display}${country ? `, ${country.display}` : ""}, em ${birthDate.display}`,
-      ),
+      sentence(`${name} nasceu em ${birthPlace.display}, em ${birthDate.display}`),
     );
   } else if (birthDate) {
     parts.push(sentence(`${name} nasceu em ${birthDate.display}`));
   } else if (birthPlace) {
     parts.push(sentence(`${name} nasceu em ${birthPlace.display}`));
+  }
+  if (nationality) {
+    parts.push(sentence(`Tem nacionalidade ${nationality.display}`));
   }
   const originClaims = claims.filter(
     (claim) => claim.category === "ORIGIN" || claim.key === "RAISED_IN",
@@ -44,9 +45,14 @@ function identityParagraph(
   const identityExtra = claims.filter(
     (claim) =>
       claim.category === "IDENTITY" &&
-      !["BIRTH_DATE", "BIRTH_PLACE", "COUNTRY", "FULL_NAME", "NATIONALITY", "PUBLIC_NAME"].includes(
-        claim.key,
-      ),
+      ![
+        "BIRTH_DATE",
+        "BIRTH_PLACE",
+        "COUNTRY",
+        "FULL_NAME",
+        "NATIONALITY",
+        "PUBLIC_NAME",
+      ].includes(claim.key),
   );
   if (identityExtra.length > 0) {
     parts.push(sentence(joinDisplays(identityExtra)));
@@ -88,7 +94,13 @@ export function renderRichDeterministicBiography(set: ApprovedClaimSet): string 
           parts.push(sentence(`Na Fórmula 1, ${joinDisplays(entryClaims)}`));
         }
         if (teamClaims.length > 0) {
-          parts.push(sentence(`Sua trajetória por equipes passa por ${joinDisplays(teamClaims)}`));
+          parts.push(
+            sentence(
+              `Sua trajetória por equipes: ${teamClaims
+                .map((claim) => claim.display.replace(/[.;]+$/u, ""))
+                .join("; ")}`,
+            ),
+          );
         }
         if (parts.length > 0) paragraphs.push(parts.join(" "));
         break;

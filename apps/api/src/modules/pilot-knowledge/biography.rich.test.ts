@@ -160,6 +160,67 @@ describe("rich biography — Norris (evidence curada real)", () => {
   });
 });
 
+describe("rich biography — Verstappen (evidence curada real)", () => {
+  const set = buildSet("Max Emilian Verstappen");
+
+  it("8) cobre família, kart 2013, base, Toro Rosso/Red Bull, títulos, interesses e projetos", () => {
+    const coverage = evaluateBiographyCoverage(set);
+    expect(coverage.rich).toBe(true);
+    expect(coverage.relevantCount).toBeGreaterThanOrEqual(9);
+    const categories = new Set(set.claims.map((claim) => claim.category));
+    for (const expected of [
+      "ORIGIN",
+      "KARTING",
+      "JUNIOR_CAREER",
+      "F1_ENTRY",
+      "TEAM_HISTORY",
+      "F1_ACHIEVEMENTS",
+      "PUBLIC_PERSONALITY",
+      "INTERESTS",
+      "PROJECTS",
+      "CURRENT_CONTEXT",
+    ]) {
+      expect(categories.has(expected as never)).toBe(true);
+    }
+
+    const text = renderRichDeterministicBiography(set)!;
+    const paragraphs = paragraphsOf(text);
+    expect(paragraphs.length).toBeGreaterThanOrEqual(5);
+    expect(paragraphs.length).toBeLessThanOrEqual(8);
+    expect(text).toContain("Hasselt");
+    expect(text).toContain("Jos Verstappen");
+    expect(text).toContain("Sophie Kumpen");
+    expect(text.toLowerCase()).toContain("kart");
+    expect(text).toContain("2013");
+    expect(text).toContain("Fórmula 3 Europeia");
+    expect(text).toContain("Toro Rosso");
+    expect(text).toContain("Red Bull Racing");
+    expect(text).toContain("2016");
+    expect(text).toContain("2021");
+    expect(text).toContain("2024");
+    expect(text).toContain("2025");
+    expect(text).toContain("sim racing");
+    expect(text).toContain("Nürburgring");
+    expect(text).toContain("Max vs 100");
+    expect(text).not.toContain("Ferrari");
+    expect(text).not.toContain("talentoexceptional");
+    expect(text).not.toMatch(/https?:\/\//i);
+  });
+
+  it("9) LLM indisponível mantém fallback rico (não volta ao texto estatístico)", async () => {
+    const result = await composeBiographyFromClaims({
+      claimSet: set,
+      facts: factsFor("Max Emilian Verstappen"),
+    });
+    expect(result.mode).toBe("RICH_DETERMINISTIC");
+    expect(result.fallbackReason).toBe("rich-deterministic");
+    const paragraphs = paragraphsOf(result.display);
+    expect(paragraphs.length).toBeGreaterThanOrEqual(5);
+    expect(result.display.toLowerCase()).toContain("kart");
+    expect(result.display).not.toContain("Tem registros na Fórmula 1 desde");
+  });
+});
+
 describe("sparse biography — sem evidence rica", () => {
   it("6) piloto só com identidade/F1 continua compacto e não força riqueza", async () => {
     const set = buildApprovedBiographyClaims({

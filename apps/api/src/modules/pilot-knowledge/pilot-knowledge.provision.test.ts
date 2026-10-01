@@ -369,8 +369,76 @@ describe("pilot knowledge provisioning", () => {
     expect(display).toContain("Toro Rosso");
     expect(display).toContain("Monza");
     expect(display).toContain("futebol");
-    expect(profile.biographyDisplay).not.toContain("Ferrari");
-    expect(profile.biographyDisplay).not.toContain("talentoexceptional");
+    expect(display).not.toContain("Ferrari");
+    expect(display).not.toContain("talentoexceptional");
+  });
+
+  it("13) Max: regenera bio sparse antiga para rich via evidenceVersion e protege o Universe", async () => {
+    const fixture = await createFixture("max-rich", { withData: true, round: 20 });
+    await prisma.externalDriver.update({
+      where: { id: fixture.driver.id },
+      data: {
+        name: "Max Verstappen",
+        fullName: "Max Verstappen",
+        nationality: "Dutch",
+      },
+    });
+    await ensurePilotKnowledgeProvisioned(fixture.character.id);
+
+    const legacySource = await recordKnowledgeSource({
+      provider: "CURATED",
+      sourceKind: "BIOGRAPHY_PAGE",
+      url: null,
+      title: "Biografia antiga (evidence stale)",
+      license: "UNKNOWN",
+      metadata: {
+        generator: "biography-composer",
+        generatorVersion: "biography-composer.v3",
+        evidenceVersion: "stale-evidence",
+      },
+    });
+    await prisma.externalDriverProfile.update({
+      where: { externalDriverId: fixture.driver.id },
+      data: {
+        biographyDisplay:
+          "Max Verstappen nasceu em Hasselt. Tem registros na Fórmula 1 desde 2015. Passou por Red Bull.",
+        biographySourceId: legacySource.id,
+      },
+    });
+
+    const before = {
+      raceResults: await prisma.raceResult.count(),
+      standings: await prisma.championshipStanding.count(),
+      timeline: await prisma.timelineEvent.count(),
+      snapshots: await prisma.worldSnapshot.count(),
+      entries: await prisma.seasonDriverEntry.count(),
+    };
+
+    const result = await ensurePilotKnowledgeProvisioned(fixture.character.id);
+    expect(result.outcome).toBe("ALREADY_PROVISIONED");
+    expect(result.biography?.mode).toBe("RICH_DETERMINISTIC");
+
+    const profile = await prisma.externalDriverProfile.findUniqueOrThrow({
+      where: { externalDriverId: fixture.driver.id },
+    });
+    const display = profile.biographyDisplay ?? "";
+    const paragraphs = display
+      .split(/\n{2,}/)
+      .map((paragraph) => paragraph.trim())
+      .filter((paragraph) => paragraph.length > 0);
+    expect(paragraphs.length).toBeGreaterThanOrEqual(5);
+    expect(display).toContain("Jos Verstappen");
+    expect(display).toContain("Sophie Kumpen");
+    expect(display.toLowerCase()).toContain("kart");
+    expect(display).toContain("Toro Rosso");
+    expect(display).toContain("2021");
+    expect(display).not.toContain("Passou por Red Bull.");
+
+    expect(await prisma.raceResult.count()).toBe(before.raceResults);
+    expect(await prisma.championshipStanding.count()).toBe(before.standings);
+    expect(await prisma.timelineEvent.count()).toBe(before.timeline);
+    expect(await prisma.worldSnapshot.count()).toBe(before.snapshots);
+    expect(await prisma.seasonDriverEntry.count()).toBe(before.entries);
   });
 
   it("8) composer LLM gera biografia aprovada com provenance e não é re-gerado na reabertura", async () => {
