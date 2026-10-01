@@ -447,7 +447,7 @@ describe("pilot knowledge routes", () => {
     expect(response.statusCode).toBe(404);
   });
 
-  it("9) GET provisiona conhecimento do espelho de forma lazy e retorna sync", async () => {
+  it("9) GET é leitura pura; geração é endpoint dedicado com single-flight", async () => {
     const owner = await createUser("owner-9");
     const { character } = await createPilotFixture(owner, "own9");
 
@@ -459,31 +459,101 @@ describe("pilot knowledge routes", () => {
     });
     expect(response.statusCode).toBe(200);
     const body = response.json() as {
-      pilot: {
-        available: boolean;
-        profile: { identity: { publicName: string } };
-      };
-      sync: { providersConfigured: boolean; provisioned: boolean; lastStatus: string | null };
+      pilot: { available: boolean };
+      biographyStatus: { status: string };
+      sync: { providersConfigured: boolean; provisioned: boolean };
     };
-    expect(body.pilot.available).toBe(true);
-    expect(body.pilot.profile.identity.publicName).toBe("PK own9");
-    expect(body.sync.provisioned).toBe(true);
+    expect(body.biographyStatus.status).toBe("MISSING");
+    expect(body.sync.provisioned).toBe(false);
     expect(body.sync.providersConfigured).toBe(false);
-    expect(body.sync.lastStatus).toBeNull();
+
+    const profileRows = await prisma.externalDriverProfile.count({
+      where: { externalDriver: { bindings: { some: { characterId: character.id } } } },
+    });
+    expect(profileRows).toBe(0);
+
+    const first = await app.inject({
+      method: "POST",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography/generation`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect(first.statusCode).toBe(202);
+    const firstRun = (first.json() as { generation: { runId: string; reused: boolean } }).generation;
+    expect(firstRun.reused).toBe(false);
 
     const second = await app.inject({
+      method: "POST",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography/generation`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    const secondRun = (second.json() as { generation: { runId: string; reused: boolean } }).generation;
+    expect(secondRun.reused).toBe(true);
+    expect(secondRun.runId).toBe(firstRun.runId);
+
+    let terminal = "PENDING";
+    for (let attempt = 0; attempt < 40 && !["SUCCEEDED", "SUCCEEDED_FALLBACK", "FAILED"].includes(terminal); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const run = await prisma.biographyGenerationRun.findUniqueOrThrow({
+        where: { id: firstRun.runId },
+        select: { status: true },
+      });
+      terminal = run.status;
+    }
+    expect(terminal).toBe("SUCCEEDED_FALLBACK");
+
+    const after = await app.inject({
       method: "GET",
       url: `/api/pilot-knowledge/drivers/${character.id}`,
       headers: { cookie: owner.cookie },
       remoteAddress: remoteAddress(),
     });
-    expect((second.json() as { sync: { provisioned: boolean } }).sync.provisioned).toBe(false);
+    const afterBody = after.json() as {
+      pilot: { available: boolean };
+      biographyStatus: { status: string; display: string | null; runId: string | null };
+    };
+    expect(afterBody.pilot.available).toBe(true);
+    expect(afterBody.biographyStatus.display).toContain("PK own9");
+    expect(afterBody.biographyStatus.runId).toBeNull();
+
+    const runCount = await prisma.biographyGenerationRun.count({
+      where: { characterId: character.id },
+    });
+    await app.inject({
+      method: "GET",
+      url: `/api/pilot-knowledge/drivers/${character.id}`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    expect(
+      await prisma.biographyGenerationRun.count({ where: { characterId: character.id } }),
+    ).toBe(runCount);
   });
 
   it("10) edita e restaura biografia do Universe com ownership", async () => {
     const owner = await createUser("owner-10");
     const intruder = await createUser("intruder-10");
     const { character } = await createPilotFixture(owner, "own10");
+
+    const generation = await app.inject({
+      method: "POST",
+      url: `/api/pilot-knowledge/drivers/${character.id}/biography/generation`,
+      headers: { cookie: owner.cookie },
+      remoteAddress: remoteAddress(),
+    });
+    const runId = (generation.json() as { generation: { runId: string } }).generation.runId;
+    let terminal = "PENDING";
+    for (let attempt = 0; attempt < 40 && !["SUCCEEDED", "SUCCEEDED_FALLBACK", "FAILED"].includes(terminal); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      terminal = (
+        await prisma.biographyGenerationRun.findUniqueOrThrow({
+          where: { id: runId },
+          select: { status: true },
+        })
+      ).status;
+    }
+    expect(terminal).toBe("SUCCEEDED_FALLBACK");
 
     const anonymous = await app.inject({
       method: "PATCH",

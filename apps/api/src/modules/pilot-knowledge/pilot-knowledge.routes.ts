@@ -16,9 +16,12 @@ import {
 } from "./pilot-knowledge.refresh.js";
 import { PROFILE_BIOGRAPHY_DISPLAY_CAP } from "./pilot-knowledge.policy.js";
 import { getPilotKnowledgeView } from "./pilot-knowledge.read.js";
-import { createLlmBiographyComposer } from "./biography.composer.js";
-import { createLlmBiographyVerifier } from "./biography.verifier.js";
-import { ensurePilotKnowledgeProvisioned } from "./pilot-knowledge.provision.js";
+import {
+  backfillCurrentGridBiographies,
+  getLatestGenerationRun,
+  readBiographyState,
+  requestBiographyGeneration,
+} from "./biography.generation.js";
 import {
   createUniverseDriverRelationship,
   deleteUniverseDriverRelationship,
@@ -129,16 +132,8 @@ export const pilotKnowledgeRoutes: FastifyPluginAsync<PilotKnowledgeRoutesOption
       try {
         const access = await resolvePilotKnowledgeAccess(request.user!.id, params.data.characterId);
         const character = requireOwnedAccess(access);
-        const provision = await withPilotKnowledgeAvailability(() =>
-          ensurePilotKnowledgeProvisioned(character.id, new Date(), {
-            ...(options.biographyProvider
-              ? {
-                  biographyComposer: createLlmBiographyComposer(options.biographyProvider),
-                  biographyVerifier: createLlmBiographyVerifier(options.biographyProvider),
-                  biographyModel: options.biographyProvider.name,
-                }
-              : {}),
-          }),
+        const biographyState = await withPilotKnowledgeAvailability(() =>
+          readBiographyState(character.id),
         );
         const pilot = await withPilotKnowledgeAvailability(() =>
           getPilotKnowledgeView(params.data.characterId, { topic: query.data.topic ?? null }),
@@ -153,13 +148,72 @@ export const pilotKnowledgeRoutes: FastifyPluginAsync<PilotKnowledgeRoutesOption
         });
         return reply.send({
           pilot,
+          biographyStatus: biographyState,
           sync: {
             providersConfigured: providers.length > 0,
-            provisioned: provision.outcome === "PROVISIONED",
+            provisioned: false,
             lastStatus: lastRun?.status ?? null,
             lastAt: lastRun?.startedAt ?? null,
           },
         });
+      } catch (error) {
+        if (sendPilotError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/pilot-knowledge/drivers/:characterId/biography/generation",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = characterParamsSchema.safeParse(request.params);
+      if (!params.success) return sendInvalid(reply, "Identificador inválido");
+      try {
+        const access = await resolvePilotKnowledgeAccess(request.user!.id, params.data.characterId);
+        const character = requireOwnedAccess(access);
+        const generation = await requestBiographyGeneration(character.id, {
+          ...(options.biographyProvider ? { provider: options.biographyProvider } : {}),
+          ...(options.biographyProvider ? { model: options.biographyProvider.name } : {}),
+        });
+        return reply.code(202).send({ generation });
+      } catch (error) {
+        if (sendPilotError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.get(
+    "/api/pilot-knowledge/drivers/:characterId/biography/generation",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = characterParamsSchema.safeParse(request.params);
+      if (!params.success) return sendInvalid(reply, "Identificador inválido");
+      try {
+        const access = await resolvePilotKnowledgeAccess(request.user!.id, params.data.characterId);
+        const character = requireOwnedAccess(access);
+        const run = await getLatestGenerationRun(character.id);
+        return reply.send({ generation: run });
+      } catch (error) {
+        if (sendPilotError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/pilot-knowledge/biography/backfill",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const adminId = await requireAdmin(request, reply);
+      if (!adminId) return;
+      try {
+        const summary = await backfillCurrentGridBiographies({
+          ...(options.biographyProvider ? { provider: options.biographyProvider } : {}),
+          ...(options.biographyProvider ? { model: options.biographyProvider.name } : {}),
+        });
+        return reply.send({ backfill: summary });
       } catch (error) {
         if (sendPilotError(reply, error)) return;
         throw error;

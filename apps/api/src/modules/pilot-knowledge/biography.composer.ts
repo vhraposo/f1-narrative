@@ -122,12 +122,23 @@ export type BiographyComposer = (input: {
   readonly claimSet: ApprovedClaimSet;
 }) => Promise<string | null>;
 
-export function createLlmBiographyComposer(provider: GenerationProvider): BiographyComposer {
+export type BiographyPromptAudit = {
+  readonly systemPrompt: string;
+  readonly userPrompt: string;
+};
+
+export function createLlmBiographyComposer(
+  provider: GenerationProvider,
+  onPrompt?: (prompt: BiographyPromptAudit) => void,
+): BiographyComposer {
   return async ({ claimSet }) => {
+    const systemPrompt = BIOGRAPHY_COMPOSER_SYSTEM_PROMPT;
+    const userPrompt = buildBiographyComposerUserPrompt(claimSet);
+    onPrompt?.({ systemPrompt, userPrompt });
     const output = await provider.run({
       context: {} as never,
-      systemPrompt: BIOGRAPHY_COMPOSER_SYSTEM_PROMPT,
-      userPrompt: buildBiographyComposerUserPrompt(claimSet),
+      systemPrompt,
+      userPrompt,
     });
     if (output.mode !== "generated" || typeof output.text !== "string") return null;
     const parsed = parseComposerOutput(

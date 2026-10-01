@@ -331,6 +331,7 @@ model Character {
   driverRelationships       UniverseDriverRelationship[] @relation("UniverseRelationshipSubject")
   driverRelationshipsTarget UniverseDriverRelationship[] @relation("UniverseRelationshipTarget")
   pilotExperiences          PilotExperience[]
+  biographyGenerationRuns   BiographyGenerationRun[]
   availability             CharacterAvailability?
   schedules                CharacterSchedule[]
   conversationParticipants ConversationParticipant[]
@@ -1714,6 +1715,54 @@ model CharacterPersona {
   updatedAt DateTime @updatedAt
 }
 
+enum BiographyGenerationStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  SUCCEEDED_FALLBACK
+  FAILED
+  CANCELLED
+}
+
+enum BiographyGenerationMode {
+  LLM
+  RICH_DETERMINISTIC
+  COMPACT_FALLBACK
+}
+
+/// Auditoria de geração de biografia: prompt final, versões, tempos e status.
+/// A biografia legível continua sendo BIOGRAPHY_PAGE (ExternalKnowledgeSource).
+model BiographyGenerationRun {
+  id               String    @id @default(uuid()) @db.Uuid
+  characterId      String    @db.Uuid
+  character        Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  externalDriverId String?   @db.Uuid
+
+  status           BiographyGenerationStatus @default(PENDING)
+  mode             BiographyGenerationMode?
+  provider         String?
+  model            String?
+  prompt           Json?
+  promptVersion    String
+  promptHash       String
+  evidenceVersion  String?
+  generatorVersion String
+  fingerprint      String?
+  fallbackReason   String?
+  failureReason    String?
+  outputSourceId   String?                   @db.Uuid
+  timings          Json?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([characterId, status])
+  @@index([status, startedAt])
+}
+
 model PersonaTrait {
   id        String           @id @default(uuid()) @db.Uuid
   personaId String           @db.Uuid
@@ -1723,6 +1772,7 @@ model PersonaTrait {
   value      String
   confidence Float
   sourceKind PersonaTraitSource
+  context    PersonaTraitContext @default(ON_TRACK)
 
   evidenceId String?          @db.Uuid
   evidence   PersonaEvidence? @relation("TraitAuthoritativeEvidence", fields: [evidenceId], references: [id], onDelete: SetNull)
@@ -1730,9 +1780,14 @@ model PersonaTrait {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([personaId, key])
+  @@unique([personaId, key, context])
   @@index([personaId])
   @@index([evidenceId])
+}
+
+enum PersonaTraitContext {
+  ON_TRACK
+  OFF_TRACK
 }
 
 model PersonaEvidence {

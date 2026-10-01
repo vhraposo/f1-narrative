@@ -1049,7 +1049,7 @@ describe("persona.evidence — reconcile", () => {
       where: { characterId: reconcileChar.id },
     });
     const traitBefore = await prisma.personaTrait.findUniqueOrThrow({
-      where: { personaId_key: { personaId: persona.id, key: "humor" } },
+      where: { personaId_key_context: { personaId: persona.id, key: "humor", context: "ON_TRACK" } },
     });
 
     const weakId = await seedProposedEvidence(persona.id, {
@@ -1060,7 +1060,7 @@ describe("persona.evidence — reconcile", () => {
     await reviewPersonaEvidence(admin.id, weakId, { status: "APPROVED" });
 
     const traitAfter = await prisma.personaTrait.findUniqueOrThrow({
-      where: { personaId_key: { personaId: persona.id, key: "humor" } },
+      where: { personaId_key_context: { personaId: persona.id, key: "humor", context: "ON_TRACK" } },
     });
     expect(traitAfter).toEqual(traitBefore);
     expect(

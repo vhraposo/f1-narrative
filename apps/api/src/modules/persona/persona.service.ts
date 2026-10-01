@@ -494,7 +494,7 @@ export async function updatePersonaManually(
 
       for (const trait of traits) {
         await tx.personaTrait.upsert({
-          where: { personaId_key: { personaId: persona.id, key: trait.key } },
+          where: { personaId_key_context: { personaId: persona.id, key: trait.key, context: "ON_TRACK" } },
           update: { value: trait.value, ...manual },
           create: {
             personaId: persona.id,
@@ -537,7 +537,7 @@ export async function deletePersonaTrait(
   if (!persona) throw notFoundError();
 
   const trait = await prisma.personaTrait.findUnique({
-    where: { personaId_key: { personaId: persona.id, key: traitKey } },
+      where: { personaId_key_context: { personaId: persona.id, key: traitKey, context: "ON_TRACK" } },
     select: { id: true },
   });
   if (!trait) throw traitNotFoundError();
@@ -612,7 +612,7 @@ async function reconcileTraitWithinTransaction(
     where: { personaId, traitKey },
   });
   const trait = await tx.personaTrait.findUnique({
-    where: { personaId_key: { personaId, key: traitKey } },
+      where: { personaId_key_context: { personaId, key: traitKey, context: "ON_TRACK" } },
   });
 
   const plan = planPersonaTraitReconcile({
