@@ -389,14 +389,27 @@ export function buildApprovedBiographyClaims(input: {
 
   const career = input.facts.career;
   if (career && career.starts > 0) {
+    const parts: string[] = [];
+    if (career.wins > 0) parts.push(`${career.wins} ${career.wins === 1 ? "vitória" : "vitórias"}`);
+    if (career.podiums > 0) parts.push(`${career.podiums} ${career.podiums === 1 ? "pódio" : "pódios"}`);
+    if (career.poles > 0) parts.push(`${career.poles} ${career.poles === 1 ? "pole" : "poles"}`);
+    if (career.fastestLaps > 0) {
+      parts.push(
+        career.fastestLaps === 1
+          ? "1 volta mais rápida"
+          : `${career.fastestLaps} voltas mais rápidas`,
+      );
+    }
     const titlesLabel =
-      career.titles === 1
-        ? "1 título mundial"
-        : `${career.titles} títulos mundiais`;
+      career.titles === 1 ? "1 título mundial" : `${career.titles} títulos mundiais`;
+    const statsText =
+      career.titles > 0
+        ? `${career.starts} largadas, ${parts.join(", ")} e ${titlesLabel}`
+        : `${career.starts} largadas, ${parts.join(", ")}`;
     pushClaim(drafts, {
       key: "CAREER_STATS",
       value: `${career.starts}:${career.wins}:${career.podiums}:${career.poles}:${career.fastestLaps}:${career.titles}`,
-      display: `${career.starts} largadas, ${career.wins} vitórias, ${career.podiums} pódios, ${career.poles} poles, ${career.fastestLaps} voltas mais rápidas e ${titlesLabel}`,
+      display: statsText,
       year: null,
       endYear: null,
       authority: "STRUCTURED_CANONICAL",
@@ -418,17 +431,24 @@ export function buildApprovedBiographyClaims(input: {
     });
   }
 
-  const curatedKeys = new Set((input.curated?.claims ?? []).map((claim) => claim.key));
-  if (curatedKeys.size > 0) {
+  const curatedClaims = input.curated?.claims ?? [];
+  const curatedKeys = new Set(curatedClaims.map((claim) => claim.key));
+  const curatedHasTeamHistory = curatedClaims.some(
+    (claim) => claim.category === "TEAM_HISTORY",
+  );
+  if (curatedKeys.size > 0 || curatedHasTeamHistory) {
     for (let index = drafts.length - 1; index >= 0; index -= 1) {
       const draft = drafts[index];
-      if (draft && curatedKeys.has(draft.key) && !draft.sourceRef) {
+      if (!draft || draft.sourceRef) continue;
+      const replacedByKey = curatedKeys.has(draft.key);
+      const replacedTeam = curatedHasTeamHistory && draft.key === "TEAM_SEASON";
+      if (replacedByKey || replacedTeam) {
         drafts.splice(index, 1);
       }
     }
   }
 
-  for (const claim of input.curated?.claims ?? []) {
+  for (const claim of curatedClaims) {
     if (!isBiographyEvidenceCategory(claim.category)) continue;
     const source = input.curated?.sources.get(claim.sourceRef);
     if (!source) continue;

@@ -3,7 +3,8 @@ import { claimsByIds, planBiographyParagraphs } from "./biography.planner.js";
 
 function sentence(text: string): string {
   const trimmed = text.trim().replace(/[.;]+$/u, "");
-  return `${trimmed}.`;
+  const capitalized = trimmed.length > 0 ? trimmed.charAt(0).toUpperCase() + trimmed.slice(1) : trimmed;
+  return `${capitalized}.`;
 }
 
 function joinDisplays(claims: readonly BiographyClaim[]): string {
