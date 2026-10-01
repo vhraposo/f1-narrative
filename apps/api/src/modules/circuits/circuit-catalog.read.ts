@@ -8,6 +8,7 @@ import {
 } from "../f1db/f1db.circuits.js";
 import { getF1dbDataset } from "../f1db/f1db.dataset.js";
 import { resolveCircuitSvg } from "../f1db/f1db.svg.js";
+import type { CircuitPhotoProvider } from "./circuit-photo.provider.js";
 
 export type CircuitLayoutView = {
   readonly key: string | null;
@@ -407,6 +408,7 @@ async function fastestRaceLapForCircuit(
 
 export async function getExternalCircuitDetail(
   circuitId: string,
+  options: { readonly photoProvider?: CircuitPhotoProvider } = {},
 ): Promise<CircuitDetail | null> {
   const circuit = await prisma.externalCircuit.findUnique({
     where: { id: circuitId },
@@ -437,7 +439,7 @@ export async function getExternalCircuitDetail(
   ]);
 
   const f1db = f1dbInfoFor({ externalId: circuit.externalId, name: circuit.name });
-  return {
+  const detail: CircuitDetail = {
     ...toListItem(
       circuit,
       stats.get(circuit.id) ?? {
@@ -463,4 +465,32 @@ export async function getExternalCircuitDetail(
       reason: "LAP_RECORD_SOURCE_UNAVAILABLE",
     },
   };
+
+  if (detail.media.photo === null && options.photoProvider) {
+    const photo = await options.photoProvider({
+      circuitId: circuit.id,
+      name: circuit.name,
+      locality: detail.locality,
+    });
+    if (photo) {
+      return {
+        ...detail,
+        media: {
+          ...detail.media,
+          photo: {
+            url: photo.url,
+            source: photo.source,
+            sourceUrl: photo.sourceUrl,
+            author: photo.author,
+            license: photo.license,
+            licenseUrl: photo.licenseUrl,
+            attribution: photo.attribution,
+          },
+          attributionRequired: true,
+        },
+      };
+    }
+  }
+
+  return detail;
 }

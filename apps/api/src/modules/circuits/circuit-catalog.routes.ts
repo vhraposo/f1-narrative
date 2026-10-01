@@ -1,12 +1,19 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
+import { env } from "../../config/env.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { resolveCircuitSvg } from "../f1db/f1db.svg.js";
+import { createCommonsCircuitPhotoProvider } from "./circuit-photo.provider.js";
 import {
   getExternalCircuitDetail,
   listExternalCircuits,
 } from "./circuit-catalog.read.js";
+
+export const circuitPhotoProvider = createCommonsCircuitPhotoProvider({
+  enabled: env.WIKIMEDIA_COMMONS_ENABLED,
+  timeoutMs: env.WIKIMEDIA_COMMONS_TIMEOUT_MS,
+});
 
 const listQuerySchema = z
   .object({
@@ -56,7 +63,9 @@ export const circuitCatalogRoutes: FastifyPluginAsync = async (fastify) => {
           .code(404)
           .send({ error: "Circuito não encontrado", code: "CIRCUIT_NOT_FOUND" });
       }
-      const circuit = await getExternalCircuitDetail(parsed.data.id);
+      const circuit = await getExternalCircuitDetail(parsed.data.id, {
+        photoProvider: circuitPhotoProvider,
+      });
       if (!circuit) {
         return reply
           .code(404)
