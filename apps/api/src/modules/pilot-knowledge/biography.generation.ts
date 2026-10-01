@@ -126,9 +126,7 @@ export async function readBiographyState(characterId: string): Promise<Biography
   const staleByVersion =
     generated && generatorVersion !== null && generatorVersion !== BIOGRAPHY_COMPOSER_VERSION;
   const staleByEvidence =
-    generated &&
-    expectedEvidenceVersion !== null &&
-    evidenceVersion !== expectedEvidenceVersion;
+    expectedEvidenceVersion !== null && evidenceVersion !== expectedEvidenceVersion;
 
   return {
     status: staleByVersion || staleByEvidence ? "STALE" : fallbackReason ? "READY_FALLBACK" : "READY",
@@ -212,7 +210,13 @@ async function executeGenerationRun(runId: string, options: GenerationOptions): 
       select: { biographySourceId: true, biographySource: { select: { metadata: true } } },
     });
     const metadata = (profile?.biographySource?.metadata ?? {}) as Record<string, unknown>;
-    const mode = modeFromProvision(result.biography?.mode);
+    const storedMode =
+      metadata.mode === "RICH_DETERMINISTIC"
+        ? "RICH_DETERMINISTIC"
+        : metadata.mode === "FALLBACK"
+          ? "COMPACT_FALLBACK"
+          : null;
+    const mode = result.biography ? modeFromProvision(result.biography.mode) : (storedMode ?? "COMPACT_FALLBACK");
     const success = mode === "LLM" ? "SUCCEEDED" : "SUCCEEDED_FALLBACK";
 
     await prisma.biographyGenerationRun.update({
@@ -275,6 +279,9 @@ async function requestBiographyGenerationInternal(
 ): Promise<GenerationRequestResult> {
   const state = await readBiographyState(characterId);
   if (state.status === "READY" || state.status === "READY_FALLBACK") {
+    const expectedEvidenceVersion = curatedEvidenceVersion();
+    const evidenceCurrent =
+      expectedEvidenceVersion !== null && state.evidenceVersion === expectedEvidenceVersion;
     const lastRun = await prisma.biographyGenerationRun.findFirst({
       where: {
         characterId,
@@ -283,7 +290,7 @@ async function requestBiographyGenerationInternal(
       orderBy: { startedAt: "desc" },
       select: { id: true, status: true, evidenceVersion: true },
     });
-    if (lastRun && lastRun.evidenceVersion === state.evidenceVersion) {
+    if (lastRun && evidenceCurrent && lastRun.evidenceVersion === state.evidenceVersion) {
       return {
         runId: lastRun.id,
         status: lastRun.status === "SUCCEEDED" ? "SUCCEEDED" : "SUCCEEDED_FALLBACK",

@@ -27,8 +27,10 @@ import {
   PILOT_CLASSIFICATION_LABELS,
   PILOT_ORIGIN_LABELS,
   PILOT_RELATIONSHIP_STATE_LABELS,
+  publicProfileProviderLabel,
   type PilotBiographyStatusView,
   type PilotKnowledgeView,
+  type PilotPublicProfileView,
   type PilotRelationshipEntryView,
 } from "@/lib/pilot-knowledge";
 
@@ -426,18 +428,116 @@ function SourcesPanel({ pilot }: { pilot: Extract<PilotKnowledgeView, { availabl
   );
 }
 
-function PublicPersonaPanel({ pilot }: { pilot: Extract<PilotKnowledgeView, { available: true }> }) {
-  const persona = pilot.persona;
-  return (
-    <div className="space-y-4">
+function PublicProfileCard({ profile }: { profile: PilotPublicProfileView }) {
+  if (profile.status === "EMPTY") {
+    return (
       <Card>
         <CardHeader>
           <CardTitle>Perfil público</CardTitle>
         </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Nenhuma informação pública confiável encontrada.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>Perfil público</CardTitle>
+          <Badge tone={profile.status === "AVAILABLE" ? "success" : "warning"}>
+            {profile.status === "AVAILABLE" ? "Cobertura completa" : "Cobertura parcial"}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {profile.summary && (
+          <p className="text-sm leading-relaxed text-foreground">{profile.summary}</p>
+        )}
+        {profile.status === "PARTIAL" && (
+          <p className="text-xs text-muted-foreground">
+            Algumas informações ainda não possuem cobertura completa.
+          </p>
+        )}
+
+        {profile.facts.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Informações públicas verificadas
+            </p>
+            <ul className="mt-2 divide-y divide-border text-sm">
+              {profile.facts.map((fact, index) => (
+                <li key={`${fact.category}-${fact.label}-${index}`} className="space-y-1 py-2 first:pt-0">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {fact.label}
+                    </span>
+                    <span className="text-foreground">{fact.display}</span>
+                  </div>
+                  {fact.sourceUrl && (
+                    <a
+                      className="inline-block text-xs font-semibold text-brand underline-offset-4 hover:underline"
+                      href={fact.sourceUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {fact.sourceTitle ?? "Abrir fonte"}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {profile.sources.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Fontes públicas
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {profile.sources.map((source) => (
+                <li key={source.url}>
+                  <a
+                    className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground underline-offset-4 hover:underline"
+                    href={source.url}
+                    rel="noreferrer"
+                    target="_blank"
+                    title={source.title}
+                  >
+                    {publicProfileProviderLabel(source.provider)} · {source.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PublicPersonaPanel({ pilot }: { pilot: Extract<PilotKnowledgeView, { available: true }> }) {
+  const persona = pilot.persona;
+  const publicProfile = pilot.publicProfile;
+  return (
+    <div className="space-y-4">
+      {publicProfile && <PublicProfileCard profile={publicProfile} />}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Traços públicos observados</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3">
           {!persona.available ? (
             <p className="text-sm text-muted-foreground">
-              Nenhuma informação pública confiável encontrada.
+              {publicProfile
+                ? "Nenhum traço público observado com evidência até o momento."
+                : "Nenhuma informação pública confiável encontrada."}
             </p>
           ) : (
             <>
@@ -464,7 +564,7 @@ function PublicPersonaPanel({ pilot }: { pilot: Extract<PilotKnowledgeView, { av
               )}
               <p className="text-xs text-muted-foreground">
                 Perfil observável publicamente. Verificado em {formatDate(persona.refresh.lastVerifiedAt)}.
-                Personalizações do Universe têm precedência e aparecem na Persona acima.
+                Personalizações do Universe têm precedência e aparecem na aba Personalidade.
               </p>
             </>
           )}

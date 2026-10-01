@@ -231,6 +231,47 @@ async function recordGeneratedBiographySource(
   );
 }
 
+async function recordDeterministicBiographySource(
+  claims: ApprovedClaimSet,
+  mode: "RICH_DETERMINISTIC" | "FALLBACK",
+  evidenceSources: ReadonlyArray<{ url: string; sourceId: string }>,
+  now: Date,
+) {
+  const title = `Biografia determinística (${BIOGRAPHY_COMPOSER_VERSION})`;
+  const existing = await prisma.externalKnowledgeSource.findFirst({
+    where: {
+      provider: "CURATED",
+      sourceKind: "BIOGRAPHY_PAGE",
+      title,
+      metadata: { path: ["fingerprint"], equals: claims.fingerprint },
+    },
+  });
+  if (existing) return existing;
+
+  return recordKnowledgeSource(
+    {
+      provider: "CURATED",
+      sourceKind: "BIOGRAPHY_PAGE",
+      url: null,
+      title,
+      license: "UNKNOWN",
+      attributionRequirement: null,
+      attributionText:
+        "Síntese determinística a partir de claims aprovados do espelho/F1DB e evidence curada; nenhum texto de fonte foi copiado.",
+      metadata: {
+        generator: "biography-deterministic",
+        generatorVersion: BIOGRAPHY_COMPOSER_VERSION,
+        fingerprint: claims.fingerprint,
+        claimsCount: claims.claims.length,
+        evidenceVersion: claims.evidenceVersion,
+        evidenceSources,
+        mode,
+      },
+    },
+    now,
+  );
+}
+
 async function buildMirrorProfileInput(
   externalDriverId: string,
   driver: MirrorDriver,
@@ -315,18 +356,26 @@ async function buildMirrorProfileInput(
     };
   }
 
-  if (pipeline.display.trim().length > 0 && typeof baseInput.sourceId === "string") {
+  if (pipeline.display.trim().length > 0) {
+    const evidenceSources = await recordCuratedEvidenceSources(claimSet, now);
+    const mode = pipeline.mode === "RICH_DETERMINISTIC" ? "RICH_DETERMINISTIC" : "FALLBACK";
+    const source = await recordDeterministicBiographySource(
+      claimSet,
+      mode,
+      evidenceSources,
+      now,
+    );
     return {
       input: {
         ...baseInput,
         biographyContent: {
           display: pipeline.display,
           context: deterministicBiographyContext(biographyFacts),
-          sourceId: baseInput.sourceId,
+          sourceId: source.id,
         },
       },
       biography: {
-        mode: pipeline.mode === "RICH_DETERMINISTIC" ? "RICH_DETERMINISTIC" : "FALLBACK",
+        mode,
         fallbackReason: pipeline.fallbackReason,
       },
     };
@@ -389,6 +438,68 @@ async function generatedBiographyNeedsRepair(input: {
     evidenceVersion: curatedEvidenceVersion(),
   });
   return !storedBiographyIsValid(claims, display);
+}
+
+export type CharacterBiographyEvidence = {
+  readonly externalDriverId: string;
+  readonly claimSet: ApprovedClaimSet;
+  readonly curated: ReturnType<typeof getCuratedEvidenceForDriver>;
+  readonly f1dbDriver: F1dbDriver | null;
+};
+
+export async function loadBiographyEvidenceForCharacter(
+  characterId: string,
+  now: Date = new Date(),
+): Promise<CharacterBiographyEvidence | null> {
+  const binding = await prisma.externalBindingDriver.findFirst({
+    where: { characterId },
+    orderBy: { createdAt: "asc" },
+    select: { externalDriverId: true },
+  });
+  if (!binding) return null;
+
+  const externalDriverId = binding.externalDriverId;
+  const driver = await prisma.externalDriver.findUnique({
+    where: { id: externalDriverId },
+    select: {
+      id: true,
+      name: true,
+      fullName: true,
+      nationality: true,
+      number: true,
+      sourceRecord: true,
+    },
+  });
+  if (!driver) return null;
+
+  const [career, milestones] = await Promise.all([
+    collectMirrorCareer(externalDriverId),
+    deriveMilestonesFromExternalData(externalDriverId, now),
+  ]);
+  const sourceIdentity = readDriverSourceIdentity(driver.sourceRecord);
+  const dataset = getF1dbDataset();
+  const resolution = dataset
+    ? resolveF1dbDriverStrict({ name: driver.name, driverCode: sourceIdentity.driverCode })
+    : { driver: null, ambiguous: false };
+  const f1dbDriver = resolution.driver;
+  const facts = buildBiographyFacts({
+    driver,
+    career,
+    milestones,
+    f1dbDriver,
+    sourceIdentity,
+  });
+  const curated = getCuratedEvidenceForDriver(f1dbDriver?.id ?? null);
+  const claimSet = buildApprovedBiographyClaims({
+    externalDriverId,
+    facts,
+    f1dbDriver,
+    f1dbAmbiguous: resolution.ambiguous,
+    f1dbSourceVersion: dataset?.sourceVersion ?? null,
+    curated,
+    evidenceVersion: curatedEvidenceVersion(),
+  });
+  return { externalDriverId, claimSet, curated, f1dbDriver };
 }
 
 export async function ensurePilotKnowledgeProvisioned(

@@ -399,3 +399,31 @@ Decisões tomadas durante a implementação autônoma da V3. Cada entrada regist
 
 
 
+
+## D-097 - GET de pilot knowledge e leitura pura; geracao so sob comando
+- **Decisao (V3.24.3):** o GET /api/pilot-knowledge/drivers/:characterId nao provisiona nem gera biografia; retorna iographyStatus e o que esta persistido. Geracao ocorre apenas via POST .../biography/generation (dono) ou POST /api/pilot-knowledge/biography/backfill (ADMIN), disparada pela UI quando o estado e MISSING/STALE.
+- **Consequencia:** leitura barata, deterministica e testavel; abrir um piloto nunca reescreve texto; o front controla quando atualizar.
+
+## D-098 - BiographyGenerationRun com prompt auditavel e single-flight
+- **Decisao (V3.24.3):** toda geracao cria um BiographyGenerationRun com status/mode/provider/model, prompt sanitizado (sanitizePromptPayload), promptHash SHA-256, evidenceVersion, generatorVersion, ingerprint, fallback/failure e timings. Pedidos concorrentes no mesmo personagem sao serializados; estado READY com evidenceVersion identico reutiliza o run terminal sem criar novo.
+- **Consequencia:** auditoria completa do que foi enviado/persistido, backfill idempotente e sem geracao duplicada.
+
+## D-099 - Personalidade por contexto ON_TRACK/OFF_TRACK
+- **Decisao (V3.24.3):** PersonaTrait ganha context (ON_TRACK default, OFF_TRACK), unique (personaId, key, context). Somente ON_TRACK alimenta geracao, contexto de piloto e evolucao; evidencias reconciliam ON_TRACK. UI agrupa em "Em pista" e "Fora das pistas".
+- **Consequencia:** tracos sociais editaveis sem alterar o comportamento do personagem em conversas.
+
+## D-100 - Evidence curada universal para o current grid (sem excecoes por piloto)
+- **Decisao (V3.24.4):** todo piloto do current grid passa a ter claims curados (ORIGIN, KARTING, JUNIOR_CAREER, F1_ENTRY e complementares quando documentados) em curated-evidence.json, pesquisados em fontes primarias (F1, equipe, FIA, piloto) e convertidos em claims com sourceRef/uthority; nenhuma prosa copiada. Diferencas de nome espelho/F1DB sao resolvidas por liases data-driven e pela normalizacao generica de sufixos geracionais.
+- **Consequencia:** a mesma pipeline (coverage -> planner -> composer/fallback -> validator) produz biografia rica para 23/23 pilotos; a riqueza e propriedade do catalogo, nao de pilotos especificos.
+
+## D-101 - Biografia determinística versionada e STALE por evidenceVersion
+- **Decisao (V3.24.4):** bios determinísticas passam a registrar fonte propria (CURATED/BIOGRAPHY_PAGE) com generatorVersion, evidenceVersion, ingerprint e mode, deduplicada por fingerprint. eadBiographyState marca STALE quando evidenceVersion diverge da curadoria atual, inclusive para fallback. Runs de perfis compartilhados classificam o mode pelo metadata persistido.
+- **Consequencia:** abrir piloto nunca regenera; mudanca real de curadoria dispara regeneracao em background; backfill idempotente (46/46 skipped).
+
+## D-102 - Public Profile derivado de claims aprovados
+- **Decisao (V3.24.4):** o Perfil publico e um read model deterministico (getPublicProfileView) sobre o claim set aprovado (espelho + F1DB + curadoria), com status AVAILABLE/PARTIAL/EMPTY, resumo e fontes; ExternalDriverPersona passa a ser complemento (tracos observados), nunca a unica fonte. Sem LLM e sem fetch de rede no GET.
+- **Consequencia:** "Nenhuma informacao publica confiavel encontrada." so aparece em EMPTY real; pilotos com evidence oficial deixam de mostrar vazio.
+
+## D-103 - Personality semeada de evidence curada preservando override manual
+- **Decisao (V3.24.4):** o enrichment cria PersonaEvidence aprovada e PersonaTrait EVIDENCE por contexto (PUBLIC_PERSONALITY -> ON_TRACK; INTERESTS/PROJECTS -> OFF_TRACK) para characters com binding externo; traits MANUAL existentes nunca sao sobrescritos e a execucao e idempotente.
+- **Consequencia:** Personalidade tem conteudo real com provenance em 46 personagens (62 ON_TRACK, 40 OFF_TRACK) sem inventar tracos.

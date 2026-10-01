@@ -38,6 +38,7 @@ export type CuratedEvidenceDataset = {
   readonly version: string;
   readonly generatedAt: string | null;
   readonly drivers: ReadonlyMap<string, CuratedEvidenceBundle>;
+  readonly aliases: ReadonlyMap<string, string>;
 };
 
 function resolveEvidenceDir(): string | null {
@@ -89,6 +90,7 @@ export function getCuratedEvidenceDataset(): CuratedEvidenceDataset | null {
       generatorVersion?: string;
       sources?: Record<string, Record<string, unknown>>;
       drivers?: Record<string, { claims?: unknown }>;
+      aliases?: Record<string, unknown>;
     };
     if (parsed.schemaVersion !== CURATED_EVIDENCE_SCHEMA_VERSION) {
       cached = null;
@@ -133,10 +135,16 @@ export function getCuratedEvidenceDataset(): CuratedEvidenceDataset | null {
       }
       drivers.set(driverKey, { driverKey, claims, sources });
     }
+    const aliases = new Map<string, string>();
+    for (const [alias, target] of Object.entries(parsed.aliases ?? {})) {
+      const resolved = toStringOrNull(target);
+      if (resolved && drivers.has(resolved)) aliases.set(alias, resolved);
+    }
     cached = {
       version,
       generatedAt: toStringOrNull(parsed.generatedAt),
       drivers,
+      aliases,
     };
     return cached;
   } catch {
@@ -154,7 +162,9 @@ export function getCuratedEvidenceForDriver(
 ): CuratedEvidenceBundle | null {
   if (!f1dbDriverId) return null;
   const dataset = getCuratedEvidenceDataset();
-  return dataset?.drivers.get(f1dbDriverId) ?? null;
+  if (!dataset) return null;
+  const key = dataset.aliases.get(f1dbDriverId) ?? f1dbDriverId;
+  return dataset.drivers.get(key) ?? null;
 }
 
 export function curatedEvidenceVersion(): string | null {

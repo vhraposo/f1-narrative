@@ -241,7 +241,7 @@ describe("biography lifecycle e backfill", () => {
     const body = read.json() as {
       biographyStatus: { status: string; display: string | null };
     };
-    expect(["READY", "READY_FALLBACK"]).toContain(body.biographyStatus.status);
+    expect(["READY", "READY_FALLBACK", "STALE"]).toContain(body.biographyStatus.status);
     expect(body.biographyStatus.display).not.toBeNull();
     expect(providerCalls.total).toBe(callsBefore);
     expect(

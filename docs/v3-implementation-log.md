@@ -1085,3 +1085,24 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 
 
 
+
+### V3.24.3 - Biography Lifecycle, Full Grid Backfill & Personalidade
+- **Cache-first:** GET de pilot knowledge virou leitura pura (eadBiographyState + view); provisionamento removido do caminho de leitura (commit  137951).
+- **Generation runs:** BiographyGenerationRun + enums persistindo prompt sanitizado, hash, fingerprint, provider/model, evidenceVersion/generatorVersion, mode/fallback/timings; single-flight por personagem e guarda de frescor (READY com evidenceVersion identico reutiliza sem novo run).
+- **Rotas:** POST/GET .../biography/generation e POST /api/pilot-knowledge/biography/backfill (ADMIN); UI dispara geracao em MISSING/STALE com skeleton, toast persistente e polling curto (348aedf).
+- **Backfill DEV:** 46 alvos (2 universes x 23), 23/23 perfis com bio persistida, 6 rich (Gasly/Norris/Max x2), 0 falhas; reexecucao 46/46 skipped; Max com 8 paragrafos e segunda solicitacao sem novo run; backup 1narrative_dev_pre_v3243.dump.
+- **Personalidade por contexto:** PersonaTrait.context ON_TRACK/OFF_TRACK, unique por contexto; API PATCH/DELETE com contexto; comportamento (geracao, contexto de piloto, evolucao) consome apenas ON_TRACK (commit eaa760); aba Personalidade com grupos Em pista/Fora das pistas, estados vazios e remocao por contexto (0d76ed).
+- **Testes:** lifecycle 6/6, persona context 5/5, web lifecycle 2 novos + persona 2 novos.
+- **QA:** API 2531/2531 (169 arquivos) x2; Web 502/502 (65 arquivos) x2; typecheck/lint/build 0; TEST 0 residuos de fixture (472 characters orfaos pre-existentes); DEV migrado 37 -> 38 migrations.
+- **Docs:** 3.24.3-biography-lifecycle.md, 3.24.3-personality.md, 3.24.3-grid-biography-coverage.md, D-097..D-099.
+
+### V3.24.4 - Universal Driver Lore, Public Knowledge & Grid Completion
+- **Lacuna:** apenas Lando/Max/Gasly tinham evidence curado; os demais recebiam biografia compacta (nascimento/estatisticas). Causa do Perfil publico vazio: ExternalDriverPersona = 0 no DEV e a UI tratava NO_PERSONA como ausencia de informacao publica.
+- **Pesquisa real:** claims curados para 20 pilotos restantes (ORIGIN/KARTING/JUNIOR_CAREER/F1_ENTRY/PERSONALITY/INTERESTS/PROJECTS/CURRENT_CONTEXT) a partir de F1, equipes, sites oficiais e FIA; 103 fontes, 16-34 claims por piloto; generatorVersion -> curated-evidence.v2.
+- **Aliases data-driven:** liases no JSON (carlos-sainz -> carlos-sainz-jr) + esolveF1dbDriverStrict ignorando sufixos geracionais (Jr./Sr.).
+- **Bios determinísticas versionadas:** fonte propria CURATED/BIOGRAPHY_PAGE com generatorVersion/evidenceVersion/fingerprint/mode, dedupe por fingerprint; STALE por evidenceVersion para deterministicas; mode de perfis compartilhados lido do metadata. Backfill idempotente (46/46 skipped).
+- **Public Profile:** getPublicProfileView deterministico (AVAILABLE/PARTIAL/EMPTY, resumo, fatos, fontes) exposto em pilot.publicProfile; UI com card "Perfil publico" + "Tracos publicos observados"; EMPTY real e o unico caso de mensagem vazia.
+- **Personality:** enrichment persona.enrichment.ts cria PersonaEvidence aprovada + PersonaTrait EVIDENCE (ON_TRACK de PUBLIC_PERSONALITY; OFF_TRACK de INTERESTS/PROJECTS), preservando MANUAL e idempotente.
+- **DEV:** 46 runs RICH_DETERMINISTIC (23/23 pilotos, 7-8 paragrafos, Public Profile AVAILABLE), 62 traits ON_TRACK/40 OFF_TRACK; leitura pura READY em ~54 ms; backup 1narrative_dev_pre_v3244.dump; zero migrations.
+- **QA:** API 2544/2544 (172 arquivos) x2; Web 505/505 (65 arquivos) x2; typecheck/lint/build 0; TEST 0 residuos de fixture.
+- **Docs:** 3.24.4-universal-driver-lore.md, 3.24.4-public-profile.md, 3.24.4-grid-coverage.md, D-100..D-103.

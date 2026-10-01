@@ -7,6 +7,8 @@ import type { PilotRelationshipsView } from "./pilot-knowledge.relationships.js"
 import { getPilotRelationshipsView } from "./pilot-knowledge.relationships.js";
 import type { DriverProfileView } from "./pilot-knowledge.access.js";
 import { getDriverProfileView } from "./pilot-knowledge.profile.js";
+import type { PublicProfileView } from "./pilot-knowledge.public-profile.js";
+import { getPublicProfileView } from "./pilot-knowledge.public-profile.js";
 import { listKnowledgeSourcesForDriver } from "./pilot-knowledge.sources.js";
 
 export type PilotSourceView = {
@@ -36,6 +38,7 @@ export type PilotKnowledgeView =
       readonly topic: string | null;
       readonly profile: Extract<DriverProfileView, { available: true }>;
       readonly persona: ExternalPersonaView;
+      readonly publicProfile: PublicProfileView;
       readonly history: Extract<PilotHistoryView, { available: true }>;
       readonly relationships: Extract<PilotRelationshipsView, { available: true }>;
       readonly sources: readonly PilotSourceView[];
@@ -48,12 +51,14 @@ export async function getPilotKnowledgeView(
   const now = options.now ?? new Date();
   const topic = options.topic?.trim() ?? null;
 
-  const [profileResult, personaResult, historyResult, relationshipsResult] = await Promise.all([
-    getDriverProfileView(characterId, now),
-    getExternalPersonaView(characterId, now),
-    getPilotHistoryView(characterId, { topic }),
-    getPilotRelationshipsView(characterId, now),
-  ]);
+  const [profileResult, personaResult, historyResult, relationshipsResult, publicProfile] =
+    await Promise.all([
+      getDriverProfileView(characterId, now),
+      getExternalPersonaView(characterId, now),
+      getPilotHistoryView(characterId, { topic }),
+      getPilotRelationshipsView(characterId, now),
+      getPublicProfileView(characterId),
+    ]);
 
   if (!profileResult.available) {
     return { available: false, reason: profileResult.reason };
@@ -72,6 +77,7 @@ export async function getPilotKnowledgeView(
     topic,
     profile: profileResult,
     persona: personaResult,
+    publicProfile,
     history,
     relationships,
     sources: sources.map((source) => ({

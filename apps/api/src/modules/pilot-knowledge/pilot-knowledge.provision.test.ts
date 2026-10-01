@@ -191,15 +191,11 @@ describe("pilot knowledge provisioning", () => {
     expect(milestones).toBe(0);
   });
 
-  it("4) reabertura atualiza biografia vinda do espelho sem duplicar sources", async () => {
+  it("4) reabertura preserva biografia determinística versionada sem duplicar sources", async () => {
     const fixture = await createFixture("upgrade", { withData: true, withIdentity: true, round: 11 });
     await ensurePilotKnowledgeProvisioned(fixture.character.id);
     const profileBefore = await prisma.externalDriverProfile.findUniqueOrThrow({
       where: { externalDriverId: fixture.driver.id },
-    });
-    await prisma.externalDriverProfile.update({
-      where: { externalDriverId: fixture.driver.id },
-      data: { biographyDisplay: "Biografia antiga do espelho." },
     });
     const sourcesBefore = await prisma.externalKnowledgeSource.count({
       where: { driverProfiles: { some: { externalDriverId: fixture.driver.id } } },
@@ -211,9 +207,13 @@ describe("pilot knowledge provisioning", () => {
     const profileAfter = await prisma.externalDriverProfile.findUniqueOrThrow({
       where: { externalDriverId: fixture.driver.id },
     });
-    expect(profileAfter.biographyDisplay).toContain("Tem registros na Fórmula 1 desde 2015");
-    expect(profileAfter.biographyDisplay).not.toBe("Biografia antiga do espelho.");
+    expect(profileAfter.biographyDisplay).toBe(profileBefore.biographyDisplay);
     expect(profileAfter.biographySourceId).toBe(profileBefore.biographySourceId);
+    const source = await prisma.externalKnowledgeSource.findUniqueOrThrow({
+      where: { id: profileAfter.biographySourceId as string },
+    });
+    expect(source.provider).toBe("CURATED");
+    expect(source.sourceKind).toBe("BIOGRAPHY_PAGE");
     const sourcesAfter = await prisma.externalKnowledgeSource.count({
       where: { driverProfiles: { some: { externalDriverId: fixture.driver.id } } },
     });
@@ -502,7 +502,8 @@ describe("pilot knowledge provisioning", () => {
     const source = await prisma.externalKnowledgeSource.findUniqueOrThrow({
       where: { id: profile.biographySourceId as string },
     });
-    expect(source.sourceKind).toBe("DATABASE_EXPORT");
+    expect(source.sourceKind).toBe("BIOGRAPHY_PAGE");
+    expect((source.metadata as Record<string, unknown>).mode).toBe("FALLBACK");
   });
 
   it("10) auto-repara biografia gerada corrompida ou de versão antiga", async () => {
@@ -536,7 +537,10 @@ describe("pilot knowledge provisioning", () => {
     const source = await prisma.externalKnowledgeSource.findUniqueOrThrow({
       where: { id: profile.biographySourceId as string },
     });
-    expect(source.sourceKind).toBe("DATABASE_EXPORT");
+    expect(source.sourceKind).toBe("BIOGRAPHY_PAGE");
+    expect((source.metadata as Record<string, unknown>).generatorVersion).toBe(
+      "biography-composer.v3",
+    );
   });
 });
 

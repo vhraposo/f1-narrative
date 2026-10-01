@@ -22,6 +22,16 @@ export function resolveF1dbDriver(input: {
   return resolveF1dbDriverStrict(input).driver;
 }
 
+const GENERATIONAL_SUFFIXES = new Set(["jr", "junior", "sr", "senior", "ii", "iii"]);
+
+function stripGenerationalSuffix(value: string): string {
+  const parts = normalizeName(value).split(" ").filter(Boolean);
+  while (parts.length > 1 && GENERATIONAL_SUFFIXES.has(parts[parts.length - 1] as string)) {
+    parts.pop();
+  }
+  return parts.join(" ");
+}
+
 export function resolveF1dbDriverStrict(input: {
   name: string;
   driverCode?: string | null;
@@ -33,10 +43,13 @@ export function resolveF1dbDriverStrict(input: {
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .map(normalizeName);
   for (const candidate of names) {
+    const baseCandidate = stripGenerationalSuffix(candidate);
     const exact = dataset.drivers.filter(
       (driver) =>
         normalizeName(driver.fullName) === candidate ||
-        normalizeName(driver.name) === candidate,
+        normalizeName(driver.name) === candidate ||
+        stripGenerationalSuffix(driver.fullName) === baseCandidate ||
+        stripGenerationalSuffix(driver.name) === baseCandidate,
     );
     if (exact.length === 1) return { driver: exact[0] as F1dbDriver, ambiguous: false };
     if (exact.length > 1) return { driver: null, ambiguous: true };

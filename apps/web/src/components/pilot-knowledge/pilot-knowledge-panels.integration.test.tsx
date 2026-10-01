@@ -86,6 +86,31 @@ const AVAILABLE_PILOT = {
       },
     ],
   },
+  publicProfile: {
+    status: "AVAILABLE",
+    summary:
+      "Piloto Teste é um piloto neerlandês de Fórmula 1, nascido em Hasselt em 1997. Na Fórmula 1, passou por Equipe Teste.",
+    facts: [
+      {
+        category: "ORIGIN",
+        label: "Origem",
+        display: "Cresceu em Hasselt, na Bélgica.",
+        year: null,
+        authority: "PRIMARY_OFFICIAL",
+        sourceTitle: "Formula 1 — Piloto Teste",
+        sourceUrl: "https://www.formula1.com/en/drivers/piloto-teste",
+      },
+    ],
+    sources: [
+      {
+        provider: "F1_OFFICIAL",
+        title: "Formula 1 — Piloto Teste",
+        url: "https://www.formula1.com/en/drivers/piloto-teste",
+      },
+    ],
+    evidenceVersion: "v1",
+    relevantAreaCount: 6,
+  },
   history: {
     available: true,
     events: [
@@ -445,5 +470,56 @@ describe("pilot knowledge panels", () => {
       "/api/pilot-knowledge/drivers/c1/biography/generation",
       {},
     );
+  });
+
+  it("14) perfil público AVAILABLE mostra resumo, fatos e fontes", async () => {
+    renderWithClient(<PilotKnowledgeSection characterId="c1" section="persona" />);
+    expect(
+      await screen.findByText(/Piloto Teste é um piloto neerlandês de Fórmula 1/),
+    ).toBeDefined();
+    expect(screen.getByText("Informações públicas verificadas")).toBeDefined();
+    expect(screen.getByText("Fontes públicas")).toBeDefined();
+    expect(
+      screen.queryByText("Nenhuma informação pública confiável encontrada."),
+    ).toBeNull();
+  });
+
+  it("15) perfil público PARTIAL mostra cobertura parcial com resumo", async () => {
+    apiMock.get.mockImplementation(async () => ({
+      pilot: {
+        ...AVAILABLE_PILOT,
+        publicProfile: {
+          ...AVAILABLE_PILOT.publicProfile,
+          status: "PARTIAL",
+          relevantAreaCount: 2,
+        },
+      },
+    }));
+    renderWithClient(<PilotKnowledgeSection characterId="c1" section="persona" />);
+    expect(await screen.findByText("Cobertura parcial")).toBeDefined();
+    expect(
+      screen.getByText("Algumas informações ainda não possuem cobertura completa."),
+    ).toBeDefined();
+  });
+
+  it("16) perfil público EMPTY mostra a mensagem de vazio", async () => {
+    apiMock.get.mockImplementation(async () => ({
+      pilot: {
+        ...AVAILABLE_PILOT,
+        persona: { available: false, reason: "NO_PERSONA" },
+        publicProfile: {
+          status: "EMPTY",
+          summary: null,
+          facts: [],
+          sources: [],
+          evidenceVersion: null,
+          relevantAreaCount: 0,
+        },
+      },
+    }));
+    renderWithClient(<PilotKnowledgeSection characterId="c1" section="persona" />);
+    expect(
+      await screen.findByText("Nenhuma informação pública confiável encontrada."),
+    ).toBeDefined();
   });
 });

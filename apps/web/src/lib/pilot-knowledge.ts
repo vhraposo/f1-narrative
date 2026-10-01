@@ -90,6 +90,33 @@ export type PilotPersonaView =
       traits: PilotPersonaTraitView[];
     };
 
+export type PilotPublicProfileStatus = "AVAILABLE" | "PARTIAL" | "EMPTY";
+
+export type PilotPublicProfileFact = {
+  category: string;
+  label: string;
+  display: string;
+  year: number | null;
+  authority: string;
+  sourceTitle: string | null;
+  sourceUrl: string | null;
+};
+
+export type PilotPublicProfileSource = {
+  provider: string;
+  title: string;
+  url: string;
+};
+
+export type PilotPublicProfileView = {
+  status: PilotPublicProfileStatus;
+  summary: string | null;
+  facts: PilotPublicProfileFact[];
+  sources: PilotPublicProfileSource[];
+  evidenceVersion: string | null;
+  relevantAreaCount: number;
+};
+
 export type PilotHistoryEventView = {
   id: string;
   category: string;
@@ -166,6 +193,7 @@ export type PilotKnowledgeView =
         hasPersona: boolean;
       };
       persona: PilotPersonaView;
+      publicProfile: PilotPublicProfileView;
       history: { available: true; events: PilotHistoryEventView[]; relevant: PilotHistoryEventView[] };
       relationships: {
         available: true;
@@ -174,6 +202,18 @@ export type PilotKnowledgeView =
       };
       sources: PilotSourceView[];
     };
+
+export const PILOT_PUBLIC_PROFILE_PROVIDER_LABELS: Record<string, string> = {
+  F1_OFFICIAL: "Formula 1",
+  TEAM_OFFICIAL: "Equipe oficial",
+  DRIVER_OFFICIAL: "Piloto oficial",
+  FIA_OFFICIAL: "FIA",
+  REPUTABLE_NEWS: "Imprensa confiável",
+};
+
+export function publicProfileProviderLabel(provider: string): string {
+  return PILOT_PUBLIC_PROFILE_PROVIDER_LABELS[provider] ?? provider;
+}
 
 export const PILOT_CLASSIFICATION_LABELS: Record<string, string> = {
   MATCH: "Compatível com a fonte",
