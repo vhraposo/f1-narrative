@@ -227,6 +227,12 @@ model Universe {
   status    UniverseStatus @default(PENDING)
   lastError String?
 
+  autonomyMode   UniverseAutonomyMode   @default(OFF)
+  autonomyStatus UniverseAutonomyStatus @default(PAUSED)
+  lastSimulationAt DateTime?
+  nextSimulationAt DateTime?
+  simulationVersion String?
+
   seasons     Season[]
   teams       Team[]
   characters  Character[]
@@ -2413,4 +2419,17 @@ model SimulationTick {
 
   @@index([universeId, startWorldDate])
   @@index([universeId, status])
+}
+
+enum UniverseAutonomyMode {
+  OFF
+  OBSERVER
+  GUIDED
+  FULL
+}
+
+enum UniverseAutonomyStatus {
+  ACTIVE
+  PAUSED
+  STOPPED
 }

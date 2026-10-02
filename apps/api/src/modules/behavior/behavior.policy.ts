@@ -148,7 +148,8 @@ export function evaluateBehaviorPolicy(
     request.trigger === "RACE_FINISHED" ||
     request.trigger === "RACE_SESSION_COMPLETED" ||
     request.trigger === "RELATIONSHIP_CHANGED" ||
-    request.trigger === "WORLD_ADVANCED"
+    request.trigger === "WORLD_ADVANCED" ||
+    request.trigger === "AUTONOMOUS_TICK"
   ) {
     drafts.push({
       actionType: "SEND_MESSAGE",
@@ -170,7 +171,8 @@ export function evaluateBehaviorPolicy(
   if (
     request.trigger === "RACE_FINISHED" ||
     request.trigger === "EVENT_CREATED" ||
-    request.trigger === "MEMORY_CREATED"
+    request.trigger === "MEMORY_CREATED" ||
+    request.trigger === "AUTONOMOUS_TICK"
   ) {
     drafts.push({
       actionType: "CREATE_MEMORY",
@@ -186,7 +188,8 @@ export function evaluateBehaviorPolicy(
   if (
     request.trigger === "RELATIONSHIP_CHANGED" ||
     request.trigger === "EVENT_CREATED" ||
-    request.trigger === "RACE_FINISHED"
+    request.trigger === "RACE_FINISHED" ||
+    request.trigger === "AUTONOMOUS_TICK"
   ) {
     drafts.push({
       actionType: "UPDATE_RELATIONSHIP",
