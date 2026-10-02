@@ -534,3 +534,35 @@ export function formatListTime(iso: string): string {
     year: "2-digit",
   });
 }
+export type AutonomousTurnInput = {
+  worldDate?: string;
+};
+
+export type AutonomousTurnResponse = {
+  turn:
+    | {
+        executed: false;
+        reasonCode: string;
+        plan: unknown;
+        decisionId: string | null;
+      }
+    | {
+        executed: true;
+        reasonCode: "EXECUTED";
+        plan: unknown;
+        decisionId: string;
+        messageId: string;
+        speakerCharacterId: string;
+        language: { provider: string; model: string; fallback: boolean };
+      };
+};
+
+export function runAutonomousTurn(
+  conversationId: string,
+  input: AutonomousTurnInput = {},
+): Promise<AutonomousTurnResponse> {
+  return post<AutonomousTurnResponse>(
+    `/api/conversations/${conversationId}/autonomous-turn`,
+    input,
+  );
+}

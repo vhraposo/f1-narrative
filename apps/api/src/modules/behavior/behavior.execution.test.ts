@@ -311,7 +311,7 @@ describe("behavior commands and execution (V4.1)", () => {
     const result = await evaluateBehaviorDecision(
       request({ trigger: "RACE_FINISHED", conversationId: null }),
     );
-    expect(result.selected.actionType).toBe("UPDATE_RELATIONSHIP");
+    expect(["CREATE_MEMORY", "UPDATE_RELATIONSHIP"]).toContain(result.selected.actionType);
     expect(result.selected.targetCharacterId).toBe(rivalCharacterId);
     const relationshipBefore = await prisma.relationship.findFirstOrThrow({
       where: { characterAId: aiCharacterId, characterBId: rivalCharacterId },

@@ -1,343 +1,188 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi, type Mock } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MessageComposer } from "@/components/conversations/message-composer";
 import { ApiError } from "@/lib/api";
-import type {
-  ConversationParticipant,
-  Message,
-  TurnFailedSpeaker,
-  TurnResponse,
-} from "@/lib/conversations";
+import { renderWithClient } from "@/test/render-with-client";
 
-type CreateInput = {
-  senderType: "USER_CHARACTER";
-  characterId: string;
-  content: string;
-};
-type TurnInput = { userPrompt: string };
-type CreateCallbacks = { onSuccess?: (data: Message) => void; onError?: (err: unknown) => void };
-type TurnCallbacks = {
-  onSuccess?: (data: TurnResponse) => void;
-  onError?: (err: unknown) => void;
-};
+const apiMock = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn(),
+  patch: vi.fn(),
+  put: vi.fn(),
+  remove: vi.fn(),
+}));
 
-// Fronteira de mock: apenas @/hooks/use-conversations. ApiError (de @/lib/api)
-// NÃO é mockado (o componente faz instanceof em ApiError).
-const mocks = vi.hoisted(() => {
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
-    participants: { data: [] as ConversationParticipant[] },
-    create: {
-      isPending: false,
-      mutate: vi.fn(),
-    } as { isPending: boolean; mutate: Mock<(input: CreateInput, callbacks?: CreateCallbacks) => void> },
-    turn: {
-      isPending: false,
-      mutate: vi.fn(),
-    } as { isPending: boolean; mutate: Mock<(input: TurnInput, callbacks?: TurnCallbacks) => void> },
+    ...actual,
+    get: apiMock.get,
+    post: apiMock.post,
+    patch: apiMock.patch,
+    put: apiMock.put,
+    remove: apiMock.remove,
   };
 });
 
-vi.mock("@/hooks/use-conversations", () => ({
-  useConversationParticipants: () => mocks.participants,
-  useCreateMessage: () => mocks.create,
-  useStreamingTurn: () => mocks.turn,
-}));
+const PARTICIPANTS = [
+  {
+    id: "user-1",
+    name: "Alicya",
+    controlledBy: "USER",
+    nationality: "BRA",
+  },
+  {
+    id: "ai-1",
+    name: "Andrea Kimi Antonelli",
+    controlledBy: "AI",
+    nationality: "ITA",
+  },
+];
 
-import { MessageComposer } from "./message-composer";
-
-const CONV_ID = "conv-1";
-
-function participant(
-  id: string,
-  controlledBy: "USER" | "AI",
-): ConversationParticipant {
-  return {
-    id,
-    name: `${controlledBy === "USER" ? "Usuario" : "IA"} ${id}`,
-    nationality: "BR",
-    imageUrl: null,
-    controlledBy,
-    userId: controlledBy === "USER" ? "u-1" : null,
-  };
+function mockPostImplementation(options: { autonomousFails?: boolean } = {}) {
+  apiMock.post.mockImplementation(async (path: string) => {
+    if (path === "/api/conversations/c1/messages") {
+      return {
+        message: {
+          id: "m-user",
+          conversationId: "c1",
+          senderType: "USER_CHARACTER",
+          characterId: "user-1",
+          content: "Bom dia",
+          createdAt: "2026-10-01T12:00:00.000Z",
+        },
+      };
+    }
+    if (path === "/api/conversations/c1/autonomous-turn") {
+      if (options.autonomousFails) {
+        throw new ApiError("Falha ao gerar resposta", 500, "EXECUTION_FAILED");
+      }
+      return {
+        turn: {
+          executed: true,
+          reasonCode: "EXECUTED",
+          decisionId: "d1",
+          messageId: "m-ai",
+          speakerCharacterId: "ai-1",
+          language: { provider: "deterministic", model: "behavior-language.v1", fallback: true },
+        },
+      };
+    }
+    throw new ApiError("Não encontrado", 404);
+  });
 }
 
-function userMessage(characterId: string, content: string): Message {
-  return {
-    id: `m-user-${Date.now()}-${Math.random()}`,
-    conversationId: CONV_ID,
-    senderType: "USER_CHARACTER",
-    characterId,
-    content,
-    createdAt: "2026-01-01T00:00:00Z",
-  };
+beforeEach(() => {
+  apiMock.get.mockReset();
+  apiMock.post.mockReset();
+  apiMock.get.mockImplementation(async (path: string) => {
+    if (path === "/api/conversations/c1/participants") return { participants: PARTICIPANTS };
+    if (path === "/api/conversations/c1/messages") return { messages: [] };
+    throw new ApiError("Não encontrado", 404);
+  });
+  mockPostImplementation();
+});
+
+async function renderComposer(props: { onError?: (message: string) => void; onTypingChange?: (typing: boolean) => void } = {}) {
+  renderWithClient(<MessageComposer conversationId="c1" {...props} />);
+  await screen.findByPlaceholderText("Escreva sua mensagem...");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
 }
 
-function aiMessage(characterId: string, content: string): Message {
-  return {
-    id: `m-ai-${Date.now()}-${Math.random()}`,
-    conversationId: CONV_ID,
-    senderType: "AI_CHARACTER",
-    characterId,
-    content,
-    createdAt: "2026-01-01T00:00:01Z",
-  };
-}
+describe("MessageComposer — envio com resposta autônoma", () => {
+  it("1) enviar persiste a mensagem e dispara o autonomous turn", async () => {
+    const user = userEvent.setup();
+    await renderComposer();
 
-function turnResponse(
-  overrides: {
-    messages?: Message[];
-    failedSpeakers?: TurnFailedSpeaker[];
-  } = {},
-): TurnResponse {
-  return {
-    userMessage: userMessage("user-1", "Olá"),
-    messages: overrides.messages ?? [],
-    failedSpeakers: overrides.failedSpeakers ?? [],
-  };
-}
+    await user.type(screen.getByPlaceholderText("Escreva sua mensagem..."), "Bom dia");
+    const sendButton = screen.getByRole("button", { name: "Enviar mensagem" }) as HTMLButtonElement;
+    await waitFor(() => expect(sendButton.disabled).toBe(false));
+    await user.click(sendButton);
 
-const textInput = () =>
-  screen.getByPlaceholderText(/escreva/i) as HTMLTextAreaElement;
-const gerarBtn = () =>
-  screen.getByRole("button", { name: "Gerar resposta IA" }) as HTMLButtonElement;
-const enviarBtn = () =>
-  screen.getByRole("button", { name: "Enviar" }) as HTMLButtonElement;
-
-function setup(
-  participants: ConversationParticipant[],
-  opts?: { createPending?: boolean; turnPending?: boolean },
-) {
-  mocks.participants.data = participants;
-  mocks.create.isPending = opts?.createPending ?? false;
-  mocks.turn.isPending = opts?.turnPending ?? false;
-  mocks.create.mutate.mockReset();
-  mocks.turn.mutate.mockReset();
-
-  const onError = vi.fn();
-  let createCb: CreateCallbacks = {};
-  let turnCb: TurnCallbacks = {};
-
-  mocks.create.mutate.mockImplementation((_input, callbacks) => {
-    createCb = callbacks ?? {};
-  });
-  mocks.turn.mutate.mockImplementation((_input, callbacks) => {
-    turnCb = callbacks ?? {};
+    await waitFor(() => {
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/conversations/c1/messages",
+        expect.objectContaining({ content: "Bom dia", characterId: "user-1" }),
+      );
+    });
+    await waitFor(() => {
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/conversations/c1/autonomous-turn",
+        {},
+      );
+    });
+    expect((screen.getByPlaceholderText("Escreva sua mensagem...") as HTMLTextAreaElement).value).toBe("");
   });
 
-  render(<MessageComposer conversationId={CONV_ID} onError={onError} />);
+  it("2) não existe botão 'Gerar resposta IA' e há um único botão primário de envio", async () => {
+    await renderComposer();
+    expect(screen.queryByRole("button", { name: /Gerar resposta IA/i })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /Enviar mensagem/i })).toHaveLength(1);
+  });
 
-  return {
-    onError,
-    user: userEvent.setup(),
-    createSpy: mocks.create.mutate,
-    turnSpy: mocks.turn.mutate,
-    fireCreateSuccess: (message: Message) =>
-      act(() => createCb.onSuccess?.(message)),
-    fireTurnSuccess: (response: TurnResponse) =>
-      act(() => turnCb.onSuccess?.(response)),
-    fireTurnError: (err: unknown) => act(() => turnCb.onError?.(err)),
-  };
-}
+  it("3) sinaliza estado de digitação durante o turno autônomo", async () => {
+    const typing: boolean[] = [];
+    const user = userEvent.setup();
+    await renderComposer({
+      onTypingChange: (value) => typing.push(value),
+    });
+    await user.type(screen.getByPlaceholderText("Escreva sua mensagem..."), "Bom dia");
+    await user.click(screen.getByRole("button", { name: "Enviar mensagem" }));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(2));
+    expect(typing).toContain(true);
+    expect(typing[typing.length - 1]).toBe(false);
+  });
 
-describe("MessageComposer — turno multi-character (STEP 109B)", () => {
-  it("A - 'Gerar resposta IA' chama /turn com { userPrompt } (sem /messages nem /generate)", async () => {
-    const h = setup([participant("user-1", "USER"), participant("ai-1", "AI")]);
-
-    await h.user.type(textInput(), "Olá, IA!");
-    await h.user.click(gerarBtn());
-
-    expect(h.turnSpy).toHaveBeenCalledTimes(1);
-    expect(h.turnSpy).toHaveBeenCalledWith(
-      { userPrompt: "Olá, IA!" },
-      expect.anything(),
+  it("4) falha do autonomous turn não apaga a mensagem do usuário e reporta erro amigável", async () => {
+    mockPostImplementation({ autonomousFails: true });
+    const errors: string[] = [];
+    const user = userEvent.setup();
+    await renderComposer({
+      onError: (message) => errors.push(message),
+    });
+    await user.type(screen.getByPlaceholderText("Escreva sua mensagem..."), "Bom dia");
+    await user.click(screen.getByRole("button", { name: "Enviar mensagem" }));
+    await waitFor(() => expect(errors.length).toBeGreaterThanOrEqual(1));
+    expect(errors[0]).toBe("Não foi possível gerar uma resposta agora.");
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/conversations/c1/messages",
+      expect.objectContaining({ content: "Bom dia" }),
     );
-    // Envio manual não é acionado; geração individual antiga não é usada.
-    expect(h.createSpy).not.toHaveBeenCalled();
-
-    h.fireTurnSuccess(turnResponse({ messages: [aiMessage("ai-1", "Olá!")] }));
-    expect(textInput().value).toBe("");
   });
 
-  it("B - sucesso com 1 mensagem: limpa input, sem notice", async () => {
-    const h = setup([participant("user-1", "USER"), participant("ai-1", "AI")]);
-
-    await h.user.type(textInput(), "Oi");
-    await h.user.click(gerarBtn());
-    h.fireTurnSuccess(turnResponse({ messages: [aiMessage("ai-1", "Oi!")] }));
-
-    expect(textInput().value).toBe("");
-    expect(screen.queryByRole("status")).toBeNull();
-  });
-
-  it("C - sucesso multi-message: múltiplas respostas aceitas, input limpo, sem notice", async () => {
-    const h = setup([
-      participant("user-1", "USER"),
-      participant("ai-1", "AI"),
-      participant("ai-2", "AI"),
-    ]);
-
-    await h.user.type(textInput(), "Pergunta para todos");
-    await h.user.click(gerarBtn());
-    h.fireTurnSuccess(
-      turnResponse({
-        messages: [
-          aiMessage("ai-1", "Resposta A"),
-          aiMessage("ai-2", "Resposta B"),
-        ],
-      }),
-    );
-
-    expect(textInput().value).toBe("");
-    expect(screen.queryByRole("status")).toBeNull();
-  });
-
-  it("D - falha parcial: 1 resposta + 1 failedSpeakers → notice com contagem", async () => {
-    const h = setup([
-      participant("user-1", "USER"),
-      participant("ai-1", "AI"),
-      participant("ai-2", "AI"),
-    ]);
-
-    await h.user.type(textInput(), "Pergunta");
-    await h.user.click(gerarBtn());
-    h.fireTurnSuccess(
-      turnResponse({
-        messages: [aiMessage("ai-1", "Resposta A")],
-        failedSpeakers: [{ characterId: "ai-2", error: "provider-error" }],
-      }),
-    );
-
-    expect(textInput().value).toBe("");
+  it("5) sem personagem do usuário não há envio e o aviso aparece", async () => {
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/conversations/c1/participants")
+        return { participants: [PARTICIPANTS[1]] };
+      if (path === "/api/conversations/c1/messages") return { messages: [] };
+      throw new ApiError("Não encontrado", 404);
+    });
+    renderWithClient(<MessageComposer conversationId="c1" />);
     expect(
-      screen.getByText(/1 resposta\(s\) gerada\(s\); 1 não respondeu\(ram\)\./),
-    ).toBeTruthy();
-  });
-
-  it("E - zero messages e zero failedSpeakers → notice de nenhum responder", async () => {
-    const h = setup([participant("user-1", "USER"), participant("ai-1", "AI")]);
-
-    await h.user.type(textInput(), "Sem menção");
-    await h.user.click(gerarBtn());
-    h.fireTurnSuccess(turnResponse());
-
-    expect(textInput().value).toBe("");
+      await screen.findByText("Nenhum dos seus personagens participa desta conversa."),
+    ).toBeDefined();
     expect(
-      screen.getByText("Nenhum personagem tinha motivo para responder neste turno."),
-    ).toBeTruthy();
+      (screen.getByRole("button", { name: "Enviar mensagem" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
-  it("F - zero messages com 1 failedSpeakers → notice de nenhuma resposta", async () => {
-    const h = setup([participant("user-1", "USER"), participant("ai-1", "AI")]);
-
-    await h.user.type(textInput(), "Ola");
-    await h.user.click(gerarBtn());
-    h.fireTurnSuccess(
-      turnResponse({
-        failedSpeakers: [{ characterId: "ai-1", error: "mode-not-generated" }],
-      }),
-    );
-
-    expect(textInput().value).toBe("");
-    expect(
-      screen.getByText("Nenhuma resposta de IA foi gerada neste turno."),
-    ).toBeTruthy();
-  });
-
-  it("G - erro 401: onError de sessão; texto permanece", async () => {
-    const h = setup([participant("user-1", "USER"), participant("ai-1", "AI")]);
-
-    await h.user.type(textInput(), "Olá");
-    await h.user.click(gerarBtn());
-    h.fireTurnError(new ApiError("Sessão expirada", 401));
-
-    expect(h.onError).toHaveBeenCalledWith("Sessão expirada. Faça login novamente.");
-    expect(textInput().value).toBe("Olá");
-    expect(h.turnSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("H - erro 500 PROVIDER_ERROR → onError genérico; texto permanece", async () => {
-    const h = setup([participant("user-1", "USER"), participant("ai-1", "AI")]);
-
-    await h.user.type(textInput(), "Olá");
-    await h.user.click(gerarBtn());
-    h.fireTurnError(new ApiError("Falha ao gerar resposta", 500, "PROVIDER_ERROR"));
-
-    expect(h.onError).toHaveBeenCalledWith(
-      "Não foi possível gerar a resposta. Tente novamente.",
-    );
-    expect(textInput().value).toBe("Olá");
-  });
-
-  it("I - turno isPending: botões desabilitados; sem duplo disparo", async () => {
-    const h = setup(
-      [participant("user-1", "USER"), participant("ai-1", "AI")],
-      { turnPending: true },
-    );
-
-    expect(enviarBtn().disabled).toBe(true);
-    expect(gerarBtn().disabled).toBe(true);
-
-    fireEvent.click(gerarBtn());
-    expect(h.turnSpy).not.toHaveBeenCalled();
-    expect(h.createSpy).not.toHaveBeenCalled();
-  });
-
-  it("J - zero AI: gerar desabilitado, aviso; Enviar continua", async () => {
-    const h = setup([participant("user-1", "USER")]);
-
-    expect(
-      screen.getByText("Nenhum personagem de IA participa desta conversa."),
-    ).toBeTruthy();
-    expect(gerarBtn().disabled).toBe(true);
-
-    await h.user.type(textInput(), "Oi");
-    await h.user.click(enviarBtn());
-    expect(h.createSpy).toHaveBeenCalledWith(
-      { senderType: "USER_CHARACTER", characterId: "user-1", content: "Oi" },
-      expect.anything(),
-    );
-    expect(h.turnSpy).not.toHaveBeenCalled();
-  });
-
-  it("K - zero USER: gerar desabilitado, aviso, sem request", async () => {
-    const h = setup([participant("ai-1", "AI")]);
-
-    expect(
-      screen.getByText("Nenhum dos seus personagens participa desta conversa."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/Escolha um remetente do seu personagem/i),
-    ).toBeTruthy();
-    expect(gerarBtn().disabled).toBe(true);
-
-    fireEvent.click(gerarBtn());
-    expect(h.turnSpy).not.toHaveBeenCalled();
-    expect(h.createSpy).not.toHaveBeenCalled();
-  });
-
-  it("L - Enviar isolado: somente /messages, nunca /turn", async () => {
-    const h = setup([participant("user-1", "USER"), participant("ai-1", "AI")]);
-
-    await h.user.type(textInput(), "Mensagem manual");
-    await h.user.click(enviarBtn());
-
-    expect(h.createSpy).toHaveBeenCalledTimes(1);
-    expect(h.turnSpy).not.toHaveBeenCalled();
-  });
-
-  it("M - retry após falha: novo clique chama /turn de novo (sem estado residual)", async () => {
-    const h = setup([participant("user-1", "USER"), participant("ai-1", "AI")]);
-
-    await h.user.type(textInput(), "Olá");
-    await h.user.click(gerarBtn());
-    h.fireTurnError(new ApiError("Falha na rede", 500));
-
-    await h.user.click(gerarBtn());
-
-    expect(h.turnSpy).toHaveBeenCalledTimes(2);
-    expect(h.turnSpy.mock.calls[0][0]).toEqual({ userPrompt: "Olá" });
-    expect(h.turnSpy.mock.calls[1][0]).toEqual({ userPrompt: "Olá" });
-    expect(h.createSpy).not.toHaveBeenCalled();
+  it("6) com múltiplos personagens do usuário, o seletor define o remetente", async () => {
+    apiMock.get.mockImplementation(async (path: string) => {
+      if (path === "/api/conversations/c1/participants")
+        return {
+          participants: [
+            PARTICIPANTS[0],
+            { id: "user-2", name: "Max User", controlledBy: "USER", nationality: "BRA" },
+            PARTICIPANTS[1],
+          ],
+        };
+      if (path === "/api/conversations/c1/messages") return { messages: [] };
+      throw new ApiError("Não encontrado", 404);
+    });
+    renderWithClient(<MessageComposer conversationId="c1" />);
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
+    expect(await screen.findByLabelText("Quem envia a mensagem")).toBeDefined();
   });
 });

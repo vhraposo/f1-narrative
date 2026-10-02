@@ -1,21 +1,13 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MessageComposer } from "@/components/conversations/message-composer";
+import { MessageList } from "@/components/conversations/message-list";
 import { ApiError } from "@/lib/api";
-import type {
-  Conversation,
-  ConversationParticipant,
-  CreateMessageInput,
-  Message,
-  TurnResponse,
-} from "@/lib/conversations";
-import { conversationMessagesKey } from "@/hooks/use-conversations";
+import type { Message } from "@/lib/conversations";
 import { renderWithClient } from "@/test/render-with-client";
-import { MessageComposer } from "./message-composer";
-import { MessageList } from "./message-list";
-
-const CONV_ID = "conv-1";
 
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -37,196 +29,137 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/conversations", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/conversations")>();
-  return {
-    ...actual,
-    streamTurnMessage: vi
-      .fn()
-      .mockRejectedValue(new Error("streaming indisponível no teste")),
-  };
-});
+const PARTICIPANTS = [
+  { id: "user-1", name: "Alicya", controlledBy: "USER", nationality: "BRA" },
+  { id: "ai-1", name: "Andrea Kimi Antonelli", controlledBy: "AI", nationality: "ITA" },
+];
 
-function participant(
-  id: string,
-  controlledBy: "USER" | "AI",
-): ConversationParticipant {
+let messages: Message[] = [];
+
+function userMessage(id: string, content: string, minute: number): Message {
   return {
     id,
-    name: `${controlledBy === "USER" ? "Usuario" : "IA"} ${id}`,
-    nationality: "BR",
-    imageUrl: null,
-    controlledBy,
-    userId: controlledBy === "USER" ? "u-1" : null,
-  };
-}
-
-function userMessage(characterId: string, content: string): Message {
-  return {
-    id: `m-user-${content.length}`,
-    conversationId: CONV_ID,
+    conversationId: "c1",
     senderType: "USER_CHARACTER",
-    characterId,
+    characterId: "user-1",
     content,
-    createdAt: "2026-01-01T00:00:00Z",
+    createdAt: `2026-10-01T12:${String(minute).padStart(2, "0")}:00.000Z`,
   };
 }
 
-function aiMessage(characterId: string, content: string): Message {
+function aiMessage(id: string, content: string, minute: number): Message {
   return {
-    id: `m-ai-${content.length}`,
-    conversationId: CONV_ID,
+    id,
+    conversationId: "c1",
     senderType: "AI_CHARACTER",
-    characterId,
+    characterId: "ai-1",
     content,
-    createdAt: "2026-01-01T00:00:01Z",
+    createdAt: `2026-10-01T12:${String(minute).padStart(2, "0")}:00.000Z`,
   };
 }
 
-const conversationFixture: Conversation = {
-  id: CONV_ID,
-  title: "Conversa de teste",
-  type: "GROUP",
-  createdAt: "2026-01-01T00:00:00Z",
-  updatedAt: "2026-01-01T00:00:00Z",
-  participants: [],
-  messageCount: 0,
-};
-
-let participantsFixture: ConversationParticipant[];
-let messagesFixture: Message[];
-let callOrder: string[];
-
-beforeEach(() => {
-  participantsFixture = [participant("user-1", "USER"), participant("ai-1", "AI")];
-  messagesFixture = [];
-  callOrder = [];
-
-  apiMock.get.mockImplementation(async (path: string) => {
-    if (path.endsWith("/participants")) {
-      return { participants: [...participantsFixture] };
-    }
-    if (path.endsWith("/messages")) {
-      return { messages: [...messagesFixture] };
-    }
-    if (path === `/api/conversations/${CONV_ID}`) {
-      return { conversation: conversationFixture };
-    }
-    if (path === "/api/conversations") {
-      return { conversations: [conversationFixture] };
-    }
-    throw new ApiError("Não encontrado", 404);
-  });
-
-  apiMock.post.mockImplementation(async (path: string, body: unknown) => {
-    if (path.endsWith("/turn")) {
-      callOrder.push("turn");
-      const input = body as { userPrompt: string };
-      const userMsg = userMessage("user-1", input.userPrompt);
-      const ai = aiMessage("ai-1", `IA respondeu: ${input.userPrompt}`);
-      messagesFixture.push(userMsg, ai);
-      const response: TurnResponse = {
-        userMessage: userMsg,
-        messages: [ai],
-        failedSpeakers: [],
-      };
-      return response;
-    }
-    callOrder.push("messages");
-    const input = body as CreateMessageInput;
-    const created = userMessage(input.characterId!, input.content);
-    messagesFixture.push(created);
-    return { message: created };
-  });
-
-  apiMock.patch.mockImplementation(async () => undefined);
-  apiMock.put.mockImplementation(async () => undefined);
-  apiMock.remove.mockImplementation(async () => undefined);
-});
-
-function renderTurn() {
-  return renderWithClient(
+function Harness() {
+  const [error, setError] = useState<string | null>(null);
+  return (
     <div>
-      <MessageComposer conversationId={CONV_ID} onError={() => undefined} />
-      <MessageList conversationId={CONV_ID} />
-    </div>,
+      {error && (
+        <p role="alert">{error}</p>
+      )}
+      <MessageList conversationId="c1" />
+      <MessageComposer conversationId="c1" onError={setError} />
+    </div>
   );
 }
 
-const textArea = () => screen.getByPlaceholderText(/escreva/i) as HTMLTextAreaElement;
-const gerarBtn = () =>
-  screen.getByRole("button", { name: "Gerar resposta IA" }) as HTMLButtonElement;
+beforeEach(() => {
+  messages = [];
+  apiMock.get.mockReset();
+  apiMock.post.mockReset();
+  apiMock.get.mockImplementation(async (path: string) => {
+    if (path === "/api/conversations/c1/participants") return { participants: PARTICIPANTS };
+    if (path === "/api/conversations/c1/messages") return { messages };
+    throw new ApiError("Não encontrado", 404);
+  });
+  apiMock.post.mockImplementation(async (path: string) => {
+    if (path === "/api/conversations/c1/messages") {
+      messages = [...messages, userMessage(`m-user-${messages.length}`, "Bom dia", 10)];
+      return { message: messages[messages.length - 1] };
+    }
+    if (path === "/api/conversations/c1/autonomous-turn") {
+      messages = [...messages, aiMessage(`m-ai-${messages.length}`, "Bom dia! Como você está?", 11)];
+      return {
+        turn: {
+          executed: true,
+          reasonCode: "EXECUTED",
+          decisionId: "d1",
+          messageId: messages[messages.length - 1]?.id,
+          speakerCharacterId: "ai-1",
+          language: { provider: "deterministic", model: "behavior-language.v1", fallback: true },
+        },
+      };
+    }
+    throw new ApiError("Não encontrado", 404);
+  });
+});
 
-// O composer habilita a digitação quando os participantes carregam e há um
-// character USER do usuário (sem mais select de speaker — o backend decide).
-async function waitComposerReady() {
-  await vi.waitFor(() => expect(textArea().disabled).toBe(false));
-}
-
-describe("Chat turn integration (QueryClient real + api mockada)", () => {
-  it("A - turno 201: USER + AI Messages visíveis na MessageList após refetch", async () => {
+describe("Chat send → autonomous response (integração)", () => {
+  it("A) enviar mostra a mensagem do usuário e a resposta da IA", async () => {
     const user = userEvent.setup();
-    const h = renderTurn();
-    await waitComposerReady();
+    renderWithClient(<Harness />);
+    await screen.findByPlaceholderText("Escreva sua mensagem...");
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
 
-    await user.type(textArea(), "Olá, mundo!");
-    await user.click(gerarBtn());
+    await user.type(screen.getByPlaceholderText("Escreva sua mensagem..."), "Bom dia");
+    await user.click(screen.getByRole("button", { name: "Enviar mensagem" }));
 
-    await vi.waitFor(() => expect(callOrder).toEqual(["turn"]));
-
-    expect(
-      await screen.findByText("IA respondeu: Olá, mundo!"),
-    ).toBeTruthy();
-
-    const cached =
-      h.client.getQueryData<Message[]>(conversationMessagesKey(CONV_ID)) ?? [];
-    expect(cached).toHaveLength(2);
-    expect(cached[0].senderType).toBe("USER_CHARACTER");
-    expect(cached[1].senderType).toBe("AI_CHARACTER");
+    expect(await screen.findByText("Bom dia")).toBeDefined();
+    expect(await screen.findByText("Bom dia! Como você está?")).toBeDefined();
+    expect(screen.getByText("Andrea Kimi Antonelli")).toBeDefined();
+    expect(apiMock.post).toHaveBeenCalledWith(
+      "/api/conversations/c1/autonomous-turn",
+      {},
+    );
   });
 
-  it("B - falha no turn (500): um único request, cache vazio, texto preservado", async () => {
+  it("B) falha do autonomous turn mantém a mensagem do usuário e mostra erro não destrutivo", async () => {
     apiMock.post.mockImplementation(async (path: string) => {
-      if (path.endsWith("/turn")) {
-        callOrder.push("turn");
-        throw new ApiError("Falha na rede", 500);
+      if (path === "/api/conversations/c1/messages") {
+        messages = [...messages, userMessage("m-user-1", "Bom dia", 10)];
+        return { message: messages[0] };
       }
-      callOrder.push("messages");
-      throw new ApiError("Falha na rede", 500);
+      if (path === "/api/conversations/c1/autonomous-turn") {
+        throw new ApiError("Falha ao gerar resposta", 500, "EXECUTION_FAILED");
+      }
+      throw new ApiError("Não encontrado", 404);
     });
-
     const user = userEvent.setup();
-    const h = renderTurn();
-    await waitComposerReady();
+    renderWithClient(<Harness />);
+    await screen.findByPlaceholderText("Escreva sua mensagem...");
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
 
-    await user.type(textArea(), "Olá");
-    await user.click(gerarBtn());
+    await user.type(screen.getByPlaceholderText("Escreva sua mensagem..."), "Bom dia");
+    await user.click(screen.getByRole("button", { name: "Enviar mensagem" }));
 
-    await vi.waitFor(() => expect(callOrder).toEqual(["turn"]));
-
-    const cached =
-      h.client.getQueryData<Message[]>(conversationMessagesKey(CONV_ID)) ?? [];
-    expect(cached).toHaveLength(0);
-    expect(textArea().value).toBe("Olá");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível gerar uma resposta agora.");
+    expect(await screen.findByText("Bom dia")).toBeDefined();
+    const list = screen.getByRole("list");
+    expect(within(list).queryByText("EXECUTION_FAILED")).toBeNull();
   });
 
-  it("C - turno único: QueryCache com USER e AI em ordem; AI visível", async () => {
+  it("C) refresh não duplica a resposta", async () => {
     const user = userEvent.setup();
-    const h = renderTurn();
-    await waitComposerReady();
+    const { unmount } = renderWithClient(<Harness />);
+    await screen.findByPlaceholderText("Escreva sua mensagem...");
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
+    await user.type(screen.getByPlaceholderText("Escreva sua mensagem..."), "Bom dia");
+    await user.click(screen.getByRole("button", { name: "Enviar mensagem" }));
+    await screen.findByText("Bom dia! Como você está?");
+    unmount();
 
-    await user.type(textArea(), "Ola");
-    await user.click(gerarBtn());
-
-    await vi.waitFor(() => expect(callOrder).toEqual(["turn"]));
-    expect(await screen.findByText("IA respondeu: Ola")).toBeTruthy();
-
-    const cached =
-      h.client.getQueryData<Message[]>(conversationMessagesKey(CONV_ID)) ?? [];
-    expect(cached).toHaveLength(2);
-    expect(cached[0].senderType).toBe("USER_CHARACTER");
-    expect(cached[0].content).toBe("Ola");
-    expect(cached[1].senderType).toBe("AI_CHARACTER");
-    expect(cached[1].content).toBe("IA respondeu: Ola");
+    renderWithClient(<Harness />);
+    await waitFor(() =>
+      expect(screen.getAllByText("Bom dia! Como você está?")).toHaveLength(1),
+    );
   });
 });

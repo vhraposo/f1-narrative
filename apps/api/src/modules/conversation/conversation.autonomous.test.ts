@@ -394,4 +394,79 @@ describe("autonomous conversation turns (V4.2)", () => {
       delete process.env.CONVERSATION_MAX_AI_TURNS_PER_ROUND;
     }
   });
+
+  it("10) mensagem do usuário via POST /messages dispara resposta autônoma (caminho real)", async () => {
+    const sent = await app.inject({
+      method: "POST",
+      url: `/api/conversations/${conversationId}/messages`,
+      headers: { cookie },
+      payload: {
+        senderType: "USER_CHARACTER",
+        characterId: userCharacterId,
+        content: "Bom dia",
+      },
+      remoteAddress: remoteAddress(),
+    });
+    expect(sent.statusCode).toBe(201);
+
+    const turn = await app.inject({
+      method: "POST",
+      url: `/api/conversations/${conversationId}/autonomous-turn`,
+      headers: { cookie },
+      payload: { worldDate: "2026-10-01T12:00:00.000Z" },
+      remoteAddress: remoteAddress(),
+    });
+    expect(turn.statusCode).toBe(201);
+    const body = turn.json() as {
+      turn: { executed: boolean; speakerCharacterId: string; messageId: string };
+    };
+    expect(body.turn.executed).toBe(true);
+    expect([characterAId, characterBId]).toContain(body.turn.speakerCharacterId);
+
+    const aiMessage = await prisma.message.findUniqueOrThrow({
+      where: { id: body.turn.messageId },
+    });
+    expect(aiMessage.senderType).toBe("AI_CHARACTER");
+    expect(aiMessage.characterId).toBe(body.turn.speakerCharacterId);
+    expect(aiMessage.content.trim().length).toBeGreaterThan(0);
+
+    const messages = await prisma.message.findMany({
+      where: { conversationId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { senderType: true, characterId: true, content: true },
+    });
+    expect(messages.some((message) => message.content === "Bom dia")).toBe(true);
+    expect(messages.some((message) => message.senderType === "AI_CHARACTER")).toBe(true);
+  });
+
+  it("11) resposta autônoma funciona sem provider (fallback determinístico)", async () => {
+    const fallbackApp = buildApp();
+    await fallbackApp.ready();
+    const sent = await fallbackApp.inject({
+      method: "POST",
+      url: `/api/conversations/${conversationId}/messages`,
+      headers: { cookie },
+      payload: {
+        senderType: "USER_CHARACTER",
+        characterId: userCharacterId,
+        content: "Como vocês estão?",
+      },
+      remoteAddress: remoteAddress(),
+    });
+    expect(sent.statusCode).toBe(201);
+    const turn = await fallbackApp.inject({
+      method: "POST",
+      url: `/api/conversations/${conversationId}/autonomous-turn`,
+      headers: { cookie },
+      payload: { worldDate: "2026-10-01T12:00:00.000Z" },
+      remoteAddress: remoteAddress(),
+    });
+    expect(turn.statusCode).toBe(201);
+    const body = turn.json() as {
+      turn: { executed: boolean; language: { fallback: boolean } };
+    };
+    expect(body.turn.executed).toBe(true);
+    expect(body.turn.language.fallback).toBe(true);
+    await fallbackApp.close();
+  });
 });

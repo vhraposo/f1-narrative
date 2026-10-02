@@ -12,11 +12,12 @@ import {
 type MessageBubbleProps = {
   message: Message;
   author: ConversationParticipant | null;
+  showHeader?: boolean;
 };
 
 // Espelho da MessageBubble: a identidade (alinhamento/avatar/nome) vem do
 // senderType REAL, nunca inferida pela aparência ou por controlledBy.
-export function MessageBubble({ message, author }: MessageBubbleProps) {
+export function MessageBubble({ message, author, showHeader = true }: MessageBubbleProps) {
   const time = formatChatTime(message.createdAt);
 
   if (message.senderType === "SYSTEM") {
@@ -52,14 +53,18 @@ export function MessageBubble({ message, author }: MessageBubbleProps) {
 
   return (
     <li className="flex items-end gap-2 px-4 py-1.5">
-      <CharacterAvatar
-        name={name}
-        imageUrl={author?.imageUrl ?? null}
-        size="sm"
-        className="mb-0.5"
-      />
+      {showHeader ? (
+        <CharacterAvatar
+          name={name}
+          imageUrl={author?.imageUrl ?? null}
+          size="sm"
+          className="mb-0.5"
+        />
+      ) : (
+        <span className="w-8 shrink-0" aria-hidden="true" />
+      )}
       <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-border bg-card px-3 py-2 text-sm shadow-sm">
-        {message.senderType === "AI_CHARACTER" && (
+        {message.senderType === "AI_CHARACTER" && showHeader && (
           <span className="mb-0.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-brand">
             <Bot className="h-3 w-3" aria-hidden="true" />
             {name}

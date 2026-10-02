@@ -13,9 +13,11 @@ import {
   listConversationParticipants,
   listConversations,
   removeConversationParticipant,
+  runAutonomousTurn,
   streamTurnMessage,
   turnMessage,
   updateConversation,
+  type AutonomousTurnInput,
   type Conversation,
   type CreateConversationInput,
   type CreateMessageInput,
@@ -173,6 +175,23 @@ export function useTurnMessage(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: TurnMessageInput) => turnMessage(conversationId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: conversationMessagesKey(conversationId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: conversationKey(conversationId),
+      });
+      void queryClient.invalidateQueries({ queryKey: conversationsKey });
+    },
+  });
+}
+
+export function useAutonomousTurn(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AutonomousTurnInput = {}) =>
+      runAutonomousTurn(conversationId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: conversationMessagesKey(conversationId),

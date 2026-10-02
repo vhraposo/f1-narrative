@@ -87,13 +87,21 @@ export function MessageList({
 
   return (
     <ul ref={listRef} className="flex flex-col py-3">
-      {messages.map((message) => (
-        <MessageBubble
-          key={message.id}
-          message={message}
-          author={findAuthor(participants, message)}
-        />
-      ))}
+      {messages.map((message, index) => {
+        const previous = messages[index - 1];
+        const showHeader =
+          !previous ||
+          previous.characterId !== message.characterId ||
+          previous.senderType !== message.senderType;
+        return (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            author={findAuthor(participants, message)}
+            showHeader={showHeader}
+          />
+        );
+      })}
     </ul>
   );
 }

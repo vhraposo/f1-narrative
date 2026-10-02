@@ -228,15 +228,17 @@ export function scoreBehaviorCandidate(input: {
   bucket: string;
 }): { score: number; breakdown: BehaviorScoreBreakdown; goalIds: string[]; goalAlignment: number } {
   const { alignment, goalIds } = resolveGoalAlignment(input.goals, input.actionType);
-  const cooldownPenalty = input.cooldown.keys.has(
-    cooldownKey({
-      actionType: input.actionType,
-      targetCharacterId: input.targetCharacterId,
-      bucket: input.bucket,
-    }),
-  )
-    ? BEHAVIOR_SCORE_WEIGHTS.cooldownPenalty
-    : 0;
+  const cooldownPenalty =
+    input.actionType === "SEND_MESSAGE" &&
+    input.cooldown.keys.has(
+      cooldownKey({
+        actionType: input.actionType,
+        targetCharacterId: input.targetCharacterId,
+        bucket: input.bucket,
+      }),
+    )
+      ? BEHAVIOR_SCORE_WEIGHTS.cooldownPenalty
+      : 0;
   const duplicatePenalty = input.cooldown.fingerprints.has(input.fingerprint)
     ? BEHAVIOR_SCORE_WEIGHTS.duplicatePenalty
     : 0;

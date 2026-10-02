@@ -1,11 +1,11 @@
 "use client";
 
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, UserPlus } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ConversationForm } from "@/components/conversations/conversation-form";
-import { ConversationParticipantPanel } from "@/components/conversations/conversation-participant-panel";
+import { ConversationParticipantsDialog } from "@/components/conversations/conversation-participants-dialog";
 import { ConversationThread } from "@/components/conversations/conversation-thread";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
@@ -22,6 +22,7 @@ export default function ConversationDetailPage() {
   const updateMutation = useUpdateConversation();
 
   const [showEdit, setShowEdit] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   function handleUpdate(payload: {
@@ -80,16 +81,27 @@ export default function ConversationDetailPage() {
         <ConversationThread
           conversationId={conversation.id}
           backHref="/app/conversations"
-          rootClassName="h-[60dvh] min-h-[400px]"
+          rootClassName="h-[70dvh] min-h-[420px]"
           rightAction={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowEdit((v) => !v)}
-            >
-              <Pencil className="mr-1.5 h-4 w-4" />
-              Editar
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Adicionar participantes"
+                onClick={() => setShowParticipants(true)}
+              >
+                <UserPlus className="mr-1.5 h-4 w-4" />
+                <span className="hidden sm:inline">Adicionar</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEdit((v) => !v)}
+              >
+                <Pencil className="mr-1.5 h-4 w-4" />
+                Editar
+              </Button>
+            </div>
           }
         />
       </div>
@@ -110,7 +122,11 @@ export default function ConversationDetailPage() {
         />
       )}
 
-      <ConversationParticipantPanel conversationId={conversation.id} />
+      <ConversationParticipantsDialog
+        conversationId={conversation.id}
+        open={showParticipants}
+        onClose={() => setShowParticipants(false)}
+      />
     </div>
   );
 }
