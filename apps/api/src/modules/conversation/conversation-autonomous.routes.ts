@@ -6,6 +6,7 @@ import {
   ConversationAutonomousError,
   runAutonomousConversationTurn,
 } from "./conversation.autonomous.js";
+import { simulateConversationTurn, getSimulationPlan } from "./conversation.simulation.js";
 import { planTurnForConversation } from "./conversation.turn-engine.js";
 import type { GenerationProvider } from "../generation/generation.assembly.js";
 import { nullProvider } from "../generation/generation.assembly.js";
@@ -73,6 +74,71 @@ export const conversationAutonomousRoutes: FastifyPluginAsync<
           : await defaultWorldDate(params.data.conversationId);
         const plan = await planTurnForConversation(params.data.conversationId, { worldDate });
         return reply.send({ plan });
+      } catch (error) {
+        if (sendAutonomousError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/conversations/:conversationId/simulate-turn/plan",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = paramsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Identificador inválido", code: "VALIDATION_ERROR" });
+      }
+      const body = turnBodySchema.safeParse(request.body ?? {});
+      if (!body.success) {
+        return reply.code(400).send({ error: "Dados inválidos", code: "VALIDATION_ERROR" });
+      }
+      try {
+        const accessible = await accessibleConversation(
+          params.data.conversationId,
+          request.user!.id,
+        );
+        if (!accessible) {
+          throw new ConversationAutonomousError("CONVERSATION_NOT_FOUND", "Conversa não encontrada", 404);
+        }
+        const plan = await getSimulationPlan(params.data.conversationId, {
+          userId: request.user!.id,
+          ...(body.data.worldDate ? { worldDate: new Date(body.data.worldDate) } : {}),
+        });
+        return reply.send({ plan });
+      } catch (error) {
+        if (sendAutonomousError(reply, error)) return;
+        throw error;
+      }
+    },
+  );
+
+  fastify.post(
+    "/api/conversations/:conversationId/simulate-turn",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const params = paramsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Identificador inválido", code: "VALIDATION_ERROR" });
+      }
+      const body = turnBodySchema.safeParse(request.body ?? {});
+      if (!body.success) {
+        return reply.code(400).send({ error: "Dados inválidos", code: "VALIDATION_ERROR" });
+      }
+      try {
+        const accessible = await accessibleConversation(
+          params.data.conversationId,
+          request.user!.id,
+        );
+        if (!accessible) {
+          throw new ConversationAutonomousError("CONVERSATION_NOT_FOUND", "Conversa não encontrada", 404);
+        }
+        const result = await simulateConversationTurn(params.data.conversationId, {
+          userId: request.user!.id,
+          ...(body.data.worldDate ? { worldDate: new Date(body.data.worldDate) } : {}),
+          provider,
+        });
+        return reply.code(result.executed ? 201 : 200).send({ simulation: result });
       } catch (error) {
         if (sendAutonomousError(reply, error)) return;
         throw error;

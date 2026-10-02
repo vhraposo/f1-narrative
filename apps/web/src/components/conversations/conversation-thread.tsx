@@ -51,7 +51,7 @@ export function ConversationThread({
     conversationId ?? undefined,
   );
   const [composerError, setComposerError] = useState<string | null>(null);
-  const [typingSpeaker, setTypingSpeaker] = useState<string | null>(null);
+  const [typingNames, setTypingNames] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   if (conversationId == null) {
@@ -158,9 +158,10 @@ export function ConversationThread({
       </div>
 
       <div className="shrink-0 border-t border-border bg-background px-2 py-2 sm:px-3">
-        {typingSpeaker && (
+        {typingNames.length > 0 && (
           <p
             role="status"
+            aria-live="polite"
             className="mb-1.5 flex items-center gap-2 px-1 text-xs text-muted-foreground"
           >
             <span className="flex gap-0.5" aria-hidden="true">
@@ -168,7 +169,11 @@ export function ConversationThread({
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.1s]" />
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
             </span>
-            {typingSpeaker} está digitando…
+            {typingNames.length === 1
+              ? `${typingNames[0]} está digitando…`
+              : typingNames.length === 2
+                ? `${typingNames[0]} e ${typingNames[1]} estão digitando…`
+                : "Várias pessoas estão digitando…"}
           </p>
         )}
         {composerError && (
@@ -179,13 +184,7 @@ export function ConversationThread({
         <MessageComposer
           conversationId={conversation.id}
           onError={setComposerError}
-          onTypingChange={(typing) =>
-            setTypingSpeaker(
-              typing
-                ? (participants.find((p) => p.controlledBy === "AI")?.name ?? "Piloto")
-                : null,
-            )
-          }
+          onTypingChange={setTypingNames}
         />
       </div>
     </div>

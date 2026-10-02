@@ -78,7 +78,7 @@ beforeEach(() => {
       ];
       return { message: messages[messages.length - 1] };
     }
-    if (path === "/api/conversations/c1/autonomous-turn") {
+    if (path === "/api/conversations/c1/simulate-turn") {
       messages = [
         ...messages,
         {
@@ -91,13 +91,20 @@ beforeEach(() => {
         },
       ];
       return {
-        turn: {
+        simulation: {
           executed: true,
-          reasonCode: "EXECUTED",
-          decisionId: "d1",
-          messageId: "m-ai",
-          speakerCharacterId: "ai-1",
-          language: { provider: "deterministic", model: "behavior-language.v1", fallback: true },
+          stopReason: "NATURAL_END",
+          depth: 1,
+          steps: [
+            {
+              depth: 0,
+              characterId: "ai-1",
+              name: "Andrea Kimi Antonelli",
+              messageId: "m-ai",
+              language: { provider: "deterministic", model: "behavior-language.v1", fallback: true },
+            },
+          ],
+          selection: [],
         },
       };
     }
@@ -117,7 +124,7 @@ describe("ConversationThread — envio sem botão de geração", () => {
 
     await screen.findByText("Bom dia! Como você está?");
     const paths = apiMock.post.mock.calls.map((call) => String(call[0]));
-    expect(paths).toContain("/api/conversations/c1/autonomous-turn");
+    expect(paths).toContain("/api/conversations/c1/simulate-turn");
     expect(paths.some((path) => path.endsWith("/turn"))).toBe(false);
     expect(paths.some((path) => path.endsWith("/turn/stream"))).toBe(false);
     expect(screen.queryByRole("button", { name: /Gerar resposta IA/i })).toBeNull();
@@ -126,6 +133,24 @@ describe("ConversationThread — envio sem botão de geração", () => {
   it("2) mostra indicador de digitação enquanto a IA responde", async () => {
     let resolveTurn: ((value: unknown) => void) | undefined;
     apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/conversations/c1/simulate-turn/plan") {
+        return {
+          plan: {
+            energy: { energy: 0.4, intensity: 0.2, level: "NORMAL", reasons: [] },
+            window: { maxInitialResponders: 1, maxReactions: 1, maxChainDepth: 2 },
+            planned: [
+              {
+                characterId: "ai-1",
+                name: "Andrea Kimi Antonelli",
+                score: 30,
+                opportunity: 0.6,
+                reasons: ["SEEDED_VARIATION"],
+              },
+            ],
+            stopReason: "SELECTED",
+          },
+        };
+      }
       if (path === "/api/conversations/c1/messages") {
         messages = [
           ...messages,
@@ -154,11 +179,12 @@ describe("ConversationThread — envio sem botão de geração", () => {
 
     expect(await screen.findByText(/está digitando…/)).toBeDefined();
     resolveTurn?.({
-      turn: {
+      simulation: {
         executed: false,
-        reasonCode: "NO_AI_PARTICIPANT",
-        plan: null,
-        decisionId: null,
+        stopReason: "NO_AI_PARTICIPANT",
+        depth: 0,
+        steps: [],
+        selection: [],
       },
     });
     await waitFor(() => expect(screen.queryByText(/está digitando…/)).toBeNull());
