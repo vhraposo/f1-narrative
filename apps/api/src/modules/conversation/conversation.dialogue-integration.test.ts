@@ -113,6 +113,9 @@ describe("F3.4 — realizer integrado ao turn execution (TEST DB)", () => {
     });
     expect(result.executed).toBe(true);
     expect(result.steps.length).toBeGreaterThanOrEqual(1);
+    expect(result.trace?.length).toBeGreaterThanOrEqual(1);
+    expect(result.trace?.[0]?.realizerKind).toBe("deterministic");
+    expect(result.trace?.[0]?.messageIds.length).toBeGreaterThanOrEqual(1);
     const first = result.steps[0]!;
     expect(first.characterId).not.toBe(userCharacterId);
     const firstMessage = await prisma.message.findUniqueOrThrow({ where: { id: first.messageId } });

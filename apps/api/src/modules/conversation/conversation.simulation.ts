@@ -21,9 +21,10 @@ import {
 import {
   buildDialogueRealizerContext,
   createDialogueRealizer,
+  DeterministicDialogueRealizer,
   resolveDialogueRealizerKind,
-  validateRealizerResult,
 } from "./conversation.dialogue-realizer.js";
+import { validateDialogueOutput } from "./conversation.dialogue-output.js";
 import { selectResponseCandidates } from "./conversation.response-engine.js";
 import type { GenerationProvider } from "../generation/generation.assembly.js";
 
@@ -80,6 +81,16 @@ export type SimulationPlan = {
   }>;
 };
 
+export type DialogueExecutionTrace = {
+  readonly speakerCharacterId: string;
+  readonly intent: string;
+  readonly replyToMessageId: string | null;
+  readonly realizerKind: string;
+  readonly fallback: boolean;
+  readonly violations: readonly string[];
+  readonly messageIds: readonly string[];
+};
+
 export type SimulationResult = {
   readonly executed: boolean;
   readonly stopReason: SimulationStopReason;
@@ -87,6 +98,7 @@ export type SimulationResult = {
   readonly steps: readonly SimulationStep[];
   readonly selection: readonly SimulationSelectionTrace[];
   readonly plan: SimulationPlan;
+  readonly trace?: readonly DialogueExecutionTrace[];
 };
 
 type PlanInput = {
@@ -442,6 +454,8 @@ export async function simulateConversationTurn(
   }
   let lastMessageId: string | null = plan.dialogue.turns[0]?.replyToMessageId ?? null;
   let producedAny = false;
+  const executionTrace: DialogueExecutionTrace[] = [];
+  const deterministicRealizer = new DeterministicDialogueRealizer();
 
   async function realizeAndPersist(input: {
     readonly candidate: { characterId: string; name: string };
@@ -472,19 +486,45 @@ export async function simulateConversationTurn(
       language: "pt-BR",
     });
     const utterance = await realizer.realize(context);
-    const validation = validateRealizerResult(utterance, {
-      speakerCharacterId: input.candidate.characterId,
-      intent: input.intent,
-      replyToMessageId: input.replyToMessageId,
-      maxMessages: input.maxMessages,
+    const lastPersisted = [...messageById.values()].slice(-1)[0]?.content ?? null;
+    const replyToKnown = input.replyToMessageId === null || messageById.has(input.replyToMessageId);
+    let outputValidation = validateDialogueOutput({
+      context,
+      utterance,
+      previousMessageContent: lastPersisted,
+      replyToKnown,
     });
-    if (!validation.valid) {
-      stopReason = validation.errors[0] ?? "REALIZER_INVALID";
-      return false;
+    let usedFallback = false;
+    if (!outputValidation.valid) {
+      usedFallback = true;
+      const fallbackUtterance = await deterministicRealizer.realize(context);
+      outputValidation = validateDialogueOutput({
+        context,
+        utterance: fallbackUtterance,
+        previousMessageContent: lastPersisted,
+        replyToKnown,
+      });
+      if (!outputValidation.valid) {
+        stopReason = outputValidation.reason ?? "OUTPUT_INVALID";
+        return false;
+      }
     }
-    if (utterance.messages.length === 0) return true;
+    const effective = outputValidation.normalized!;
+    if (effective.messages.length === 0) {
+      executionTrace.push({
+        speakerCharacterId: input.candidate.characterId,
+        intent: input.intent,
+        replyToMessageId: input.replyToMessageId,
+        realizerKind: realizer.kind,
+        fallback: usedFallback,
+        violations: outputValidation.violations,
+        messageIds: [],
+      });
+      return true;
+    }
     let replyTo = input.replyToMessageId;
-    for (const fragment of utterance.messages) {
+    const persistedIds: string[] = [];
+    for (const fragment of effective.messages) {
       const turn: AutonomousTurnResult = await runAutonomousConversationTurn(conversationId, {
         userId: options.userId,
         ...(options.worldDate ? { worldDate: options.worldDate } : {}),
@@ -517,7 +557,17 @@ export async function simulateConversationTurn(
       });
       replyTo = turn.messageId;
       lastMessageId = turn.messageId;
+      persistedIds.push(turn.messageId);
     }
+    executionTrace.push({
+      speakerCharacterId: input.candidate.characterId,
+      intent: input.intent,
+      replyToMessageId: input.replyToMessageId,
+      realizerKind: realizer.kind,
+      fallback: usedFallback,
+      violations: outputValidation.violations,
+      messageIds: persistedIds,
+    });
     return true;
   }
 
@@ -603,5 +653,13 @@ export async function simulateConversationTurn(
   }
 
   if (steps.length > 0 && steps.length >= maxDepth) stopReason = "DEPTH_LIMIT";
-  return { executed: steps.length > 0, stopReason, depth: steps.length, steps, selection, plan };
+  return {
+    executed: steps.length > 0,
+    stopReason,
+    depth: steps.length,
+    steps,
+    selection,
+    plan,
+    trace: executionTrace,
+  };
 }
