@@ -28,6 +28,10 @@ import { validateDialogueOutput } from "./conversation.dialogue-output.js";
 import { deriveDialogueEmotion } from "./conversation.dialogue-emotion.js";
 import { deriveDialogueTopic } from "./conversation.dialogue-topic.js";
 import { buildDialogueMemoryContext } from "./conversation.dialogue-memory.js";
+import {
+  buildDialogueContext,
+  buildDialogueKnowledgeContext,
+} from "./conversation.dialogue-context.js";
 import { retrieveRelevantMemories } from "../memory/memory.retrieval.js";
 import { selectResponseCandidates } from "./conversation.response-engine.js";
 import type { GenerationProvider } from "../generation/generation.assembly.js";
@@ -489,6 +493,33 @@ export async function simulateConversationTurn(
       conversationParticipantIds: initialInput!.participantIds,
       memories: authorizedMemories,
     });
+    const emotion = deriveDialogueEmotion({
+      energy: plan.energy,
+      affinity: typeof affinity === "number" ? affinity : null,
+      recentMessages,
+    });
+    const topicContext = deriveDialogueTopic({
+      messages: recentMessages,
+      previousTopic: null,
+    });
+    const knowledgeContext = buildDialogueKnowledgeContext({
+      universeId: initialInput!.universeId,
+      memories: authorizedMemories.map((memory) => ({
+        id: memory.id,
+        summary: memory.summary,
+        content: memory.content,
+        importance: memory.importance,
+        universeId: initialInput!.universeId,
+      })),
+    });
+    const dialogueContext = buildDialogueContext({
+      speakerCharacterId: input.candidate.characterId,
+      emotion,
+      topic: topicContext,
+      memory: memoryContext,
+      knowledge: knowledgeContext,
+      affinity: typeof affinity === "number" ? affinity : null,
+    });
     const context = buildDialogueRealizerContext({
       speakerCharacterId: input.candidate.characterId,
       speakerName: input.candidate.name,
@@ -498,20 +529,14 @@ export async function simulateConversationTurn(
         ? messageById.get(input.replyToMessageId)?.content ?? null
         : null,
       recentMessages,
-      emotion: deriveDialogueEmotion({
-        energy: plan.energy,
-        affinity: typeof affinity === "number" ? affinity : null,
-        recentMessages,
-      }),
+      emotion: dialogueContext.emotion,
       topic: plan.dialogue.topic,
-      topicContext: deriveDialogueTopic({
-        messages: recentMessages,
-        previousTopic: null,
-      }),
+      topicContext: dialogueContext.topic,
       emotionalTone: plan.dialogue.emotionalTone,
-      relationshipAffinity: typeof affinity === "number" ? affinity : null,
+      relationshipAffinity: dialogueContext.relationship.affinity,
       memorySummaries: memoryContext.items.map((item) => item.summary),
       memoryContext,
+      knowledgeContext: dialogueContext.knowledge,
       voice: realizerVoice(affinity),
       maxMessages: input.maxMessages,
       language: "pt-BR",

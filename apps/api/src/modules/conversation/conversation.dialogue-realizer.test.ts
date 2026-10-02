@@ -427,6 +427,7 @@ describe("F3.3 — provider do Dialogue Realizer", () => {
         "emotion",
         "emotionalTone",
         "intent",
+        "knowledgeContext",
         "language",
         "maxMessages",
         "memoryContext",
