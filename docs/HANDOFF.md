@@ -2,11 +2,11 @@
 
 ## Estado atual
 - Branch: `v4-Living-F1-Universe`
-- HEAD: `5719019` — `feat(conversation): bridge domain evidence to conversation opportunities` (F6.4)
+- HEAD: `1cc8562` — `test(conversation): complete F6 evals and documentation` (F6.5)
 - Working tree: limpo (após commit deste HANDOFF)
-- Última fase concluída: F6.4
-- Subfase atual: nenhuma; F6.5 não iniciada
-- Próximo checkpoint: F6.5 — evals F6-E01..E10 + full API/build + doc F6
+- Última fase concluída: F6.5 (F6 encerrada de F6.1 a F6.5)
+- Subfase atual: nenhuma; F7 não iniciada
+- Próximo checkpoint: F7 — private groups/secrets (não iniciada)
 
 ## Roadmap (commits reais)
 F5 (concluída):
@@ -15,60 +15,44 @@ F5 (concluída):
 - F5.3 memory — `91d319e`
 - F5.4 knowledge asymmetry + buildDialogueContext — `4c6ac82`
 
-F6:
-- F6.1 conversation opportunity — `48e83ba` (concluída)
-- F6.2 seleção no autonomy tick — `502f998` (concluída)
-- F6.3 execução de envelope a partir da oportunidade (AI↔AI, TEST DB) — `9c1c006` (concluída)
-- F6.4 ponte eventos→oportunidade — `5719019` (concluída)
-- F6.5 evals F6-E01..E10 + full API/build + doc F6 — PENDENTE
+F6 (concluída):
+- F6.1 conversation opportunity — `48e83ba`
+- F6.2 seleção no autonomy tick — `502f998`
+- F6.3 execução de envelope a partir da oportunidade (AI↔AI, TEST DB) — `9c1c006`
+- F6.4 ponte eventos→oportunidade — `5719019`
+- F6.5 evals F6-E01..E10 + full API/build + doc F6 — `1cc8562`
 
 F7 (private groups/secrets), F8 (UI/microbehaviors), F9 (benchmark gate): não iniciadas.
 
-## Última implementação (F6.4)
-Investigação (sem alterar código) e ponte evento→oportunidade:
-- Achados do fluxo real: eventos nascem em `createEventWithDerivations` (behavior command CREATE_EVENT,
-  world-simulation schedule, event routes, ai-behavior, race-narrative) e derivam NewsItem +
-  `applyEventEvolution` (que cria RelationshipChange com `sourceType="EVENT"`/`sourceId=eventId` e
-  UMA Memory com `eventId`). Os triggers `EVENT_CREATED`, `MEMORY_CREATED` e `RELATIONSHIP_CHANGED`
-  NÃO têm consumidor de produção (só types/policy/routes/testes); `RACE_FINISHED` é consumido por
-  `processRaceConsequences` apenas para criar AiDecision de auditoria — nenhum deles produzia
-  oportunidade. Por isso a estratégia escolhida foi **A (adaptador)**, não B.
-- `conversation.opportunity-bridge.ts` (novo, puro/determinístico): converte `OpportunityEvidence`
-  (EVENT/MEMORY/RELATIONSHIP_CHANGE/GOAL/INACTIVITY) em `ConversationOpportunitySignal[]` com
-  strength/target determinísticos. Não persiste nada, não executa conversa, não chama LLM.
-  `buildAutonomyOpportunityPlan` consome a ponte (substituiu os loops inline da F6.2); depois
-  `buildConversationOpportunity` → seleção F6.2 → envelope F6.3 permanecem intocados.
-- `evidenceId` canônico por raiz de domínio: EVENT `event:<id>`; MEMORY com `eventId` →
-  `event:<eventId>` (senão `memory:<id>`); RELATIONSHIP_CHANGE com `sourceType="EVENT"`+`sourceId`
-  → `event:<sourceId>` (senão `relationship-change:<id>`); GOAL `goal:<id>`; INACTIVITY
-  `inactivity:<conversationId>:<lastMessageId|none>`. Algoritmo de fingerprint F6.1 inalterado
-  (apenas o valor de evidenceId de linhas derivadas de evento foi canonicalizado, deliberadamente).
-- Dedupe/idempotência: evento + memória derivada + relationship change derivados compartilham
-  `event:<id>`; a seleção F6.2 rejeita os derivados com `DUPLICATE_EVIDENCE` e mantém a maior
-  prioridade (WORLD_EVENT). Replay do mesmo evento/linha gera o mesmo evidenceId/fingerprint.
-- Race: Event da narrativa de corrida → WORLD_EVENT `event:<id>`; Memory de race-consequences
-  (sem eventId) → MEMORY_TRIGGER `memory:<id>`. Sem novo reason.
-- Modos e envelope F6.3 inalterados: OFF/PAUSED/STOPPED/REUSED não executam; OBSERVER/GUIDED
-  audit-only; FULL executa via `simulateConversationTurn`.
-Testes: +16 (12 puros da ponte + 4 de integração no tick: dedupe evento+derivações, isolamento
-por universe, evento sem conversa elegível, FULL evento→oportunidade→envelope). Subset
-conversation+autonomy 30 files / 440 tests verde. Suíte completa API 203 files / 2864 tests verde.
-`tsc --noEmit`, ESLint do escopo e build `tsc -p` verdes.
-Flake observado 1x (não reproduzido): `conversation.autonomous.test.ts` #13 (primeira seleção
-esperada para characterA veio characterB) no subset; passou isolado e no rerun do subset — sem
-relação com F6.4; documentado e não mascarado.
+## Última implementação (F6.5)
+Fechamento da F6 com evals e documentação, sem novo mecanismo:
+- `conversation/conversation.dialogue-f6-evals.test.ts`: evals F6-E01..E10 + agregação de métricas,
+  em TEST DB com fixtures próprias e cleanup em `afterAll`. Resultados reais (todos PASS):
+  E01 evento gera oportunidade (audit WORLD_EVENT, `event:<id>`); E02 personagem irrelevante
+  excluído; E03 personagem relevante inicia (FULL, replyTo real); E04 AI→AI espontâneo sem USER;
+  E05 reação relationship-aware (RELATIONSHIP_SIGNAL + target preservado); E06 duplicata bloqueada
+  (evento + memória derivada + changes → mesma evidência, 1 audit); E07 cooldown bloqueia e libera;
+  E08 stop natural sem fala adicional; E09 isolamento de Universe; E10 replay determinístico
+  (plano idêntico + tick REUSED).
+- `docs/post-v4-dialogue-engine-f6.md`: documento da fase (objetivo, arquitetura, F6.1–F6.5,
+  fluxo, budgets, dedupe, cooldown, fingerprint/evidenceId, isolamento, AI↔AI, modos, Command
+  Layer, testes/evals, resultados, limitações, riscos, decisões, próximos passos).
+- Validação real: eval F6 rodada 2x verde (sem flake); subset conversation+autonomy 31 files /
+  451 tests; suíte completa API 204 files / 2875 tests; `tsc --noEmit` verde; ESLint do escopo
+  (conversation+autonomy) verde; build `tsc -p` verde. DEV somente leitura; TEST com cleanup;
+  nenhuma migration.
 
-## Próxima ação — F6.5 (exata)
-Fechar a fase F6 com evals e documentação, sem novo mecanismo:
-- implementar/rodar as evals F6-E01..E10 no padrão das evals existentes (determinístico, TEST DB
-  com cleanup), cobrindo opportunity→seleção→envelope e a ponte F6.4;
-- rodar conversation suite + full API + build API (`tsc -p`) reais;
-- escrever o doc F6 (escopo, arquitetura, evidência, limitações) em `docs/`;
-- não alterar planner/realizer/validator/Command Layer nem criar event bus/outbox/writer novo.
+## Próxima ação — F7 (exata)
+Private groups/secrets. Antes de implementar: inspecionar o código real de `Conversation`/
+`ConversationParticipant`/`Message` e das rotas/permissões existentes para definir o menor
+recorte de privacidade (grupos privados, secrets por grupo) sem novo writer/pipeline; manter
+Command Layer como writer único e Context Assembly com apenas contexto autorizado. DEV read-only;
+TEST com fixtures/cleanup; um commit por subfase; atualizar este HANDOFF ao final.
 
 ## Decisões F6 (tomadas)
 - Iniciativa automática só em GUIDED/FULL; OFF não executa; OBSERVER audit-only; GUIDED sem
-  execução de envelope; FULL executa envelope via pipeline F3–F5.
+  execução de envelope; FULL executa envelope via pipeline F3–F5; PAUSED/STOPPED/REUSED não
+  executam.
 - `AUTONOMY_MAX_CONVERSATIONS_PER_TICK=2` (env-configurável); envelope respeita também
   `AUTONOMY_MAX_ACTIONS_PER_TICK` e `AUTONOMY_MAX_MESSAGES_PER_TICK`.
 - Não criar novo SimulationTick, event bus/outbox, pipeline textual ou writer.
@@ -80,6 +64,7 @@ Fechar a fase F6 com evals e documentação, sem novo mecanismo:
   com fingerprint/evidenceId; não recomputar `buildAutonomyOpportunityPlan` no mesmo tick.
 - F6.4: evidência derivada de Event usa a raiz canônica `event:<id>` (evento, memória derivada e
   relationship change derivado convergem para o mesmo evidenceId).
+- Evals F6 ficam em TEST DB, determinísticas, com cleanup completo; sem mocks de writer.
 
 ## Riscos conhecidos (F6)
 - Loops A↔B entre envelopes → cooldown + fingerprint + ≤1 envelope/conversa/tick (F6.2/F6.3).
@@ -88,7 +73,10 @@ Fechar a fase F6 com evals e documentação, sem novo mecanismo:
 - Duplicação → fingerprint por evidência/janela + evidenceId canônico por raiz (F6.4).
 - Custo LLM → caminho autônomo sem provider; realizer determinístico default.
 - Vazamento entre universos → queries escopadas + validação de participantes + F5 por speaker.
-- Evals F6 ainda não escritas (F6.5); flake pontual do teste #13 (não reproduzido).
+- Fingerprint de linhas derivadas de evento mudou com a canonicalização F6.4 (documentado; sem
+  dados F6 em produção).
+- Flake histórico 1x em `conversation.autonomous.test.ts` #13 (não reproduzido; passou isolado e
+  nos reruns completos desta execução).
 
 ## Regras essenciais
 Ver `AGENTS.md`. DEV read-only; TEST com cleanup; um commit por subfase; nunca amend;
@@ -96,6 +84,7 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md` e `AGENTS.md`. Valide Git (branch, HEAD, working tree). Confirme que
-o HEAD é o checkpoint registrado. Execute a próxima ação descrita no HANDOFF (F6.5). Rode os
-testes/typecheck/lint, crie um commit novo, atualize `docs/HANDOFF.md` e pare no checkpoint
-verde. Não use amend."
+o HEAD é o checkpoint registrado. A F6 está encerrada (F6.1–F6.5). Não repita fases concluídas.
+Execute a próxima ação descrita no HANDOFF (F7 — private groups/secrets) somente após inspecionar
+o código real relevante. Rode os testes/typecheck/lint, crie um commit novo, atualize
+`docs/HANDOFF.md` e pare no checkpoint verde. Não use amend."
