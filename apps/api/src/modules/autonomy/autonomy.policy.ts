@@ -9,6 +9,7 @@ export type AutonomyBudgets = {
   readonly maxAutonomousCharacters: number;
   readonly maxLlmCallsPerTick: number;
   readonly tickWindowHours: number;
+  readonly maxConversationsPerTick: number;
 };
 
 function readPositiveInt(name: string, fallback: number): number {
@@ -38,5 +39,6 @@ export function autonomyBudgets(): AutonomyBudgets {
     maxAutonomousCharacters: readPositiveInt("AUTONOMY_MAX_CHARACTERS_PER_TICK", 5),
     maxLlmCallsPerTick: readNonNegativeInt("AUTONOMY_MAX_LLM_CALLS_PER_TICK", 0),
     tickWindowHours: readPositiveInt("AUTONOMY_TICK_WINDOW_HOURS", 24),
+    maxConversationsPerTick: readPositiveInt("AUTONOMY_MAX_CONVERSATIONS_PER_TICK", 2),
   };
 }

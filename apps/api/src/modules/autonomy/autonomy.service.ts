@@ -7,6 +7,11 @@ import { executeBehaviorDecision } from "../behavior/behavior.execution.js";
 import { evaluateBehaviorPolicy } from "../behavior/behavior.policy.js";
 import { resolveCharacterGoals } from "../behavior/behavior.goals.js";
 import { runSimulationTick } from "../world-simulation/world-simulation.tick.js";
+import {
+  buildAutonomyOpportunityPlan,
+  toConversationOpportunityAudit,
+  toConversationOpportunitySelectionAudit,
+} from "./autonomy.opportunities.js";
 import { AUTONOMY_VERSION, autonomyBudgets } from "./autonomy.policy.js";
 
 export class AutonomyError extends Error {
@@ -261,6 +266,24 @@ export async function runAutonomousTick(input: {
     input.universeId,
     budgets.maxAutonomousCharacters,
   );
+  const opportunityPlan = await buildAutonomyOpportunityPlan({
+    universeId: input.universeId,
+    fromDate,
+    toDate,
+    characterIds: characters.map((entry) => entry.characterId),
+    maxConversations: budgets.maxConversationsPerTick,
+    cooldownHours: budgets.tickWindowHours,
+  });
+  const selectedOpportunityByCharacter = new Map(
+    opportunityPlan.selection.selected.map((selected) => [
+      selected.opportunity.characterId,
+      selected,
+    ]),
+  );
+  const selectionAudit = toConversationOpportunitySelectionAudit(
+    opportunityPlan.selection,
+    budgets.maxConversationsPerTick,
+  );
   let decisionsEvaluated = 0;
   let actionsExecuted = 0;
   let actionsRejected = 0;
@@ -281,43 +304,60 @@ export async function runAutonomousTick(input: {
     });
     if (existing) continue;
 
-    const relationship = await prisma.relationship.findFirst({
-      where: {
-        OR: [
-          { characterAId: entry.characterId },
-          { characterBId: entry.characterId },
-        ],
-      },
-      orderBy: { id: "asc" },
-      select: { characterAId: true, characterBId: true },
-    });
-    const targetCharacterId = relationship
-      ? relationship.characterAId === entry.characterId
-        ? relationship.characterBId
-        : relationship.characterAId
-      : null;
-    const conversation =
-      targetCharacterId === null
-        ? null
-        : await prisma.conversation.findFirst({
-            where: {
-              AND: [
-                { participants: { some: { characterId: entry.characterId } } },
-                { participants: { some: { characterId: targetCharacterId } } },
-              ],
-            },
-            orderBy: { createdAt: "asc" },
-            select: { id: true },
-          });
+    const selectedOpportunity =
+      selectedOpportunityByCharacter.get(entry.characterId) ?? null;
+    let targetCharacterId: string | null;
+    let conversationId: string | null;
+    if (selectedOpportunity) {
+      targetCharacterId = selectedOpportunity.opportunity.targetCharacterId;
+      conversationId = selectedOpportunity.opportunity.conversationId;
+    } else {
+      const relationship = await prisma.relationship.findFirst({
+        where: {
+          OR: [
+            { characterAId: entry.characterId },
+            { characterBId: entry.characterId },
+          ],
+        },
+        orderBy: { id: "asc" },
+        select: { characterAId: true, characterBId: true },
+      });
+      targetCharacterId = relationship
+        ? relationship.characterAId === entry.characterId
+          ? relationship.characterBId
+          : relationship.characterAId
+        : null;
+      const conversation =
+        targetCharacterId === null
+          ? null
+          : await prisma.conversation.findFirst({
+              where: {
+                AND: [
+                  { participants: { some: { characterId: entry.characterId } } },
+                  { participants: { some: { characterId: targetCharacterId } } },
+                ],
+              },
+              orderBy: { createdAt: "asc" },
+              select: { id: true },
+            });
+      conversationId = conversation?.id ?? null;
+    }
 
     const decision = await evaluateBehaviorDecision({
       universeId: input.universeId,
       characterId: entry.characterId,
       trigger: "AUTONOMOUS_TICK",
       worldDate: toDate,
-      conversationId: conversation?.id ?? null,
+      conversationId,
       userInitiated: false,
-      metadata: { tickId: tick.tickId, ...(targetCharacterId ? { targetCharacterId } : {}) },
+      metadata: {
+        tickId: tick.tickId,
+        ...(targetCharacterId ? { targetCharacterId } : {}),
+        opportunitySelection: selectionAudit,
+        ...(selectedOpportunity
+          ? { conversationOpportunity: toConversationOpportunityAudit(selectedOpportunity) }
+          : {}),
+      },
     });
     decisionsEvaluated += 1;
     if (state.mode !== "FULL" || decision.selected.actionType === "NO_ACTION") continue;
