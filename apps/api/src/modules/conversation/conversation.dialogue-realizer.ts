@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
 
 import { z } from "zod";
 
@@ -291,4 +292,103 @@ export class DeterministicDialogueRealizer implements DialogueRealizer {
       messages: fragments.map((text, index) => ({ text, fragmentIndex: index })),
     };
   }
+}
+
+export type DialogueRealizerKind = "off" | "deterministic" | "llm";
+
+export function resolveDialogueRealizerKind(
+  value: string | undefined = process.env.DIALOGUE_REALIZER,
+): DialogueRealizerKind {
+  if (value === "llm") return "llm";
+  if (value === "off") return "off";
+  return "deterministic";
+}
+
+export type RealizerTrace = {
+  readonly realizerKind: "llm";
+  readonly provider: string;
+  readonly model: string | null;
+  readonly latencyMs: number;
+  readonly valid: boolean;
+  readonly fallback: boolean;
+  readonly invalidReason: string | null;
+};
+
+export class LlmDialogueRealizer implements DialogueRealizer {
+  readonly kind = "llm" as const;
+  private trace: RealizerTrace | null = null;
+  private readonly deterministic = new DeterministicDialogueRealizer();
+
+  constructor(private readonly provider: DialogueRealizerProvider) {}
+
+  get lastTrace(): RealizerTrace | null {
+    return this.trace;
+  }
+
+  async realize(context: DialogueRealizerContext): Promise<DialogueUtterance> {
+    const started = performance.now();
+    if (context.intent === "SILENCE") {
+      const utterance = await this.deterministic.realize(context);
+      this.trace = {
+        realizerKind: "llm",
+        provider: this.provider.name,
+        model: this.provider.model ?? null,
+        latencyMs: Math.round(performance.now() - started),
+        valid: true,
+        fallback: false,
+        invalidReason: null,
+      };
+      return utterance;
+    }
+    try {
+      const raw = await this.provider.realize(context);
+      const validation = validateRealizerResult(raw, {
+        speakerCharacterId: context.speakerCharacterId,
+        intent: context.intent,
+        replyToMessageId: context.replyToMessageId,
+        maxMessages: context.maxMessages,
+      });
+      if (!validation.valid) {
+        return this.fallback(context, validation.errors[0] ?? "INVALID_OUTPUT", started);
+      }
+      this.trace = {
+        realizerKind: "llm",
+        provider: this.provider.name,
+        model: this.provider.model ?? null,
+        latencyMs: Math.round(performance.now() - started),
+        valid: true,
+        fallback: false,
+        invalidReason: null,
+      };
+      return raw as DialogueUtterance;
+    } catch {
+      return this.fallback(context, "PROVIDER_ERROR", started);
+    }
+  }
+
+  private async fallback(
+    context: DialogueRealizerContext,
+    reason: string,
+    started: number,
+  ): Promise<DialogueUtterance> {
+    const utterance = await this.deterministic.realize(context);
+    this.trace = {
+      realizerKind: "llm",
+      provider: this.provider.name,
+      model: this.provider.model ?? null,
+      latencyMs: Math.round(performance.now() - started),
+      valid: false,
+      fallback: true,
+      invalidReason: reason,
+    };
+    return utterance;
+  }
+}
+
+export function createDialogueRealizer(
+  kind: DialogueRealizerKind,
+  provider?: DialogueRealizerProvider,
+): DialogueRealizer {
+  if (kind === "llm" && provider) return new LlmDialogueRealizer(provider);
+  return new DeterministicDialogueRealizer();
 }

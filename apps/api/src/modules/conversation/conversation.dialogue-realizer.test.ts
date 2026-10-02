@@ -3,12 +3,16 @@ import { describe, expect, it } from "vitest";
 import { DialogueUtteranceSchema, type DialogueIntent, type DialogueUtterance } from "./conversation.dialogue.js";
 import {
   buildDialogueRealizerContext,
+  createDialogueRealizer,
   DeterministicDialogueRealizer,
   DialogueRealizerContextSchema,
   INTENT_REALIZATION_POLICY,
   isGenericText,
+  LlmDialogueRealizer,
+  resolveDialogueRealizerKind,
   validateRealizerResult,
   type DialogueRealizerContext,
+  type DialogueRealizerProvider,
 } from "./conversation.dialogue-realizer.js";
 
 function context(overrides: Partial<DialogueRealizerContext> = {}): DialogueRealizerContext {
@@ -301,5 +305,140 @@ describe("F3.2 — DeterministicDialogueRealizer", () => {
         expect(isGenericText(phrase)).toBe(false);
       }
     }
+  });
+});
+
+function validUtteranceFor(context: DialogueRealizerContext) {
+  return {
+    speakerCharacterId: context.speakerCharacterId,
+    replyToMessageId: context.replyToMessageId,
+    intent: context.intent,
+    messages: [{ text: "kkkk", fragmentIndex: 0 }],
+  };
+}
+
+function providerReturning(value: unknown): DialogueRealizerProvider {
+  return { name: "stub-realizer", model: "stub-1", async realize() { return value; } };
+}
+
+function providerFailing(): DialogueRealizerProvider {
+  return { name: "failing-realizer", async realize() { throw new Error("provider indisponível"); } };
+}
+
+describe("F3.3 — provider do Dialogue Realizer", () => {
+  it("flag default é deterministic; off e llm reconhecidos", () => {
+    expect(resolveDialogueRealizerKind(undefined)).toBe("deterministic");
+    expect(resolveDialogueRealizerKind("")).toBe("deterministic");
+    expect(resolveDialogueRealizerKind("off")).toBe("off");
+    expect(resolveDialogueRealizerKind("llm")).toBe("llm");
+  });
+
+  it("provider ausente cai para deterministic mesmo com kind llm", () => {
+    expect(createDialogueRealizer("llm").kind).toBe("deterministic");
+    expect(createDialogueRealizer("off").kind).toBe("deterministic");
+  });
+
+  it("provider presente com kind llm cria LlmDialogueRealizer", () => {
+    expect(createDialogueRealizer("llm", providerReturning(validUtteranceFor(context()))).kind).toBe("llm");
+  });
+
+  it("output estruturado válido é aceito com trace sem fallback", async () => {
+    const ctx = context();
+    const realizer = new LlmDialogueRealizer(providerReturning(validUtteranceFor(ctx)));
+    const utterance = await realizer.realize(ctx);
+    expect(utterance).toEqual(validUtteranceFor(ctx));
+    expect(realizer.lastTrace?.valid).toBe(true);
+    expect(realizer.lastTrace?.fallback).toBe(false);
+    expect(realizer.lastTrace?.provider).toBe("stub-realizer");
+  });
+
+  it("provider que lança erro usa fallback determinístico", async () => {
+    const ctx = context();
+    const realizer = new LlmDialogueRealizer(providerFailing());
+    const utterance = await realizer.realize(ctx);
+    const expected = await new DeterministicDialogueRealizer().realize(ctx);
+    expect(utterance).toEqual(expected);
+    expect(realizer.lastTrace?.fallback).toBe(true);
+    expect(realizer.lastTrace?.invalidReason).toBe("PROVIDER_ERROR");
+  });
+
+  it("schema inválido, speaker, intent, replyTo, texto vazio e fragmentos demais caem no fallback", async () => {
+    const cases: Array<[unknown, string]> = [
+      [{ nope: true }, "INVALID_SCHEMA"],
+      [{ ...validUtteranceFor(context()), speakerCharacterId: "ai-max" }, "SPEAKER_MISMATCH"],
+      [{ ...validUtteranceFor(context()), intent: "ANSWER" }, "INTENT_MISMATCH"],
+      [{ ...validUtteranceFor(context()), replyToMessageId: "msg-999" }, "REPLY_TO_MISMATCH"],
+      [{ ...validUtteranceFor(context()), messages: [{ text: "  ", fragmentIndex: 0 }] }, "EMPTY_TEXT"],
+      [
+        {
+          ...validUtteranceFor(context()),
+          messages: [
+            { text: "kkkk", fragmentIndex: 0 },
+            { text: "pera", fragmentIndex: 1 },
+          ],
+        },
+        "MAX_MESSAGES_EXCEEDED",
+      ],
+    ];
+    for (const [raw, expectedReason] of cases) {
+      const realizer = new LlmDialogueRealizer(providerReturning(raw));
+      await realizer.realize(context());
+      expect(realizer.lastTrace?.fallback).toBe(true);
+      expect(realizer.lastTrace?.invalidReason).toBe(expectedReason);
+    }
+  });
+
+  it("SILENCE não chama o provider", async () => {
+    let calls = 0;
+    const provider: DialogueRealizerProvider = {
+      name: "counting",
+      async realize() {
+        calls += 1;
+        return validUtteranceFor(context({ intent: "SILENCE" }));
+      },
+    };
+    const utterance = await new LlmDialogueRealizer(provider).realize(context({ intent: "SILENCE" }));
+    expect(calls).toBe(0);
+    expect(utterance.messages).toEqual([]);
+  });
+
+  it("replay determinístico do fallback", async () => {
+    const first = new LlmDialogueRealizer(providerFailing());
+    const second = new LlmDialogueRealizer(providerFailing());
+    const ctx = context({ intent: "SUPPORT", maxMessages: 2 });
+    expect(await first.realize(ctx)).toEqual(await second.realize(ctx));
+  });
+
+  it("contexto do provider usa allowlist e não contém secrets", async () => {
+    let received: Record<string, unknown> | null = null;
+    const provider: DialogueRealizerProvider = {
+      name: "capture",
+      async realize(ctx) {
+        received = ctx as unknown as Record<string, unknown>;
+        return validUtteranceFor(ctx);
+      },
+    };
+    const raw = { ...context(), apiKey: "sk-secret", authorization: "Bearer x" };
+    const parsed = DialogueRealizerContextSchema.parse(raw);
+    await new LlmDialogueRealizer(provider).realize(parsed);
+    expect(received).not.toBeNull();
+    expect(Object.keys(received!).sort()).toEqual(
+      [
+        "emotionalTone",
+        "intent",
+        "language",
+        "maxMessages",
+        "memorySummaries",
+        "recentMessages",
+        "relationshipAffinity",
+        "replyToContent",
+        "replyToMessageId",
+        "speakerCharacterId",
+        "speakerName",
+        "topic",
+        "voice",
+      ].sort(),
+    );
+    expect(JSON.stringify(received)).not.toContain("sk-secret");
   });
 });
