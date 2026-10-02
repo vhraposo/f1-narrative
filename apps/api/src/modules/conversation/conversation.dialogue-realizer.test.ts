@@ -437,6 +437,7 @@ describe("F3.3 — provider do Dialogue Realizer", () => {
         "speakerCharacterId",
         "speakerName",
         "topic",
+        "topicContext",
         "voice",
       ].sort(),
     );

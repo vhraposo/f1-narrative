@@ -10,6 +10,7 @@ import {
   type DialogueUtterance,
 } from "./conversation.dialogue.js";
 import { DialogueEmotionContextSchema } from "./conversation.dialogue-emotion.js";
+import { DialogueTopicContextSchema } from "./conversation.dialogue-topic.js";
 
 export const RealizerVoiceSchema = z.object({
   informality: z.number().min(0).max(1),
@@ -33,6 +34,7 @@ export const DialogueRealizerContextSchema = z.object({
   replyToContent: z.string().nullable(),
   recentMessages: z.array(RealizerRecentMessageSchema).max(6),
   topic: z.string().nullable(),
+  topicContext: DialogueTopicContextSchema.nullable().optional().default(null),
   emotionalTone: z.string().nullable(),
   emotion: DialogueEmotionContextSchema.nullable().optional().default(null),
   relationshipAffinity: z.number().min(0).max(1).nullable(),
