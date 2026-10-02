@@ -1210,6 +1210,8 @@ model Relationship {
   // Dimensões multidimensionais (amizade, confiança, respeito, rivalidade, ...)
   dimensions Json @default("{}")
 
+  changes RelationshipChange[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2355,4 +2357,31 @@ model CharacterGoal {
   @@index([characterId, status])
   @@index([universeId, kind, status])
   @@index([validTo])
+}
+
+model RelationshipChange {
+  id             String       @id @default(uuid()) @db.Uuid
+  relationshipId String       @db.Uuid
+  relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  characterAId String @db.Uuid
+  characterBId String @db.Uuid
+
+  dimension      String
+  previousValue  Int
+  delta          Int
+  resultingValue Int
+
+  ruleCode   String
+  sourceType String
+  sourceId   String?
+  worldDate  DateTime?
+  fingerprint String @unique
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([relationshipId, createdAt])
+  @@index([characterAId, characterBId, createdAt])
+  @@index([sourceType, sourceId])
 }

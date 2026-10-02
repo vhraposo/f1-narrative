@@ -1,5 +1,6 @@
 import type { Prisma, EventType, EventImportance } from "@prisma/client";
-import { canonicalizeRelationshipPair } from "../relationships/relationship.pair.js";
+import { applyRelationshipDelta } from "../relationships/relationship.evolution.js";
+import { socialRuleForEvent } from "../relationships/relationship.rules.js";
 
 export const EVOLUTION_ELIGIBLE_TYPES: readonly EventType[] = [
   "RACE_INCIDENT",
@@ -10,13 +11,6 @@ export const EVOLUTION_ELIGIBLE_TYPES: readonly EventType[] = [
 const DIMENSION_MIN = -100;
 const DIMENSION_MAX = 100;
 
-const IMPORTANCE_WEIGHT: Record<EventImportance, number> = {
-  LOW: 0.5,
-  MEDIUM: 1,
-  HIGH: 1.5,
-  CRITICAL: 2,
-};
-
 const EMOTIONAL_IMPACT: Record<EventType, number> = {
   RACE: 0,
   RACE_INCIDENT: -5,
@@ -25,16 +19,6 @@ const EMOTIONAL_IMPACT: Record<EventType, number> = {
   PERSONAL: 0,
   NEWS: 0,
   WORLD: 0,
-};
-
-const BASE_DELTAS: Record<EventType, EvolutionDelta> = {
-  RACE: { affinity: 0, trust: 0, rivalry: 0 },
-  RACE_INCIDENT: { affinity: -20, trust: -10, rivalry: 30 },
-  RELATIONSHIP: { affinity: 25, trust: 20, rivalry: -10 },
-  SOCIAL: { affinity: 10, trust: 5, rivalry: 0 },
-  PERSONAL: { affinity: 0, trust: 0, rivalry: 0 },
-  NEWS: { affinity: 0, trust: 0, rivalry: 0 },
-  WORLD: { affinity: 0, trust: 0, rivalry: 0 },
 };
 
 export interface EvolutionDelta {
@@ -54,13 +38,7 @@ export function computeEventDelta(
   type: EventType,
   importance: EventImportance,
 ): EvolutionDelta {
-  const base = BASE_DELTAS[type];
-  const weight = IMPORTANCE_WEIGHT[importance];
-  return {
-    affinity: Math.round(base.affinity * weight),
-    trust: Math.round(base.trust * weight),
-    rivalry: Math.round(base.rivalry * weight),
-  };
+  return socialRuleForEvent(type, importance).deltas;
 }
 
 function clampDimension(value: number): number {
@@ -138,7 +116,7 @@ export async function applyEventEvolution(
     evolutionMemory?.participants.map((p) => p.characterId) ?? [],
   );
 
-  const delta = computeEventDelta(event.type, event.importance);
+  const rule = socialRuleForEvent(event.type, event.importance);
   let appliedPairs = 0;
 
   for (let i = 0; i < participantIds.length; i += 1) {
@@ -148,33 +126,19 @@ export async function applyEventEvolution(
       if (appliedIds.has(pairA) && appliedIds.has(pairB)) {
         continue;
       }
-      const canonical = canonicalizeRelationshipPair(pairA, pairB);
-      const existing = await client.relationship.findFirst({
-        where: {
-          characterAId: canonical.characterAId,
-          characterBId: canonical.characterBId,
+      await applyRelationshipDelta(
+        {
+          characterAId: pairA,
+          characterBId: pairB,
+          deltas: rule.deltas,
+          ruleCode: rule.ruleCode,
+          sourceType: "EVENT",
+          sourceId: eventId,
+          worldDate: event.worldDate,
+          metadata: { eventType: event.type, importance: event.importance },
         },
-        select: { id: true, dimensions: true },
-      });
-      if (existing) {
-        await client.relationship.update({
-          where: { id: existing.id },
-          data: {
-            dimensions: mergeEvolutionDimensions(
-              existing.dimensions,
-              delta,
-            ) as Prisma.InputJsonValue,
-          },
-        });
-      } else {
-        await client.relationship.create({
-          data: {
-            characterAId: canonical.characterAId,
-            characterBId: canonical.characterBId,
-            dimensions: mergeEvolutionDimensions({}, delta) as Prisma.InputJsonValue,
-          },
-        });
-      }
+        client,
+      );
       appliedPairs += 1;
     }
   }

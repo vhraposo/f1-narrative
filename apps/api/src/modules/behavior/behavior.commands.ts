@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { createEventWithDerivations } from "../events/event-create.js";
-import { canonicalizeRelationshipPair } from "../relationships/relationship.pair.js";
+import { applyRelationshipDelta } from "../relationships/relationship.evolution.js";
 import { deterministicTextFor } from "./behavior.language.js";
 import {
   BehaviorError,
@@ -33,12 +33,6 @@ export type BehaviorCommandResult = {
 };
 
 const ALLOWED_EVENT_TYPES = new Set(["SOCIAL", "PERSONAL", "RELATIONSHIP"]);
-const DIMENSION_MIN = -100;
-const DIMENSION_MAX = 100;
-
-function clampDimension(value: number): number {
-  return Math.max(DIMENSION_MIN, Math.min(DIMENSION_MAX, Math.round(value)));
-}
 
 function requireAiCharacter(request: BehaviorDecisionRequest, context: BehaviorContextView): void {
   if (!request.userInitiated && context.identity.controller !== "AI") {
@@ -228,42 +222,26 @@ async function executeUpdateRelationshipCommand(
     throw new BehaviorError("TARGET_NOT_FOUND", "Alvo não informado", 400);
   }
   await requireTargetInUniverse(input.tx, input.request.universeId, targetId);
-  const pair = canonicalizeRelationshipPair(input.request.characterId, targetId);
-  const existing = await input.tx.relationship.findUnique({
-    where: {
-      characterAId_characterBId: {
-        characterAId: pair.characterAId,
-        characterBId: pair.characterBId,
-      },
-    },
-    select: { id: true, dimensions: true },
-  });
-  const dimensions =
-    existing && existing.dimensions && typeof existing.dimensions === "object"
-      ? (existing.dimensions as Record<string, unknown>)
-      : {};
-  const respect = typeof dimensions.respect === "number" ? dimensions.respect : 0;
-  const rivalry = typeof dimensions.rivalry === "number" ? dimensions.rivalry : 0;
   const confront = /CONFRONT/.test(input.candidate.reasonCode);
-  const nextDimensions = {
-    ...dimensions,
-    respect: clampDimension(respect + (confront ? -1 : 2)),
-    rivalry: clampDimension(rivalry + (confront ? 2 : -1)),
-  };
-  if (existing) {
-    await input.tx.relationship.update({
-      where: { id: existing.id },
-      data: { dimensions: nextDimensions },
-    });
-  } else {
-    await input.tx.relationship.create({
-      data: {
-        characterAId: pair.characterAId,
-        characterBId: pair.characterBId,
-        dimensions: nextDimensions,
-      },
-    });
-  }
+  const fingerprint =
+    typeof input.candidate.metadata.actionFingerprint === "string"
+      ? input.candidate.metadata.actionFingerprint
+      : null;
+  await applyRelationshipDelta(
+    {
+      characterAId: input.request.characterId,
+      characterBId: targetId,
+      deltas: { respect: confront ? -1 : 2, rivalry: confront ? 2 : -1 },
+      ruleCode: confront
+        ? "relationship-rule.behavior-confront.v1"
+        : "relationship-rule.behavior-support.v1",
+      sourceType: "BEHAVIOR_DECISION",
+      sourceId: fingerprint,
+      worldDate: input.worldDate,
+      metadata: { reasonCode: input.candidate.reasonCode },
+    },
+    input.tx,
+  );
   return {};
 }
 
