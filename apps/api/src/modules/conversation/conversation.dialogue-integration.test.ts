@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
-import { simulateConversationTurn } from "./conversation.simulation.js";
+import { getSimulationPlan, simulateConversationTurn } from "./conversation.simulation.js";
 
 const PREFIX = "dialogue-f34";
 const WORLD_DATE = new Date("2026-10-01T12:00:00.000Z");
@@ -143,9 +143,9 @@ describe("F3.4 — realizer integrado ao turn execution (TEST DB)", () => {
   });
 
   it("deterministic replay do turno produz a mesma estrutura", async () => {
-    const a = await simulateConversationTurn(conversationId, { userId, worldDate: WORLD_DATE });
-    const b = await simulateConversationTurn(conversationId, { userId, worldDate: WORLD_DATE });
-    expect(a.plan.dialogue).toEqual(b.plan.dialogue);
+    const a = await getSimulationPlan(conversationId, { userId, worldDate: WORLD_DATE });
+    const b = await getSimulationPlan(conversationId, { userId, worldDate: WORLD_DATE });
+    expect(a.dialogue).toEqual(b.dialogue);
   });
 
   it("SILENCE não cria Message", async () => {
