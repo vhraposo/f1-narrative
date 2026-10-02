@@ -2,11 +2,11 @@
 
 ## Estado atual
 - Branch: `v4-Living-F1-Universe`
-- HEAD: `9c1c006` — `feat(autonomy): execute conversation envelopes from selected opportunities` (F6.3)
+- HEAD: `5719019` — `feat(conversation): bridge domain evidence to conversation opportunities` (F6.4)
 - Working tree: limpo (após commit deste HANDOFF)
-- Última fase concluída: F6.3
-- Subfase atual: nenhuma; F6.4 não iniciada
-- Próximo checkpoint: F6.4 — ponte eventos→oportunidade
+- Última fase concluída: F6.4
+- Subfase atual: nenhuma; F6.5 não iniciada
+- Próximo checkpoint: F6.5 — evals F6-E01..E10 + full API/build + doc F6
 
 ## Roadmap (commits reais)
 F5 (concluída):
@@ -19,61 +19,52 @@ F6:
 - F6.1 conversation opportunity — `48e83ba` (concluída)
 - F6.2 seleção no autonomy tick — `502f998` (concluída)
 - F6.3 execução de envelope a partir da oportunidade (AI↔AI, TEST DB) — `9c1c006` (concluída)
-- F6.4 ponte eventos→oportunidade — PENDENTE
+- F6.4 ponte eventos→oportunidade — `5719019` (concluída)
 - F6.5 evals F6-E01..E10 + full API/build + doc F6 — PENDENTE
 
 F7 (private groups/secrets), F8 (UI/microbehaviors), F9 (benchmark gate): não iniciadas.
 
-## Última implementação (F6.3)
-Envelope de conversa executado a partir da oportunidade selecionada, SEM novo loop/writer:
-- `autonomy.service.ts`: em `FULL`, após o loop comportamental, itera
-  `opportunityPlan.selection.selected` (a MESMA seleção que gerou o audit F6.2 em
-  `AiDecision.metadata.requestMetadata.conversationOpportunity`; não há recomputação nem terceiro
-  transporte). Revalida conversa (`ACTIVE`, speaker/target participantes, todos no mesmo universe)
-  e chama o pipeline existente `simulateConversationTurn` com seed e `maxDepth`. Envelope budget =
-  `min(AUTONOMY_MAX_ACTIONS_PER_TICK - ações, AUTONOMY_MAX_MESSAGES_PER_TICK - mensagens usadas)`.
-  Mensagens do envelope contam como RESPOND (actions/messages do tick). Resultado auditado no
-  retorno do tick (`AutonomyTickResult.envelopes`) e por mensagem em `AiDecision`
-  (`CONVERSATION_TURN_DUE`, status EXECUTED, `executedMessageId`). Personagens com oportunidade
-  pulam a execução genérica de behavior no FULL (o envelope é a iniciativa; evita ação dupla).
-- `conversation.simulation.ts`: `getSimulationPlan`/`simulateConversationTurn` aceitam
-  `opportunity?: OpportunityEnvelopeSeed` ({ conversationId, characterId, targetCharacterId,
-  fingerprint, windowStart }). Valida seed (conversa, speaker AI, disponibilidade, target
-  participante); conversa vazia abre via `planOpportunityOpening` (candidate set do seed +
-  planner determinístico + `validateDialoguePlan`); seed rejeitado por LOW_SCORE é promovido
-  como `OPPORTUNITY_SEED`; planner recebe `preferredFirstSpeakerCharacterId` (primeiro turno do
-  domínio, intenção/continuidade/stop continuam do planner); `maxDepth` explícito também limita
-  os turns iniciais (cap do tick); target da oportunidade é preservado na abertura via override.
-- `conversation.dialogue.ts`: `DialogueCandidateSet.lastMessageId` passou a `string | null`
-  (abertura sem mensagem); planner determinístico honra `preferredFirstSpeakerCharacterId`
-  (rotação estável do turno inicial); `allowedIntentsFor` exportado.
-- `conversation.autonomous.ts`: `runAutonomousConversationTurn` aceita `targetCharacterId` para
-  usar como alvo quando ainda não há mensagem (com histórico, a última mensagem continua o alvo).
-- Modos: `OFF`/`PAUSED`/`STOPPED`/`REUSED` não executam envelope; `OBSERVER`/`GUIDED` seguem
-  audit-only; `FULL` executa. Determinístico default; `simulateConversationTurn` sem provider usa
-  `DeterministicDialogueRealizer` (nenhuma chamada LLM no caminho autônomo).
-- Segurança anti-loop/duplicação: F6.2 já garante ≤1 oportunidade por conversa/personagem/tick,
-  dedupe por fingerprint/evidenceId e cooldown por personagem/conversa (`TICK_WINDOW_HOURS`).
-  F6.3 não reabre seleção: itera a lista selecionada uma única vez; `maxDepth` limita o envelope;
-  tick repetido retorna `REUSED` antes de qualquer seleção/execução. Nenhum novo sistema de
-  cooldown foi criado.
-- Contexto F5 por speaker preservado: `simulateConversationTurn` continua chamando
-  `retrieveRelevantMemories(characterId)` + emotion/topic/memory/knowledge/relationship por
-  speaker; nada virou contexto compartilhado.
-Testes: +17 (2 puros do planner, 5 do pipeline com opportunity seed, 10 no tick; teste FULL da
-F6.2 adaptado para a nova semântica). Subset conversation+autonomy 29 files / 424 tests verde.
-Suíte completa API 202 files / 2848 tests verde. `tsc --noEmit`, ESLint do escopo e build
-`tsc -p` verdes.
+## Última implementação (F6.4)
+Investigação (sem alterar código) e ponte evento→oportunidade:
+- Achados do fluxo real: eventos nascem em `createEventWithDerivations` (behavior command CREATE_EVENT,
+  world-simulation schedule, event routes, ai-behavior, race-narrative) e derivam NewsItem +
+  `applyEventEvolution` (que cria RelationshipChange com `sourceType="EVENT"`/`sourceId=eventId` e
+  UMA Memory com `eventId`). Os triggers `EVENT_CREATED`, `MEMORY_CREATED` e `RELATIONSHIP_CHANGED`
+  NÃO têm consumidor de produção (só types/policy/routes/testes); `RACE_FINISHED` é consumido por
+  `processRaceConsequences` apenas para criar AiDecision de auditoria — nenhum deles produzia
+  oportunidade. Por isso a estratégia escolhida foi **A (adaptador)**, não B.
+- `conversation.opportunity-bridge.ts` (novo, puro/determinístico): converte `OpportunityEvidence`
+  (EVENT/MEMORY/RELATIONSHIP_CHANGE/GOAL/INACTIVITY) em `ConversationOpportunitySignal[]` com
+  strength/target determinísticos. Não persiste nada, não executa conversa, não chama LLM.
+  `buildAutonomyOpportunityPlan` consome a ponte (substituiu os loops inline da F6.2); depois
+  `buildConversationOpportunity` → seleção F6.2 → envelope F6.3 permanecem intocados.
+- `evidenceId` canônico por raiz de domínio: EVENT `event:<id>`; MEMORY com `eventId` →
+  `event:<eventId>` (senão `memory:<id>`); RELATIONSHIP_CHANGE com `sourceType="EVENT"`+`sourceId`
+  → `event:<sourceId>` (senão `relationship-change:<id>`); GOAL `goal:<id>`; INACTIVITY
+  `inactivity:<conversationId>:<lastMessageId|none>`. Algoritmo de fingerprint F6.1 inalterado
+  (apenas o valor de evidenceId de linhas derivadas de evento foi canonicalizado, deliberadamente).
+- Dedupe/idempotência: evento + memória derivada + relationship change derivados compartilham
+  `event:<id>`; a seleção F6.2 rejeita os derivados com `DUPLICATE_EVIDENCE` e mantém a maior
+  prioridade (WORLD_EVENT). Replay do mesmo evento/linha gera o mesmo evidenceId/fingerprint.
+- Race: Event da narrativa de corrida → WORLD_EVENT `event:<id>`; Memory de race-consequences
+  (sem eventId) → MEMORY_TRIGGER `memory:<id>`. Sem novo reason.
+- Modos e envelope F6.3 inalterados: OFF/PAUSED/STOPPED/REUSED não executam; OBSERVER/GUIDED
+  audit-only; FULL executa via `simulateConversationTurn`.
+Testes: +16 (12 puros da ponte + 4 de integração no tick: dedupe evento+derivações, isolamento
+por universe, evento sem conversa elegível, FULL evento→oportunidade→envelope). Subset
+conversation+autonomy 30 files / 440 tests verde. Suíte completa API 203 files / 2864 tests verde.
+`tsc --noEmit`, ESLint do escopo e build `tsc -p` verdes.
+Flake observado 1x (não reproduzido): `conversation.autonomous.test.ts` #13 (primeira seleção
+esperada para characterA veio characterB) no subset; passou isolado e no rerun do subset — sem
+relação com F6.4; documentado e não mascarado.
 
-## Próxima ação — F6.4 (exata)
-Ponte eventos→oportunidade, sem novo writer/loop:
-- inspecionar primeiro os triggers/consumidores existentes de eventos (`createEventWithDerivations`,
-  `processRaceConsequences`, `evaluateBehaviorDecision` com triggers EVENT_CREATED/RACE_FINISHED/
-  MEMORY_CREATED/RELATIONSHIP_CHANGED) e decidir se a ponte é (a) um adaptador que enfileira
-  sinais para `buildConversationOpportunity`/`buildAutonomyOpportunityPlan` ou (b) metadata de
-  trigger já existente — NUNCA event bus/outbox novo;
-- manter fingerprint/evidenceId estáveis e o modo (OFF/OBSERVER/GUIDED/FULL) como em F6.2/F6.3;
-- testes de dedupe/idempotência e de isolamento por universe; DEV read-only, TEST com cleanup.
+## Próxima ação — F6.5 (exata)
+Fechar a fase F6 com evals e documentação, sem novo mecanismo:
+- implementar/rodar as evals F6-E01..E10 no padrão das evals existentes (determinístico, TEST DB
+  com cleanup), cobrindo opportunity→seleção→envelope e a ponte F6.4;
+- rodar conversation suite + full API + build API (`tsc -p`) reais;
+- escrever o doc F6 (escopo, arquitetura, evidência, limitações) em `docs/`;
+- não alterar planner/realizer/validator/Command Layer nem criar event bus/outbox/writer novo.
 
 ## Decisões F6 (tomadas)
 - Iniciativa automática só em GUIDED/FULL; OFF não executa; OBSERVER audit-only; GUIDED sem
@@ -87,14 +78,17 @@ Ponte eventos→oportunidade, sem novo writer/loop:
   da oportunidade; continuação/stop vêm do planner existente.
 - Consumo da oportunidade: a seleção em memória da F6.2 (fonte do audit) é passada ao envelope
   com fingerprint/evidenceId; não recomputar `buildAutonomyOpportunityPlan` no mesmo tick.
+- F6.4: evidência derivada de Event usa a raiz canônica `event:<id>` (evento, memória derivada e
+  relationship change derivado convergem para o mesmo evidenceId).
 
 ## Riscos conhecidos (F6)
 - Loops A↔B entre envelopes → cooldown + fingerprint + ≤1 envelope/conversa/tick (F6.2/F6.3).
 - Cascatas → janela/stop do planner + budgets de ações/mensagens/conversas do tick.
 - Ticks concorrentes → fingerprint/lock do SimulationTick existente; tick repetido = REUSED.
-- Duplicação → fingerprint por evidência/janela; mensagens passam pelo Command Layer.
+- Duplicação → fingerprint por evidência/janela + evidenceId canônico por raiz (F6.4).
 - Custo LLM → caminho autônomo sem provider; realizer determinístico default.
 - Vazamento entre universos → queries escopadas + validação de participantes + F5 por speaker.
+- Evals F6 ainda não escritas (F6.5); flake pontual do teste #13 (não reproduzido).
 
 ## Regras essenciais
 Ver `AGENTS.md`. DEV read-only; TEST com cleanup; um commit por subfase; nunca amend;
@@ -102,6 +96,6 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md` e `AGENTS.md`. Valide Git (branch, HEAD, working tree). Confirme que
-o HEAD é o checkpoint registrado. Execute a próxima ação descrita no HANDOFF (F6.4). Rode os
+o HEAD é o checkpoint registrado. Execute a próxima ação descrita no HANDOFF (F6.5). Rode os
 testes/typecheck/lint, crie um commit novo, atualize `docs/HANDOFF.md` e pare no checkpoint
 verde. Não use amend."
