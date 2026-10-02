@@ -566,3 +566,54 @@ export function runAutonomousTurn(
     input,
   );
 }
+export type SimulationStep = {
+  depth: number;
+  characterId: string;
+  name: string;
+  messageId: string;
+  language: { provider: string; model: string; fallback: boolean };
+};
+
+export type SimulationResponse = {
+  simulation: {
+    executed: boolean;
+    stopReason: string;
+    depth: number;
+    steps: SimulationStep[];
+    selection: unknown[];
+  };
+};
+
+export function simulateConversationTurn(
+  conversationId: string,
+  input: AutonomousTurnInput = {},
+): Promise<SimulationResponse> {
+  return post<SimulationResponse>(
+    `/api/conversations/${conversationId}/simulate-turn`,
+    input,
+  );
+}
+export type SimulationPlanResponse = {
+  plan: {
+    energy: { energy: number; intensity: number; level: string; reasons: string[] };
+    window: { maxInitialResponders: number; maxReactions: number; maxChainDepth: number };
+    planned: Array<{
+      characterId: string;
+      name: string;
+      score: number;
+      opportunity: number;
+      reasons: string[];
+    }>;
+    stopReason: string;
+  };
+};
+
+export function planSimulationTurn(
+  conversationId: string,
+  input: AutonomousTurnInput = {},
+): Promise<SimulationPlanResponse> {
+  return post<SimulationPlanResponse>(
+    `/api/conversations/${conversationId}/simulate-turn/plan`,
+    input,
+  );
+}

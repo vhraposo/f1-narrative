@@ -56,7 +56,12 @@ function fallbackText(speakerName: string): string {
 
 export async function runAutonomousConversationTurn(
   conversationId: string,
-  options: { readonly userId: string; readonly worldDate?: Date; readonly provider?: GenerationProvider },
+  options: {
+    readonly userId: string;
+    readonly worldDate?: Date;
+    readonly provider?: GenerationProvider;
+    readonly forceSpeakerCharacterId?: string;
+  },
 ): Promise<AutonomousTurnResult> {
   const limits = conversationTurnLimits();
   const conversation = await prisma.conversation.findUnique({
@@ -121,16 +126,23 @@ export async function runAutonomousConversationTurn(
     limits,
   });
 
-  if (!plan.canContinue || !plan.speakerCharacterId) {
+  if (!plan.canContinue && !options.forceSpeakerCharacterId) {
     return { executed: false, reasonCode: plan.reasonCode, plan, decisionId: null };
   }
 
-  const speaker = participants.find(
-    (character) => character.id === plan.speakerCharacterId,
-  );
+  const forcedSpeakerId = options.forceSpeakerCharacterId ?? null;
+  const speaker = forcedSpeakerId
+    ? participants.find(
+        (character) => character.id === forcedSpeakerId && character.controlledBy === "AI",
+      )
+    : participants.find((character) => character.id === plan.speakerCharacterId);
   if (!speaker || !speaker.universeId) {
     return { executed: false, reasonCode: "NO_UNIVERSE", plan, decisionId: null };
   }
+  const effectiveTargetCharacterId =
+    forcedSpeakerId !== null
+      ? (messages[messages.length - 1]?.characterId ?? null)
+      : plan.targetCharacterId;
 
   const worldDate =
     options.worldDate ??
@@ -198,8 +210,8 @@ export async function runAutonomousConversationTurn(
     worldDate,
     conversationId,
     userInitiated: false,
-    ...(plan.targetCharacterId
-      ? { metadata: { targetCharacterId: plan.targetCharacterId } }
+    ...(effectiveTargetCharacterId
+      ? { metadata: { targetCharacterId: effectiveTargetCharacterId } }
       : {}),
   });
   if (decision.selected.actionType !== "RESPOND") {

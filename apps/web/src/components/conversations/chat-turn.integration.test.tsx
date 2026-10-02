@@ -85,16 +85,23 @@ beforeEach(() => {
       messages = [...messages, userMessage(`m-user-${messages.length}`, "Bom dia", 10)];
       return { message: messages[messages.length - 1] };
     }
-    if (path === "/api/conversations/c1/autonomous-turn") {
+    if (path === "/api/conversations/c1/simulate-turn") {
       messages = [...messages, aiMessage(`m-ai-${messages.length}`, "Bom dia! Como você está?", 11)];
       return {
-        turn: {
+        simulation: {
           executed: true,
-          reasonCode: "EXECUTED",
-          decisionId: "d1",
-          messageId: messages[messages.length - 1]?.id,
-          speakerCharacterId: "ai-1",
-          language: { provider: "deterministic", model: "behavior-language.v1", fallback: true },
+          stopReason: "NATURAL_END",
+          depth: 1,
+          steps: [
+            {
+              depth: 0,
+              characterId: "ai-1",
+              name: "Andrea Kimi Antonelli",
+              messageId: messages[messages.length - 1]?.id,
+              language: { provider: "deterministic", model: "behavior-language.v1", fallback: true },
+            },
+          ],
+          selection: [],
         },
       };
     }
@@ -116,7 +123,7 @@ describe("Chat send → autonomous response (integração)", () => {
     expect(await screen.findByText("Bom dia! Como você está?")).toBeDefined();
     expect(screen.getByText("Andrea Kimi Antonelli")).toBeDefined();
     expect(apiMock.post).toHaveBeenCalledWith(
-      "/api/conversations/c1/autonomous-turn",
+      "/api/conversations/c1/simulate-turn",
       {},
     );
   });
@@ -127,7 +134,7 @@ describe("Chat send → autonomous response (integração)", () => {
         messages = [...messages, userMessage("m-user-1", "Bom dia", 10)];
         return { message: messages[0] };
       }
-      if (path === "/api/conversations/c1/autonomous-turn") {
+      if (path === "/api/conversations/c1/simulate-turn") {
         throw new ApiError("Falha ao gerar resposta", 500, "EXECUTION_FAILED");
       }
       throw new ApiError("Não encontrado", 404);

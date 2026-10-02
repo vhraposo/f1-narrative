@@ -55,18 +55,43 @@ function mockPostImplementation(options: { autonomousFails?: boolean } = {}) {
         },
       };
     }
-    if (path === "/api/conversations/c1/autonomous-turn") {
+    if (path === "/api/conversations/c1/simulate-turn/plan") {
+      return {
+        plan: {
+          energy: { energy: 0.4, intensity: 0.2, level: "NORMAL", reasons: [] },
+          window: { maxInitialResponders: 1, maxReactions: 1, maxChainDepth: 2 },
+          planned: [
+            {
+              characterId: "ai-1",
+              name: "Andrea Kimi Antonelli",
+              score: 30,
+              opportunity: 0.6,
+              reasons: ["SEEDED_VARIATION"],
+            },
+          ],
+          stopReason: "SELECTED",
+        },
+      };
+    }
+    if (path === "/api/conversations/c1/simulate-turn") {
       if (options.autonomousFails) {
         throw new ApiError("Falha ao gerar resposta", 500, "EXECUTION_FAILED");
       }
       return {
-        turn: {
+        simulation: {
           executed: true,
-          reasonCode: "EXECUTED",
-          decisionId: "d1",
-          messageId: "m-ai",
-          speakerCharacterId: "ai-1",
-          language: { provider: "deterministic", model: "behavior-language.v1", fallback: true },
+          stopReason: "NATURAL_END",
+          depth: 1,
+          steps: [
+            {
+              depth: 0,
+              characterId: "ai-1",
+              name: "Andrea Kimi Antonelli",
+              messageId: "m-ai",
+              language: { provider: "deterministic", model: "behavior-language.v1", fallback: true },
+            },
+          ],
+          selection: [],
         },
       };
     }
@@ -85,7 +110,7 @@ beforeEach(() => {
   mockPostImplementation();
 });
 
-async function renderComposer(props: { onError?: (message: string) => void; onTypingChange?: (typing: boolean) => void } = {}) {
+async function renderComposer(props: { onError?: (message: string) => void; onTypingChange?: (names: string[]) => void } = {}) {
   renderWithClient(<MessageComposer conversationId="c1" {...props} />);
   await screen.findByPlaceholderText("Escreva sua mensagem...");
   await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
@@ -109,7 +134,7 @@ describe("MessageComposer — envio com resposta autônoma", () => {
     });
     await waitFor(() => {
       expect(apiMock.post).toHaveBeenCalledWith(
-        "/api/conversations/c1/autonomous-turn",
+        "/api/conversations/c1/simulate-turn",
         {},
       );
     });
@@ -123,16 +148,16 @@ describe("MessageComposer — envio com resposta autônoma", () => {
   });
 
   it("3) sinaliza estado de digitação durante o turno autônomo", async () => {
-    const typing: boolean[] = [];
+    const typing: string[][] = [];
     const user = userEvent.setup();
     await renderComposer({
       onTypingChange: (value) => typing.push(value),
     });
     await user.type(screen.getByPlaceholderText("Escreva sua mensagem..."), "Bom dia");
     await user.click(screen.getByRole("button", { name: "Enviar mensagem" }));
-    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(2));
-    expect(typing).toContain(true);
-    expect(typing[typing.length - 1]).toBe(false);
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(3));
+    expect(typing.some((names) => names.length > 0)).toBe(true);
+    expect(typing[typing.length - 1]).toEqual([]);
   });
 
   it("4) falha do autonomous turn não apaga a mensagem do usuário e reporta erro amigável", async () => {

@@ -510,4 +510,65 @@ describe("autonomous conversation turns (V4.2)", () => {
     expect(captured.join("\n")).toContain("português do Brasil");
     await captureApp.close();
   });
+
+  it("13) simulate-turn gera 1..N respostas sequenciais com menção e para naturalmente", async () => {
+    const participant = await prisma.conversationParticipant.findFirstOrThrow({
+      where: { conversationId, characterId: characterAId },
+      select: { character: { select: { name: true } } },
+    });
+    const sent = await app.inject({
+      method: "POST",
+      url: `/api/conversations/${conversationId}/messages`,
+      headers: { cookie },
+      payload: {
+        senderType: "USER_CHARACTER",
+        characterId: userCharacterId,
+        content: `Bom dia ${participant.character.name}`,
+      },
+      remoteAddress: remoteAddress(),
+    });
+    expect(sent.statusCode).toBe(201);
+
+    const simulation = await app.inject({
+      method: "POST",
+      url: `/api/conversations/${conversationId}/simulate-turn`,
+      headers: { cookie },
+      payload: { worldDate: "2026-10-01T12:00:00.000Z" },
+      remoteAddress: remoteAddress(),
+    });
+    expect(simulation.statusCode).toBe(201);
+    const body = simulation.json() as {
+      simulation: {
+        executed: boolean;
+        stopReason: string;
+        depth: number;
+        steps: Array<{ characterId: string; messageId: string; name: string }>;
+        plan: {
+          planned: Array<{ characterId: string; reasons: string[] }>;
+          energy: { level: string };
+          window: { maxInitialResponders: number; maxChainDepth: number };
+        };
+        selection: Array<{ depth: number; reasons?: unknown; selected: string[]; candidates: Array<{ characterId: string; reasons: string[] }> }>;
+      };
+    };
+    expect(body.simulation.executed).toBe(true);
+    expect(body.simulation.steps.length).toBeGreaterThanOrEqual(1);
+    expect(body.simulation.steps.length).toBeLessThanOrEqual(3);
+    expect(body.simulation.stopReason.length).toBeGreaterThan(0);
+    expect(
+      body.simulation.steps.every((step) => [characterAId, characterBId].includes(step.characterId)),
+    ).toBe(true);
+    const firstSelection = body.simulation.plan.planned[0];
+    expect(firstSelection?.characterId).toBe(characterAId);
+    expect(firstSelection?.reasons).toContain("DIRECT_MENTION");
+    expect(body.simulation.plan.window.maxInitialResponders).toBeGreaterThanOrEqual(1);
+    expect(body.simulation.plan.window.maxChainDepth).toBeLessThanOrEqual(body.simulation.plan.window.maxInitialResponders + 1);
+
+    for (const step of body.simulation.steps) {
+      const message = await prisma.message.findUniqueOrThrow({ where: { id: step.messageId } });
+      expect(message.senderType).toBe("AI_CHARACTER");
+      expect(message.characterId).toBe(step.characterId);
+      expect(message.content.trim().length).toBeGreaterThan(0);
+    }
+  });
 });

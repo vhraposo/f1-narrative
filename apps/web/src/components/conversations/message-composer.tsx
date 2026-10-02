@@ -6,16 +6,17 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectTrigger } from "@/components/ui/select";
 import {
-  useAutonomousTurn,
   useConversationParticipants,
   useCreateMessage,
+  useSimulateTurn,
 } from "@/hooks/use-conversations";
 import { ApiError } from "@/lib/api";
+import { planSimulationTurn } from "@/lib/conversations";
 
 type MessageComposerProps = {
   conversationId: string;
   onError?: (message: string) => void;
-  onTypingChange?: (typing: boolean) => void;
+  onTypingChange?: (names: string[]) => void;
 };
 
 export function MessageComposer({
@@ -25,7 +26,7 @@ export function MessageComposer({
 }: MessageComposerProps) {
   const participantsQuery = useConversationParticipants(conversationId);
   const createMutation = useCreateMessage(conversationId);
-  const autonomousMutation = useAutonomousTurn(conversationId);
+  const simulationMutation = useSimulateTurn(conversationId);
 
   const [content, setContent] = useState("");
   const [senderCharacterId, setSenderCharacterId] = useState("");
@@ -37,7 +38,7 @@ export function MessageComposer({
   const effectiveSender =
     senderCharacterId || (ownCharacters.length === 1 ? ownCharacters[0].id : "");
 
-  const isBusy = createMutation.isPending || autonomousMutation.isPending;
+  const isBusy = createMutation.isPending || simulationMutation.isPending;
 
   function reportTurnError(err: unknown) {
     if (err instanceof ApiError) {
@@ -54,16 +55,21 @@ export function MessageComposer({
   }
 
   async function triggerAutonomousResponse() {
-    onTypingChange?.(true);
     try {
-      const result = await autonomousMutation.mutateAsync({});
-      if (!result.turn.executed) {
+      const plan = await planSimulationTurn(conversationId, {});
+      onTypingChange?.(plan.plan.planned.map((candidate) => candidate.name));
+    } catch {
+      onTypingChange?.([]);
+    }
+    try {
+      const result = await simulationMutation.mutateAsync({});
+      if (!result.simulation.executed) {
         setNotice(null);
       }
     } catch (err) {
       reportTurnError(err);
     } finally {
-      onTypingChange?.(false);
+      onTypingChange?.([]);
     }
   }
 
