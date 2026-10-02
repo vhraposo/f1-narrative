@@ -91,15 +91,28 @@ export async function applyRelationshipDelta(
   }
 
   const canonical = canonicalizeRelationshipPair(input.characterAId, input.characterBId);
-  const existing = await client.relationship.findFirst({
+  const found = await client.relationship.findFirst({
     where: {
-      characterAId: canonical.characterAId,
-      characterBId: canonical.characterBId,
+      OR: [
+        { characterAId: canonical.characterAId, characterBId: canonical.characterBId },
+        { characterAId: canonical.characterBId, characterBId: canonical.characterAId },
+      ],
     },
-    select: { id: true, dimensions: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, dimensions: true, characterAId: true, characterBId: true },
   });
+  if (
+    found &&
+    (found.characterAId !== canonical.characterAId ||
+      found.characterBId !== canonical.characterBId)
+  ) {
+    await client.relationship.update({
+      where: { id: found.id },
+      data: { characterAId: canonical.characterAId, characterBId: canonical.characterBId },
+    });
+  }
   const relationship =
-    existing ??
+    found ??
     (await client.relationship.create({
       data: {
         characterAId: canonical.characterAId,

@@ -242,6 +242,7 @@ model Universe {
   bindingCircuits      ExternalBindingCircuit[]
   aiDecisions          AiDecision[]
   characterGoals       CharacterGoal[]
+  simulationTicks      SimulationTick[]
   bindingDriverSeasons ExternalBindingDriverSeason[]
   bindingResults       ExternalBindingResult[]
   bindingStandings     ExternalBindingStanding[]
@@ -2384,4 +2385,32 @@ model RelationshipChange {
   @@index([relationshipId, createdAt])
   @@index([characterAId, characterBId, createdAt])
   @@index([sourceType, sourceId])
+}
+
+enum SimulationTickStatus {
+  RUNNING
+  COMPLETED
+  DRY_RUN
+  FAILED
+}
+
+model SimulationTick {
+  id        String    @id @default(uuid()) @db.Uuid
+  universeId String   @db.Uuid
+  universe  Universe  @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
+  startWorldDate    DateTime
+  endWorldDate      DateTime
+  simulationVersion String
+  status            SimulationTickStatus @default(RUNNING)
+  dryRun            Boolean              @default(false)
+  fingerprint       String               @unique
+  summary           Json?
+  error             String?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([universeId, startWorldDate])
+  @@index([universeId, status])
 }

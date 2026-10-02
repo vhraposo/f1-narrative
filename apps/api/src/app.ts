@@ -66,6 +66,7 @@ import { mediaRoutes } from "./modules/media/media.routes.js";
 import newsRoutes from "./modules/news/news.routes.js";
 import aiBehaviorRoutes from "./modules/ai-behavior/ai-behavior.routes.js";
 import behaviorRoutes from "./modules/behavior/behavior.routes.js";
+import worldSimulationRoutes from "./modules/world-simulation/world-simulation.routes.js";
 import evolutionRoutes from "./modules/evolution/evolution.routes.js";
 import raceWeekendRoutes from "./modules/race-weekend/race-weekend.routes.js";
 import type { StorageProvider } from "./infrastructure/storage/storage-provider.js";
@@ -149,6 +150,7 @@ export function buildApp(
   void app.register(charactersRoutes);
   void app.register(personaRoutes);
   void app.register(behaviorRoutes);
+  void app.register(worldSimulationRoutes);
   void app.register(characterHeadshotMaterializationRoutes);
   void app.register(driversRoutes);
   void app.register(teamsRoutes);
