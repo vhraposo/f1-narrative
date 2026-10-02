@@ -25,6 +25,7 @@ import {
   resolveDialogueRealizerKind,
 } from "./conversation.dialogue-realizer.js";
 import { validateDialogueOutput } from "./conversation.dialogue-output.js";
+import { deriveDialogueEmotion } from "./conversation.dialogue-emotion.js";
 import { selectResponseCandidates } from "./conversation.response-engine.js";
 import type { GenerationProvider } from "../generation/generation.assembly.js";
 
@@ -477,6 +478,11 @@ export async function simulateConversationTurn(
         ? messageById.get(input.replyToMessageId)?.content ?? null
         : null,
       recentMessages,
+      emotion: deriveDialogueEmotion({
+        energy: plan.energy,
+        affinity: typeof affinity === "number" ? affinity : null,
+        recentMessages,
+      }),
       topic: plan.dialogue.topic,
       emotionalTone: plan.dialogue.emotionalTone,
       relationshipAffinity: typeof affinity === "number" ? affinity : null,

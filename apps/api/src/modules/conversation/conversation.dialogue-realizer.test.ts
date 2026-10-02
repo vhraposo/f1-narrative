@@ -424,6 +424,7 @@ describe("F3.3 — provider do Dialogue Realizer", () => {
     expect(received).not.toBeNull();
     expect(Object.keys(received!).sort()).toEqual(
       [
+        "emotion",
         "emotionalTone",
         "intent",
         "language",
