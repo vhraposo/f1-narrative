@@ -1,6 +1,8 @@
-import type { EventImportance, MemoryImportance } from "@prisma/client";
-
 import { prisma } from "../../infrastructure/database/prisma.js";
+import {
+  buildOpportunitySignals,
+  type OpportunityEvidence,
+} from "../conversation/conversation.opportunity-bridge.js";
 import {
   buildConversationOpportunity,
   type ConversationOpportunity,
@@ -124,43 +126,8 @@ const REASON_ORDER: Record<ConversationOpportunityReason, number> = {
   INACTIVITY: 4,
 };
 
-const EVENT_IMPORTANCE_STRENGTH: Record<EventImportance, number> = {
-  LOW: 0.25,
-  MEDIUM: 0.5,
-  HIGH: 0.75,
-  CRITICAL: 1,
-};
-
-const MEMORY_IMPORTANCE_STRENGTH: Record<MemoryImportance, number> = {
-  LOW: 0.25,
-  MEDIUM: 0.5,
-  HIGH: 0.75,
-  CRITICAL: 1,
-};
-
 const OPPORTUNITY_SOURCE_LIMIT = 100;
 const COOLDOWN_LOOKBACK = 200;
-
-function pickTargetCharacterId(
-  candidateIds: readonly string[],
-  characterId: string,
-  participantIds: readonly string[],
-): string | null {
-  const participants = new Set(participantIds);
-  const eligible = candidateIds
-    .filter((id) => id !== characterId && participants.has(id))
-    .sort((a, b) => a.localeCompare(b));
-  return eligible[0] ?? null;
-}
-
-function relationshipChangeStrength(delta: number): number {
-  return Math.min(1, Math.max(0.2, Math.abs(delta) / 50));
-}
-
-function inactivityStrength(idleMs: number, windowMs: number): number {
-  if (windowMs <= 0 || idleMs < windowMs) return 0;
-  return Math.min(1, idleMs / (windowMs * 2));
-}
 
 export function selectConversationOpportunities(input: {
   readonly universeId: string;
@@ -408,36 +375,35 @@ export async function buildAutonomyOpportunityPlan(input: {
   const candidates: OpportunityCandidate[] = [];
   const sourceCounts = emptySourceCounts();
 
-  const pushCandidate = (args: {
-    readonly conversation: EligibleConversation;
-    readonly characterId: string;
-    readonly targetCharacterId: string | null;
-    readonly reason: ConversationOpportunityReason;
-    readonly strength: number;
-    readonly evidenceId: string;
-  }): void => {
-    const signal: ConversationOpportunitySignal = {
-      universeId: input.universeId,
-      characterId: args.characterId,
-      reason: args.reason,
-      strength: args.strength,
-      evidenceId: args.evidenceId,
-      ...(args.targetCharacterId ? { targetCharacterId: args.targetCharacterId } : {}),
-    };
+  const pushSignal = (
+    conversation: EligibleConversation,
+    signal: ConversationOpportunitySignal,
+  ): void => {
     const opportunity = buildConversationOpportunity({
       universeId: input.universeId,
-      conversationId: args.conversation.id,
-      participantIds: args.conversation.participantIds,
+      conversationId: conversation.id,
+      participantIds: conversation.participantIds,
       windowStart: input.fromDate,
       signal,
     });
     if (!opportunity) return;
     candidates.push({
       opportunity,
-      evidenceId: args.evidenceId,
-      fairnessRank: fairnessRank.get(args.characterId) ?? Number.MAX_SAFE_INTEGER,
+      evidenceId: signal.evidenceId,
+      fairnessRank: fairnessRank.get(signal.characterId) ?? Number.MAX_SAFE_INTEGER,
     });
-    sourceCounts[args.reason] += 1;
+    sourceCounts[signal.reason] += 1;
+  };
+
+  const pushEvidence = (conversation: EligibleConversation, evidence: OpportunityEvidence): void => {
+    const signals = buildOpportunitySignals({
+      universeId: input.universeId,
+      conversationId: conversation.id,
+      participantIds: conversation.participantIds,
+      characterIds: conversation.aiCharacterIds,
+      evidence,
+    });
+    for (const signal of signals) pushSignal(conversation, signal);
   };
 
   const [events, relationshipChanges, memories, goals] = await Promise.all([
@@ -464,7 +430,14 @@ export async function buildAutonomyOpportunityPlan(input: {
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: OPPORTUNITY_SOURCE_LIMIT,
-      select: { id: true, characterAId: true, characterBId: true, delta: true },
+      select: {
+        id: true,
+        characterAId: true,
+        characterBId: true,
+        delta: true,
+        sourceType: true,
+        sourceId: true,
+      },
     }),
     prisma.memory.findMany({
       where: {
@@ -477,6 +450,7 @@ export async function buildAutonomyOpportunityPlan(input: {
       take: OPPORTUNITY_SOURCE_LIMIT,
       select: {
         id: true,
+        eventId: true,
         importance: true,
         participants: { select: { characterId: true }, orderBy: { characterId: "asc" } },
       },
@@ -498,96 +472,48 @@ export async function buildAutonomyOpportunityPlan(input: {
   ]);
 
   for (const event of events) {
-    const eventParticipantIds = event.participants.map(
-      (participant) => participant.characterId,
-    );
-    for (const conversation of eligible) {
-      for (const characterId of conversation.aiCharacterIds) {
-        if (!eventParticipantIds.includes(characterId)) continue;
-        pushCandidate({
-          conversation,
-          characterId,
-          targetCharacterId: pickTargetCharacterId(
-            eventParticipantIds,
-            characterId,
-            conversation.participantIds,
-          ),
-          reason: "WORLD_EVENT",
-          strength: EVENT_IMPORTANCE_STRENGTH[event.importance],
-          evidenceId: `event:${event.id}`,
-        });
-      }
-    }
+    const evidence: OpportunityEvidence = {
+      kind: "EVENT",
+      id: event.id,
+      importance: event.importance,
+      participantIds: event.participants.map((participant) => participant.characterId),
+    };
+    for (const conversation of eligible) pushEvidence(conversation, evidence);
   }
 
   for (const change of relationshipChanges) {
-    const involved = [change.characterAId, change.characterBId];
-    for (const conversation of eligible) {
-      for (const characterId of conversation.aiCharacterIds) {
-        if (!involved.includes(characterId)) continue;
-        const other = involved.find((id) => id !== characterId) ?? null;
-        pushCandidate({
-          conversation,
-          characterId,
-          targetCharacterId:
-            other && conversation.participantIds.includes(other) ? other : null,
-          reason: "RELATIONSHIP_CHANGE",
-          strength: relationshipChangeStrength(change.delta),
-          evidenceId: `relationship-change:${change.id}`,
-        });
-      }
-    }
+    const evidence: OpportunityEvidence = {
+      kind: "RELATIONSHIP_CHANGE",
+      id: change.id,
+      sourceType: change.sourceType,
+      sourceId: change.sourceId,
+      characterAId: change.characterAId,
+      characterBId: change.characterBId,
+      delta: change.delta,
+    };
+    for (const conversation of eligible) pushEvidence(conversation, evidence);
   }
 
   for (const memory of memories) {
-    const memoryParticipantIds = memory.participants.map(
-      (participant) => participant.characterId,
-    );
-    for (const conversation of eligible) {
-      for (const characterId of conversation.aiCharacterIds) {
-        if (!memoryParticipantIds.includes(characterId)) continue;
-        pushCandidate({
-          conversation,
-          characterId,
-          targetCharacterId: pickTargetCharacterId(
-            memoryParticipantIds,
-            characterId,
-            conversation.participantIds,
-          ),
-          reason: "MEMORY_TRIGGER",
-          strength: MEMORY_IMPORTANCE_STRENGTH[memory.importance],
-          evidenceId: `memory:${memory.id}`,
-        });
-      }
-    }
+    const evidence: OpportunityEvidence = {
+      kind: "MEMORY",
+      id: memory.id,
+      eventId: memory.eventId,
+      importance: memory.importance,
+      participantIds: memory.participants.map((participant) => participant.characterId),
+    };
+    for (const conversation of eligible) pushEvidence(conversation, evidence);
   }
 
   for (const goal of goals) {
-    const strength = Math.min(1, Math.max(0, goal.priority / 100));
-    if (strength <= 0) continue;
-    for (const conversation of eligible) {
-      if (!conversation.participantIds.includes(goal.characterId)) continue;
-      const explicitTarget =
-        goal.targetCharacterId &&
-        goal.targetCharacterId !== goal.characterId &&
-        conversation.participantIds.includes(goal.targetCharacterId)
-          ? goal.targetCharacterId
-          : null;
-      pushCandidate({
-        conversation,
-        characterId: goal.characterId,
-        targetCharacterId:
-          explicitTarget ??
-          pickTargetCharacterId(
-            conversation.participantIds,
-            goal.characterId,
-            conversation.participantIds,
-          ),
-        reason: "GOAL_PRESSURE",
-        strength,
-        evidenceId: `goal:${goal.id}`,
-      });
-    }
+    const evidence: OpportunityEvidence = {
+      kind: "GOAL",
+      id: goal.id,
+      characterId: goal.characterId,
+      priority: goal.priority,
+      targetCharacterId: goal.targetCharacterId,
+    };
+    for (const conversation of eligible) pushEvidence(conversation, evidence);
   }
 
   const windowMs = input.toDate.getTime() - input.fromDate.getTime();
@@ -598,25 +524,14 @@ export async function buildAutonomyOpportunityPlan(input: {
       select: { id: true, createdAt: true },
     });
     const lastActivityAt = lastMessage?.createdAt ?? conversation.createdAt;
-    const strength = inactivityStrength(
-      input.toDate.getTime() - lastActivityAt.getTime(),
+    const evidence: OpportunityEvidence = {
+      kind: "INACTIVITY",
+      conversationId: conversation.id,
+      lastMessageId: lastMessage?.id ?? null,
+      idleMs: input.toDate.getTime() - lastActivityAt.getTime(),
       windowMs,
-    );
-    if (strength <= 0) continue;
-    for (const characterId of conversation.aiCharacterIds) {
-      pushCandidate({
-        conversation,
-        characterId,
-        targetCharacterId: pickTargetCharacterId(
-          conversation.participantIds,
-          characterId,
-          conversation.participantIds,
-        ),
-        reason: "INACTIVITY",
-        strength,
-        evidenceId: `inactivity:${conversation.id}:${lastMessage?.id ?? "none"}`,
-      });
-    }
+    };
+    pushEvidence(conversation, evidence);
   }
 
   const cooldown = await loadConversationOpportunityCooldown({

@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import type { EventImportance, MemoryImportance } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { createEventWithDerivations } from "../events/event-create.js";
 import {
   readConversationOpportunityAudit,
   readConversationOpportunitySelectionAudit,
@@ -281,6 +282,7 @@ afterAll(async () => {
     await prisma.memory.deleteMany({ where: { id: { in: createdMemoryIds } } });
   }
   if (createdEventIds.length > 0) {
+    await prisma.newsItem.deleteMany({ where: { eventId: { in: createdEventIds } } });
     await prisma.eventCharacter.deleteMany({ where: { eventId: { in: createdEventIds } } });
     await prisma.event.deleteMany({ where: { id: { in: createdEventIds } } });
   }
@@ -903,5 +905,123 @@ describe("F6.3 — envelope de conversa a partir da oportunidade", () => {
       await prisma.message.count({ where: { conversationId: foreign.conversationIds[0]! } }),
     ).toBe(1);
     expect(await prisma.aiDecision.count({ where: { universeId: foreign.universeId } })).toBe(0);
+  });
+});
+
+describe("F6.4 — ponte eventos→oportunidade", () => {
+  it("evento e derivações convergem para uma única evidência canônica", async () => {
+    const fixture = await createFixture({
+      label: "bridge-dedupe",
+      mode: "GUIDED",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+    });
+    const event = await prisma.$transaction((tx) =>
+      createEventWithDerivations(
+        tx,
+        {
+          type: "SOCIAL",
+          importance: "HIGH",
+          source: "GENERATED_EVENT",
+          title: `${PREFIX}-bridge-event`,
+          description: null,
+          worldDate: SIGNAL_AT,
+        },
+        [fixture.characterIds[0]!, fixture.characterIds[1]!],
+      ),
+    );
+    createdEventIds.push(event.id);
+    const derivedMemories = await prisma.memory.findMany({
+      where: { eventId: event.id },
+      select: { id: true },
+    });
+    for (const memory of derivedMemories) createdMemoryIds.push(memory.id);
+    await prisma.memory.updateMany({
+      where: { eventId: event.id },
+      data: { createdAt: SIGNAL_AT },
+    });
+    await prisma.relationshipChange.updateMany({
+      where: { sourceType: "EVENT", sourceId: event.id },
+      data: { createdAt: SIGNAL_AT },
+    });
+
+    const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    expect(result.status).toBe("EXECUTED");
+    expect(result.envelopes).toHaveLength(0);
+    const audits = (await readDecisionAudits(fixture.universeId)).filter((entry) => entry.audit);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.audit!.evidenceId).toBe(`event:${event.id}`);
+    expect(audits[0]!.audit!.reason).toBe("WORLD_EVENT");
+    expect(audits[0]!.summary?.candidateCount).toBeGreaterThanOrEqual(4);
+    expect(
+      await prisma.message.count({ where: { conversationId: fixture.conversationIds[0]! } }),
+    ).toBe(0);
+  });
+
+  it("evento de outro universe não vaza para a seleção", async () => {
+    const home = await createFixture({
+      label: "bridge-home",
+      mode: "GUIDED",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      events: [{ participants: [0], importance: "HIGH" }],
+    });
+    const foreign = await createFixture({
+      label: "bridge-foreign",
+      mode: "GUIDED",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      events: [{ participants: [0], importance: "CRITICAL" }],
+    });
+    const homeEvent = await prisma.event.findFirstOrThrow({
+      where: { participants: { some: { characterId: home.characterIds[0]! } } },
+      select: { id: true },
+    });
+
+    const result = await runAutonomousTick({ universeId: home.universeId, toDate: TO_1 });
+    expect(result.status).toBe("EXECUTED");
+    const audits = (await readDecisionAudits(home.universeId)).filter((entry) => entry.audit);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.audit!.evidenceId).toBe(`event:${homeEvent.id}`);
+    expect(await prisma.aiDecision.count({ where: { universeId: foreign.universeId } })).toBe(0);
+  });
+
+  it("evento sem conversa elegível não cria oportunidade", async () => {
+    const fixture = await createFixture({
+      label: "bridge-no-conversation",
+      mode: "GUIDED",
+      aiCharacters: 2,
+      conversations: [],
+      events: [{ participants: [0], importance: "HIGH" }],
+    });
+    const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    expect(result.status).toBe("EXECUTED");
+    const audits = (await readDecisionAudits(fixture.universeId)).filter((entry) => entry.audit);
+    expect(audits).toHaveLength(0);
+    expect(result.envelopes).toHaveLength(0);
+  });
+
+  it("FULL: evento gera oportunidade e envelope via F6.3", async () => {
+    const fixture = await createFixture({
+      label: "bridge-full",
+      mode: "FULL",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      messages: [{ conversation: 0, sender: 1, content: "bom dia" }],
+      events: [{ participants: [0], importance: "HIGH" }],
+    });
+    const event = await prisma.event.findFirstOrThrow({
+      where: { participants: { some: { characterId: fixture.characterIds[0]! } } },
+      select: { id: true },
+    });
+
+    const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    expect(result.status).toBe("EXECUTED");
+    expect(result.envelopes).toHaveLength(1);
+    const envelope = result.envelopes[0]!;
+    expect(envelope.evidenceId).toBe(`event:${event.id}`);
+    expect(envelope.executed).toBe(true);
+    const audits = (await readDecisionAudits(fixture.universeId)).filter((entry) => entry.audit);
+    expect(audits.some((entry) => entry.audit!.evidenceId === `event:${event.id}`)).toBe(true);
   });
 });
