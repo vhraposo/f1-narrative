@@ -10,11 +10,14 @@ import {
   type ResponseWindow,
 } from "./conversation.energy.js";
 import {
+  allowedIntentsFor,
   buildDialogueCandidateSet,
   buildFallbackPlan,
   deriveDialogueIntent,
   DeterministicDialoguePlanner,
   validateDialoguePlan,
+  type CandidateSetEntry,
+  type DialogueCandidateSet,
   type DialogueIntent,
   type DialoguePlan,
 } from "./conversation.dialogue.js";
@@ -33,7 +36,11 @@ import {
   buildDialogueKnowledgeContext,
 } from "./conversation.dialogue-context.js";
 import { retrieveRelevantMemories } from "../memory/memory.retrieval.js";
-import { selectResponseCandidates } from "./conversation.response-engine.js";
+import {
+  selectResponseCandidates,
+  type ResponseCandidate,
+  type ResponseSelectionResult,
+} from "./conversation.response-engine.js";
 import type { GenerationProvider } from "../generation/generation.assembly.js";
 
 export type SimulationStopReason =
@@ -107,6 +114,19 @@ export type SimulationResult = {
   readonly selection: readonly SimulationSelectionTrace[];
   readonly plan: SimulationPlan;
   readonly trace?: readonly DialogueExecutionTrace[];
+};
+
+/**
+ * F6.3 — seed de envelope vindo da oportunidade selecionada no tick autônomo.
+ * A oportunidade determina conversa, primeiro speaker e target; o planner
+ * existente continua decidindo intenção, continuidade e stop.
+ */
+export type OpportunityEnvelopeSeed = {
+  readonly conversationId: string;
+  readonly characterId: string;
+  readonly targetCharacterId: string | null;
+  readonly fingerprint: string;
+  readonly windowStart: string;
 };
 
 type PlanInput = {
@@ -249,9 +269,171 @@ function recentAiMessages(input: PlanInput): { characterId: string; content: str
     .map((message) => ({ characterId: message.characterId, content: message.content }));
 }
 
+function stoppedSimulationPlan(input: PlanInput, reasonCode: SimulationStopReason): SimulationPlan {
+  const energy = evaluateConversationEnergy({
+    message: "",
+    participantCount: input.participants.length,
+    recentAiMessages: 0,
+  });
+  const window = planResponseWindow(energy, { budgetRemaining: input.budgetRemaining });
+  return {
+    energy,
+    window,
+    planned: [],
+    stopReason: reasonCode,
+    dialogue: {
+      conversationIntent: "CLOSE",
+      topic: null,
+      emotionalTone: "NEUTRAL",
+      turns: [],
+      continuation: "STOP",
+      stopReason: "PLANNER_DECLINED",
+    },
+    candidates: [],
+  };
+}
+
+function assembleSimulationPlan(input: {
+  readonly energy: ConversationEnergy;
+  readonly window: ResponseWindow;
+  readonly candidateSet: DialogueCandidateSet;
+  readonly dialogue: DialoguePlan;
+}): SimulationPlan {
+  const candidateById = new Map(
+    input.candidateSet.candidates.map((candidate) => [candidate.characterId, candidate]),
+  );
+  return {
+    energy: input.energy,
+    window: input.window,
+    planned: input.dialogue.turns.flatMap((turn) => {
+      const candidate = candidateById.get(turn.speakerCharacterId);
+      if (!candidate) return [];
+      return [
+        {
+          characterId: candidate.characterId,
+          name: candidate.name,
+          score: candidate.score,
+          opportunity: candidate.opportunity,
+          reasons: [...candidate.reasons, `INTENT_${turn.intent}`],
+        },
+      ];
+    }),
+    stopReason: input.dialogue.stopReason === "SELECTED" ? "SELECTED" : input.dialogue.stopReason,
+    dialogue: input.dialogue,
+    candidates: input.candidateSet.candidates.map((candidate) => ({
+      characterId: candidate.characterId,
+      score: candidate.score,
+      opportunity: candidate.opportunity,
+      reasons: candidate.reasons,
+      eligible: candidate.eligible,
+    })),
+  };
+}
+
+function applyOpportunitySeedToSelection(
+  selection: ResponseSelectionResult,
+  seedParticipant: { readonly characterId: string; readonly name: string },
+): ResponseSelectionResult {
+  const alreadySelected = selection.selected.some(
+    (candidate) => candidate.characterId === seedParticipant.characterId,
+  );
+  if (alreadySelected) {
+    return {
+      ...selection,
+      selected: selection.selected.map((candidate) =>
+        candidate.characterId === seedParticipant.characterId
+          ? { ...candidate, reasons: [...candidate.reasons, "OPPORTUNITY_SEED"] }
+          : candidate,
+      ),
+    };
+  }
+  const rejected = selection.rejected.find(
+    (candidate) => candidate.characterId === seedParticipant.characterId,
+  );
+  if (!rejected) return selection;
+  const promoted: ResponseCandidate = {
+    characterId: rejected.characterId,
+    name: rejected.name,
+    score: rejected.score,
+    opportunity: rejected.opportunity,
+    reasons: [...rejected.reasons.filter((reason) => reason !== "LOW_SCORE"), "OPPORTUNITY_SEED"],
+  };
+  return {
+    ...selection,
+    selected: [promoted, ...selection.selected],
+    rejected: selection.rejected.filter(
+      (candidate) => candidate.characterId !== seedParticipant.characterId,
+    ),
+    stopReason: "SELECTED",
+  };
+}
+
+async function planOpportunityOpening(
+  input: PlanInput,
+  seedParticipant: { readonly characterId: string; readonly name: string },
+  seed: OpportunityEnvelopeSeed,
+): Promise<SimulationPlan> {
+  const energy = evaluateConversationEnergy({
+    message: "",
+    participantCount: input.participants.length,
+    recentAiMessages: 0,
+  });
+  const window = planResponseWindow(energy, { budgetRemaining: input.budgetRemaining });
+  if (window.maxInitialResponders === 0) return stoppedSimulationPlan(input, "BUDGET_LIMIT");
+
+  const openingCandidate: CandidateSetEntry = {
+    characterId: seedParticipant.characterId,
+    name: seedParticipant.name,
+    eligible: true,
+    opportunity: 1,
+    score: 0,
+    reasons: ["OPPORTUNITY_SEED"],
+    allowedIntents: allowedIntentsFor(["OPPORTUNITY_SEED"]),
+    recentActivity: 0,
+  };
+  const candidateSet: DialogueCandidateSet = {
+    conversationId: seed.conversationId,
+    universeId: input.universeId,
+    lastMessageId: null,
+    lastMessageContent: "",
+    depth: 0,
+    energy,
+    window,
+    candidates: [openingCandidate],
+    selected: [openingCandidate],
+    rejected: [],
+  };
+  const planner = new DeterministicDialoguePlanner();
+  const proposed = await planner.plan({
+    candidateSet,
+    preferredFirstSpeakerCharacterId: seedParticipant.characterId,
+  });
+  const validation = validateDialoguePlan(proposed, {
+    participantIds: new Set(input.participants.map((participant) => participant.characterId)),
+    aiParticipantIds: new Set(
+      input.participants
+        .filter((participant) => participant.controller === "AI")
+        .map((participant) => participant.characterId),
+    ),
+    eligibleCandidateIds: new Set([seedParticipant.characterId]),
+    availablePutativeIds: new Set(
+      input.participants.filter((participant) => participant.available).map((p) => p.characterId),
+    ),
+    messageIds: new Set<string>(),
+    maxTurns: window.maxInitialResponders + window.maxReactions,
+    remainingBudget: input.budgetRemaining,
+  });
+  const dialogue = validation.valid ? proposed : buildFallbackPlan(candidateSet);
+  return assembleSimulationPlan({ energy, window, candidateSet, dialogue });
+}
+
 export async function getSimulationPlan(
   conversationId: string,
-  options: { readonly userId: string; readonly worldDate?: Date },
+  options: {
+    readonly userId: string;
+    readonly worldDate?: Date;
+    readonly opportunity?: OpportunityEnvelopeSeed;
+  },
 ): Promise<SimulationPlan> {
   const input = await loadPlanInput(conversationId, options.userId);
   if (!input) {
@@ -276,8 +458,33 @@ export async function getSimulationPlan(
       candidates: [],
     };
   }
+  const seed = options.opportunity ?? null;
+  let seedParticipant: { characterId: string; name: string } | null = null;
+  if (seed) {
+    if (seed.conversationId !== conversationId) {
+      return stoppedSimulationPlan(input, "OPPORTUNITY_INVALID");
+    }
+    const participant =
+      input.participants.find((entry) => entry.characterId === seed.characterId) ?? null;
+    if (!participant || participant.controller !== "AI") {
+      return stoppedSimulationPlan(input, "OPPORTUNITY_INVALID");
+    }
+    if (
+      seed.targetCharacterId &&
+      !input.participants.some((entry) => entry.characterId === seed.targetCharacterId)
+    ) {
+      return stoppedSimulationPlan(input, "OPPORTUNITY_INVALID");
+    }
+    if (!participant.available) {
+      return stoppedSimulationPlan(input, "NO_ELIGIBLE_SPEAKER");
+    }
+    seedParticipant = { characterId: participant.characterId, name: participant.name };
+  }
   const lastMessage = input.messages[input.messages.length - 1] ?? null;
   if (!lastMessage) {
+    if (seed && seedParticipant) {
+      return planOpportunityOpening(input, seedParticipant, seed);
+    }
     const energy = evaluateConversationEnergy({
       message: "",
       participantCount: input.participants.length,
@@ -336,7 +543,7 @@ export async function getSimulationPlan(
       candidates: [],
     };
   }
-  const selection = selectResponseCandidates({
+  let selection = selectResponseCandidates({
     participants: input.participants.map((participant) => ({ ...participant })),
     messages: triggerMessages.map((message) => ({ ...message })),
     relationshipAffinity: input.affinity,
@@ -354,6 +561,9 @@ export async function getSimulationPlan(
       minScore: window.stopThresholds.initial,
     },
   });
+  if (seedParticipant) {
+    selection = applyOpportunitySeedToSelection(selection, seedParticipant);
+  }
   const candidateSet = buildDialogueCandidateSet({
     conversationId,
     universeId: input.universeId,
@@ -365,7 +575,10 @@ export async function getSimulationPlan(
     selection,
   });
   const planner = new DeterministicDialoguePlanner();
-  const proposed = await planner.plan({ candidateSet });
+  const proposed = await planner.plan({
+    candidateSet,
+    preferredFirstSpeakerCharacterId: seedParticipant?.characterId ?? null,
+  });
   const participantIds = new Set(input.participants.map((participant) => participant.characterId));
   const aiParticipantIds = new Set(
     input.participants
@@ -384,33 +597,7 @@ export async function getSimulationPlan(
     remainingBudget: input.budgetRemaining,
   });
   const dialogue = validation.valid ? proposed : buildFallbackPlan(candidateSet);
-  const candidateById = new Map(candidateSet.candidates.map((candidate) => [candidate.characterId, candidate]));
-  return {
-    energy,
-    window,
-    planned: dialogue.turns.flatMap((turn) => {
-      const candidate = candidateById.get(turn.speakerCharacterId);
-      if (!candidate) return [];
-      return [
-        {
-          characterId: candidate.characterId,
-          name: candidate.name,
-          score: candidate.score,
-          opportunity: candidate.opportunity,
-          reasons: [...candidate.reasons, `INTENT_${turn.intent}`],
-        },
-      ];
-    }),
-    stopReason: dialogue.stopReason === "SELECTED" ? "SELECTED" : dialogue.stopReason,
-    dialogue,
-    candidates: candidateSet.candidates.map((candidate) => ({
-      characterId: candidate.characterId,
-      score: candidate.score,
-      opportunity: candidate.opportunity,
-      reasons: candidate.reasons,
-      eligible: candidate.eligible,
-    })),
-  };
+  return assembleSimulationPlan({ energy, window, candidateSet, dialogue });
 }
 
 function realizerVoice(affinity: number | undefined) {
@@ -431,11 +618,13 @@ export async function simulateConversationTurn(
     readonly worldDate?: Date;
     readonly provider?: GenerationProvider;
     readonly maxDepth?: number;
+    readonly opportunity?: OpportunityEnvelopeSeed;
   },
 ): Promise<SimulationResult> {
   const plan = await getSimulationPlan(conversationId, {
     userId: options.userId,
     ...(options.worldDate ? { worldDate: options.worldDate } : {}),
+    ...(options.opportunity ? { opportunity: options.opportunity } : {}),
   });
   const steps: SimulationStep[] = [];
   const selection: SimulationSelectionTrace[] = [];
@@ -475,6 +664,7 @@ export async function simulateConversationTurn(
     readonly replyToMessageId: string | null;
     readonly maxMessages: 1 | 2 | 3;
     readonly depth: number;
+    readonly targetCharacterIdOverride?: string | null;
   }): Promise<boolean> {
     const affinity = initialInput!.affinity[input.candidate.characterId];
     const recentMessages = [...messageById.entries()]
@@ -586,6 +776,9 @@ export async function simulateConversationTurn(
         ...(options.worldDate ? { worldDate: options.worldDate } : {}),
         forceSpeakerCharacterId: input.candidate.characterId,
         textOverride: fragment.text,
+        ...(typeof input.targetCharacterIdOverride === "string"
+          ? { targetCharacterId: input.targetCharacterIdOverride }
+          : {}),
         dialogue: {
           intent: input.intent,
           replyToMessageId: replyTo,
@@ -628,7 +821,11 @@ export async function simulateConversationTurn(
   }
 
   const candidateById = new Map(plan.planned.map((candidate) => [candidate.characterId, candidate]));
-  for (const [index, turn] of plan.dialogue.turns.entries()) {
+  const initialTurns =
+    options.maxDepth === undefined
+      ? plan.dialogue.turns
+      : plan.dialogue.turns.slice(0, Math.max(0, options.maxDepth));
+  for (const [index, turn] of initialTurns.entries()) {
     const candidate = candidateById.get(turn.speakerCharacterId);
     if (!candidate) continue;
     const replyTo = index === 0 ? turn.replyToMessageId : lastMessageId;
@@ -638,6 +835,10 @@ export async function simulateConversationTurn(
       replyToMessageId: replyTo,
       maxMessages: turn.maxMessages,
       depth: index,
+      targetCharacterIdOverride:
+        index === 0 && turn.replyToMessageId === null
+          ? (options.opportunity?.targetCharacterId ?? null)
+          : null,
     });
     if (!ok) break;
   }

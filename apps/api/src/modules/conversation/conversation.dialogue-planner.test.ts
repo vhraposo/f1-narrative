@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { DialogueCandidateSet, DialoguePlan } from "./conversation.dialogue.js";
+import type { CandidateSetEntry, DialogueCandidateSet, DialoguePlan } from "./conversation.dialogue.js";
 import {
   createDialoguePlanner,
   LlmDialoguePlanner,
@@ -166,5 +166,39 @@ describe("F2B — LLM dialogue planner atrás de flag", () => {
     const plan = await planner.plan(input);
     expect(plan).toEqual(deterministic);
     expect(planner.lastTrace?.fallback).toBe(false);
+  });
+});
+
+describe("F6.3 — primeiro speaker preferido da oportunidade", () => {
+  function entry(characterId: string, score: number): CandidateSetEntry {
+    return {
+      characterId,
+      name: characterId,
+      eligible: true,
+      opportunity: score / 100,
+      score,
+      reasons: ["SOCIAL_BASELINE"],
+      allowedIntents: ["REACTION"],
+      recentActivity: 0,
+    };
+  }
+
+  function twoSpeakers(): DialogueCandidateSet {
+    const a = entry("ai-a", 40);
+    const b = entry("ai-b", 39);
+    return { ...candidateSet, candidates: [a, b], selected: [a, b], rejected: [] };
+  }
+
+  it("honra o primeiro speaker da oportunidade", async () => {
+    const plan = await new DeterministicDialoguePlanner().plan({
+      candidateSet: twoSpeakers(),
+      preferredFirstSpeakerCharacterId: "ai-b",
+    });
+    expect(plan.turns[0]?.speakerCharacterId).toBe("ai-b");
+  });
+
+  it("sem preferência mantém o ranking por score", async () => {
+    const plan = await new DeterministicDialoguePlanner().plan({ candidateSet: twoSpeakers() });
+    expect(plan.turns[0]?.speakerCharacterId).toBe("ai-a");
   });
 });

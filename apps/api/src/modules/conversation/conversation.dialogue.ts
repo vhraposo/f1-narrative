@@ -88,7 +88,7 @@ export type CandidateSetEntry = {
 export type DialogueCandidateSet = {
   readonly conversationId: string;
   readonly universeId: string;
-  readonly lastMessageId: string;
+  readonly lastMessageId: string | null;
   readonly lastMessageContent: string;
   readonly depth: number;
   readonly energy: ConversationEnergy;
@@ -106,7 +106,7 @@ const INTENT_BY_REASON: Readonly<Record<string, DialogueIntent>> = {
   SEEDED_VARIATION: "REACTION",
 };
 
-function allowedIntentsFor(reasons: readonly string[]): DialogueIntent[] {
+export function allowedIntentsFor(reasons: readonly string[]): DialogueIntent[] {
   const intents = new Set<DialogueIntent>(["REACTION", "FOLLOW_UP", "SUPPORT", "SILENCE"]);
   for (const reason of reasons) {
     const intent = INTENT_BY_REASON[reason];
@@ -135,7 +135,7 @@ function toCandidateEntry(
 export function buildDialogueCandidateSet(input: {
   readonly conversationId: string;
   readonly universeId: string;
-  readonly lastMessageId: string;
+  readonly lastMessageId: string | null;
   readonly lastMessageContent: string;
   readonly depth: number;
   readonly energy: ConversationEnergy;
@@ -192,6 +192,11 @@ export function deriveDialogueIntent(input: {
 
 export type DialoguePlannerInput = {
   readonly candidateSet: DialogueCandidateSet;
+  /**
+   * F6.3 — quando a oportunidade seleciona o iniciador, o planner mantém
+   * intenção/continuidade/stop, mas honra o primeiro speaker do domínio.
+   */
+  readonly preferredFirstSpeakerCharacterId?: string | null;
 };
 
 export interface DialoguePlanner {
@@ -233,6 +238,15 @@ export class DeterministicDialoguePlanner implements DialoguePlanner {
       if (b.score !== a.score) return b.score - a.score;
       return a.characterId.localeCompare(b.characterId);
     });
+    const preferred = input.preferredFirstSpeakerCharacterId ?? null;
+    if (preferred) {
+      const preferredIndex = ranked.findIndex(
+        (candidate) => candidate.characterId === preferred,
+      );
+      if (preferredIndex > 0) {
+        ranked.unshift(ranked.splice(preferredIndex, 1)[0] as CandidateSetEntry);
+      }
+    }
 
     const turns: DialogueTurn[] = [];
     for (const candidate of ranked) {

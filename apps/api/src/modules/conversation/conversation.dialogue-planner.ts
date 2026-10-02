@@ -15,7 +15,7 @@ export type DialoguePlannerKind = "off" | "deterministic" | "llm";
 export type DialoguePlannerContext = {
   readonly conversationId: string;
   readonly universeId: string;
-  readonly lastMessageId: string;
+  readonly lastMessageId: string | null;
   readonly lastMessageContent: string;
   readonly depth: number;
   readonly energyLevel: string;
@@ -103,7 +103,8 @@ export class LlmDialoguePlanner implements DialoguePlanner {
 
   async plan(input: DialoguePlannerInput): Promise<DialoguePlan> {
     const started = performance.now();
-    const allowedMessageIds = [input.candidateSet.lastMessageId];
+    const allowedMessageIds =
+      input.candidateSet.lastMessageId === null ? [] : [input.candidateSet.lastMessageId];
     const context = buildDialoguePlannerContext(input, allowedMessageIds);
     try {
       const raw = await this.provider.plan(context);

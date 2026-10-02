@@ -49,6 +49,16 @@ type FixtureOptions = {
     readonly pair: readonly [number, number];
     readonly delta?: number;
   }>;
+  readonly messages?: ReadonlyArray<{
+    readonly conversation: number;
+    readonly sender: number;
+    readonly content?: string;
+    readonly createdAt?: Date;
+  }>;
+  readonly availability?: ReadonlyArray<{
+    readonly character: number;
+    readonly status: "AVAILABLE" | "BUSY" | "OFFLINE";
+  }>;
 };
 
 type Fixture = {
@@ -126,6 +136,27 @@ async function createFixture(options: FixtureOptions): Promise<Fixture> {
     });
     createdConversationIds.push(conversation.id);
     conversationIds.push(conversation.id);
+  }
+
+  for (const message of options.messages ?? []) {
+    const isUser =
+      message.sender >= options.aiCharacters &&
+      message.sender < options.aiCharacters + (options.userCharacters ?? 0);
+    await prisma.message.create({
+      data: {
+        conversationId: conversationIds[message.conversation]!,
+        senderType: isUser ? "USER_CHARACTER" : "AI_CHARACTER",
+        characterId: characterIds[message.sender]!,
+        content: message.content ?? `${tag}-message`,
+        createdAt: message.createdAt ?? SIGNAL_AT,
+      },
+    });
+  }
+
+  for (const availability of options.availability ?? []) {
+    await prisma.characterAvailability.create({
+      data: { characterId: characterIds[availability.character]!, status: availability.status },
+    });
   }
 
   for (const goal of options.goals ?? []) {
@@ -459,7 +490,7 @@ describe("F6.2 — oportunidades no runAutonomousTick", () => {
     expect(await prisma.aiDecision.count({ where: { universeId: fixture.universeId } })).toBe(0);
   });
 
-  it("FULL seleciona, audita e não executa conversa nem LLM", async () => {
+  it("FULL seleciona, audita e executa o envelope sem LLM (F6.3)", async () => {
     const fixture = await createFixture({
       label: "full",
       mode: "FULL",
@@ -469,7 +500,10 @@ describe("F6.2 — oportunidades no runAutonomousTick", () => {
     });
     const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
     expect(result.status).toBe("EXECUTED");
-    expect(result.actionsExecuted).toBe(0);
+    expect(result.envelopes).toHaveLength(1);
+    expect(result.envelopes[0]!.executed).toBe(true);
+    expect(result.envelopes[0]!.depth).toBeGreaterThanOrEqual(1);
+    expect(result.envelopes[0]!.messageIds.length).toBeGreaterThanOrEqual(1);
     const decisions = await prisma.aiDecision.findMany({
       where: { universeId: fixture.universeId },
       select: { metadata: true },
@@ -484,11 +518,12 @@ describe("F6.2 — oportunidades no runAutonomousTick", () => {
     const audits = (await readDecisionAudits(fixture.universeId)).filter((entry) => entry.audit);
     expect(audits).toHaveLength(1);
     expect(JSON.stringify(audits[0]!.audit)).not.toMatch(/provider|model|prompt/i);
-    expect(
-      await prisma.message.count({
-        where: { conversationId: { in: [...fixture.conversationIds] } },
-      }),
-    ).toBe(0);
+    const messages = await prisma.message.findMany({
+      where: { conversationId: { in: [...fixture.conversationIds] } },
+      select: { id: true, senderType: true },
+    });
+    expect(messages.length).toBe(result.envelopes[0]!.messageIds.length);
+    expect(messages.every((message) => message.senderType === "AI_CHARACTER")).toBe(true);
   });
 
   it("isolamento por universe: conversa mista e actions externas ficam fora", async () => {
@@ -572,5 +607,301 @@ describe("F6.2 — oportunidades no runAutonomousTick", () => {
     expect(evidence.some((id) => id.startsWith("relationship-change:"))).toBe(true);
     expect(evidence.some((id) => id.startsWith("memory:"))).toBe(true);
     expect(new Set(audits.map((entry) => entry.audit!.conversationId)).size).toBe(2);
+  });
+});
+
+describe("F6.3 — envelope de conversa a partir da oportunidade", () => {
+  it("FULL executa envelope AI→AI pelo pipeline existente, sem LLM", async () => {
+    const fixture = await createFixture({
+      label: "env-full",
+      mode: "FULL",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      goals: [{ character: 0, priority: 60 }],
+      messages: [
+        { conversation: 0, sender: 1, content: "bom dia, parceiro", createdAt: SIGNAL_AT },
+      ],
+    });
+    const seed = await prisma.message.findFirstOrThrow({
+      where: { conversationId: fixture.conversationIds[0]!, characterId: fixture.characterIds[1]! },
+      select: { id: true },
+    });
+
+    const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    expect(result.status).toBe("EXECUTED");
+    expect(result.envelopes).toHaveLength(1);
+    const envelope = result.envelopes[0]!;
+    expect(envelope.executed).toBe(true);
+    expect(envelope.characterId).toBe(fixture.characterIds[0]);
+    expect(envelope.conversationId).toBe(fixture.conversationIds[0]);
+    expect(envelope.depth).toBeGreaterThanOrEqual(1);
+    expect(envelope.messageIds.length).toBeGreaterThanOrEqual(1);
+
+    const messages = await prisma.message.findMany({
+      where: { id: { in: [...envelope.messageIds] } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    expect(messages).toHaveLength(envelope.messageIds.length);
+    expect(messages[0]!.characterId).toBe(fixture.characterIds[0]);
+    expect(messages[0]!.senderType).toBe("AI_CHARACTER");
+    const contextJson = messages[0]!.contextJson as Record<string, unknown>;
+    const dialogue = contextJson.dialogue as Record<string, unknown>;
+    expect(dialogue.replyToMessageId).toBe(seed.id);
+    const language = contextJson.language as Record<string, unknown>;
+    expect(language.provider).toBe("dialogue-realizer");
+    expect(language.fallback).toBe(false);
+
+    const decisions = await prisma.aiDecision.findMany({
+      where: { universeId: fixture.universeId, status: "EXECUTED" },
+      select: { executedMessageId: true, metadata: true },
+    });
+    for (const messageId of envelope.messageIds) {
+      expect(decisions.some((decision) => decision.executedMessageId === messageId)).toBe(true);
+    }
+    expect(
+      messages.every((message) =>
+        decisions.some((decision) => decision.executedMessageId === message.id),
+      ),
+    ).toBe(true);
+    expect(
+      decisions.every(
+        (decision) => (decision.metadata as Record<string, unknown>).llmUsed === false,
+      ),
+    ).toBe(true);
+    const turnDecision = await prisma.aiDecision.findFirstOrThrow({
+      where: {
+        universeId: fixture.universeId,
+        characterId: fixture.characterIds[0]!,
+        metadata: { path: ["trigger"], equals: "CONVERSATION_TURN_DUE" },
+      },
+      select: { metadata: true },
+    });
+    const turnMetadata = turnDecision.metadata as Record<string, unknown>;
+    expect(turnMetadata.targetCharacterId).toBe(fixture.characterIds[1]);
+    const audits = (await readDecisionAudits(fixture.universeId)).filter((entry) => entry.audit);
+    expect(
+      audits.some((entry) => entry.audit!.fingerprint === envelope.fingerprint),
+    ).toBe(true);
+  });
+
+  it("OFF/OBSERVER/GUIDED não executam envelope nesta fase", async () => {
+    for (const mode of ["OFF", "OBSERVER", "GUIDED"] as const) {
+      const fixture = await createFixture({
+        label: `env-mode-${mode}`,
+        mode,
+        aiCharacters: 2,
+        conversations: [[0, 1]],
+        goals: [{ character: 0, priority: 60 }],
+        messages: [{ conversation: 0, sender: 1, content: "bom dia" }],
+      });
+      const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+      expect(result.envelopes).toHaveLength(0);
+      expect(
+        await prisma.message.count({ where: { conversationId: fixture.conversationIds[0]! } }),
+      ).toBe(1);
+    }
+  });
+
+  it("oportunidade inexistente não executa conversa", async () => {
+    const fixture = await createFixture({
+      label: "env-no-opportunity",
+      mode: "FULL",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      messages: [{ conversation: 0, sender: 1, content: "bom dia" }],
+    });
+    const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    expect(result.status).toBe("EXECUTED");
+    expect(result.envelopes).toHaveLength(0);
+    expect(
+      await prisma.message.count({ where: { conversationId: fixture.conversationIds[0]! } }),
+    ).toBe(1);
+  });
+
+  it("idempotência: tick repetido não duplica envelope nem mensagem", async () => {
+    const fixture = await createFixture({
+      label: "env-replay",
+      mode: "FULL",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      goals: [{ character: 0, priority: 60 }],
+      messages: [{ conversation: 0, sender: 1, content: "bom dia" }],
+    });
+    await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    const messagesAfterFirst = await prisma.message.count({
+      where: { conversationId: fixture.conversationIds[0]! },
+    });
+    const decisionsAfterFirst = await prisma.aiDecision.count({
+      where: { universeId: fixture.universeId },
+    });
+    const replay = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    expect(replay.status).toBe("REUSED");
+    expect(replay.envelopes).toHaveLength(0);
+    expect(
+      await prisma.message.count({ where: { conversationId: fixture.conversationIds[0]! } }),
+    ).toBe(messagesAfterFirst);
+    expect(await prisma.aiDecision.count({ where: { universeId: fixture.universeId } })).toBe(
+      decisionsAfterFirst,
+    );
+  });
+
+  it("no máximo uma conversa por tick e budget de conversações", async () => {
+    const fixture = await createFixture({
+      label: "env-budget",
+      mode: "FULL",
+      aiCharacters: 3,
+      userCharacters: 1,
+      conversations: [
+        [0, 3],
+        [1, 3],
+        [2, 3],
+      ],
+      goals: [
+        { character: 0, priority: 60 },
+        { character: 1, priority: 55 },
+        { character: 2, priority: 50 },
+      ],
+      messages: [
+        { conversation: 0, sender: 3, content: "bom dia" },
+        { conversation: 1, sender: 3, content: "bom dia" },
+        { conversation: 2, sender: 3, content: "bom dia" },
+      ],
+    });
+    const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    expect(result.envelopes).toHaveLength(2);
+    expect(new Set(result.envelopes.map((envelope) => envelope.conversationId)).size).toBe(2);
+    expect(result.envelopes.every((envelope) => envelope.executed)).toBe(true);
+  });
+
+  it("AUTONOMY_MAX_CONVERSATIONS_PER_TICK limita envelopes", async () => {
+    process.env.AUTONOMY_MAX_CONVERSATIONS_PER_TICK = "1";
+    try {
+      const fixture = await createFixture({
+        label: "env-budget-1",
+        mode: "FULL",
+        aiCharacters: 2,
+        userCharacters: 1,
+        conversations: [
+          [0, 2],
+          [1, 2],
+        ],
+        goals: [
+          { character: 0, priority: 60 },
+          { character: 1, priority: 55 },
+        ],
+        messages: [
+          { conversation: 0, sender: 2, content: "bom dia" },
+          { conversation: 1, sender: 2, content: "bom dia" },
+        ],
+      });
+      const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+      expect(result.envelopes).toHaveLength(1);
+    } finally {
+      delete process.env.AUTONOMY_MAX_CONVERSATIONS_PER_TICK;
+    }
+  });
+
+  it("budget de mensagens limita envelopes seguintes", async () => {
+    process.env.AUTONOMY_MAX_MESSAGES_PER_TICK = "1";
+    try {
+      const fixture = await createFixture({
+        label: "env-budget-msg",
+        mode: "FULL",
+        aiCharacters: 2,
+        userCharacters: 1,
+        conversations: [
+          [0, 2],
+          [1, 2],
+        ],
+        goals: [
+          { character: 0, priority: 60 },
+          { character: 1, priority: 55 },
+        ],
+        messages: [
+          { conversation: 0, sender: 2, content: "bom dia" },
+          { conversation: 1, sender: 2, content: "bom dia" },
+        ],
+      });
+      const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+      expect(result.envelopes).toHaveLength(2);
+      const executed = result.envelopes.filter((envelope) => envelope.executed);
+      const blocked = result.envelopes.filter((envelope) => !envelope.executed);
+      expect(executed).toHaveLength(1);
+      expect(blocked).toHaveLength(1);
+      expect(blocked[0]!.stopReason).toBe("BUDGET_LIMIT");
+      const created = await prisma.message.count({
+        where: { conversationId: { in: [...fixture.conversationIds] } },
+      });
+      expect(created).toBe(3);
+    } finally {
+      delete process.env.AUTONOMY_MAX_MESSAGES_PER_TICK;
+    }
+  });
+
+  it("planner pode produzir stop quando o speaker está indisponível", async () => {
+    const fixture = await createFixture({
+      label: "env-busy",
+      mode: "FULL",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      goals: [{ character: 0, priority: 60 }],
+      messages: [{ conversation: 0, sender: 1, content: "bom dia" }],
+      availability: [{ character: 0, status: "BUSY" }],
+    });
+    const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    expect(result.envelopes).toHaveLength(1);
+    expect(result.envelopes[0]!.executed).toBe(false);
+    expect(result.envelopes[0]!.stopReason).toBe("NO_ELIGIBLE_SPEAKER");
+    expect(result.envelopes[0]!.messageIds).toHaveLength(0);
+    expect(
+      await prisma.message.count({ where: { conversationId: fixture.conversationIds[0]! } }),
+    ).toBe(1);
+  });
+
+  it("envelope termina naturalmente sem mensagem adicional", async () => {
+    const fixture = await createFixture({
+      label: "env-natural-end",
+      mode: "FULL",
+      aiCharacters: 1,
+      userCharacters: 1,
+      conversations: [[0, 1]],
+      goals: [{ character: 0, priority: 60 }],
+      messages: [{ conversation: 0, sender: 1, content: "bom dia" }],
+    });
+    const result = await runAutonomousTick({ universeId: fixture.universeId, toDate: TO_1 });
+    const envelope = result.envelopes[0]!;
+    expect(envelope.executed).toBe(true);
+    expect(envelope.depth).toBe(1);
+    expect(envelope.messageIds).toHaveLength(1);
+    expect(["NO_OPPORTUNITY", "NATURAL_END"]).toContain(envelope.stopReason);
+    expect(
+      await prisma.message.count({ where: { conversationId: fixture.conversationIds[0]! } }),
+    ).toBe(2);
+  });
+
+  it("isolamento entre universes também vale para envelopes", async () => {
+    const home = await createFixture({
+      label: "env-iso-home",
+      mode: "FULL",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      goals: [{ character: 0, priority: 60 }],
+      messages: [{ conversation: 0, sender: 1, content: "bom dia" }],
+    });
+    const foreign = await createFixture({
+      label: "env-iso-foreign",
+      mode: "FULL",
+      aiCharacters: 2,
+      conversations: [[0, 1]],
+      goals: [{ character: 0, priority: 90 }],
+      messages: [{ conversation: 0, sender: 1, content: "bom dia" }],
+    });
+    const result = await runAutonomousTick({ universeId: home.universeId, toDate: TO_1 });
+    expect(result.envelopes).toHaveLength(1);
+    expect(result.envelopes[0]!.conversationId).toBe(home.conversationIds[0]);
+    expect(
+      await prisma.message.count({ where: { conversationId: foreign.conversationIds[0]! } }),
+    ).toBe(1);
+    expect(await prisma.aiDecision.count({ where: { universeId: foreign.universeId } })).toBe(0);
   });
 });

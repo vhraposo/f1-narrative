@@ -64,6 +64,12 @@ export async function runAutonomousConversationTurn(
     readonly forceSpeakerCharacterId?: string;
     readonly textOverride?: string;
     readonly dialogue?: BehaviorDialogueMetadata;
+    /**
+     * F6.3 — preserva o target da oportunidade quando ainda não há mensagem
+     * na conversa (abertura); com histórico, a última mensagem continua sendo
+     * o alvo autorizado.
+     */
+    readonly targetCharacterId?: string | null;
   },
 ): Promise<AutonomousTurnResult> {
   const limits = conversationTurnLimits();
@@ -144,7 +150,7 @@ export async function runAutonomousConversationTurn(
   }
   const effectiveTargetCharacterId =
     forcedSpeakerId !== null
-      ? (messages[messages.length - 1]?.characterId ?? null)
+      ? (messages[messages.length - 1]?.characterId ?? options.targetCharacterId ?? null)
       : plan.targetCharacterId;
 
   const worldDate =

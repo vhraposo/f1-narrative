@@ -7,6 +7,7 @@ import { executeBehaviorDecision } from "../behavior/behavior.execution.js";
 import { evaluateBehaviorPolicy } from "../behavior/behavior.policy.js";
 import { resolveCharacterGoals } from "../behavior/behavior.goals.js";
 import { runSimulationTick } from "../world-simulation/world-simulation.tick.js";
+import { simulateConversationTurn } from "../conversation/conversation.simulation.js";
 import {
   buildAutonomyOpportunityPlan,
   toConversationOpportunityAudit,
@@ -35,6 +36,18 @@ export type AutonomyStateView = {
   readonly simulationVersion: string | null;
 };
 
+export type AutonomyEnvelopeResult = {
+  readonly conversationId: string;
+  readonly characterId: string;
+  readonly targetCharacterId: string | null;
+  readonly fingerprint: string;
+  readonly evidenceId: string;
+  readonly executed: boolean;
+  readonly stopReason: string;
+  readonly depth: number;
+  readonly messageIds: readonly string[];
+};
+
 export type AutonomyTickResult = {
   readonly universeId: string;
   readonly status: "EXECUTED" | "DRY_RUN" | "REUSED" | "SKIPPED";
@@ -51,6 +64,7 @@ export type AutonomyTickResult = {
     reasonCode: string;
     goalIds: readonly string[];
   }>;
+  readonly envelopes: readonly AutonomyEnvelopeResult[];
 };
 
 export async function getAutonomyState(universeId: string): Promise<AutonomyStateView> {
@@ -120,6 +134,37 @@ async function listAutonomousCharacters(universeId: string, limit: number) {
     .slice(0, limit);
 }
 
+async function validateEnvelopeConversation(input: {
+  readonly universeId: string;
+  readonly conversationId: string;
+  readonly characterId: string;
+  readonly targetCharacterId: string | null;
+}): Promise<string | null> {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: input.conversationId },
+    select: {
+      status: true,
+      participants: {
+        select: {
+          characterId: true,
+          character: { select: { universeId: true } },
+        },
+      },
+    },
+  });
+  if (!conversation) return "CONVERSATION_NOT_FOUND";
+  if (conversation.status !== "ACTIVE") return "CONVERSATION_NOT_ACTIVE";
+  const participantIds = conversation.participants.map((participant) => participant.characterId);
+  if (!participantIds.includes(input.characterId)) return "SPEAKER_NOT_PARTICIPANT";
+  if (input.targetCharacterId && !participantIds.includes(input.targetCharacterId)) {
+    return "TARGET_NOT_PARTICIPANT";
+  }
+  if (conversation.participants.some((participant) => participant.character.universeId !== input.universeId)) {
+    return "UNIVERSE_MISMATCH";
+  }
+  return null;
+}
+
 export async function runAutonomousTick(input: {
   readonly universeId: string;
   readonly dryRun?: boolean;
@@ -138,6 +183,7 @@ export async function runAutonomousTick(input: {
       actionsRejected: 0,
       budgetExhausted: false,
       planned: [],
+      envelopes: [],
     };
   }
   if (state.status !== "ACTIVE") {
@@ -152,6 +198,7 @@ export async function runAutonomousTick(input: {
       actionsRejected: 0,
       budgetExhausted: false,
       planned: [],
+      envelopes: [],
     };
   }
 
@@ -173,6 +220,7 @@ export async function runAutonomousTick(input: {
       actionsRejected: 0,
       budgetExhausted: false,
       planned: [],
+      envelopes: [],
     };
   }
   const toDate =
@@ -239,6 +287,7 @@ export async function runAutonomousTick(input: {
       actionsRejected: 0,
       budgetExhausted: false,
       planned,
+      envelopes: [],
     };
   }
 
@@ -259,6 +308,7 @@ export async function runAutonomousTick(input: {
       actionsRejected: 0,
       budgetExhausted: false,
       planned: [],
+      envelopes: [],
     };
   }
 
@@ -361,6 +411,7 @@ export async function runAutonomousTick(input: {
     });
     decisionsEvaluated += 1;
     if (state.mode !== "FULL" || decision.selected.actionType === "NO_ACTION") continue;
+    if (selectedOpportunity) continue;
 
     const actionType = decision.selected.actionType as AiActionType;
     const typeLimit: Partial<Record<AiActionType, number>> = {
@@ -384,6 +435,83 @@ export async function runAutonomousTick(input: {
     }
   }
 
+  const envelopes: AutonomyEnvelopeResult[] = [];
+  if (state.mode === "FULL") {
+    const owner = await prisma.universe.findUnique({
+      where: { id: input.universeId },
+      select: { userId: true },
+    });
+    if (owner) {
+      for (const selected of opportunityPlan.selection.selected) {
+        const usedMessages =
+          (perType.get("SEND_MESSAGE") ?? 0) + (perType.get("RESPOND") ?? 0);
+        const remainingMessages = budgets.maxMessagesPerTick - usedMessages;
+        const remainingActions = budgets.maxActionsPerTick - actionsExecuted;
+        const envelopeBudget = Math.max(0, Math.min(remainingActions, remainingMessages));
+        const baseAudit = {
+          conversationId: selected.opportunity.conversationId,
+          characterId: selected.opportunity.characterId,
+          targetCharacterId: selected.opportunity.targetCharacterId,
+          fingerprint: selected.opportunity.fingerprint,
+          evidenceId: selected.evidenceId,
+        };
+        if (envelopeBudget === 0) {
+          envelopes.push({
+            ...baseAudit,
+            executed: false,
+            stopReason: "BUDGET_LIMIT",
+            depth: 0,
+            messageIds: [],
+          });
+          continue;
+        }
+        const precondition = await validateEnvelopeConversation({
+          universeId: input.universeId,
+          conversationId: selected.opportunity.conversationId,
+          characterId: selected.opportunity.characterId,
+          targetCharacterId: selected.opportunity.targetCharacterId,
+        });
+        if (precondition) {
+          envelopes.push({
+            ...baseAudit,
+            executed: false,
+            stopReason: precondition,
+            depth: 0,
+            messageIds: [],
+          });
+          continue;
+        }
+        const simulation = await simulateConversationTurn(
+          selected.opportunity.conversationId,
+          {
+            userId: owner.userId,
+            worldDate: toDate,
+            maxDepth: envelopeBudget,
+            opportunity: {
+              conversationId: selected.opportunity.conversationId,
+              characterId: selected.opportunity.characterId,
+              targetCharacterId: selected.opportunity.targetCharacterId,
+              fingerprint: selected.opportunity.fingerprint,
+              windowStart: selected.opportunity.windowStart,
+            },
+          },
+        );
+        const messageIds = simulation.steps.map((step) => step.messageId);
+        if (messageIds.length > 0) {
+          actionsExecuted += messageIds.length;
+          perType.set("RESPOND", (perType.get("RESPOND") ?? 0) + messageIds.length);
+        }
+        envelopes.push({
+          ...baseAudit,
+          executed: simulation.executed,
+          stopReason: simulation.stopReason,
+          depth: simulation.depth,
+          messageIds,
+        });
+      }
+    }
+  }
+
   await prisma.universe.update({
     where: { id: input.universeId },
     data: {
@@ -404,5 +532,6 @@ export async function runAutonomousTick(input: {
     actionsRejected,
     budgetExhausted,
     planned: [],
+    envelopes,
   };
 }
