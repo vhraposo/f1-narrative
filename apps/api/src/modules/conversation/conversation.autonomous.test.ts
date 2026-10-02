@@ -469,4 +469,45 @@ describe("autonomous conversation turns (V4.2)", () => {
     expect(body.turn.language.fallback).toBe(true);
     await fallbackApp.close();
   });
+
+  it("12) provider recebe instrução explícita de pt-BR no turno autônomo", async () => {
+    const captured: string[] = [];
+    const captureProvider: GenerationProvider = {
+      name: "capture-v42",
+      async run(input) {
+        captured.push(input.systemPrompt);
+        captured.push(input.userPrompt ?? "");
+        return {
+          provider: "capture-v42",
+          mode: "generated" as const,
+          text: "Bom dia, pessoal. Tudo bem?",
+          tokenStats: { systemPromptChars: input.systemPrompt.length, contextBlocks: 1 },
+        };
+      },
+    };
+    const captureApp = buildApp(undefined, captureProvider);
+    await captureApp.ready();
+    const sent = await captureApp.inject({
+      method: "POST",
+      url: `/api/conversations/${conversationId}/messages`,
+      headers: { cookie },
+      payload: {
+        senderType: "USER_CHARACTER",
+        characterId: userCharacterId,
+        content: "Bom dia amigos, tudo bom?",
+      },
+      remoteAddress: remoteAddress(),
+    });
+    expect(sent.statusCode).toBe(201);
+    const turn = await captureApp.inject({
+      method: "POST",
+      url: `/api/conversations/${conversationId}/autonomous-turn`,
+      headers: { cookie },
+      payload: { worldDate: "2026-10-01T12:00:00.000Z" },
+      remoteAddress: remoteAddress(),
+    });
+    expect(turn.statusCode).toBe(201);
+    expect(captured.join("\n")).toContain("português do Brasil");
+    await captureApp.close();
+  });
 });

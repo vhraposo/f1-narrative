@@ -8,6 +8,7 @@ import {
   type ConversationParticipant,
   type Message,
 } from "@/lib/conversations";
+import { speakerColorClass } from "@/lib/speaker-color";
 
 type MessageBubbleProps = {
   message: Message;
@@ -65,7 +66,9 @@ export function MessageBubble({ message, author, showHeader = true }: MessageBub
       )}
       <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-border bg-card px-3 py-2 text-sm shadow-sm">
         {message.senderType === "AI_CHARACTER" && showHeader && (
-          <span className="mb-0.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-brand">
+          <span
+            className={`mb-0.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide ${speakerColorClass(message.characterId)}`}
+          >
             <Bot className="h-3 w-3" aria-hidden="true" />
             {name}
           </span>

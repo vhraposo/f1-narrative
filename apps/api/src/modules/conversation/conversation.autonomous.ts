@@ -147,6 +147,7 @@ export async function runAutonomousConversationTurn(
   const lastMessage = messages[messages.length - 1] ?? null;
   const userPrompt = [
     `Continue a conversa como ${speaker.name}.`,
+    "Responda exclusivamente em português do Brasil (pt-BR).",
     plan.summary ? `Resumo recente: ${plan.summary}` : null,
     `Motivo do turno: ${plan.speakerReasonCode ?? "DETERMINISTIC_ORDER"}.`,
   ]
