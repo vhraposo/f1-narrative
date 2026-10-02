@@ -27,6 +27,8 @@ import {
 import { validateDialogueOutput } from "./conversation.dialogue-output.js";
 import { deriveDialogueEmotion } from "./conversation.dialogue-emotion.js";
 import { deriveDialogueTopic } from "./conversation.dialogue-topic.js";
+import { buildDialogueMemoryContext } from "./conversation.dialogue-memory.js";
+import { retrieveRelevantMemories } from "../memory/memory.retrieval.js";
 import { selectResponseCandidates } from "./conversation.response-engine.js";
 import type { GenerationProvider } from "../generation/generation.assembly.js";
 
@@ -458,6 +460,10 @@ export async function simulateConversationTurn(
   let producedAny = false;
   const executionTrace: DialogueExecutionTrace[] = [];
   const deterministicRealizer = new DeterministicDialogueRealizer();
+  const referenceDate =
+    options.worldDate ??
+    initialInput.messages[initialInput.messages.length - 1]?.createdAt ??
+    new Date(0);
 
   async function realizeAndPersist(input: {
     readonly candidate: { characterId: string; name: string };
@@ -470,6 +476,19 @@ export async function simulateConversationTurn(
     const recentMessages = [...messageById.entries()]
       .slice(-3)
       .map(([, message]) => ({ speakerName: message.name, content: message.content }));
+    const authorizedMemories = await retrieveRelevantMemories({
+      universeId: initialInput!.universeId,
+      characterId: input.candidate.characterId,
+      participantIds: initialInput!.participantIds,
+      worldDate: referenceDate,
+      now: referenceDate,
+      limit: 3,
+    });
+    const memoryContext = buildDialogueMemoryContext({
+      characterId: input.candidate.characterId,
+      conversationParticipantIds: initialInput!.participantIds,
+      memories: authorizedMemories,
+    });
     const context = buildDialogueRealizerContext({
       speakerCharacterId: input.candidate.characterId,
       speakerName: input.candidate.name,
@@ -491,7 +510,8 @@ export async function simulateConversationTurn(
       }),
       emotionalTone: plan.dialogue.emotionalTone,
       relationshipAffinity: typeof affinity === "number" ? affinity : null,
-      memorySummaries: [],
+      memorySummaries: memoryContext.items.map((item) => item.summary),
+      memoryContext,
       voice: realizerVoice(affinity),
       maxMessages: input.maxMessages,
       language: "pt-BR",

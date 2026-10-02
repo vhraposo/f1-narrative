@@ -429,6 +429,7 @@ describe("F3.3 — provider do Dialogue Realizer", () => {
         "intent",
         "language",
         "maxMessages",
+        "memoryContext",
         "memorySummaries",
         "recentMessages",
         "relationshipAffinity",
