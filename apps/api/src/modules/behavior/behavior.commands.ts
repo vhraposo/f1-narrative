@@ -11,11 +11,19 @@ import {
   type BehaviorDecisionRequest,
 } from "./behavior.types.js";
 
+export type BehaviorDialogueMetadata = {
+  readonly intent?: string;
+  readonly replyToMessageId?: string | null;
+  readonly fragmentIndex?: number;
+  readonly topicTag?: string | null;
+};
+
 export type BehaviorLanguageOverride = {
   readonly text: string;
   readonly provider: string;
   readonly model: string;
   readonly fallback: boolean;
+  readonly dialogue?: BehaviorDialogueMetadata;
 };
 
 export type BehaviorCommandInput = {
@@ -117,6 +125,7 @@ async function executeMessageCommand(
               },
             }
           : {}),
+        ...(override?.dialogue ? { dialogue: override.dialogue } : {}),
       },
     },
     select: { id: true },

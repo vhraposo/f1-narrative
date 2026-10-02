@@ -12,10 +12,18 @@ import {
 import {
   buildDialogueCandidateSet,
   buildFallbackPlan,
+  deriveDialogueIntent,
   DeterministicDialoguePlanner,
   validateDialoguePlan,
+  type DialogueIntent,
   type DialoguePlan,
 } from "./conversation.dialogue.js";
+import {
+  buildDialogueRealizerContext,
+  createDialogueRealizer,
+  resolveDialogueRealizerKind,
+  validateRealizerResult,
+} from "./conversation.dialogue-realizer.js";
 import { selectResponseCandidates } from "./conversation.response-engine.js";
 import type { GenerationProvider } from "../generation/generation.assembly.js";
 
@@ -385,6 +393,17 @@ export async function getSimulationPlan(
   };
 }
 
+function realizerVoice(affinity: number | undefined) {
+  const value = affinity ?? 0.5;
+  return {
+    informality: Math.min(1, 0.4 + value * 0.4),
+    warmth: value,
+    humor: 0.4,
+    emojiTendency: Math.min(1, 0.2 + value * 0.4),
+    verbosity: 0.3,
+  };
+}
+
 export async function simulateConversationTurn(
   conversationId: string,
   options: {
@@ -407,32 +426,113 @@ export async function simulateConversationTurn(
     return { executed: false, stopReason, depth: 0, steps, selection, plan };
   }
 
-  async function runSpeaker(candidate: { characterId: string; name: string }, depth: number) {
-    const turn: AutonomousTurnResult = await runAutonomousConversationTurn(conversationId, {
-      userId: options.userId,
-      ...(options.worldDate ? { worldDate: options.worldDate } : {}),
-      ...(options.provider ? { provider: options.provider } : {}),
-      forceSpeakerCharacterId: candidate.characterId,
+  const initialInput = await loadPlanInput(conversationId, options.userId);
+  if (!initialInput) {
+    return { executed: false, stopReason: "CONVERSATION_INACTIVE", depth: 0, steps, selection, plan };
+  }
+  const realizer = createDialogueRealizer(resolveDialogueRealizerKind());
+  const nameById = new Map(initialInput.participants.map((p) => [p.characterId, p.name]));
+  const messageById = new Map<string, { characterId: string | null; content: string; name: string }>();
+  for (const message of initialInput.messages) {
+    messageById.set(message.id, {
+      characterId: message.characterId,
+      content: message.content,
+      name: message.characterId ? nameById.get(message.characterId) ?? "" : "",
     });
-    if (!turn.executed || !turn.messageId || !turn.speakerCharacterId) {
-      stopReason = turn.reasonCode;
+  }
+  let lastMessageId: string | null = plan.dialogue.turns[0]?.replyToMessageId ?? null;
+  let producedAny = false;
+
+  async function realizeAndPersist(input: {
+    readonly candidate: { characterId: string; name: string };
+    readonly intent: DialogueIntent;
+    readonly replyToMessageId: string | null;
+    readonly maxMessages: 1 | 2 | 3;
+    readonly depth: number;
+  }): Promise<boolean> {
+    const affinity = initialInput!.affinity[input.candidate.characterId];
+    const recentMessages = [...messageById.entries()]
+      .slice(-3)
+      .map(([, message]) => ({ speakerName: message.name, content: message.content }));
+    const context = buildDialogueRealizerContext({
+      speakerCharacterId: input.candidate.characterId,
+      speakerName: input.candidate.name,
+      intent: input.intent,
+      replyToMessageId: input.replyToMessageId,
+      replyToContent: input.replyToMessageId
+        ? messageById.get(input.replyToMessageId)?.content ?? null
+        : null,
+      recentMessages,
+      topic: plan.dialogue.topic,
+      emotionalTone: plan.dialogue.emotionalTone,
+      relationshipAffinity: typeof affinity === "number" ? affinity : null,
+      memorySummaries: [],
+      voice: realizerVoice(affinity),
+      maxMessages: input.maxMessages,
+      language: "pt-BR",
+    });
+    const utterance = await realizer.realize(context);
+    const validation = validateRealizerResult(utterance, {
+      speakerCharacterId: input.candidate.characterId,
+      intent: input.intent,
+      replyToMessageId: input.replyToMessageId,
+      maxMessages: input.maxMessages,
+    });
+    if (!validation.valid) {
+      stopReason = validation.errors[0] ?? "REALIZER_INVALID";
       return false;
     }
-    alreadyResponded.add(candidate.characterId);
-    steps.push({
-      depth,
-      characterId: turn.speakerCharacterId,
-      name: candidate.name,
-      messageId: turn.messageId,
-      language: turn.language,
-    });
+    if (utterance.messages.length === 0) return true;
+    let replyTo = input.replyToMessageId;
+    for (const fragment of utterance.messages) {
+      const turn: AutonomousTurnResult = await runAutonomousConversationTurn(conversationId, {
+        userId: options.userId,
+        ...(options.worldDate ? { worldDate: options.worldDate } : {}),
+        forceSpeakerCharacterId: input.candidate.characterId,
+        textOverride: fragment.text,
+        dialogue: {
+          intent: input.intent,
+          replyToMessageId: replyTo,
+          fragmentIndex: fragment.fragmentIndex,
+          topicTag: plan.dialogue.topic,
+        },
+      });
+      if (!turn.executed || !turn.messageId || !turn.speakerCharacterId) {
+        stopReason = turn.reasonCode;
+        return false;
+      }
+      producedAny = true;
+      alreadyResponded.add(input.candidate.characterId);
+      steps.push({
+        depth: input.depth,
+        characterId: turn.speakerCharacterId,
+        name: input.candidate.name,
+        messageId: turn.messageId,
+        language: turn.language,
+      });
+      messageById.set(turn.messageId, {
+        characterId: input.candidate.characterId,
+        content: fragment.text,
+        name: input.candidate.name,
+      });
+      replyTo = turn.messageId;
+      lastMessageId = turn.messageId;
+    }
     return true;
   }
 
-  for (let index = 0; index < plan.planned.length; index += 1) {
-    const candidate = plan.planned[index];
-    if (!candidate) break;
-    const ok = await runSpeaker(candidate, index);
+  const candidateById = new Map(plan.planned.map((candidate) => [candidate.characterId, candidate]));
+  for (const [index, turn] of plan.dialogue.turns.entries()) {
+    const candidate = candidateById.get(turn.speakerCharacterId);
+    if (!candidate) continue;
+    const replyTo = index === 0 ? turn.replyToMessageId : lastMessageId;
+    const ok = await realizeAndPersist({
+      candidate,
+      intent: turn.intent,
+      replyToMessageId: replyTo,
+      maxMessages: turn.maxMessages,
+      depth: index,
+    });
     if (!ok) break;
   }
 
@@ -442,7 +542,7 @@ export async function simulateConversationTurn(
   );
   let reactions = 0;
   while (
-    steps.length > 0 &&
+    producedAny &&
     steps.length < maxDepth &&
     reactions < plan.window.maxReactions &&
     stopReason !== "CONVERSATION_INACTIVE"
@@ -485,7 +585,18 @@ export async function simulateConversationTurn(
       stopReason = "NO_OPPORTUNITY";
       break;
     }
-    const ok = await runSpeaker(chosen, steps.length);
+    const intent = deriveDialogueIntent({
+      content: lastMessage.content,
+      mentioned: false,
+      energy: plan.energy,
+    });
+    const ok = await realizeAndPersist({
+      candidate: { characterId: chosen.characterId, name: chosen.name },
+      intent,
+      replyToMessageId: lastMessage.id,
+      maxMessages: 1,
+      depth: steps.length,
+    });
     if (!ok) break;
     reactions += 1;
     stopReason = "NATURAL_END";

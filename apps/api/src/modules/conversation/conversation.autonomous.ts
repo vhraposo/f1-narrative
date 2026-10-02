@@ -4,6 +4,7 @@ import { prisma } from "../../infrastructure/database/prisma.js";
 import { assembleGenerationBundle, type GenerationProvider } from "../generation/generation.assembly.js";
 import { evaluateBehaviorDecision } from "../behavior/behavior.decision.js";
 import { executeBehaviorDecision } from "../behavior/behavior.execution.js";
+import type { BehaviorDialogueMetadata } from "../behavior/behavior.commands.js";
 import { conversationTurnLimits } from "./conversation.policy.js";
 import {
   planConversationTurn,
@@ -61,6 +62,8 @@ export async function runAutonomousConversationTurn(
     readonly worldDate?: Date;
     readonly provider?: GenerationProvider;
     readonly forceSpeakerCharacterId?: string;
+    readonly textOverride?: string;
+    readonly dialogue?: BehaviorDialogueMetadata;
   },
 ): Promise<AutonomousTurnResult> {
   const limits = conversationTurnLimits();
@@ -167,13 +170,11 @@ export async function runAutonomousConversationTurn(
     .join(" ")
     .slice(0, 2000);
 
-  let language: AutonomousTurnLanguage = {
-    provider: "deterministic",
-    model: "behavior-language.v1",
-    fallback: true,
-  };
-  let text = fallbackText(speaker.name);
-  if (options.provider) {
+  let language: AutonomousTurnLanguage = options.textOverride
+    ? { provider: "dialogue-realizer", model: "deterministic-realizer.v1", fallback: false }
+    : { provider: "deterministic", model: "behavior-language.v1", fallback: true };
+  let text = options.textOverride?.trim() ?? fallbackText(speaker.name);
+  if (options.provider && !options.textOverride) {
     try {
       const generated = await assembleGenerationBundle(
         prisma,
@@ -224,6 +225,7 @@ export async function runAutonomousConversationTurn(
       provider: language.provider,
       model: language.model,
       fallback: language.fallback,
+      ...(options.dialogue ? { dialogue: options.dialogue } : {}),
     },
   });
   if (execution.status !== "EXECUTED" || !execution.executedMessageId) {
