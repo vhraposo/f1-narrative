@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { DialogueUtteranceSchema, type DialogueUtterance } from "./conversation.dialogue.js";
+import { DialogueUtteranceSchema, type DialogueIntent, type DialogueUtterance } from "./conversation.dialogue.js";
 import {
   buildDialogueRealizerContext,
+  DeterministicDialogueRealizer,
   DialogueRealizerContextSchema,
+  INTENT_REALIZATION_POLICY,
+  isGenericText,
   validateRealizerResult,
   type DialogueRealizerContext,
 } from "./conversation.dialogue-realizer.js";
@@ -156,5 +159,147 @@ describe("F3.1 — contrato do Dialogue Realizer", () => {
       maxMessages: 1,
     });
     expect(result.errors).toEqual(["INVALID_SCHEMA"]);
+  });
+});
+
+const realizer = new DeterministicDialogueRealizer();
+const NON_SILENT_INTENTS: DialogueIntent[] = [
+  "ANSWER",
+  "QUESTION",
+  "REACTION",
+  "JOKE",
+  "TEASE",
+  "SUPPORT",
+  "DISAGREE",
+  "FOLLOW_UP",
+  "TOPIC_CHANGE",
+  "INTERRUPTION",
+  "CALLBACK",
+];
+
+async function realizeFor(intent: DialogueIntent, overrides: Partial<DialogueRealizerContext> = {}) {
+  return realizer.realize(context({ intent, ...overrides }));
+}
+
+describe("F3.2 — DeterministicDialogueRealizer", () => {
+  it("todos os intents produzem fala curta, pt-BR, sem JSON e sem genericidade", async () => {
+    for (const intent of NON_SILENT_INTENTS) {
+      const utterance = await realizeFor(intent, { maxMessages: 3 });
+      expect(utterance.messages.length).toBeGreaterThanOrEqual(1);
+      for (const message of utterance.messages) {
+        expect(message.text.trim().length).toBeGreaterThan(0);
+        expect(message.text.length).toBeLessThanOrEqual(INTENT_REALIZATION_POLICY[intent].maxChars);
+        expect(message.text.startsWith("{")).toBe(false);
+        expect(isGenericText(message.text)).toBe(false);
+        expect(/^[\p{L}\p{N}\s.,!?;:'"()\-—…#@]+$/u.test(message.text.replace(/(?:😂|❤️|😭)/gu, ""))).toBe(true);
+      }
+    }
+  });
+
+  it("REACTION é muito curta e QUESTION termina em pergunta", async () => {
+    const reaction = await realizeFor("REACTION");
+    expect(reaction.messages[0]!.text.length).toBeLessThanOrEqual(40);
+    const question = await realizeFor("QUESTION");
+    expect(question.messages[0]!.text.endsWith("?")).toBe(true);
+  });
+
+  it("maxMessages = 1 nunca fragmenta, mesmo com risada", async () => {
+    const utterance = await realizeFor("JOKE", { maxMessages: 1 });
+    expect(utterance.messages.length).toBe(1);
+  });
+
+  it("maxMessages > 1 permite fragmentação com fragmentIndex sequencial", async () => {
+    const utterance = await realizeFor("JOKE", {
+      maxMessages: 2,
+      voice: { informality: 0.8, warmth: 0.5, humor: 0.9, emojiTendency: 0, verbosity: 0.8 },
+    });
+    expect(utterance.messages.length).toBeLessThanOrEqual(2);
+    utterance.messages.forEach((message, index) => {
+      expect(message.fragmentIndex).toBe(index);
+    });
+  });
+
+  it("maxMessages = 3 é respeitado em todos os intents", async () => {
+    for (const intent of NON_SILENT_INTENTS) {
+      const utterance = await realizeFor(intent, {
+        maxMessages: 3,
+        voice: { informality: 0.9, warmth: 0.9, humor: 0.9, emojiTendency: 1, verbosity: 1 },
+      });
+      expect(utterance.messages.length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("speaker, intent e replyTo são preservados e passam na integridade", async () => {
+    for (const intent of NON_SILENT_INTENTS) {
+      const utterance = await realizeFor(intent, { maxMessages: 2 });
+      const result = validateRealizerResult(utterance, {
+        speakerCharacterId: "ai-kimi",
+        intent,
+        replyToMessageId: "msg-1",
+        maxMessages: 2,
+      });
+      expect(result.valid).toBe(true);
+    }
+  });
+
+  it("voz diferente produz resultado diferente (informalidade)", async () => {
+    const dry = await realizeFor("ANSWER", {
+      voice: { informality: 0.1, warmth: 0.2, humor: 0.1, emojiTendency: 0, verbosity: 0.2 },
+    });
+    const informal = await realizeFor("ANSWER", {
+      voice: { informality: 0.9, warmth: 0.6, humor: 0.6, emojiTendency: 0, verbosity: 0.4 },
+    });
+    expect(dry.messages[0]!.text).not.toBe(informal.messages[0]!.text);
+  });
+
+  it("relationship modula a fala sem mudar o speaker", async () => {
+    const close = await realizeFor("REACTION", { relationshipAffinity: 0.9, replyToContent: "oi" });
+    const distant = await realizeFor("REACTION", { relationshipAffinity: 0.1, replyToContent: "oi" });
+    expect(close.speakerCharacterId).toBe("ai-kimi");
+    expect(distant.speakerCharacterId).toBe("ai-kimi");
+    expect(close.messages[0]!.text).not.toBe(distant.messages[0]!.text);
+  });
+
+  it("afinidade alta libera emoji quando a voz permite; baixa mantém neutro", async () => {
+    const warm = await realizeFor("REACTION", {
+      relationshipAffinity: 0.9,
+      replyToContent: "oi",
+      voice: { informality: 0.5, warmth: 0.5, humor: 0.5, emojiTendency: 0.4, verbosity: 0.3 },
+    });
+    const cold = await realizeFor("REACTION", {
+      relationshipAffinity: 0.1,
+      replyToContent: "oi",
+      voice: { informality: 0.5, warmth: 0.5, humor: 0.5, emojiTendency: 0.4, verbosity: 0.3 },
+    });
+    expect(warm.messages[0]!.text).toContain("😂");
+    expect(cold.messages[0]!.text).not.toContain("😂");
+  });
+
+  it("replyTo com pergunta usa respostas de pergunta em REACTION", async () => {
+    const utterance = await realizeFor("REACTION", {
+      relationshipAffinity: null,
+      replyToContent: "você acha que ganha hoje?",
+    });
+    expect(INTENT_REALIZATION_POLICY.REACTION.questionPhrases).toContain(utterance.messages[0]!.text);
+  });
+
+  it("deterministic replay: mesmo contexto, mesma saída", async () => {
+    const first = await realizeFor("SUPPORT", { maxMessages: 2, relationshipAffinity: 0.5 });
+    const second = await realizeFor("SUPPORT", { maxMessages: 2, relationshipAffinity: 0.5 });
+    expect(first).toEqual(second);
+  });
+
+  it("SILENCE não inventa texto", async () => {
+    const utterance = await realizeFor("SILENCE");
+    expect(utterance.messages).toEqual([]);
+    expect(utterance.speakerCharacterId).toBe("ai-kimi");
+  });
+
+  it("nenhuma frase da política é genérica ou corporativa", () => {
+    for (const policy of Object.values(INTENT_REALIZATION_POLICY)) {
+      for (const phrase of [...policy.phrases, ...(policy.neutralPhrases ?? []), ...(policy.questionPhrases ?? [])]) {
+        expect(isGenericText(phrase)).toBe(false);
+      }
+    }
   });
 });
