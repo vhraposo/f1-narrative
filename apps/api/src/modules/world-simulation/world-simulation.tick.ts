@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { createEventWithDerivations } from "../events/event-create.js";
+import { processRaceConsequences } from "../race-consequences/race-consequences.service.js";
 import {
   UNAVAILABLE_STATUSES,
   WORLD_SIMULATION_VERSION,
@@ -32,6 +33,11 @@ export type SimulationTickSummary = {
   readonly skippedUnavailable: number;
   readonly skippedExisting: number;
   readonly dryRun: boolean;
+  readonly racesDue: number;
+  readonly racesProcessed: number;
+  readonly raceExperiencesCreated: number;
+  readonly raceMemoriesCreated: number;
+  readonly raceDecisionsCreated: number;
 };
 
 export type SimulationTickResult = {
@@ -73,6 +79,11 @@ function toSummary(value: unknown, dryRun: boolean): SimulationTickSummary {
       skippedUnavailable: 0,
       skippedExisting: 0,
       dryRun,
+      racesDue: 0,
+      racesProcessed: 0,
+      raceExperiencesCreated: 0,
+      raceMemoriesCreated: 0,
+      raceDecisionsCreated: 0,
     };
   }
   const record = value as Record<string, unknown>;
@@ -88,6 +99,11 @@ function toSummary(value: unknown, dryRun: boolean): SimulationTickSummary {
     skippedUnavailable: read("skippedUnavailable"),
     skippedExisting: read("skippedExisting"),
     dryRun,
+    racesDue: read("racesDue"),
+    racesProcessed: read("racesProcessed"),
+    raceExperiencesCreated: read("raceExperiencesCreated"),
+    raceMemoriesCreated: read("raceMemoriesCreated"),
+    raceDecisionsCreated: read("raceDecisionsCreated"),
   };
 }
 
@@ -215,6 +231,11 @@ export async function runSimulationTick(input: {
       skippedExisting: 0,
       dryRun: input.dryRun === true,
       plannedEvents: [] as unknown[],
+      racesDue: 0,
+      racesProcessed: 0,
+      raceExperiencesCreated: 0,
+      raceMemoriesCreated: 0,
+      raceDecisionsCreated: 0,
     };
     const perCharacter = new Map<string, number>();
 
@@ -296,6 +317,33 @@ export async function runSimulationTick(input: {
         const newsCount = await tx.newsItem.count({ where: { eventId: created.id } });
         summary.newsCreated += newsCount;
       });
+    }
+
+    const dueRaces = await prisma.race.findMany({
+      where: {
+        season: { universeId: input.universeId },
+        status: "FINISHED",
+        date: { gte: fromDate, lte: toDate },
+      },
+      orderBy: [{ date: "asc" }, { id: "asc" }],
+      take: budgets.maxRacesPerTick,
+      select: { id: true },
+    });
+    summary.racesDue = dueRaces.length;
+    if (input.dryRun !== true) {
+      for (const race of dueRaces) {
+        const consequence = await processRaceConsequences({
+          universeId: input.universeId,
+          raceId: race.id,
+          now: toDate,
+        });
+        summary.racesProcessed += 1;
+        for (const character of consequence.characters) {
+          summary.raceExperiencesCreated += character.experiences.created;
+          summary.raceMemoriesCreated += character.memories.created;
+          if (character.decisionCreated) summary.raceDecisionsCreated += 1;
+        }
+      }
     }
 
     await prisma.simulationTick.update({

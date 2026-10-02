@@ -174,7 +174,12 @@ describe("world narrative simulation tick (V4.5)", () => {
     expect(event.title).toContain("coletiva de imprensa");
     expect(event.source).toBe("GENERATED_EVENT");
     const relationship = await prisma.relationship.findFirstOrThrow({
-      where: { characterAId: availableCharacterId, characterBId: unavailableCharacterId },
+      where: {
+        OR: [
+          { characterAId: availableCharacterId, characterBId: unavailableCharacterId },
+          { characterAId: unavailableCharacterId, characterBId: availableCharacterId },
+        ],
+      },
     });
     expect((relationship.dimensions as Record<string, number>).affinity).toBeGreaterThan(0);
   });

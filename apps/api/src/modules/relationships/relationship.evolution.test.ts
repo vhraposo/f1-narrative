@@ -200,9 +200,10 @@ describe("relationship social evolution (V4.3)", () => {
   });
 
   it("5) fingerprint idempotente impede aplicação duplicada", async () => {
+    const [canonicalA, canonicalB] = [characterAId, characterBId].sort();
     const fingerprint = relationshipChangeFingerprint({
-      characterAId,
-      characterBId,
+      characterAId: canonicalA as string,
+      characterBId: canonicalB as string,
       dimension: "trust",
       ruleCode: "relationship-rule.test-clamp.v1",
       sourceType: "TEST",

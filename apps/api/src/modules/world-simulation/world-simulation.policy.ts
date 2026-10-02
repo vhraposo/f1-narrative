@@ -3,6 +3,7 @@ export const WORLD_SIMULATION_VERSION = "world-simulation.v1";
 export type WorldSimulationBudgets = {
   readonly maxEventsPerTick: number;
   readonly maxEventsPerCharacter: number;
+  readonly maxRacesPerTick: number;
   readonly staleRunningMs: number;
 };
 
@@ -17,6 +18,7 @@ export function worldSimulationBudgets(): WorldSimulationBudgets {
   return {
     maxEventsPerTick: readPositiveInt("WORLD_SIM_MAX_EVENTS_PER_TICK", 8),
     maxEventsPerCharacter: readPositiveInt("WORLD_SIM_MAX_EVENTS_PER_CHARACTER", 2),
+    maxRacesPerTick: readPositiveInt("WORLD_SIM_MAX_RACES_PER_TICK", 2),
     staleRunningMs: readPositiveInt("WORLD_SIM_STALE_RUNNING_MS", 5 * 60 * 1000),
   };
 }
