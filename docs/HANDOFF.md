@@ -2,10 +2,11 @@
 
 ## Estado atual
 - Branch: `v4-Living-F1-Universe`
-- HEAD: `48e83ba` — `feat(conversation): add deterministic conversation opportunities`
+- HEAD: `31981a3` — `docs: add continuity handoff and agent rules` (F6.1 permanece em `48e83ba`)
 - Working tree: limpo
 - Última fase concluída: F6.1
-- Subfase atual: nenhuma (F6.2 é a próxima)
+- Subfase atual: nenhuma; F6.2 não iniciada (sessão encerrada por orçamento de contexto —
+  retomar pela seção "Próxima ação — F6.2" abaixo, sem repetir a investigação)
 - Próximo checkpoint: F6.2 — seleção de oportunidades no `runAutonomousTick`
 
 ## Roadmap (commits reais)
