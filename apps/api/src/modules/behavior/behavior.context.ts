@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { retrieveRelevantMemories } from "../memory/memory.retrieval.js";
 import {
   BEHAVIOR_CONTEXT_VERSION_PREFIX,
   BehaviorError,
@@ -71,7 +72,7 @@ export async function buildBehaviorContext(
     { section: "GOALS", reason: "GOALS_PENDING_V4_1" },
   ];
 
-  const [worldState, memories, experiences, relationships, availability, schedules] =
+  const [worldState, experiences, relationships, availability, schedules] =
     await Promise.all([
       prisma.worldState.findUnique({
         where: { universeId_key: { universeId: request.universeId, key: "default" } },
@@ -80,23 +81,6 @@ export async function buildBehaviorContext(
           currentSeasonId: true,
           currentRaceId: true,
           currentSession: true,
-        },
-      }),
-      prisma.memory.findMany({
-        where: {
-          status: "ACTIVE",
-          participants: { some: { characterId: request.characterId } },
-          OR: [{ universeId: request.universeId }, { universeId: null }],
-        },
-        orderBy: [{ importance: "desc" }, { createdAt: "desc" }, { id: "asc" }],
-        take: MAX_MEMORIES,
-        select: {
-          id: true,
-          summary: true,
-          content: true,
-          importance: true,
-          memoryType: true,
-          createdAt: true,
         },
       }),
       prisma.pilotExperience.findMany({
@@ -297,6 +281,20 @@ export async function buildBehaviorContext(
   } else {
     omitted.push({ section: "CONVERSATION", reason: "NO_CONVERSATION_IN_REQUEST" });
   }
+
+  const memories = await retrieveRelevantMemories({
+    universeId: request.universeId,
+    characterId: request.characterId,
+    participantIds: conversation?.participantIds ?? [],
+    relationshipCharacterIds: relationships.map((relationship) =>
+      relationship.characterAId === request.characterId
+        ? relationship.characterBId
+        : relationship.characterAId,
+    ),
+    worldDate: request.worldDate,
+    now: request.worldDate,
+    limit: MAX_MEMORIES,
+  });
 
   if (!availability) omitted.push({ section: "AVAILABILITY", reason: "NO_AVAILABILITY_RECORD" });
   if (memories.length === 0) omitted.push({ section: "MEMORY", reason: "NO_ACTIVE_MEMORY" });
