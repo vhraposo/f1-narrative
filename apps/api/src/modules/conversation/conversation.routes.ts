@@ -25,6 +25,7 @@ const conversationSelect = {
   id: true,
   title: true,
   type: true,
+  visibility: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -86,6 +87,37 @@ async function accessibleConversationId(conversationId: string, userId: string) 
   });
   return membership?.conversationId ?? null;
 }
+
+type CharacterAccessRow = {
+  readonly id: string;
+  readonly userId: string | null;
+  readonly universeId: string | null;
+};
+
+async function callerUniverseId(userId: string): Promise<string | null> {
+  const universe = await prisma.universe.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  return universe?.id ?? null;
+}
+
+// F7.1: um personagem só entra numa Conversation do Universe do usuário.
+// Global catalog (userId null + universeId null) continua permitido; personagem
+// de outro Universe ou de outro usuário é rejeitado sem vazar existência (404).
+function characterCompatibleWithUniverse(
+  character: CharacterAccessRow,
+  userId: string,
+  universeId: string | null,
+): boolean {
+  const ownershipOk = character.userId === null || character.userId === userId;
+  const universeOk =
+    character.universeId === null ||
+    (universeId !== null && character.universeId === universeId);
+  return ownershipOk && universeOk;
+}
+
+const characterAccessSelect = { id: true, userId: true, universeId: true } as const;
 
 async function validateMessageSender(
   conversationId: string,
@@ -211,12 +243,19 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       let ownsAny = false;
+      const userUniverseId = await callerUniverseId(userId);
       for (const characterId of participantIds) {
         const character = await prisma.character.findUnique({
           where: { id: characterId },
-          select: { id: true, userId: true },
+          select: characterAccessSelect,
         });
         if (!character) {
+          return reply.code(404).send({
+            error: "Personagem não encontrado",
+            code: "NOT_FOUND",
+          });
+        }
+        if (!characterCompatibleWithUniverse(character, userId, userUniverseId)) {
           return reply.code(404).send({
             error: "Personagem não encontrado",
             code: "NOT_FOUND",
@@ -448,9 +487,33 @@ export const conversationRoutes: FastifyPluginAsync = async (fastify) => {
 
       const character = await prisma.character.findUnique({
         where: { id: parsed.data.characterId },
-        select: { id: true },
+        select: characterAccessSelect,
       });
       if (!character) {
+        return reply.code(404).send({
+          error: "Personagem não encontrado",
+          code: "NOT_FOUND",
+        });
+      }
+
+      const participantUniverseIds = await prisma.conversationParticipant.findMany({
+        where: { conversationId: accessible },
+        select: { character: { select: { universeId: true } } },
+      });
+      const distinctUniverseIds = new Set(
+        participantUniverseIds
+          .map((participant) => participant.character.universeId)
+          .filter((universeId): universeId is string => universeId !== null),
+      );
+      if (distinctUniverseIds.size > 1) {
+        return reply.code(409).send({
+          error: "Conversa com participantes de universos diferentes",
+          code: "CONFLICT",
+        });
+      }
+      const conversationUniverseId =
+        [...distinctUniverseIds][0] ?? (await callerUniverseId(userId));
+      if (!characterCompatibleWithUniverse(character, userId, conversationUniverseId)) {
         return reply.code(404).send({
           error: "Personagem não encontrado",
           code: "NOT_FOUND",

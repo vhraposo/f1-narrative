@@ -1095,12 +1095,22 @@ model ExternalBindingStanding {
 // Chat
 // ---------------------------------------------------------------
 
+/// Visibilidade de uma Conversation. PRIVATE = somente participantes
+/// listados (comportamento atual). UNIVERSE está reservado para grupos
+/// abertos do mesmo Universe; enquanto não implementado o acesso permanece
+/// fail-closed (somente participantes).
+enum ConversationVisibility {
+  PRIVATE
+  UNIVERSE
+}
+
 /// Grupo ou conversa direta composta por Characters.
 model Conversation {
-  id     String             @id @default(uuid()) @db.Uuid
-  title  String?
-  type   ConversationType   @default(GROUP)
-  status ConversationStatus @default(ACTIVE)
+  id         String                 @id @default(uuid()) @db.Uuid
+  title      String?
+  type       ConversationType       @default(GROUP)
+  status     ConversationStatus     @default(ACTIVE)
+  visibility ConversationVisibility @default(PRIVATE)
 
   participants ConversationParticipant[]
   messages     Message[]
