@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "benchmark:f9": "vitest run --disableConsoleIntercept src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts",
     "admin:promote": "tsx src/scripts/admin-promote.ts",
     "test": "vitest run"
   },
