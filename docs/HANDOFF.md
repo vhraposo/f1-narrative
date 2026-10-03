@@ -2,11 +2,11 @@
 
 ## Estado atual
 - Branch: `v4-Living-F1-Universe`
-- HEAD: `9be1ff4` — `test(autonomy): cover F6 audience enforcement` (F7.4)
+- HEAD: `185bdef` — `feat(privacy): enforce command layer authorization` (F7.5)
 - Working tree: limpo (após commit deste HANDOFF)
-- Última unidade concluída: F7.4 — F6 audience
-- F6 encerrada; F7.0–F7.4 concluídas
-- Próximo checkpoint: F7.5 — Command Layer + validator
+- Última unidade concluída: F7.5 — Command Layer + validator
+- F6 encerrada; F7.0–F7.5 concluídas
+- Próximo checkpoint: F7.6 — evals F7 + doc + fechamento
 
 ## Roadmap (commits reais)
 F5 (concluída): F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
@@ -14,38 +14,35 @@ F6 (concluída): F6.1 `48e83ba`, F6.2 `502f998`, F6.3 `9c1c006`, F6.4 `5719019`,
 F7:
 - F7.0 análise — `2207c0f`; F7.1 ACL de Conversation — `286a165`
 - F7.2 audiência de memória — `6e390be`; F7.3 audiência de eventos — `c0bbe39`
-- F7.4 F6 audience — `9be1ff4` (concluída)
-- F7.5 Command Layer + validador — PENDENTE
+- F7.4 F6 audience — `9be1ff4`; F7.5 Command Layer — `185bdef` (concluída)
 - F7.6 evals F7 + doc — PENDENTE
 F8/F9: não iniciadas.
 
-## Última implementação (F7.4)
-- Auditoria confirmou que a audiência no F6 já é estrutural (sem gap de contrato):
-  `conversation.opportunity-bridge.ts` só emite sinal para `characterIds` ∩ participantes da
-  conversa ∩ participantes da evidência (EventCharacter/MemoryCharacter/par do change); memória
-  filtra `universeId`; goal do próprio personagem; envelope revalida participantes/universe.
-- Nenhum código de produção alterado (contratos F6 preservados: fingerprint, evidenceId canônico,
-  budgets, cooldown, fairness, tick REUSED).
-- `autonomy.f7-audience.test.ts` (+7): evento RESTRICTED só para autorizado; memória privada só
-  para o dono; evento + memória/change derivados não contornam audiência; isolamento de Universe;
-  FULL executa envelope só do speaker autorizado; OFF/OBSERVER/GUIDED respeitam audiência sem
-  envelope; replay/dedupe determinísticos (candidateCount ≥4, selected 1).
-- Subset autonomy+conversation 33 files / 470 tests verde; `tsc`, ESLint autonomy e build verdes.
-- Achado: canonicalização de RelationshipChange depende de `sourceType=EVENT` + `sourceId`; um
-  `sourceId` divergente gera evidência própria (sem risco de segurança, apenas sem dedupe com o
-  evento). Dados reais vêm de `applyEventEvolution` com sourceId correto.
+## Última implementação (F7.5)
+- `behavior.commands.ts` (Command Layer, writer único): no handler de RESPOND/SEND_MESSAGE, além
+  do `requireTargetInUniverse`, o `targetCharacterId` (quando presente) precisa ser participante
+  da conversa; caso contrário `BehaviorError TARGET_NOT_PARTICIPANT` (403) e a transação é
+  revertida (AiDecision vira REJECTED, sem Message).
+- Sem detecção semântica de segredo no output validator (mantido estrutural, conforme decisão).
+- `behavior.authorization.test.ts` (+6): speaker válido→EXECUTED; alvo fora da conversa→REJECTED
+  TARGET_NOT_PARTICIPANT; alvo de outro universe→UNIVERSE_MISMATCH; alvo inexistente→
+  TARGET_NOT_FOUND; API direta com remetente fora da conversa→403 sem Message; executor de turno
+  autônomo não aceita speaker fora da conversa (executed false, sem Message).
+- Subset behavior+conversation+autonomy 38 files / 513 tests verde; `tsc`, ESLint behavior e build
+  verdes. Nenhum segundo writer criado.
 
-## Próxima ação — F7.5 (exata)
-Command Layer + validador (defesa em profundidade, sem detecção semântica de segredo):
-- `behavior.commands.ts`: no handler de RESPOND/SEND_MESSAGE, exigir que o `targetCharacterId`
-  (quando presente) seja participante da Conversation (hoje só valida universe do alvo);
-- garantir que `executeBehaviorDecision` rejeita (REJECTED/erro controlado) tentativas com
-  conversa inválida, speaker fora da conversa, target fora da conversa, universo inconsistente —
-  sem criar segundo writer;
-- validar que o caminho autônomo (F6) e o caminho manual/`runAutonomousConversationTurn` herdam o
-  gate; mensagem legítima continua 201/EXECUTED;
-- NÃO adicionar detecção semântica de segredo no output validator; manter validator estrutural;
-- testes TEST DB (API + Command Layer direto) cobrindo bypass e regressão.
+## Próxima ação — F7.6 (exata)
+Evals F7 + documento + fechamento:
+- criar bateria F7-E01..E20 (padrão F3.5/F6, TEST DB, fixtures próprias, cleanup, determinístico)
+  cobrindo ACL de conversa, MemoryCharacter/contexto legado/API, Event PUBLIC/RESTRICTED,
+  F6 audience, Command Layer e isolamento de Universe;
+- rodar evals F7, evals F6 (E01..E10), subset conversation/autonomy, memory/context, ACL,
+  suíte completa API, `tsc --noEmit`, ESLint dos escopos alterados e build API;
+- criar `docs/post-v4-dialogue-engine-f7.md` (objetivo, F7.0–F7.6, modelo de autorização,
+  ACL, MemoryCharacter, EventCharacter, visibility, contexto legado, F5/F6, Command Layer,
+  validator, isolamento, migrations, testes/evals, resultados, riscos, limitações, decisões,
+  arquitetura final, o que NÃO foi implementado, próximos passos F8);
+- marcar F7 concluída no HANDOFF e definir F8 como próximo checkpoint.
 
 ## Flake conhecido (documentado, não mascarado)
 `conversation.autonomous.test.ts` #13 falhou 1x no subset F7.2 (characterB antes de characterA);
