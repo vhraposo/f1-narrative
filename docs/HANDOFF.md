@@ -2,83 +2,61 @@
 
 ## Estado atual
 - Branch: `v4-Living-F1-Universe`
-- HEAD: `ebfca63` — `feat(web): surface restricted event visibility and respect reduced motion` (F8.4)
+- HEAD: `199b098` — `test(api): add deterministic F9 dialogue engine benchmark gate` (F9)
 - Working tree: limpo (após commit deste HANDOFF)
-- **F8 concluída (UI/microbehaviors)**; F5/F6/F7 encerradas.
-- Próximo checkpoint: F9 — benchmark gate (NÃO iniciado)
+- **F9 concluída (Benchmark Gate)**; **roadmap F3–F9 concluído**.
+- Próximo estado: sem fase planejada; backlog futuro abaixo.
 
-## Roadmap (commits reais)
+## Roadmap concluído (commits reais)
+F3: F3.1–F3.5 (HEAD F3.5 `b0f7b8b`); docs `docs/post-v4-dialogue-engine-f3.md`.
 F5: F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
 F6: F6.1 `48e83ba`, F6.2 `502f998`, F6.3 `9c1c006`, F6.4 `5719019`, F6.5 `1cc8562`.
 F7: F7.0 `2207c0f`, F7.1 `286a165`, F7.2 `6e390be`, F7.3 `c0bbe39`, F7.4 `9be1ff4`,
 F7.5 `185bdef`, F7.6 `59c1e25`.
-F8:
-- F8.1 mensagens/reply/dia — `f58b41e`
-- F8.2 composer (teclado/limites/erros) — `8fff7bd`
-- F8.3 visibility/participantes/estados de acesso — `5fc7470`
-- F8.4 event badge + reduced motion — `ebfca63`
-- F8.5 testes/doc/HANDOFF — este commit
-F9 (benchmark gate): não iniciado.
+F8: F8.1 `f58b41e`, F8.2 `8fff7bd`, F8.3 `5fc7470`, F8.4 `ebfca63`, F8.5 `83caa99`.
+F9: gate `199b098`; doc+handoff neste commit.
 
-## Resumo da F8 (detalhes em docs/post-v4-dialogue-engine-f8.md)
-- Frontend `apps/web` evoluído sem novo backend/endpoint/migration: mensagens com agrupamento,
-  separadores de dia, reply preview, timestamps `<time>`; composer com Enter/Shift+Enter,
-  `maxLength=5000`, mapeamento de erros 400/401/403/404/429/5xx e preservação do texto em falha;
-  header com badge de `visibility` (Privada / Universo com semântica honesta), pilha de avatares
-  de participantes e estados de acesso (404/403 sem vazamento); auto-scroll inteligente com
-  indicador “N novas mensagens”; typing indicator derivado do plano real (`simulate-turn/plan`);
-  badge “Restrito” em eventos RESTRICTED; `motion-reduce` em spinners/typing.
-- Decisão: manter o pipeline determinístico F3–F5 (`simulate-turn`) como engine da conversa;
-  NÃO religar o streaming legado `/turn/stream` (provider LLM) para não alterar semântica.
-- Privacidade: autorização permanece server-side (F7); UI não renderiza conteúdo restrito e trata
-  403/404 como ausência de acesso; sem secret no DOM; sem proteção client-side como autoridade.
-- DTOs web: `Conversation.visibility?`, `Event.visibility?`, `MessageContextJson.dialogue?`
-  (opcionais; backend já os fornece).
+## F9 — Benchmark Gate
+- Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
+  (TEST DB, fixtures próprias, cleanup em `afterAll`, sem LLM/rede, usa serviços reais).
+- Comando: `pnpm benchmark:f9` (raiz) ou `npm run benchmark:f9` (apps/api).
+- Cenários: B01 replay determinístico; B02 memória privada; B03 evento restrito; B04 ACL de
+  conversa; B05 dedupe por evidenceId canônico; B06 cooldown; B07 budgets; B08 AI↔AI/stop;
+  B09 isolamento de Universe; B10 Command Layer guard + prova de regressão (checkers puros).
+- Thresholds: zeros duros para vazamento/escrita/cross-universe/duplicata/cooldown/budget/
+  mensagens após stop/LLM; budgets lidos de `autonomyBudgets()` (nenhum número inventado).
+- Resultado real: `F9 BENCHMARK GATE: PASS` (12/12 testes; contadores todos 0; exit 0).
 
-## Validação real da F8
-- Web: `npx tsc --noEmit` verde; `npx vitest run` **70 files / 519 tests**; `next lint` OK
-  (warnings pré-existentes); `next build` produção OK.
-- API: `npx tsc --noEmit` verde; subset conversation/autonomy/context/events/behavior
-  **51 files / 745 tests** (inclui evals F6 E01–E10 e F7 E01–E20); suíte completa
-  **210 files / 2933 tests** verdes.
-- Backend: NÃO alterado; nenhuma migration; DEV intocado; TEST usado apenas nas suítes de teste.
-- Nenhum teste removido/enfraquecido; sem skip/todo/sleep novo; sem flake novo observado.
+## Validação real da F9
+- Gate: `npm run benchmark:f9` PASS (12 testes).
+- API: `npx tsc --noEmit` verde; ESLint do arquivo verde; build `tsc -p` verde; suíte completa
+  **211 files / 2945 tests** verdes (inclui F6 E01–E10 e F7 E01–E20).
+- Web (regressão F8): `npx tsc --noEmit` verde; **70 files / 519 tests**; `next lint` OK;
+  `next build` produção OK.
+- Banco: TEST (`f1_narrative_test`) com cleanup; DEV intocado; nenhuma migration nova.
+- Flakes: nenhum observado em F9; flake histórico #13 não reproduziu.
 
-## Próxima ação — F9 (exata, não iniciado)
-F9 — benchmark gate. Antes de implementar: inspecionar o que já existe de benchmark/evals
-(`conversation.dialogue-*-evals.test.ts`, docs F3–F8) e definir o gate mínimo (métricas
-determinísticas, budgets, regressão F5–F8) sem novo pipeline. DEV read-only; TEST com cleanup;
-um commit por subfase; atualizar HANDOFF.
-
-## Flake conhecido (histórico, não mascarado)
-`conversation.autonomous.test.ts` #13 (characterB antes de characterA) — reproduzido 1x na F7.2,
-passou isolado/reruns; não apareceu na F7.6 nem na F8. Mecânica provável: penalties
-RECENTLY_SPOKE/REDUNDANT_RESPONSE + timestamps reais vs worldDate fixo. Não corrigir sem
-evidência de bug real.
+## Backlog futuro (não é fase incompleta)
+- Presença online real (não existe no backend).
+- Integração opcional do streaming legado (`/turn/stream`) ao composer.
+- Virtualização de mensagens em volumes altos; auto-resize de composer; skeletons dedicados.
+- Guarda semântica de secret (somente se necessária; hoje a defesa é contextual).
+- Sincronização do drift pré-existente schema↔migrations.
+- Evals de performance/latência (F9 cobre invariantes, não tempo).
 
 ## Achados de infraestrutura (mantidos)
-- Drift pré-existente schema↔migrations (`Conversation_status_idx`, unique `Season(universeId,
-  year)`, rename de índice) — NÃO corrigido.
-- `prisma migrate dev` é interativo; migrations aplicadas com `migrate deploy` em TEST.
-- `prisma generate` pode falhar com EPERM no engine DLL em uso; verificar tipos gerados antes.
-- Web usa `.eslintrc.json` via `next lint` (ESLint 9 não encontra `eslint.config` para o binário
-  direto); usar `npx next lint`.
-
-## Limitações F8
-- Sem presença online real; sem virtualização; sem auto-resize de composer/skeletons dedicados;
-  streaming legado não integrado; badge Restrito apenas no card de evento.
-
-## Riscos
-- `visibility` opcional no DTO web (default PRIVATE/PUBLIC) — alinhado ao backend.
-- Indicador de novas mensagens depende de geometria do scroller.
-- Flake histórico #13 permanece documentado.
+- Drift schema↔migrations (`Conversation_status_idx`, unique `Season(universeId, year)`, rename
+  de índice) — NÃO corrigido.
+- `prisma migrate dev` interativo; migrations via `migrate deploy` em TEST.
+- `prisma generate` pode falhar com EPERM no engine DLL; verificar tipos gerados.
+- Web usa `.eslintrc.json` via `next lint` (ESLint 9 direto não acha config).
 
 ## Regras essenciais
 Ver `AGENTS.md`. DEV read-only; TEST com cleanup; um commit por subfase; nunca amend;
 atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o handoff.
 
 ## Prompt de retomada
-"Leia `docs/HANDOFF.md`, `AGENTS.md` e `docs/post-v4-dialogue-engine-f8.md`. Valide Git (branch,
-HEAD, working tree). F5–F8 estão concluídas; NÃO repita. A próxima fase é F9 (benchmark gate) —
-inspecione o código real de evals/benchmark antes de implementar, com testes, um commit novo e
-atualização do HANDOFF. Não use amend."
+"Leia `docs/HANDOFF.md`, `AGENTS.md` e `docs/post-v4-dialogue-engine-f9.md`. Valide Git (branch,
+HEAD, working tree). O roadmap F3–F9 está concluído; NÃO repita fases. Para verificar o engine,
+rode `pnpm benchmark:f9` (gate PASS/FAIL). Para trabalho novo, escolha um item do backlog futuro
+e trate como subfase própria (um commit, testes, HANDOFF). Não use amend e não faça push."
