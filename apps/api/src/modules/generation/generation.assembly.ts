@@ -787,17 +787,20 @@ export async function assembleGenerationBundle(
   request: ContextGenerationRequest,
   provider: GenerationProvider = nullProvider,
 ): Promise<GenerationResult> {
-  const context = await assembleContext(db, {
-    conversationId: request.conversationId,
-    userId: request.userId,
-    now: request.now,
-  });
-
   const speakerCharacterId = await resolveGenerationSpeaker(
     db,
     request.conversationId,
     request.targetCharacterId,
   );
+
+  const context = await assembleContext(db, {
+    conversationId: request.conversationId,
+    userId: request.userId,
+    now: request.now,
+    ...(speakerCharacterId !== undefined
+      ? { audienceCharacterId: speakerCharacterId }
+      : {}),
+  });
 
   let rag: ExternalRagContext | null = null;
   if (request.ragFrameId !== undefined) {

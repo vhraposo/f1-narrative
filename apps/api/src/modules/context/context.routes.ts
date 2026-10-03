@@ -15,6 +15,13 @@ const conversationIdParamSchema = z.object({
   id: z.string().uuid("Identificador de conversa inválido"),
 });
 
+// F7.2: opcional — filtra o contexto pela audiência de conhecimento do
+// personagem (MemoryCharacter). Sem o parâmetro, mantém a visão de observação
+// da conversa (owner-level).
+const contextQuerySchema = z.object({
+  characterId: z.string().uuid("Identificador de personagem inválido").optional(),
+});
+
 // Resolve se a Conversation é alcançável pelo usuário: o usuário possui ao
 // menos um dos Characters participantes. Retorna o id ou null (404, sem vazar).
 async function accessibleConversationId(conversationId: string, userId: string) {
@@ -43,6 +50,14 @@ export const contextRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const query = contextQuerySchema.safeParse(request.query ?? {});
+      if (!query.success) {
+        return reply.code(400).send({
+          error: "Consulta inválida",
+          code: "VALIDATION_ERROR",
+        });
+      }
+
       const accessible = await accessibleConversationId(params.data.id, userId);
       if (!accessible) {
         return reply.code(404).send({
@@ -51,10 +66,31 @@ export const contextRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      if (query.data.characterId !== undefined) {
+        const participant = await prisma.conversationParticipant.findUnique({
+          where: {
+            conversationId_characterId: {
+              conversationId: accessible,
+              characterId: query.data.characterId,
+            },
+          },
+          select: { id: true },
+        });
+        if (!participant) {
+          return reply.code(404).send({
+            error: "Personagem não participa da conversa",
+            code: "NOT_FOUND",
+          });
+        }
+      }
+
       try {
         const context = await assembleContext(prisma, {
           conversationId: accessible,
           userId,
+          ...(query.data.characterId !== undefined
+            ? { audienceCharacterId: query.data.characterId }
+            : {}),
         });
         return reply.send({ context });
       } catch (error) {

@@ -223,6 +223,13 @@ export interface AssemblyInput {
   userId: string;
   now?: Date;
 
+  /**
+   * F7.2 — audiência de conhecimento. Quando informado, apenas memórias com
+   * vínculo `MemoryCharacter` para este personagem entram no contexto.
+   * Ausente mantém o comportamento de observação (pool da conversa).
+   */
+  audienceCharacterId?: string;
+
   externalRag?: ExternalRagContext | null;
 }
 
@@ -269,6 +276,7 @@ export async function assembleContext(
           controlledBy: true,
           dna: true,
           biography: true,
+          universeId: true,
         },
       })
     : [];
@@ -345,16 +353,35 @@ export async function assembleContext(
     createdAt: m.createdAt.toISOString(),
   }));
 
-  const memoryLinks = scope.length
+  // F7.2: a audiência de conhecimento é `MemoryCharacter`. Com speaker definido,
+  // apenas as memórias do próprio speaker entram no contexto (fail-closed se o
+  // personagem não participa da conversa). Sem speaker, mantém o pool da
+  // conversa usado por observabilidade/composição (`/craft`, `/context`).
+  const audienceScope =
+    input.audienceCharacterId === undefined
+      ? scope
+      : scope.includes(input.audienceCharacterId)
+        ? [input.audienceCharacterId]
+        : [];
+  const audienceUniverseId =
+    characters.find((character) => character.id === input.audienceCharacterId)?.universeId ?? null;
+
+  const memoryLinks = audienceScope.length
     ? await db.memoryCharacter.findMany({
-        where: { characterId: { in: scope } },
+        where: { characterId: { in: audienceScope } },
         select: { memoryId: true, characterId: true },
       })
     : [];
   const memoryIds = [...new Set(memoryLinks.map((l) => l.memoryId))];
   const memories = memoryIds.length
     ? await db.memory.findMany({
-        where: { id: { in: memoryIds }, status: "ACTIVE" },
+        where: {
+          id: { in: memoryIds },
+          status: "ACTIVE",
+          ...(input.audienceCharacterId !== undefined && audienceUniverseId !== null
+            ? { OR: [{ universeId: null }, { universeId: audienceUniverseId }] }
+            : {}),
+        },
         select: {
           id: true,
           content: true,
@@ -367,10 +394,16 @@ export async function assembleContext(
         },
       })
     : [];
+  const memoryParticipantLinks = memoryIds.length
+    ? await db.memoryCharacter.findMany({
+        where: { memoryId: { in: memoryIds } },
+        select: { memoryId: true, characterId: true },
+      })
+    : [];
 
   const memoryViews = memories
     .map((m) => {
-      const participantIds = memoryLinks
+      const participantIds = memoryParticipantLinks
         .filter((l) => l.memoryId === m.id)
         .map((l) => l.characterId)
         .sort();
