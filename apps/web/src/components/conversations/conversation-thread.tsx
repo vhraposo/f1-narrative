@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Globe2, Loader2, Lock } from "lucide-react";
 import Link from "next/link";
 import { useState, useRef, type ReactNode } from "react";
 
@@ -15,6 +15,7 @@ import {
   useConversation,
   useConversationParticipants,
 } from "@/hooks/use-conversations";
+import { ApiError } from "@/lib/api";
 import { CONVERSATION_TYPE_LABELS } from "@/lib/conversations";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,7 @@ export function ConversationThread({
   );
   const [composerError, setComposerError] = useState<string | null>(null);
   const [typingNames, setTypingNames] = useState<string[]>([]);
+  const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   if (conversationId == null) {
@@ -75,12 +77,20 @@ export function ConversationThread({
   }
 
   if (conversationQuery.isError || !conversationQuery.data) {
+    const error = conversationQuery.error;
+    const noAccess =
+      error instanceof ApiError &&
+      (error.status === 403 || error.status === 404);
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-background">
         <EmptyState
           kicker="Conversas"
-          title="Conversa não encontrada"
-          description="Não foi possível carregar esta conversa."
+          title={noAccess ? "Conversa não encontrada" : "Não foi possível carregar"}
+          description={
+            noAccess
+              ? "Esta conversa não existe ou você não tem acesso a ela."
+              : "Ocorreu um erro ao carregar a conversa. Tente novamente."
+          }
           action={
             backHref ? (
               <Link
@@ -98,6 +108,7 @@ export function ConversationThread({
 
   const conversation = conversationQuery.data;
   const participants = participantsQuery.data ?? [];
+  const visibility = conversation.visibility ?? "PRIVATE";
 
   const isGroup = conversation.type === "GROUP";
   const subtitle = isGroup
@@ -145,16 +156,57 @@ export function ConversationThread({
           />
         ) : null}
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-bold leading-tight text-foreground">
-            {threadTitle(conversation.title, participants)}
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="truncate text-sm font-bold leading-tight text-foreground">
+              {threadTitle(conversation.title, participants)}
+            </h2>
+            {visibility === "PRIVATE" ? (
+              <span
+                title="Conversa privada — somente participantes"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              >
+                <Lock className="h-3 w-3" aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">Privada</span>
+              </span>
+            ) : (
+              <span
+                title="Visibilidade de universo — nesta fase o acesso continua restrito aos participantes"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand"
+              >
+                <Globe2 className="h-3 w-3" aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">Universo</span>
+              </span>
+            )}
+          </div>
           <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
         </div>
+        {isGroup && participants.length > 0 && (
+          <div className="hidden -space-x-2 sm:flex" aria-hidden="true">
+            {participants.slice(0, 3).map((participant) => (
+              <CharacterAvatar
+                key={participant.id}
+                name={participant.name}
+                imageUrl={participant.imageUrl}
+                size="sm"
+                className="ring-2 ring-background"
+              />
+            ))}
+            {participants.length > 3 && (
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground ring-2 ring-background">
+                +{participants.length - 3}
+              </span>
+            )}
+          </div>
+        )}
         {rightAction}
       </header>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <MessageList conversationId={conversation.id} scrollContainerRef={scrollRef} />
+        <MessageList
+          conversationId={conversation.id}
+          scrollContainerRef={scrollRef}
+          scrollToBottomSignal={scrollToBottomSignal}
+        />
       </div>
 
       <div className="shrink-0 border-t border-border bg-background px-2 py-2 sm:px-3">
@@ -185,6 +237,10 @@ export function ConversationThread({
           conversationId={conversation.id}
           onError={setComposerError}
           onTypingChange={setTypingNames}
+          onMessageSent={() => {
+            setComposerError(null);
+            setScrollToBottomSignal((value) => value + 1);
+          }}
         />
       </div>
     </div>
