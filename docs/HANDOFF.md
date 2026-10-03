@@ -2,53 +2,56 @@
 
 ## Estado atual
 - Branch: `v4-Living-F1-Universe`
-- HEAD: `6e390be` — `feat(privacy): enforce memory audience in dialogue context` (F7.2)
+- HEAD: `c0bbe39` — `feat(privacy): enforce event audience` (F7.3)
 - Working tree: limpo (após commit deste HANDOFF)
-- Última unidade concluída: F7.2 — audiência de conhecimento (MemoryCharacter)
-- F6 encerrada; F7.0/F7.1/F7.2 concluídas
-- Próximo checkpoint: F7.3 — audiência de Event (`EventVisibility` + API + contexto)
+- Última unidade concluída: F7.3 — audiência de Event
+- F6 encerrada; F7.0/F7.1/F7.2/F7.3 concluídas
+- Próximo checkpoint: F7.4 — F6 audience
 
 ## Roadmap (commits reais)
 F5 (concluída): F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
 F6 (concluída): F6.1 `48e83ba`, F6.2 `502f998`, F6.3 `9c1c006`, F6.4 `5719019`, F6.5 `1cc8562`.
 F7:
 - F7.0 análise — `2207c0f`; F7.1 ACL de Conversation — `286a165`
-- F7.2 audiência de memória — `6e390be` (concluída)
-- F7.3 audiência de eventos — PENDENTE
+- F7.2 audiência de memória — `6e390be`; F7.3 audiência de eventos — `c0bbe39` (concluída)
 - F7.4 F6 audience — PENDENTE
 - F7.5 Command Layer + validador — PENDENTE
 - F7.6 evals F7 + doc — PENDENTE
 F8/F9: não iniciadas.
 
-## Última implementação (F7.2)
-- `context.assembly.ts`: `AssemblyInput.audienceCharacterId?`; seleção de memórias passa a
-  filtrar por `MemoryCharacter` do speaker quando informado (fail-closed se não participante;
-  também filtra `universeId null|do speaker` quando conhecido). `memoryParticipantLinks`
-  separado para listar participantes da memória. Sem speaker (observabilidade `/craft`,
-  `/context`) mantém o pool da conversa (owner-level).
-- `generation.assembly.ts`: resolve o speaker ANTES de `assembleContext` e passa
-  `audienceCharacterId`; prompt (`sectionMemories`) e `context.memories` ficam por speaker.
-- `context.routes.ts`: `GET /context?characterId=` opcional valida participante (404 se não) e
-  filtra por audiência; sem o parâmetro mantém a visão da conversa.
-- Sem mudanças em `memory.routes.ts`/`memory.retrieval.ts`/F5/F6: MemoryCharacter já era o grant;
-  APIs de memória já escopam por participante (testes de não vazamento adicionados).
-- Testes: `context.memory-audience.test.ts` (+6): legado A/B assimétrico, determinismo,
-  F5 retrieval+knownFacts, `/context` filtrado vs pool, APIs de memória por usuário,
-  isolamento de Universe. Subset context+generation+memory+conversation+autonomy 63 files /
-  1109 tests verde (após rerun; flake #13 1x, ver abaixo). `tsc --noEmit` verde, ESLint
-  context/generation verde, build `tsc -p` verde. Sem migration.
+## Última implementação (F7.3)
+- Schema: `EventVisibility { PUBLIC, RESTRICTED }` + `Event.visibility @default(PUBLIC)`
+  (migration `20261002140000_add_event_visibility`, `migrate deploy` em TEST, status up to date).
+- `createEventWithDerivations` aceita `visibility`; `event.schema` aceita `visibility` opcional
+  (create/PATCH); `event.routes` expõe `visibility` no select e escopa leitura:
+  `GET /api/events` e `GET /api/events/:id` só retornam PUBLIC ou RESTRICTED com
+  `createdById`/personagem do usuário/universe (helper `eventVisibilityScope`).
+- `syncNewsForEvent`: evento RESTRICTED não gera NewsItem e remove notícia existente ao ser
+  reclassificado.
+- `context.assembly`: com `audienceCharacterId`, eventos considerados são apenas os vinculados à
+  audiência, e a query exige PUBLIC ou participante da audiência; participantes do evento seguem
+  completos. Sem speaker (observabilidade) mantém o pool.
+- F6: audiência de evento já era imposta por `EventCharacter` (bridge/alocação só geram sinal para
+  participantes do evento que também estão na conversa) — testado, sem mudança de contrato
+  (fingerprint/evidenceId/budgets intactos).
+- Testes: `event.visibility.test.ts` (+7): PUBLIC acessível, RESTRICTED invisível a terceiros
+  (lista/GET), audiência EventCharacter, ciclo de news, contexto por audiência, F6 restricted
+  (só autorizado), F6 public + replay do plano. `event.test.ts` atualizado (campo `visibility` no
+  contrato de chaves). Subset events+news+world-simulation+context+generation+conversation+autonomy
+  67 files / 1137 tests verde (após corrigir a expectativa de chaves; flake #13 não apareceu nesse
+  run). `tsc`, ESLint eventos/news/context/generation e build verdes.
 
-## Próxima ação — F7.3 (exata)
-Audiência de Event, sem event bus/outbox:
-- `EventVisibility { PUBLIC, RESTRICTED }` + `Event.visibility @default(PUBLIC)` (aditivo;
-  migration manual no padrão do projeto, aplicada só em TEST);
-- `EventCharacter` = audiência quando `RESTRICTED`; `createdBy` também;
-- `GET /api/events` escopado (public + restricted autorizados por personagens do usuário);
-  mutações já escopadas (`findMutatableEventId`);
-- contexto (legado/F5) não inclui evento RESTRICTED para speaker sem audiência; F6.4 bridge
-  (`conversation.opportunity-bridge.ts`) e `autonomy.opportunities.ts` não geram sinal/oportunidade
-  de evento RESTRICTED para personagem sem audiência; canonicalização `event:<id>` preservada;
-- News pública continua; testes em TEST DB com cleanup.
+## Próxima ação — F7.4 (exata)
+F6 audience (sem reconstruir o pipeline):
+- auditar `autonomy.opportunities.ts`/`conversation.opportunity-bridge.ts`/`conversation.opportunity.ts`/
+  `autonomy.service.ts` para garantir que uma oportunidade só exista se o speaker estiver na
+  audiência da evidência (MemoryCharacter, EventCharacter, par de RelationshipChange, goal do
+  próprio personagem) e que F5/F6 dedupe/fingerprint/evidenceId/cooldown/budgets não mudem;
+- cobrir: PUBLIC vs RESTRICTED, Memory restricted, event-derived Memory/RelationshipChange não
+  contornando audiência, A/B autorizados vs C não autorizado, isolamento de Universe, FULL/GUIDED/
+  OFF/OBSERVER com audiência, replay determinístico e dedupe; E01..E10 continuam verdes;
+- se não houver gap estrutural, registrar isso no HANDOFF e entregar a subfase como cobertura de
+  testes + eventuais gates mínimos (sem tocar contratos F6).
 
 ## Flake conhecido (documentado, não mascarado)
 `conversation.autonomous.test.ts` #13 falhou 1x no subset F7.2 (characterB antes de characterA);
