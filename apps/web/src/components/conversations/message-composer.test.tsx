@@ -211,3 +211,67 @@ describe("MessageComposer — envio com resposta autônoma", () => {
     expect(await screen.findByLabelText("Quem envia a mensagem")).toBeDefined();
   });
 });
+
+describe("MessageComposer — F8 teclado e erros", () => {
+  it("Enter envia; Shift+Enter quebra linha sem enviar", async () => {
+    const user = userEvent.setup();
+    await renderComposer();
+    const textarea = screen.getByLabelText("Mensagem") as HTMLTextAreaElement;
+
+    await user.click(textarea);
+    await user.type(textarea, "linha um{Shift>}{Enter}{/Shift}linha dois");
+    expect(textarea.value).toContain("linha um\nlinha dois");
+    expect(apiMock.post).not.toHaveBeenCalledWith(
+      "/api/conversations/c1/messages",
+      expect.anything(),
+    );
+
+    await user.type(textarea, "{Enter}");
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        "/api/conversations/c1/messages",
+        expect.objectContaining({ content: "linha um\nlinha dois" }),
+      ),
+    );
+  });
+
+  it("limite de 5000 caracteres no textarea", async () => {
+    await renderComposer();
+    expect((screen.getByLabelText("Mensagem") as HTMLTextAreaElement).maxLength).toBe(5000);
+  });
+
+  it("falha de envio preserva o texto e reporta mensagem amigável", async () => {
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/conversations/c1/messages") {
+        throw new ApiError("Personagem não participa desta conversa", 403, "FORBIDDEN");
+      }
+      throw new ApiError("Não encontrado", 404);
+    });
+    const errors: string[] = [];
+    const user = userEvent.setup();
+    await renderComposer({ onError: (message) => errors.push(message) });
+    const textarea = screen.getByLabelText("Mensagem") as HTMLTextAreaElement;
+    await user.type(textarea, "Bom dia");
+    await user.click(screen.getByRole("button", { name: "Enviar mensagem" }));
+
+    await waitFor(() => expect(errors.length).toBeGreaterThanOrEqual(1));
+    expect(errors[0]).toBe("Você não tem permissão para enviar nesta conversa.");
+    expect(textarea.value).toBe("Bom dia");
+  });
+
+  it("429 reporta excesso de mensagens sem descartar o texto", async () => {
+    apiMock.post.mockImplementation(async (path: string) => {
+      if (path === "/api/conversations/c1/messages") {
+        throw new ApiError("Rate limit", 429, "RATE_LIMIT");
+      }
+      throw new ApiError("Não encontrado", 404);
+    });
+    const errors: string[] = [];
+    const user = userEvent.setup();
+    await renderComposer({ onError: (message) => errors.push(message) });
+    await user.type(screen.getByLabelText("Mensagem"), "Bom dia");
+    await user.click(screen.getByRole("button", { name: "Enviar mensagem" }));
+    await waitFor(() => expect(errors.length).toBeGreaterThanOrEqual(1));
+    expect(errors[0]).toBe("Muitas mensagens em pouco tempo. Aguarde um instante.");
+  });
+});

@@ -17,12 +17,14 @@ type MessageComposerProps = {
   conversationId: string;
   onError?: (message: string) => void;
   onTypingChange?: (names: string[]) => void;
+  onMessageSent?: () => void;
 };
 
 export function MessageComposer({
   conversationId,
   onError,
   onTypingChange,
+  onMessageSent,
 }: MessageComposerProps) {
   const participantsQuery = useConversationParticipants(conversationId);
   const createMutation = useCreateMessage(conversationId);
@@ -46,8 +48,16 @@ export function MessageComposer({
         onError?.("Sessão expirada. Faça login novamente.");
         return;
       }
+      if (err.status === 403) {
+        onError?.("Você não tem permissão para enviar nesta conversa.");
+        return;
+      }
       if (err.status === 404) {
         onError?.("Conversa não encontrada.");
+        return;
+      }
+      if (err.status === 429) {
+        onError?.("Muitas mensagens em pouco tempo. Aguarde um instante.");
         return;
       }
     }
@@ -73,8 +83,33 @@ export function MessageComposer({
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function reportSendError(err: unknown) {
+    if (err instanceof ApiError) {
+      if (err.status === 401) {
+        onError?.("Sessão expirada. Faça login novamente.");
+        return;
+      }
+      if (err.status === 403) {
+        onError?.("Você não tem permissão para enviar nesta conversa.");
+        return;
+      }
+      if (err.status === 404) {
+        onError?.("Conversa não encontrada.");
+        return;
+      }
+      if (err.status === 400) {
+        onError?.("Mensagem inválida.");
+        return;
+      }
+      if (err.status === 429) {
+        onError?.("Muitas mensagens em pouco tempo. Aguarde um instante.");
+        return;
+      }
+    }
+    onError?.(err instanceof Error ? err.message : "Falha ao enviar mensagem");
+  }
+
+  function submitMessage() {
     if (!effectiveSender || !content.trim() || isBusy) return;
     setNotice(null);
     const text = content.trim();
@@ -83,12 +118,23 @@ export function MessageComposer({
       {
         onSuccess: () => {
           setContent("");
+          onMessageSent?.();
           void triggerAutonomousResponse();
         },
-        onError: (err) =>
-          onError?.(err instanceof Error ? err.message : "Falha ao enviar mensagem"),
+        onError: reportSendError,
       },
     );
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    submitMessage();
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    submitMessage();
   }
 
   return (
@@ -116,8 +162,11 @@ export function MessageComposer({
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Escreva sua mensagem..."
+          aria-label="Mensagem"
           rows={2}
+          maxLength={5000}
           disabled={!effectiveSender}
           className="min-h-[40px] max-h-[160px] w-full resize-none rounded-md bg-transparent py-1.5 px-1 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
