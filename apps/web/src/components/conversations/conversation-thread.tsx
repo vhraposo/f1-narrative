@@ -71,7 +71,7 @@ export function ConversationThread({
   if (conversationQuery.isLoading) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="h-6 w-6 animate-spin motion-reduce:animate-none text-muted-foreground" />
       </div>
     );
   }
@@ -217,9 +217,9 @@ export function ConversationThread({
             className="mb-1.5 flex items-center gap-2 px-1 text-xs text-muted-foreground"
           >
             <span className="flex gap-0.5" aria-hidden="true">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.2s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.1s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+              <span className="h-1.5 w-1.5 animate-bounce motion-reduce:animate-none rounded-full bg-muted-foreground [animation-delay:-0.2s]" />
+              <span className="h-1.5 w-1.5 animate-bounce motion-reduce:animate-none rounded-full bg-muted-foreground [animation-delay:-0.1s]" />
+              <span className="h-1.5 w-1.5 animate-bounce motion-reduce:animate-none rounded-full bg-muted-foreground" />
             </span>
             {typingNames.length === 1
               ? `${typingNames[0]} está digitando…`

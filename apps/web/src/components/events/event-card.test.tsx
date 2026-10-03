@@ -64,4 +64,17 @@ describe("EventCard", () => {
     renderCard({ ...baseEvent, worldDate: null });
     expect(screen.queryByText(/2026/)).toBeNull();
   });
+
+  it("F8: evento restrito recebe badge honesto; público não", () => {
+    renderCard({ ...baseEvent, visibility: "RESTRICTED" });
+    expect(screen.getByText("Restrito")).toBeDefined();
+    expect(
+      screen.getByTitle("Evento restrito — visível apenas à audiência"),
+    ).toBeDefined();
+  });
+
+  it("F8: evento público não exibe badge de restrito", () => {
+    renderCard({ ...baseEvent, visibility: "PUBLIC" });
+    expect(screen.queryByText("Restrito")).toBeNull();
+  });
 });

@@ -178,7 +178,7 @@ export function MessageComposer({
           disabled={!effectiveSender || !content.trim() || isBusy}
         >
           {isBusy ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
           ) : (
             <Send className="h-4 w-4" />
           )}

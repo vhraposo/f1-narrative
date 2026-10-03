@@ -123,7 +123,7 @@ export function MessageList({
   if (messagesQuery.isLoading) {
     return (
       <div className="flex justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none text-muted-foreground" />
       </div>
     );
   }

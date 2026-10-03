@@ -11,6 +11,8 @@ export type EventType =
 
 export type EventImportance = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
+export type EventVisibility = "PUBLIC" | "RESTRICTED";
+
 export type EventSource =
   | "CANON"
   | "USER_DEFINED"
@@ -22,6 +24,7 @@ export type Event = {
   type: EventType;
   importance: EventImportance;
   source: EventSource;
+  visibility?: EventVisibility;
   title: string;
   description: string | null;
   worldDate: string | null;
