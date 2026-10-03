@@ -2,108 +2,82 @@
 
 ## Estado atual
 - Branch: `v4-Living-F1-Universe`
-- HEAD: `286a165` — `feat(conversation): enforce universe-scoped conversation ACL` (F7.1)
+- HEAD: `6e390be` — `feat(privacy): enforce memory audience in dialogue context` (F7.2)
 - Working tree: limpo (após commit deste HANDOFF)
-- Última unidade concluída: F7.1 — ACL de Conversation
-- F6 encerrada (F6.1–F6.5); F7.0 (análise) concluída em `2207c0f`
-- Próximo checkpoint: F7.2 — grants de conhecimento (MemoryCharacter + contexto legado + APIs)
+- Última unidade concluída: F7.2 — audiência de conhecimento (MemoryCharacter)
+- F6 encerrada; F7.0/F7.1/F7.2 concluídas
+- Próximo checkpoint: F7.3 — audiência de Event (`EventVisibility` + API + contexto)
 
 ## Roadmap (commits reais)
 F5 (concluída): F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
 F6 (concluída): F6.1 `48e83ba`, F6.2 `502f998`, F6.3 `9c1c006`, F6.4 `5719019`, F6.5 `1cc8562`.
 F7:
-- F7.0 análise — `2207c0f` (`docs/post-v4-dialogue-engine-f7-analysis.md`)
-- F7.1 ACL de Conversation — `286a165` (concluída)
-- F7.2 grants de conhecimento (MemoryCharacter/contexto legado/APIs) — PENDENTE
+- F7.0 análise — `2207c0f`; F7.1 ACL de Conversation — `286a165`
+- F7.2 audiência de memória — `6e390be` (concluída)
 - F7.3 audiência de eventos — PENDENTE
 - F7.4 F6 audience — PENDENTE
 - F7.5 Command Layer + validador — PENDENTE
 - F7.6 evals F7 + doc — PENDENTE
 F8/F9: não iniciadas.
 
-## Última implementação (F7.1)
-- Schema: `ConversationVisibility { PRIVATE, UNIVERSE }` + `Conversation.visibility @default(PRIVATE)`
-  (`prisma/schema.prisma`). Migration aditiva
-  `prisma/migrations/20261002130000_add_conversation_visibility/migration.sql` (CREATE TYPE +
-  ADD COLUMN default). Aplicada e validada em TEST (`migrate deploy`; `migrate status` up to date).
-  DEV não tocado.
-- Decisão: **NÃO** foi adicionado `Conversation.universeId`. A fonte de verdade do Universe de uma
-  Conversation continua sendo `Character.universeId` dos participantes (evita segunda fonte de
-  verdade/backfill). `UNIVERSE` existe reservado e fail-closed: em F7.1 o acesso é somente
-  participantes para ambos os valores (sem abrir nada). Se F7.x exigir consultas por universe,
-  reavaliar com migration+backfill dedicados.
-- `conversation.routes.ts`:
-  - `characterCompatibleWithUniverse`: ownership (`userId === caller` ou global `null`) e universe
-    (`universeId === null` ou do caller); global catalog (null+null) permitido;
-  - criação: cada participante precisa ser compatível (rejeita outro usuário/universe com 404 sem
-    vazar existência); mantém `ownsAny` (>=1 personagem do caller) e regras DM/GROUP/duplicados;
-  - add-participante: deriva o universe da conversa dos participantes (unanimidade; >1 → 409
-    `CONFLICT` para dados legados inconsistentes) e valida o novo personagem (404 se incompatível);
-  - DTO de conversa passa a expor `visibility`.
-- Testes: `conversation.acl.test.ts` (+12) cobre criação válida PRIVATE, cross-universe em
-  criação/adición (404 + sem vínculo), personagem inexistente, personagem de outro usuário sem
-  universe (legado), acesso legítimo (conversa/mensagens/participantes), bloqueio total a
-  não-participante (leitura, PATCH/DELETE, mensagem, context), add por não autorizado, add
-  same-universe/global AI, listagem sem vazamento, UNIVERSE fail-closed e regressão DM/duplicados.
-  `conversation.test.ts` teve UM caso adaptado: o setup que adicionava personagem de outro usuário
-  agora falha por design (404) e o post do outsider vira 404 (antes 403 — mais restritivo, sem
-  bypass; não foi enfraquecido).
-- Validação real: subconjunto conversation+autonomy+characters 35 files / 509 tests verde (com 1
-  flake histórico reproduzido 1x, ver abaixo); suíte completa API 205 files / 2887 tests verde;
-  `tsc --noEmit` verde; ESLint conversation verde; build `tsc -p` verde.
+## Última implementação (F7.2)
+- `context.assembly.ts`: `AssemblyInput.audienceCharacterId?`; seleção de memórias passa a
+  filtrar por `MemoryCharacter` do speaker quando informado (fail-closed se não participante;
+  também filtra `universeId null|do speaker` quando conhecido). `memoryParticipantLinks`
+  separado para listar participantes da memória. Sem speaker (observabilidade `/craft`,
+  `/context`) mantém o pool da conversa (owner-level).
+- `generation.assembly.ts`: resolve o speaker ANTES de `assembleContext` e passa
+  `audienceCharacterId`; prompt (`sectionMemories`) e `context.memories` ficam por speaker.
+- `context.routes.ts`: `GET /context?characterId=` opcional valida participante (404 se não) e
+  filtra por audiência; sem o parâmetro mantém a visão da conversa.
+- Sem mudanças em `memory.routes.ts`/`memory.retrieval.ts`/F5/F6: MemoryCharacter já era o grant;
+  APIs de memória já escopam por participante (testes de não vazamento adicionados).
+- Testes: `context.memory-audience.test.ts` (+6): legado A/B assimétrico, determinismo,
+  F5 retrieval+knownFacts, `/context` filtrado vs pool, APIs de memória por usuário,
+  isolamento de Universe. Subset context+generation+memory+conversation+autonomy 63 files /
+  1109 tests verde (após rerun; flake #13 1x, ver abaixo). `tsc --noEmit` verde, ESLint
+  context/generation verde, build `tsc -p` verde. Sem migration.
 
-## Próxima ação — F7.2 (exata)
-Grants de conhecimento (F7.0 seção 20), sem tocar F5/F6 fora do necessário:
-- formalizar `MemoryCharacter` como audiência autorizada e garantir que TODOS os caminhos de
-  contexto a respeitem: o caminho legado `assembleContext`/`generation.assembly` hoje usa pool
-  compartilhado de memórias/eventos de todos os participantes (vazamento dentro da conversa) —
-  filtrar por speaker/audiência ou bloquear conteúdo restrito para o caminho legado;
-- escopar `GET /api/memories` (já usa participante, revisar exposição de `context`/summary);
-- testes reais em TEST DB: memória privada não entra no contexto do outro speaker (F5 ok + legado),
-  `knownFacts` sem secret não autorizado; cleanup;
-- não criar `Secret`/`KnowledgeGrant` nesta subfase; se necessário, registrar achado e propor a
-  menor mudança.
+## Próxima ação — F7.3 (exata)
+Audiência de Event, sem event bus/outbox:
+- `EventVisibility { PUBLIC, RESTRICTED }` + `Event.visibility @default(PUBLIC)` (aditivo;
+  migration manual no padrão do projeto, aplicada só em TEST);
+- `EventCharacter` = audiência quando `RESTRICTED`; `createdBy` também;
+- `GET /api/events` escopado (public + restricted autorizados por personagens do usuário);
+  mutações já escopadas (`findMutatableEventId`);
+- contexto (legado/F5) não inclui evento RESTRICTED para speaker sem audiência; F6.4 bridge
+  (`conversation.opportunity-bridge.ts`) e `autonomy.opportunities.ts` não geram sinal/oportunidade
+  de evento RESTRICTED para personagem sem audiência; canonicalização `event:<id>` preservada;
+- News pública continua; testes em TEST DB com cleanup.
 
 ## Flake conhecido (documentado, não mascarado)
-`conversation.autonomous.test.ts` #13 ("simulate-turn ... menção") falhou 1x no subset
-F7.1 (primeira seleção veio characterB em vez de characterA) e passou isolado e no rerun do
-subset e na suíte completa. Mecânica provável: o speaker mencionado pode ser penalizado por
-RECENTLY_SPOKE/REDUNDANT_RESPONSE conforme mensagens dos testes anteriores da mesma conversa
-(createdAt real vs worldDate fixo) e cair abaixo do minScore, deixando o social baseline vencer.
-Hipótese de correção fora do escopo F7.1 (mexeria em scoring F3/F5). Ação: monitorar; se voltar,
-tratar em subfase própria com evidência.
+`conversation.autonomous.test.ts` #13 falhou 1x no subset F7.2 (characterB antes de characterA);
+passou isolado e no rerun do subset. Mecânica provável: penalties RECENTLY_SPOKE/REDUNDANT_RESPONSE
++ timestamps reais vs worldDate fixo derrubam o mencionado abaixo do minScore. Não corrigir em
+F7; registrar.
 
 ## Achados de infraestrutura
-- `prisma migrate dev` é interativo (não roda headless) e detectou drift PRÉ-EXISTENTE entre
-  schema e migrations: `Conversation_status_idx` presente no banco e ausente no schema; unique
-  `Season(universeId, year)` presente no schema e ausente nas migrations; rename de index
-  `ExternalBindingDriverSeason`. `migrate status` em TEST diz "up to date" (44→45). NÃO corrigir
-  fora de escopo; registrar para uma futura migration de sincronização.
-- `prisma generate` falhou no rename do `query_engine-windows.dll.node` (EPERM, arquivo em uso),
-  mas os tipos do client foram gerados (`ConversationVisibility` presente em
-  `node_modules/.pnpm/@prisma+client.../.prisma/client/index.d.ts`). Testes/tsc verdes.
+- Drift pré-existente schema↔migrations (`Conversation_status_idx`, unique `Season(universeId,
+  year)`, rename de índice) — não corrigir na F7.
+- `prisma generate` pode falhar com EPERM no engine DLL em uso; verificar se os tipos foram
+  gerados antes de repetir.
+- `prisma migrate dev` é interativo: criar migration manualmente e aplicar com `migrate deploy`
+  em TEST.
 
-## Decisões F6 (mantidas)
-- Modos: OFF não executa; OBSERVER audit-only; GUIDED sem envelope; FULL executa via pipeline
-  F3–F5; PAUSED/STOPPED/REUSED não executam.
-- Budgets `AUTONOMY_MAX_CONVERSATIONS_PER_TICK`/`ACTIONS`/`MESSAGES`; evidenceId canônico por raiz
-  (`event:<id>`); fingerprint F6.1 inalterado; Command Layer writer único.
+## Decisões F6/F7 (mantidas)
+- Modos F6: OFF não executa; OBSERVER audit-only; GUIDED sem envelope; FULL executa via F3–F5;
+  PAUSED/STOPPED/REUSED não executam. Budgets/evidenceId/fingerprint inalterados.
+- F7.1: sem `Conversation.universeId`; Universe derivado dos participantes; `UNIVERSE` fail-closed.
 
 ## Riscos conhecidos
-- F7: pool compartilhado do caminho legado é o maior risco de vazamento (F7.2); `GET /api/events`
-  global (F7.3); guarda semântica de secret limitada (F7.5); `UNIVERSE` fail-closed até implemento.
-- Conversas legadas cross-universe/inconsistentes permanecem acessíveis aos seus participantes
-  (não retro-corrigidas); add-participante nelas retorna 409.
-- F6: loop A↔B (cooldown/fingerprint/≤1 por conversa/tick); ticks concorrentes (REUSED).
-- Flake #13 acima.
+- Event global (F7.3); secret detection semântica não será usada como autorização (F7.5);
+  conversas legadas cross-universe permanecem; flake #13.
 
 ## Regras essenciais
 Ver `AGENTS.md`. DEV read-only; TEST com cleanup; um commit por subfase; nunca amend;
 atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o handoff.
 
 ## Prompt de retomada
-"Leia `docs/HANDOFF.md`, `AGENTS.md` e `docs/post-v4-dialogue-engine-f7-analysis.md`. Valide Git
-(branch, HEAD, working tree). A F6 está encerrada, F7.0/F7.1 concluídas; NÃO repita essas fases.
-Execute a próxima ação descrita no HANDOFF (F7.2 — grants de conhecimento: MemoryCharacter +
-contexto legado + APIs), com testes em TEST DB e cleanup. Rode testes/typecheck/lint/build, crie
-um commit novo, atualize `docs/HANDOFF.md` e pare no checkpoint verde. Não use amend."
+"Leia `docs/HANDOFF.md`, `AGENTS.md` e `docs/post-v4-dialogue-engine-f7-analysis.md`. Valide Git.
+F6 e F7.0–F7.2 estão concluídas; não repita. Execute a próxima ação (F7.3 — audiência de Event)
+com testes em TEST DB/cleanup, tsc/eslint/build, um commit novo e atualização do HANDOFF."
