@@ -99,6 +99,19 @@ async function executeMessageCommand(
   }
   await requireTargetInUniverse(input.tx, input.request.universeId, input.candidate.targetCharacterId);
 
+  // F7.5: o alvo da mensagem precisa ser participante da conversa (defesa
+  // estrutural no Command Layer; não depende de conteúdo).
+  if (
+    input.candidate.targetCharacterId &&
+    !participantIds.includes(input.candidate.targetCharacterId)
+  ) {
+    throw new BehaviorError(
+      "TARGET_NOT_PARTICIPANT",
+      "Alvo não participa da conversa",
+      403,
+    );
+  }
+
   const override = input.contentOverride;
   const content = override ? override.text.trim() : deterministicTextFor(input.context, input.candidate.reasonCode);
   if (content.length === 0 || content.length > 5000) {
