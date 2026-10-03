@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, UserRoundCog } from "lucide-react";
+import { Bot, CornerUpLeft, UserRoundCog } from "lucide-react";
 
 import { CharacterAvatar } from "@/components/conversations/character-avatar";
 import {
@@ -9,16 +9,53 @@ import {
   type Message,
 } from "@/lib/conversations";
 import { speakerColorClass } from "@/lib/speaker-color";
+import { cn } from "@/lib/utils";
+
+export type MessageReplyPreview = {
+  authorName: string;
+  content: string;
+};
 
 type MessageBubbleProps = {
   message: Message;
   author: ConversationParticipant | null;
   showHeader?: boolean;
+  replyTo?: MessageReplyPreview | null;
 };
+
+function ReplyPreview({
+  replyTo,
+  own,
+}: {
+  replyTo: MessageReplyPreview;
+  own: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "mb-1 block rounded-md border-l-2 px-2 py-1 text-[11px] leading-tight",
+        own
+          ? "border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground/80"
+          : "border-brand/50 bg-muted/60 text-muted-foreground",
+      )}
+    >
+      <span className="flex items-center gap-1 font-semibold">
+        <CornerUpLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
+        Respondendo a {replyTo.authorName}
+      </span>
+      <span className="block truncate">{replyTo.content}</span>
+    </span>
+  );
+}
 
 // Espelho da MessageBubble: a identidade (alinhamento/avatar/nome) vem do
 // senderType REAL, nunca inferida pela aparência ou por controlledBy.
-export function MessageBubble({ message, author, showHeader = true }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  author,
+  showHeader = true,
+  replyTo = null,
+}: MessageBubbleProps) {
   const time = formatChatTime(message.createdAt);
 
   if (message.senderType === "SYSTEM") {
@@ -41,11 +78,15 @@ export function MessageBubble({ message, author, showHeader = true }: MessageBub
     return (
       <li className="flex justify-end px-4 py-1.5">
         <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground shadow-sm">
+          {replyTo && <ReplyPreview replyTo={replyTo} own />}
           <span className="block whitespace-pre-wrap break-words">{message.content}</span>
           {time && (
-            <span className="mt-0.5 block text-right text-[10px] font-medium text-primary-foreground/70">
+            <time
+              dateTime={message.createdAt}
+              className="mt-0.5 block text-right text-[10px] font-medium text-primary-foreground/70"
+            >
               {time}
-            </span>
+            </time>
           )}
         </div>
       </li>
@@ -65,9 +106,13 @@ export function MessageBubble({ message, author, showHeader = true }: MessageBub
         <span className="w-8 shrink-0" aria-hidden="true" />
       )}
       <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-border bg-card px-3 py-2 text-sm shadow-sm">
+        {replyTo && <ReplyPreview replyTo={replyTo} own={false} />}
         {message.senderType === "AI_CHARACTER" && showHeader && (
           <span
-            className={`mb-0.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide ${speakerColorClass(message.characterId)}`}
+            className={cn(
+              "mb-0.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide",
+              speakerColorClass(message.characterId),
+            )}
           >
             <Bot className="h-3 w-3" aria-hidden="true" />
             {name}
@@ -77,9 +122,12 @@ export function MessageBubble({ message, author, showHeader = true }: MessageBub
           {message.content}
         </span>
         {time && (
-          <span className="mt-0.5 block text-right text-[10px] font-medium text-muted-foreground">
+          <time
+            dateTime={message.createdAt}
+            className="mt-0.5 block text-right text-[10px] font-medium text-muted-foreground"
+          >
             {time}
-          </span>
+          </time>
         )}
       </div>
     </li>

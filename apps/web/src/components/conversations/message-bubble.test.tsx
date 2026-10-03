@@ -88,4 +88,31 @@ describe("MessageBubble", () => {
     expect(screen.getByText("Olá")).toBeDefined();
     expect(screen.queryByText("Usuario")).toBeNull();
   });
+
+  it("F8: reply mostra referência compacta sem duplicar o conteúdo", () => {
+    render(
+      <ul>
+        <MessageBubble
+          message={message("m5", "AI_CHARACTER", "Concordo", "ai1")}
+          author={author("ai1", "Kiminawa")}
+          replyTo={{ authorName: "Lando", content: "Vamos atacar na volta 10" }}
+        />
+      </ul>,
+    );
+    expect(screen.getByText(/Respondendo a Lando/)).toBeDefined();
+    expect(screen.getByText("Vamos atacar na volta 10")).toBeDefined();
+    expect(screen.getByText("Concordo")).toBeDefined();
+  });
+
+  it("F8: sem replyTo não renderiza referência", () => {
+    render(
+      <ul>
+        <MessageBubble
+          message={message("m6", "AI_CHARACTER", "Só isso", "ai1")}
+          author={author("ai1", "Kiminawa")}
+        />
+      </ul>,
+    );
+    expect(screen.queryByText(/Respondendo a/)).toBeNull();
+  });
 });

@@ -4,7 +4,16 @@ import { ApiError, API_BASE, get, patch, post, remove } from "./api";
 
 export type ConversationType = "GROUP" | "DM";
 
+export type ConversationVisibility = "PRIVATE" | "UNIVERSE";
+
 export type MessageSenderType = "USER_CHARACTER" | "AI_CHARACTER" | "SYSTEM";
+
+export type MessageDialogueContext = {
+  intent?: string;
+  replyToMessageId?: string | null;
+  fragmentIndex?: number;
+  topicTag?: string | null;
+};
 
 export type MessageContextJson = {
   family: string;
@@ -15,6 +24,7 @@ export type MessageContextJson = {
   assembledAt: string;
   activeSpeaker: { characterId: string | null; senderType: MessageSenderType };
   participantCharacterIds: string[];
+  dialogue?: MessageDialogueContext;
   temporal: {
     worldDate: string | null;
     currentSeasonId: string | null;
@@ -58,6 +68,7 @@ export type Conversation = {
   id: string;
   title: string | null;
   type: ConversationType;
+  visibility?: ConversationVisibility;
   createdAt: string;
   updatedAt: string;
   participants: ConversationParticipant[];
@@ -533,6 +544,31 @@ export function formatListTime(iso: string): string {
     month: "2-digit",
     year: "2-digit",
   });
+}
+
+export function formatChatDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  if (sameDay(date, now)) return "Hoje";
+  const daysDiff = Math.round(
+    (startOfDay(now) - startOfDay(date)) / 86_400_000,
+  );
+  if (daysDiff === 1) return "Ontem";
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
+export function messageReplyToId(message: Message): string | null {
+  const context = message.contextJson;
+  if (!context || typeof context !== "object") return null;
+  const dialogue = context.dialogue;
+  if (!dialogue || typeof dialogue !== "object") return null;
+  const replyTo = dialogue.replyToMessageId;
+  return typeof replyTo === "string" && replyTo.length > 0 ? replyTo : null;
 }
 export type AutonomousTurnInput = {
   worldDate?: string;
