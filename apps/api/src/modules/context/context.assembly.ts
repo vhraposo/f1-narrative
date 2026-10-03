@@ -451,23 +451,49 @@ export async function assembleContext(
       participantCharacterIds: m.participantCharacterIds,
     }));
 
-  const eventLinks = scope.length
+  // F7.3: com speaker definido, apenas eventos da audiência do speaker entram
+  // (RESTRICTED exige vínculo EventCharacter; PUBLIC segue a seleção normal).
+  const eventLinks = audienceScope.length
     ? await db.eventCharacter.findMany({
-        where: { characterId: { in: scope } },
+        where: { characterId: { in: audienceScope } },
         select: { eventId: true, characterId: true },
       })
     : [];
   const eventIds = [...new Set(eventLinks.map((l) => l.eventId))];
   const events = eventIds.length
     ? await db.event.findMany({
-        where: { id: { in: eventIds } },
-        select: { id: true, type: true, importance: true, title: true, description: true, worldDate: true },
+        where: {
+          id: { in: eventIds },
+          ...(input.audienceCharacterId !== undefined
+            ? {
+                OR: [
+                  { visibility: "PUBLIC" as const },
+                  { participants: { some: { characterId: input.audienceCharacterId } } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          type: true,
+          importance: true,
+          title: true,
+          description: true,
+          worldDate: true,
+          visibility: true,
+        },
+      })
+    : [];
+  const eventParticipantLinks = eventIds.length
+    ? await db.eventCharacter.findMany({
+        where: { eventId: { in: eventIds } },
+        select: { eventId: true, characterId: true },
       })
     : [];
   const selectedEvents = events
     .map((e) => ({
       event: e,
-      participantIds: eventLinks
+      participantIds: eventParticipantLinks
         .filter((l) => l.eventId === e.id)
         .map((l) => l.characterId)
         .sort(),

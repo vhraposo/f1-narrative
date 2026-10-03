@@ -1243,11 +1243,17 @@ model Relationship {
 /// Acontecimento do universo. Tipos bem definidos; o payload JSON carrega
 /// dados específicos do tipo. Pode envolver múltiplos Characters e gerar
 /// memórias e notícias.
+enum EventVisibility {
+  PUBLIC
+  RESTRICTED
+}
+
 model Event {
   id          String          @id @default(uuid()) @db.Uuid
   type        EventType
   importance  EventImportance @default(MEDIUM)
   source      CanonSource     @default(GENERATED_EVENT)
+  visibility  EventVisibility @default(PUBLIC)
   title       String
   description String?
   worldDate   DateTime?

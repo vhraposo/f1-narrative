@@ -254,6 +254,7 @@ describe("POST /api/events", () => {
       "source",
       "title",
       "type",
+      "visibility",
       "worldDate",
     ]);
     expect(keys).not.toContain("updatedAt");

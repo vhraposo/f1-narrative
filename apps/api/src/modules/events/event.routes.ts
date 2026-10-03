@@ -23,6 +23,7 @@ const eventSelect = {
   type: true,
   importance: true,
   source: true,
+  visibility: true,
   title: true,
   description: true,
   worldDate: true,
@@ -88,6 +89,19 @@ async function findMutatableEventId(userId: string, eventId: string): Promise<st
   return any?.id ?? null;
 }
 
+// F7.3: Event RESTRICTED só é visível ao criador/participantes (audiência
+// EventCharacter). PUBLIC continua visível a qualquer usuário autenticado.
+function eventVisibilityScope(userId: string) {
+  return {
+    OR: [
+      { visibility: "PUBLIC" as const },
+      { createdById: userId },
+      { participants: { some: { character: { userId } } } },
+      { participants: { some: { character: { universe: { userId } } } } },
+    ],
+  };
+}
+
 export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
   // ------------------------------------------------------------------
   // Events — entidade global compartilhada (sem userId), como Season/Race.
@@ -105,8 +119,9 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
           issues: query.error.issues,
         });
       }
+      const userId = request.user!.id;
       const events = await prisma.event.findMany({
-        where: query.data,
+        where: { ...query.data, ...eventVisibilityScope(userId) },
         select: eventSelect,
         orderBy: [
           { worldDate: "desc" },
@@ -147,6 +162,9 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
           description: parsed.data.description ?? null,
           importance: parsed.data.importance,
           source: parsed.data.source,
+          ...(parsed.data.visibility !== undefined
+            ? { visibility: parsed.data.visibility }
+            : {}),
           worldDate: parsed.data.worldDate ?? null,
           payload: parsed.data.payload as Prisma.InputJsonValue | null | undefined,
           createdById: request.user!.id,
@@ -173,8 +191,8 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const event = await prisma.event.findUnique({
-        where: { id: params.data.id },
+      const event = await prisma.event.findFirst({
+        where: { id: params.data.id, ...eventVisibilityScope(request.user!.id) },
         select: eventSelect,
       });
 
