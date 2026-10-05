@@ -2,13 +2,16 @@
 
 ## Estado atual
 - Branch: `v4-Living-F1-Universe`
-- HEAD: `7c9b417` — `docs: complete F9 benchmark gate documentation` (F9)
+- HEAD: `d392196` — `feat(ai-behavior): route SEND_MESSAGE through the dialogue engine` (F11);
+  docs/HANDOFF deste ciclo neste commit.
 - Working tree: limpo (após commit deste HANDOFF)
-- **F9 concluída (Benchmark Gate)**; **F10 concluída como análise (sem implementação)**.
+- **F9 concluída (Benchmark Gate)**; **F10 concluída (análise)**; **F11 concluída (unificação do
+  AI Behavior com o Dialogue Engine)**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
-  `simulate-turn` (engine determinístico F3–F7 + Command Layer). Nenhum acesso pelo web a
-  `useStreamingTurn`/`useGenerateMessage`/`useAutonomousTurn` fora de lib/hooks/testes.
-- Próximo passo: backlog P1 (unificar/desativar `ai-behavior` SEND_MESSAGE) ou itens F9.
+  `simulate-turn`; o `SEND_MESSAGE` do AI Behavior agora usa `simulateConversationTurn` com seed
+  (planner/realizer/validator/domain gate/Command Layer). O segundo writer
+  (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI Behavior.
+- Próximo passo: escolher item do backlog abaixo (nenhum P0/P1 aberto de escrita paralela).
 
 ## F10 — conclusão (detalhes em docs/post-v4-dialogue-engine-f10.md)
 - Análise sem alteração de código (Caso 1/3): a experiência de Conversas já usa o engine
@@ -20,6 +23,23 @@
 - P0: nenhum. P2: streaming não integrado (intencional); painel SEND_MESSAGE sem provider.
 - Benchmark F9 reexecutado após a análise: `F9 BENCHMARK GATE: PASS` (12/12; contadores 0).
 
+## F11 — conclusão (detalhes em docs/post-v4-dialogue-engine-f11.md)
+- `ai-behavior.service.executeSendMessage` passou a chamar `simulateConversationTurn` com
+  `OpportunityEnvelopeSeed` (`fingerprint: decision.id`, `targetCharacterId: null`,
+  `maxDepth: 1`); `Message` nasce apenas no Command Layer, com texto determinístico do realizer.
+- `provider` removido do módulo AI Behavior (`ai-behavior.service.ts`, `ai-behavior.routes.ts`,
+  `app.ts`); sem LLM no caminho (`metadata.llmUsed === false`).
+- Rejeições: ACL/target → `TARGET_NOT_FOUND`; engine/domain gate → `EXECUTION_REJECTED` (409);
+  WorldState ausente → `PRECONDITION_FAILED` sanitizado (200 com decision REJECTED/FAILED).
+- Testes do ai-behavior adaptados (13/13) sem remover cobertura; provam ausência de marcadores do
+  writer legado (`contextJson.family`/`generationKey`) e presença de `language.provider =
+  "dialogue-realizer"` + `behavior.reasonCode`.
+- Fixtures do ai-behavior passaram a criar `WorldState { key: "default", currentDate }` (pré-
+  condição do engine). O engine cria `AiDecision` oficial `CONVERSATION_TURN_DUE`; testes que
+  contavam decisões EXECUTED filtraram `contextVersion: "ai-behavior.v1"`.
+- Fora do escopo: `CREATE_EVENT` do ai-behavior (Event, não Message), rotas legadas `/turn`,
+  `/turn/stream`, `/generate`, streaming.
+
 ## Roadmap concluído (commits reais)
 F3: F3.1–F3.5 (HEAD F3.5 `b0f7b8b`); docs `docs/post-v4-dialogue-engine-f3.md`.
 F5: F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
@@ -28,7 +48,8 @@ F7: F7.0 `2207c0f`, F7.1 `286a165`, F7.2 `6e390be`, F7.3 `c0bbe39`, F7.4 `9be1ff
 F7.5 `185bdef`, F7.6 `59c1e25`.
 F8: F8.1 `f58b41e`, F8.2 `8fff7bd`, F8.3 `5fc7470`, F8.4 `ebfca63`, F8.5 `83caa99`.
 F9: gate `199b098`; doc `7c9b417`.
-F10: análise/docs neste commit.
+F10: análise `c9eee60`.
+F11: F11.1 `d392196`; docs/HANDOFF neste commit.
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -37,22 +58,31 @@ F10: análise/docs neste commit.
 - Cenários B01–B10 + prova de regressão; thresholds hard-zero; budgets de `autonomyBudgets()`.
 - Resultado real: `F9 BENCHMARK GATE: PASS` (12/12; contadores todos 0; exit 0).
 
-## Validação real (F9, ainda referência para o código atual)
-- API: `npx tsc --noEmit` verde; ESLint do arquivo verde; build `tsc -p` verde; suíte completa
-  **211 files / 2945 tests** verdes (inclui F6 E01–E10 e F7 E01–E20).
-- Web: `npx tsc --noEmit` verde; **70 files / 519 tests**; `next lint` OK; `next build` OK.
-- F10 não reexecutou as suítes completas porque nenhum arquivo de código foi alterado; o
-  benchmark F9 foi reexecutado e segue verde.
-- Banco: TEST (`f1_narrative_test`) com cleanup; DEV intocado; nenhuma migration.
-- Flakes: nenhum em F9/F10; flake histórico #13 não reproduzido.
+## Validação real (F11)
+- API: `npx tsc --noEmit` verde; ESLint do escopo verde; build `tsc -p` verde.
+- Suíte do ai-behavior: **13/13** (3 execuções isoladas consecutivas).
+- Subset afetado (`ai-behavior + conversation + autonomy + behavior`): **42 files / 561 tests**.
+- Suíte completa API: **2945/2946**; a única falha é o flake pré-existente
+  `pilot-knowledge.provision.test.ts #4` (reproduzido no full, passa isolado — ver Flakes).
+- Benchmark: `pnpm benchmark:f9` → `F9 BENCHMARK GATE: PASS` antes e depois (12/12; contadores 0).
+- Web: `npx tsc --noEmit` verde; **70 files / 519 tests**; `next lint` OK; `next build` OK
+  (F11 não alterou web).
+- Banco: TEST (`f1_narrative_test`) com fixtures/cleanup; DEV intocado; nenhuma migration.
+
+## Flakes observados (F11)
+- `pilot-knowledge.provision.test.ts` caso "4) reabertura": falhou no full (ordem de marcos),
+  passou isolado; flake antigo documentado desde F6, não relacionado à F11.
+- `world-progression`, `biography.lifecycle` e `conversation.autonomous #13` falharam uma vez
+  numa execução completa sob pressão do ambiente e passaram isoladas nos reruns; flake histórico,
+  não reproduzido de forma consistente. Nenhum flake novo atribuído à F11.
 
 ## Backlog futuro (priorizado)
-1. **P1**: unificar/desativar `ai-behavior` SEND_MESSAGE (segundo writer) em fase própria com
-   testes; hoje inerte por default, ativo se `generationProvider` configurado.
+1. Streaming como transporte do realizer determinístico (somente com requisito real de UX).
 2. Presença online real (não existe no backend).
-3. Streaming como transporte do realizer determinístico (somente com requisito real de UX).
-4. Virtualização de mensagens/auto-resize/skeletons; evals de performance/latência.
+3. Virtualização de mensagens/auto-resize/skeletons; evals de performance/latência.
+4. `CREATE_EVENT` do ai-behavior via pipeline oficial (opcional; hoje writer direto de Event).
 5. Guarda semântica de secret (se necessária); sincronização do drift schema↔migrations.
+   (P1 da F10 — segundo writer de SEND_MESSAGE — concluído na F11.)
 
 ## Achados de infraestrutura (mantidos)
 - Drift schema↔migrations (`Conversation_status_idx`, unique `Season(universeId, year)`, rename
@@ -66,9 +96,10 @@ Ver `AGENTS.md`. DEV read-only; TEST com cleanup; um commit por subfase; nunca a
 atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o handoff.
 
 ## Prompt de retomada
-"Leia `docs/HANDOFF.md`, `AGENTS.md`, `docs/post-v4-dialogue-engine-f9.md` e
-`docs/post-v4-dialogue-engine-f10.md`. Valide Git (branch, HEAD, working tree). F3–F9 concluídas
-e F10 concluída como análise; NÃO repita. Para verificar o engine, rode `pnpm benchmark:f9`.
-Para trabalho novo, escolha um item do backlog priorizado (P1 do ai-behavior primeiro) e trate
-como subfase própria (um commit, testes, HANDOFF). Não use amend e não faça push."
+"Leia `docs/HANDOFF.md`, `AGENTS.md`, `docs/post-v4-dialogue-engine-f9.md`,
+`docs/post-v4-dialogue-engine-f10.md` e `docs/post-v4-dialogue-engine-f11.md`. Valide Git
+(branch, HEAD, working tree). F3–F9 concluídas, F10 concluída como análise e F11 concluída
+(unificação do AI Behavior); NÃO repita. Para verificar o engine, rode `pnpm benchmark:f9`.
+Para trabalho novo, escolha um item do backlog priorizado e trate como subfase própria (um
+commit, testes, HANDOFF). Não use amend e não faça push."
 
