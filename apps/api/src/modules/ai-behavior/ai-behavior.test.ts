@@ -10,8 +10,6 @@ import type {
   ProviderInput,
   ProviderOutput,
 } from "../generation/generation.assembly.js";
-import { OllamaProviderError } from "../generation/ollama-provider.js";
-import { AI_BEHAVIOR_INSTRUCTION } from "./ai-behavior.service.js";
 
 type TestUser = { cookie: string; userId: string };
 
@@ -49,15 +47,6 @@ function generatedProvider(capture?: {
         text: "resposta espontanea",
         tokenStats: stats(input),
       };
-    },
-  };
-}
-
-function failingProvider(error: OllamaProviderError): GenerationProvider {
-  return {
-    name: "spy-fail",
-    async run(): Promise<ProviderOutput> {
-      throw error;
     },
   };
 }
@@ -178,6 +167,14 @@ async function createFixture(
     }
     seasonId = season.id;
     raceId = race.id;
+  } else {
+    await prisma.worldState.create({
+      data: {
+        universeId: universe.id,
+        key: "default",
+        currentDate: new Date("2026-10-01T00:00:00.000Z"),
+      },
+    });
   }
 
   return {
@@ -355,9 +352,8 @@ describe("AI Behavior (Fase 9)", () => {
     await app.close();
   });
 
-  it("executa SEND_MESSAGE pelo pipeline de geração e persiste a mensagem", async () => {
-    const capture: { input?: ProviderInput; calls: number } = { calls: 0 };
-    const app = buildApp(undefined, generatedProvider(capture));
+  it("executa SEND_MESSAGE pelo Dialogue Engine e persiste via Command Layer", async () => {
+    const app = buildApp();
     await app.ready();
     const user = await createDbUser("execute");
     const fixture = await createFixture(user.userId);
@@ -375,35 +371,95 @@ describe("AI Behavior (Fase 9)", () => {
     expect(decision.status).toBe("EXECUTED");
     expect(decision.executedMessageId).toBeTruthy();
 
-    const messages = await prisma.message.findMany({
-      where: { conversationId: fixture.conversationId },
+    const aiMessage = await prisma.message.findFirst({
+      where: {
+        conversationId: fixture.conversationId,
+        senderType: "AI_CHARACTER",
+      },
+      orderBy: { createdAt: "desc" },
     });
-    const aiMessage = messages.find((m) => m.senderType === "AI_CHARACTER");
-    expect(aiMessage?.content).toBe("resposta espontanea");
     expect(aiMessage?.characterId).toBe(fixture.aiCharacterId);
-    expect(aiMessage?.contextJson).not.toBeNull();
+    expect(aiMessage?.content.trim().length).toBeGreaterThan(0);
 
-    expect(capture.calls).toBe(1);
-    expect(capture.input?.userPrompt).toBe(AI_BEHAVIOR_INSTRUCTION);
-    expect(capture.input?.systemPrompt.length).toBeGreaterThan(0);
+    const context = (aiMessage?.contextJson ?? {}) as Record<string, unknown>;
+    const language = (context.language ?? {}) as Record<string, unknown>;
+    const behavior = (context.behavior ?? {}) as Record<string, unknown>;
+    expect(language.provider).toBe("dialogue-realizer");
+    expect(behavior.reasonCode).toBeTruthy();
+    expect(context.family).toBeUndefined();
+    expect(context.generationKey).toBeUndefined();
+
+    const official = await prisma.aiDecision.findFirst({
+      where: {
+        characterId: fixture.aiCharacterId,
+        status: "EXECUTED",
+        metadata: { path: ["trigger"], equals: "CONVERSATION_TURN_DUE" },
+      },
+      select: { executedMessageId: true, metadata: true },
+    });
+    expect(official?.executedMessageId).toBe(aiMessage?.id);
+    expect(
+      (official?.metadata as Record<string, unknown> | undefined)?.llmUsed,
+    ).toBe(false);
 
     await app.close();
   });
 
-  it("registra falha do provider sem criar estado parcial", async () => {
-    const app = buildApp(
-      undefined,
-      failingProvider(new OllamaProviderError("network", "rede indisponível")),
-    );
+  it("rejeita execução quando o executor não participa da conversa alvo", async () => {
+    const app = buildApp();
     await app.ready();
-    const user = await createDbUser("provider-fail");
+    const user = await createDbUser("acl-execute");
+    const fixture = await createFixture(user.userId);
+
+    const conversation = await prisma.conversation.create({
+      data: { type: "GROUP", title: "Sem o executor" },
+    });
+    createdConversationIds.push(conversation.id);
+    await prisma.conversationParticipant.create({
+      data: {
+        conversationId: conversation.id,
+        characterId: fixture.userCharacterId,
+      },
+    });
+    const manipulated = await prisma.aiDecision.create({
+      data: {
+        universeId: fixture.universeId,
+        characterId: fixture.aiCharacterId,
+        status: "DECIDED",
+        actionType: "SEND_MESSAGE",
+        conversationId: conversation.id,
+        contextVersion: "ai-behavior.v1",
+      },
+    });
+
+    const execution = await execute(app, user, manipulated.id);
+    expect(execution.statusCode).toBe(200);
+    expect(execution.json().decision.status).toBe("REJECTED");
+    expect(execution.json().decision.policyCode).toBe("TARGET_NOT_FOUND");
+    expect(
+      await prisma.message.count({ where: { conversationId: conversation.id } }),
+    ).toBe(0);
+
+    await app.close();
+  });
+
+  it("rejeição do engine não cria estado parcial", async () => {
+    const app = buildApp();
+    await app.ready();
+    const user = await createDbUser("engine-reject");
     const fixture = await createFixture(user.userId);
 
     const evaluated = await evaluate(app, user, fixture.aiCharacterId);
+    await prisma.characterAvailability.upsert({
+      where: { characterId: fixture.aiCharacterId },
+      update: { status: "OFFLINE" },
+      create: { characterId: fixture.aiCharacterId, status: "OFFLINE" },
+    });
+
     const execution = await execute(app, user, evaluated.json().decision.id);
     expect(execution.statusCode).toBe(200);
-    expect(execution.json().decision.status).toBe("FAILED");
-    expect(execution.json().decision.policyCode).toBe("PROVIDER_ERROR");
+    expect(execution.json().decision.status).toBe("REJECTED");
+    expect(execution.json().decision.policyCode).toBe("EXECUTION_REJECTED");
 
     const messages = await prisma.message.count({
       where: { conversationId: fixture.conversationId },
@@ -413,75 +469,26 @@ describe("AI Behavior (Fase 9)", () => {
     await app.close();
   });
 
-  it("registra timeout e output malformado como falha sanitizada", async () => {
-    const app = buildApp(
-      undefined,
-      failingProvider(new OllamaProviderError("timeout", "timeout interno")),
-    );
+  it("rejeição é sanitizada e não deixa estado parcial", async () => {
+    const app = buildApp();
     await app.ready();
-    const user = await createDbUser("timeout");
+    const user = await createDbUser("sanitized");
     const fixture = await createFixture(user.userId);
 
     const evaluated = await evaluate(app, user, fixture.aiCharacterId);
+    await prisma.worldState.deleteMany({ where: { universeId: fixture.universeId } });
+
     const execution = await execute(app, user, evaluated.json().decision.id);
-    expect(execution.json().decision.status).toBe("FAILED");
-    expect(execution.json().decision.policyCode).toBe("PROVIDER_TIMEOUT");
-    expect(JSON.stringify(execution.json())).not.toContain("timeout interno");
+    expect(execution.statusCode).toBe(200);
+    expect(execution.json().decision.status).toBe("REJECTED");
+    expect(execution.json().decision.policyCode).toBe("PRECONDITION_FAILED");
+    expect(JSON.stringify(execution.json())).not.toContain(
+      "WorldState sem currentDate",
+    );
+    expect(
+      await prisma.message.count({ where: { conversationId: fixture.conversationId } }),
+    ).toBe(0);
 
-    const malformedAi = await prisma.character.create({
-      data: {
-        name: "AI Malformado",
-        nationality: "Brazil",
-        birthDate: new Date("2000-01-01"),
-        userId: user.userId,
-        universeId: fixture.universeId,
-        controlledBy: "AI",
-      },
-    });
-    const malformedUser = await prisma.character.create({
-      data: {
-        name: "User Malformado",
-        nationality: "Brazil",
-        birthDate: new Date("2000-01-01"),
-        userId: user.userId,
-        universeId: fixture.universeId,
-        controlledBy: "USER",
-      },
-    });
-    const malformedConversation = await prisma.conversation.create({
-      data: { type: "GROUP", title: "Malformado" },
-    });
-    createdConversationIds.push(malformedConversation.id);
-    await prisma.conversationParticipant.createMany({
-      data: [
-        { conversationId: malformedConversation.id, characterId: malformedAi.id },
-        { conversationId: malformedConversation.id, characterId: malformedUser.id },
-      ],
-    });
-
-    const malformedApp = buildApp(
-      undefined,
-      failingProvider(
-        new OllamaProviderError("malformed_response", "chunk inválido"),
-      ),
-    );
-    await malformedApp.ready();
-    const malformedEvaluated = await evaluate(
-      malformedApp,
-      user,
-      malformedAi.id,
-    );
-    const malformedExecution = await execute(
-      malformedApp,
-      user,
-      malformedEvaluated.json().decision.id,
-    );
-    expect(malformedExecution.json().decision.status).toBe("FAILED");
-    expect(malformedExecution.json().decision.policyCode).toBe(
-      "PROVIDER_ERROR",
-    );
-
-    await malformedApp.close();
     await app.close();
   });
 
@@ -557,22 +564,7 @@ describe("AI Behavior (Fase 9)", () => {
   });
 
   it("mantém execução única sob concorrência (avaliação e execução duplas)", async () => {
-    let delay = false;
-    const provider: GenerationProvider = {
-      name: "slow",
-      async run(input) {
-        if (delay) {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        }
-        return {
-          provider: "slow",
-          mode: "generated",
-          text: "concorrente",
-          tokenStats: stats(input),
-        };
-      },
-    };
-    const app = buildApp(undefined, provider);
+    const app = buildApp();
     await app.ready();
     const user = await createDbUser("concurrent");
     const fixture = await createFixture(user.userId);
@@ -584,7 +576,6 @@ describe("AI Behavior (Fase 9)", () => {
     expect(firstEvaluation.statusCode).toBe(200);
     expect(secondEvaluation.statusCode).toBe(200);
 
-    delay = true;
     const [firstExecution, secondExecution] = await Promise.all([
       execute(app, user, firstEvaluation.json().decision.id),
       execute(app, user, secondEvaluation.json().decision.id),
@@ -596,7 +587,11 @@ describe("AI Behavior (Fase 9)", () => {
     expect(statuses).toEqual([200, 409]);
 
     const executedCount = await prisma.aiDecision.count({
-      where: { characterId: fixture.aiCharacterId, status: "EXECUTED" },
+      where: {
+        characterId: fixture.aiCharacterId,
+        status: "EXECUTED",
+        contextVersion: "ai-behavior.v1",
+      },
     });
     expect(executedCount).toBe(1);
     const messages = await prisma.message.count({

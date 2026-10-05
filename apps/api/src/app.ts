@@ -165,9 +165,7 @@ export function buildApp(
   void app.register(profileRoutes, { storageProvider });
   void app.register(mediaRoutes, { storageProvider });
   void app.register(newsRoutes);
-  void app.register(aiBehaviorRoutes, {
-    provider: generationProvider ?? nullProvider,
-  });
+  void app.register(aiBehaviorRoutes);
   void app.register(evolutionRoutes);
   void app.register(raceWeekendRoutes);
   void app.register(teamPerformanceRoutes);

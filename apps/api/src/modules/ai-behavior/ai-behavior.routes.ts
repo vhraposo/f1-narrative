@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
 
-import type { GenerationProvider } from "../generation/generation.assembly.js";
 import {
   evaluateCharacterBehavior,
   executeCharacterDecision,
@@ -9,10 +8,6 @@ import {
   recoverStaleExecutions,
 } from "./ai-behavior.service.js";
 import { AiBehaviorError } from "./ai-behavior.policy.js";
-
-export interface AiBehaviorRoutesOptions {
-  provider: GenerationProvider;
-}
 
 const evaluateBodySchema = z
   .object({
@@ -41,8 +36,8 @@ async function sendBehaviorError(reply: FastifyReply, error: unknown) {
   throw error;
 }
 
-export const aiBehaviorRoutes: FastifyPluginAsync<AiBehaviorRoutesOptions> =
-  async (fastify, options) => {
+export const aiBehaviorRoutes: FastifyPluginAsync =
+  async (fastify) => {
     fastify.post(
       "/api/ai-behavior/evaluate",
       { preHandler: [fastify.authenticate] },
@@ -84,7 +79,6 @@ export const aiBehaviorRoutes: FastifyPluginAsync<AiBehaviorRoutesOptions> =
           const decision = await executeCharacterDecision(
             request.user!.id,
             parsed.data.decisionId,
-            options.provider,
           );
           return reply.send({ decision });
         } catch (error) {

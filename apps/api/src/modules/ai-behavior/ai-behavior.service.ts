@@ -3,12 +3,7 @@ import type { AiDecision } from "@prisma/client";
 import { prisma } from "../../infrastructure/database/prisma.js";
 import { ensureUniverse } from "../universe/universe.service.js";
 import { createEventWithDerivations } from "../events/event-create.js";
-import {
-  assembleGenerationBundle,
-  type GenerationProvider,
-} from "../generation/generation.assembly.js";
-import { persistGeneratedMessage } from "../generation/generation-persist.js";
-import { OllamaProviderError } from "../generation/ollama-provider.js";
+import { simulateConversationTurn } from "../conversation/conversation.simulation.js";
 import { buildBehaviorContext, decideBehavior } from "./ai-behavior.decide.js";
 import {
   AiBehaviorError,
@@ -22,9 +17,6 @@ import {
 } from "./ai-behavior.policy.js";
 
 const WORLD_KEY = "default";
-
-export const AI_BEHAVIOR_INSTRUCTION =
-  "Continue a conversa de forma coerente com o contexto narrativo. Não invente fatos, resultados ou declarações de terceiros.";
 
 export const AI_EXECUTING_STALE_MS = 15 * 60_000;
 
@@ -112,7 +104,6 @@ export async function listCharacterDecisions(
 export async function executeCharacterDecision(
   userId: string,
   decisionId: string,
-  provider: GenerationProvider,
 ): Promise<AiDecisionView> {
   const decision = await prisma.aiDecision.findUnique({
     where: { id: decisionId },
@@ -205,24 +196,12 @@ export async function executeCharacterDecision(
 
   try {
     if (actionType === "SEND_MESSAGE") {
-      return await executeSendMessage(
-        userId,
-        character.id,
-        universeId,
-        decision,
-        provider,
-      );
+      return await executeSendMessage(userId, character.id, universeId, decision);
     }
     return await executeCreateEvent(userId, universeId, decision);
   } catch (error) {
     const policyCode =
-      error instanceof AiBehaviorError
-        ? error.code
-        : error instanceof OllamaProviderError
-          ? error.category === "timeout"
-            ? "PROVIDER_TIMEOUT"
-            : "PROVIDER_ERROR"
-          : "EXECUTION_FAILED";
+      error instanceof AiBehaviorError ? error.code : "EXECUTION_FAILED";
     const failed = await prisma.aiDecision.update({
       where: { id: decision.id },
       data: {
@@ -239,7 +218,6 @@ async function executeSendMessage(
   characterId: string,
   universeId: string,
   decision: AiDecision,
-  provider: GenerationProvider,
 ): Promise<AiDecisionView> {
   if (!decision.conversationId) {
     throw new AiBehaviorError(
@@ -255,30 +233,42 @@ async function executeSendMessage(
     characterId,
     userId,
   );
-
-  const result = await assembleGenerationBundle(
-    prisma,
-    {
-      conversationId: target.conversationId,
-      userId,
-      userPrompt: AI_BEHAVIOR_INSTRUCTION,
-      targetCharacterId: characterId,
-    },
-    provider,
-  );
-
-  const persisted = await persistGeneratedMessage(prisma, result, userId);
-  if (!persisted.persisted) {
+  const worldState = await prisma.worldState.findUnique({
+    where: { universeId_key: { universeId, key: WORLD_KEY } },
+    select: { currentDate: true },
+  });
+  if (!worldState?.currentDate) {
     throw new AiBehaviorError(
-      persisted.reason.toUpperCase().replace(/-/g, "_"),
-      "Resposta não pôde ser persistida",
+      "PRECONDITION_FAILED",
+      "WorldState sem currentDate",
+      409,
+    );
+  }
+
+  const simulation = await simulateConversationTurn(target.conversationId, {
+    userId,
+    worldDate: worldState.currentDate,
+    maxDepth: 1,
+    opportunity: {
+      conversationId: target.conversationId,
+      characterId,
+      targetCharacterId: null,
+      fingerprint: decision.id,
+      windowStart: worldState.currentDate.toISOString(),
+    },
+  });
+  const step = simulation.steps[0];
+  if (!simulation.executed || !step) {
+    throw new AiBehaviorError(
+      "EXECUTION_REJECTED",
+      simulation.stopReason,
       409,
     );
   }
 
   const updated = await prisma.aiDecision.update({
     where: { id: decision.id },
-    data: { status: "EXECUTED", executedMessageId: persisted.message.id },
+    data: { status: "EXECUTED", executedMessageId: step.messageId },
   });
   return toDecisionView(updated);
 }
