@@ -7,7 +7,8 @@
 - Working tree: limpo (após commit deste HANDOFF)
 - **F9 concluída (Benchmark Gate)**; **F10 concluída (análise)**; **F11 concluída (unificação do
   AI Behavior)**; **F12 concluída (presença/availability efetiva no runtime)**; **F13 concluída
-  como análise (streaming: sem implementação por falta de benefício real)**.
+  como análise (streaming: sem implementação por falta de benefício real)**; **F14 concluída
+  (CREATE_EVENT: writer único já existia; correção pequena de atomicidade)**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -73,6 +74,21 @@
   fingerprint reutilizados; desconexão sem estado parcial/rollback.
 - Benchmark F9 reexecutado: PASS (12/12); último checkpoint verde de código é o da F12.
 
+## F14 — conclusão (detalhes em docs/post-v4-dialogue-engine-f14.md)
+- Inventário: **writer único de Event** = `createEventWithDerivations`
+  (`events/event-create.ts`: Event + EventCharacter + News + EventEvolution), usado pela rota HTTP,
+  world-simulation, Command Layer oficial (`behavior.commands.ts`) e AI Behavior. Não há segundo
+  writer; o problema do F11 não existe para Event.
+- AI Behavior é um command path legado próprio (decisão `ai-behavior.v1`), mas usa o mesmo domain
+  service; não foi unificado ao `behavior.commands.ts` porque isso mudaria a semântica do Event
+  (título/conteúdo). `CREATE_EVENT` NÃO foi roteado para o Dialogue Engine.
+- Correção aplicada (Opção A): `executeCreateEvent` agora cria Event + marca `AiDecision`
+  EXECUTED/`executedEventId` na MESMA transação (antes eram duas), eliminando Event sem decisão
+  EXECUTED e duplicata em retry. Teste de concorrência de CREATE_EVENT + asserções de causalidade
+  e de "zero Event" em rejeição.
+- Commit `826e492`; API full 212/2959 verde; benchmark F9 PASS antes/depois; web verde (sem
+  alteração web).
+
 ## Roadmap concluído (commits reais)
 F3: F3.1–F3.5 (HEAD F3.5 `b0f7b8b`); docs `docs/post-v4-dialogue-engine-f3.md`.
 F5: F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
@@ -84,7 +100,8 @@ F9: gate `199b098`; doc `7c9b417`.
 F10: análise `c9eee60`.
 F11: F11.1 `d392196`; docs `c190018`.
 F12: F12.1 `3e0ad46`; docs `94ff8f1`.
-F13: análise `post-v4-dialogue-engine-f13.md`; docs/HANDOFF neste commit (sem código).
+F13: análise `post-v4-dialogue-engine-f13.md`; docs `392bdff` (sem código).
+F14: F14.1 `826e492`; docs/HANDOFF neste commit.
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -105,8 +122,12 @@ F13: análise `post-v4-dialogue-engine-f13.md`; docs/HANDOFF neste commit (sem c
 - F11 regression: `ai-behavior` 13/13 (Command Layer/dialogue-realizer/llmUsed=false intactos).
 - F13 (análise, sem código): `pnpm benchmark:f9` → PASS (12/12); suítes completas não
   reexecutadas porque nenhum arquivo de código foi alterado (checkpoint F12 permanece válido).
+- F14 (código): foco `ai-behavior+behavior+events` 135/135; API full **212 files / 2959 tests**
+  verdes; web 70/519 + tsc/lint/build; `pnpm benchmark:f9` PASS antes e depois.
 
 ## Flakes observados
+- F14: uma execução do foco (`ai-behavior+behavior+events`) falhou 1 teste sob pressão; rerun
+  135/135 e API full 100% verde — não reproduzido, não atribuído à F14.
 - F12: nenhum flake novo; `pilot-knowledge.provision.test.ts #4` não reproduziu no full.
 - Histórico: `pilot-knowledge.provision #4` (falhou no full na F11, passa isolado; documentado
   desde F6); `world-progression`/`biography.lifecycle`/`conversation.autonomous #13` falharam uma
@@ -119,11 +140,13 @@ F13: análise `post-v4-dialogue-engine-f13.md`; docs/HANDOFF neste commit (sem c
 2. Presença em tempo real (sessão/websocket/heartbeat) — só existe presença de domínio hoje
    (F12); exige infraestrutura nova e requisito de UX.
 3. Virtualização de mensagens/auto-resize/skeletons; evals de performance/latência.
-4. `CREATE_EVENT` do ai-behavior via pipeline oficial (opcional; hoje writer direto de Event).
+4. Alinhar atomicidade de `executeSendMessage` (update da decisão legada fora das txs do engine;
+   mesma classe do gap corrigido na F14 para CREATE_EVENT) — item pequeno futuro.
 5. Derivação automática de RACE_WEEKEND/status via Schedule/WorldState (F12 deixou manual).
 6. Guarda semântica de secret (se necessária); sincronização do drift schema↔migrations.
    (P1 da F10 — segundo writer — concluído na F11; presença de domínio na F12; streaming
-   analisado e não implementado na F13.)
+   analisado/não implementado na F13; CREATE_EVENT investigado e atomicidade corrigida na F14 —
+   unificação com o Command Layer oficial descartada por mudança semântica do Event.)
 
 ## Achados de infraestrutura (mantidos)
 - Drift schema↔migrations (`Conversation_status_idx`, unique `Season(universeId, year)`, rename
@@ -137,12 +160,10 @@ Ver `AGENTS.md`. DEV read-only; TEST com cleanup; um commit por subfase; nunca a
 atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o handoff.
 
 ## Prompt de retomada
-"Leia `docs/HANDOFF.md`, `AGENTS.md`, `docs/post-v4-dialogue-engine-f9.md`,
-`docs/post-v4-dialogue-engine-f10.md`, `docs/post-v4-dialogue-engine-f11.md`,
-`docs/post-v4-dialogue-engine-f12.md` e `docs/post-v4-dialogue-engine-f13.md`. Valide Git
-(branch, HEAD, working tree). F3–F9 concluídas, F10 análise, F11 (unificação do AI Behavior),
-F12 (presença/availability efetiva) e F13 (streaming: análise-only, não implementar) concluídas;
-NÃO repita. Para verificar o engine, rode `pnpm benchmark:f9`. Para trabalho novo, escolha um
-item do backlog priorizado e trate como subfase própria (um commit, testes, HANDOFF). Não use
-amend e não faça push."
+"Leia `docs/HANDOFF.md`, `AGENTS.md` e os docs `docs/post-v4-dialogue-engine-f9.md` a
+`docs/post-v4-dialogue-engine-f14.md`. Valide Git (branch, HEAD, working tree). F3–F9
+concluídas, F10 análise, F11 (AI Behavior), F12 (presença), F13 (streaming: não implementar) e
+F14 (CREATE_EVENT: writer único + atomicidade) concluídas; NÃO repita. Para verificar o engine,
+rode `pnpm benchmark:f9`. Para trabalho novo, escolha um item do backlog priorizado e trate como
+subfase própria (um commit, testes, HANDOFF). Não use amend e não faça push."
 
