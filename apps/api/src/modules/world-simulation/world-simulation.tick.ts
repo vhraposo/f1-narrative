@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { resolveEffectiveAvailabilityStatus } from "../availability/availability.policy.js";
 import { createEventWithDerivations } from "../events/event-create.js";
 import { processRaceConsequences } from "../race-consequences/race-consequences.service.js";
 import {
@@ -214,7 +215,7 @@ export async function runSimulationTick(input: {
         character: {
           select: {
             name: true,
-            availability: { select: { status: true } },
+            availability: { select: { status: true, until: true } },
           },
         },
       },
@@ -240,7 +241,14 @@ export async function runSimulationTick(input: {
     const perCharacter = new Map<string, number>();
 
     for (const schedule of schedules) {
-      const status = schedule.character.availability?.status;
+      // F12 — a janela `until` é avaliada no horário da atividade agendada;
+      // status temporário expirado não bloqueia a agenda.
+      const status = schedule.character.availability
+        ? resolveEffectiveAvailabilityStatus(
+            schedule.character.availability,
+            schedule.startsAt,
+          )
+        : null;
       if (status && UNAVAILABLE_STATUSES.has(status)) {
         summary.skippedUnavailable += 1;
         continue;

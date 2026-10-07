@@ -1,6 +1,7 @@
 import type { CharacterController, ConversationStatus, MessageSenderType } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { isAvailabilityOpen } from "../availability/availability.policy.js";
 import {
   CONVERSATION_TURN_PLAN_VERSION,
   conversationTurnLimits,
@@ -207,7 +208,7 @@ export async function planTurnForConversation(
               name: true,
               controlledBy: true,
               universeId: true,
-              availability: { select: { status: true } },
+              availability: { select: { status: true, until: true } },
             },
           },
         },
@@ -241,10 +242,7 @@ export async function planTurnForConversation(
       name: character.name,
       controller: character.controlledBy,
       universeId: character.universeId,
-      available:
-        !character.availability ||
-        character.availability.status === "AVAILABLE" ||
-        character.availability.status === "RACE_WEEKEND",
+      available: isAvailabilityOpen(character.availability, options.worldDate),
     }));
 
   const messages = [...conversation.messages].reverse();

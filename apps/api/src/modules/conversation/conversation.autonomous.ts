@@ -1,6 +1,7 @@
 import type { CharacterController, ConversationStatus, MessageSenderType } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { isAvailabilityOpen } from "../availability/availability.policy.js";
 import { assembleGenerationBundle, type GenerationProvider } from "../generation/generation.assembly.js";
 import { evaluateBehaviorDecision } from "../behavior/behavior.decision.js";
 import { executeBehaviorDecision } from "../behavior/behavior.execution.js";
@@ -87,7 +88,7 @@ export async function runAutonomousConversationTurn(
               controlledBy: true,
               universeId: true,
               userId: true,
-              availability: { select: { status: true } },
+              availability: { select: { status: true, until: true } },
             },
           },
         },
@@ -113,6 +114,26 @@ export async function runAutonomousConversationTurn(
     .map((participant) => participant.character)
     .sort((a, b) => a.id.localeCompare(b.id));
   const messages = [...conversation.messages].reverse();
+
+  // F12 — o relógio do engine é resolvido ANTES do planner para que a
+  // disponibilidade efetiva (janela `until`) seja determinística e idêntica
+  // à usada pelo domain gate no mesmo turno.
+  const universeId =
+    participants
+      .map((character) => character.universeId)
+      .find((value): value is string => typeof value === "string") ?? null;
+  const resolvedWorldDate =
+    options.worldDate ??
+    (universeId
+      ? (
+          await prisma.worldState.findUnique({
+            where: { universeId_key: { universeId, key: "default" } },
+            select: { currentDate: true },
+          })
+        )?.currentDate ?? null
+      : null);
+  const planningReferenceDate = resolvedWorldDate ?? new Date();
+
   const plan = planConversationTurn({
     status: conversation.status as ConversationStatus,
     participants: participants.map((character) => ({
@@ -120,10 +141,7 @@ export async function runAutonomousConversationTurn(
       name: character.name,
       controller: character.controlledBy as CharacterController,
       universeId: character.universeId,
-      available:
-        !character.availability ||
-        character.availability.status === "AVAILABLE" ||
-        character.availability.status === "RACE_WEEKEND",
+      available: isAvailabilityOpen(character.availability, planningReferenceDate),
     })),
     messages: messages.map((message) => ({
       senderType: message.senderType as MessageSenderType,
@@ -131,7 +149,7 @@ export async function runAutonomousConversationTurn(
       content: message.content,
       createdAt: message.createdAt,
     })),
-    worldDate: options.worldDate ?? new Date(),
+    worldDate: planningReferenceDate,
     limits,
   });
 
@@ -153,17 +171,10 @@ export async function runAutonomousConversationTurn(
       ? (messages[messages.length - 1]?.characterId ?? options.targetCharacterId ?? null)
       : plan.targetCharacterId;
 
-  const worldDate =
-    options.worldDate ??
-    (
-      await prisma.worldState.findUnique({
-        where: { universeId_key: { universeId: speaker.universeId, key: "default" } },
-        select: { currentDate: true },
-      })
-    )?.currentDate;
-  if (!worldDate) {
+  if (!resolvedWorldDate) {
     throw new ConversationAutonomousError("PRECONDITION_FAILED", "WorldState sem currentDate", 400);
   }
+  const worldDate = resolvedWorldDate;
 
   const lastMessage = messages[messages.length - 1] ?? null;
   const userPrompt = [

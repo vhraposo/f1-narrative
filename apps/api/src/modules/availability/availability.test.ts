@@ -283,6 +283,47 @@ describe("Availability - PATCH", () => {
     expect(res.json().code).toBe("VALIDATION_ERROR");
   });
 
+  it("mudança de status sem until descarta a janela anterior", async () => {
+    const until = "2099-01-01T00:00:00.000Z";
+    await app.inject({
+      method: "PATCH",
+      url: `/api/characters/${character.id}/availability`,
+      headers: { cookie: owner.cookie },
+      payload: { status: "BUSY", until },
+    });
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/characters/${character.id}/availability`,
+      headers: { cookie: owner.cookie },
+      payload: { status: "OFFLINE" },
+    });
+    expect(res.statusCode).toBe(200);
+    const { availability } = res.json() as { availability: Availability };
+    expect(availability.status).toBe("OFFLINE");
+    expect(availability.until).toBeNull();
+  });
+
+  it("atualização apenas de reason preserva status e janela", async () => {
+    const until = "2099-01-01T00:00:00.000Z";
+    await app.inject({
+      method: "PATCH",
+      url: `/api/characters/${character.id}/availability`,
+      headers: { cookie: owner.cookie },
+      payload: { status: "BUSY", until },
+    });
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/characters/${character.id}/availability`,
+      headers: { cookie: owner.cookie },
+      payload: { reason: "viagem" },
+    });
+    expect(res.statusCode).toBe(200);
+    const { availability } = res.json() as { availability: Availability };
+    expect(availability.status).toBe("BUSY");
+    expect(availability.reason).toBe("viagem");
+    expect(availability.until).toBe(until);
+  });
+
   it("atualização parcial preserva campos não enviados", async () => {
     await app.inject({
       method: "PATCH",

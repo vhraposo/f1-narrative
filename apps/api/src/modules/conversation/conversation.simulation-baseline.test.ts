@@ -229,4 +229,52 @@ describe("Fase 2.2 — baseline social e regressao de zero resposta", () => {
     const body = response.json() as PlanBody;
     expect(body.plan.planned).toEqual([]);
   });
+
+  it("H) janela de indisponibilidade expirada libera o planner", async () => {
+    const conversation = await prisma.conversation.create({
+      data: {
+        type: "GROUP",
+        status: "ACTIVE",
+        participants: { create: [{ characterId: aiBId }] },
+        messages: {
+          create: {
+            senderType: "USER_CHARACTER",
+            characterId: userCharacterId,
+            content: "bom dia",
+          },
+        },
+      },
+    });
+    createdConversationIds.push(conversation.id);
+
+    const untilFuture = new Date("2026-10-01T13:00:00.000Z");
+    await prisma.characterAvailability.upsert({
+      where: { characterId: aiBId },
+      update: { status: "OFFLINE", until: untilFuture },
+      create: { characterId: aiBId, status: "OFFLINE", until: untilFuture },
+    });
+    const blocked = await app.inject({
+      method: "POST",
+      url: `/api/conversations/${conversation.id}/simulate-turn/plan`,
+      headers: { cookie },
+      payload: { worldDate: "2026-10-01T12:00:00.000Z" },
+      remoteAddress: "10.22.1.6",
+    });
+    expect(blocked.statusCode).toBe(200);
+    expect((blocked.json() as PlanBody).plan.planned).toEqual([]);
+
+    await prisma.characterAvailability.update({
+      where: { characterId: aiBId },
+      data: { until: new Date("2026-10-01T11:00:00.000Z") },
+    });
+    const released = await app.inject({
+      method: "POST",
+      url: `/api/conversations/${conversation.id}/simulate-turn/plan`,
+      headers: { cookie },
+      payload: { worldDate: "2026-10-01T12:00:00.000Z" },
+      remoteAddress: "10.22.1.7",
+    });
+    expect(released.statusCode).toBe(200);
+    expect((released.json() as PlanBody).plan.planned.length).toBeGreaterThanOrEqual(1);
+  });
 });

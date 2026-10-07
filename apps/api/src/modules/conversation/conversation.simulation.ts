@@ -1,6 +1,7 @@
 ﻿import type { CharacterController, MessageSenderType } from "@prisma/client";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { isAvailabilityOpen } from "../availability/availability.policy.js";
 import { runAutonomousConversationTurn, type AutonomousTurnResult } from "./conversation.autonomous.js";
 import { conversationTurnLimits } from "./conversation.policy.js";
 import {
@@ -153,6 +154,7 @@ type PlanInput = {
 async function loadPlanInput(
   conversationId: string,
   userId: string,
+  referenceDate: Date | null = null,
 ): Promise<PlanInput | null> {
   const limits = conversationTurnLimits();
   const conversation = await prisma.conversation.findUnique({
@@ -168,7 +170,7 @@ async function loadPlanInput(
               controlledBy: true,
               universeId: true,
               userId: true,
-              availability: { select: { status: true } },
+              availability: { select: { status: true, until: true } },
             },
           },
         },
@@ -201,6 +203,8 @@ async function loadPlanInput(
     conversation.participants
       .map((participant) => participant.character.universeId)
       .find((value): value is string => typeof value === "string") ?? "unknown";
+  const availabilityReference =
+    referenceDate ?? messages[messages.length - 1]?.createdAt ?? null;
 
   return {
     conversationId,
@@ -209,10 +213,10 @@ async function loadPlanInput(
       characterId: participant.character.id,
       name: participant.character.name,
       controller: participant.character.controlledBy as CharacterController,
-      available:
-        !participant.character.availability ||
-        participant.character.availability.status === "AVAILABLE" ||
-        participant.character.availability.status === "RACE_WEEKEND",
+      available: isAvailabilityOpen(
+        participant.character.availability,
+        availabilityReference,
+      ),
     })),
     messages: messages.map((message) => ({
       id: message.id,
@@ -435,7 +439,7 @@ export async function getSimulationPlan(
     readonly opportunity?: OpportunityEnvelopeSeed;
   },
 ): Promise<SimulationPlan> {
-  const input = await loadPlanInput(conversationId, options.userId);
+  const input = await loadPlanInput(conversationId, options.userId, options.worldDate ?? null);
   if (!input) {
     const energy = evaluateConversationEnergy({
       message: "",
@@ -635,7 +639,7 @@ export async function simulateConversationTurn(
     return { executed: false, stopReason, depth: 0, steps, selection, plan };
   }
 
-  const initialInput = await loadPlanInput(conversationId, options.userId);
+  const initialInput = await loadPlanInput(conversationId, options.userId, options.worldDate ?? null);
   if (!initialInput) {
     return { executed: false, stopReason: "CONVERSATION_INACTIVE", depth: 0, steps, selection, plan };
   }
@@ -854,7 +858,7 @@ export async function simulateConversationTurn(
     reactions < plan.window.maxReactions &&
     stopReason !== "CONVERSATION_INACTIVE"
   ) {
-    const input = await loadPlanInput(conversationId, options.userId);
+    const input = await loadPlanInput(conversationId, options.userId, options.worldDate ?? null);
     if (!input) {
       stopReason = "CONVERSATION_INACTIVE";
       break;

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { resolveEffectiveAvailability } from "../availability/availability.policy.js";
 import { retrieveRelevantMemories } from "../memory/memory.retrieval.js";
 import {
   BEHAVIOR_CONTEXT_VERSION_PREFIX,
@@ -128,6 +129,8 @@ export async function buildBehaviorContext(
         select: { id: true, activity: true, startsAt: true, endsAt: true },
       }),
     ]);
+
+  const effectiveAvailability = resolveEffectiveAvailability(availability, request.worldDate);
 
   const scheduleDue = schedules
     .filter(
@@ -296,7 +299,9 @@ export async function buildBehaviorContext(
     limit: MAX_MEMORIES,
   });
 
-  if (!availability) omitted.push({ section: "AVAILABILITY", reason: "NO_AVAILABILITY_RECORD" });
+  if (!effectiveAvailability) {
+    omitted.push({ section: "AVAILABILITY", reason: "NO_AVAILABILITY_RECORD" });
+  }
   if (memories.length === 0) omitted.push({ section: "MEMORY", reason: "NO_ACTIVE_MEMORY" });
   if (experiences.length === 0) {
     omitted.push({ section: "EXPERIENCE", reason: "NO_ACTIVE_EXPERIENCE" });
@@ -375,7 +380,7 @@ export async function buildBehaviorContext(
       })),
     },
     conversation,
-    availability,
+    availability: effectiveAvailability,
     schedule: { due: scheduleDue, upcoming: scheduleUpcoming },
     news: { recent: news },
   };

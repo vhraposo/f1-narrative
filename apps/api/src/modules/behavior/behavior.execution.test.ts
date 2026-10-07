@@ -261,6 +261,32 @@ describe("behavior commands and execution (V4.1)", () => {
     });
   });
 
+  it("4b) indisponibilidade com janela expirada é tratada como disponível", async () => {
+    await prisma.characterAvailability.update({
+      where: { characterId: aiCharacterId },
+      data: { status: "OFFLINE", until: new Date("2026-09-30T00:00:00.000Z") },
+    });
+    try {
+      const result = await evaluateBehaviorDecision(
+        request({
+          trigger: "MESSAGE_RECEIVED",
+          userInitiated: true,
+          conversationId,
+        }),
+      );
+      expect(result.selected.actionType).toBe("RESPOND");
+      const respond = result.candidates.find((candidate) => candidate.actionType === "RESPOND");
+      expect(respond?.failedPreconditions).not.toContain("AVAILABILITY_OPEN");
+      const execution = await executeBehaviorDecision(result.decisionId);
+      expect(execution.status).toBe("EXECUTED");
+    } finally {
+      await prisma.characterAvailability.update({
+        where: { characterId: aiCharacterId },
+        data: { status: "AVAILABLE", until: null },
+      });
+    }
+  });
+
   it("5) character USER em trigger autônomo não executa nada", async () => {
     const result = await evaluateBehaviorDecision(
       request({

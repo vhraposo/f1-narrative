@@ -294,6 +294,27 @@ describe("world narrative simulation tick (V4.5)", () => {
     expect(body.ticks.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("9) indisponibilidade com janela expirada não bloqueia a agenda", async () => {
+    await createSchedule(
+      unavailableCharacterId,
+      "entrevista pós-corrida",
+      new Date("2026-10-10T09:00:00.000Z"),
+    );
+    await prisma.characterAvailability.update({
+      where: { characterId: unavailableCharacterId },
+      data: { status: "OFFLINE", until: new Date("2026-10-10T08:00:00.000Z") },
+    });
+    const result = await runSimulationTick({
+      universeId,
+      fromDate: new Date("2026-10-10T00:00:00.000Z"),
+      toDate: new Date("2026-10-11T00:00:00.000Z"),
+    });
+    createdTickIds.push(result.tickId);
+    expect(result.status).toBe("COMPLETED");
+    expect(result.summary?.skippedUnavailable).toBe(0);
+    expect(result.summary?.eventsCreated).toBe(1);
+  });
+
   it("8) outro usuário não acessa ticks do Universe", async () => {
     const otherEmail = `${PREFIX}-other-${Date.now()}@f1nw.test`;
     const signUp = await app.inject({
