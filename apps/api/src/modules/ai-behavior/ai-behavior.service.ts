@@ -339,8 +339,11 @@ async function executeCreateEvent(
     select: { currentDate: true },
   });
 
-  const created = await prisma.$transaction((tx) =>
-    createEventWithDerivations(
+  // F14 — Event e AiDecision na MESMA transação (mesmo padrão do Command Layer
+  // oficial em behavior.execution.ts): nunca existe Event sem a decisão
+  // EXECUTED nem decisão EXECUTED sem Event.
+  const updated = await prisma.$transaction(async (tx) => {
+    const created = await createEventWithDerivations(
       tx,
       {
         type: "SOCIAL",
@@ -359,12 +362,11 @@ async function executeCreateEvent(
         },
       },
       participants,
-    ),
-  );
-
-  const updated = await prisma.aiDecision.update({
-    where: { id: decision.id },
-    data: { status: "EXECUTED", executedEventId: created.id },
+    );
+    return tx.aiDecision.update({
+      where: { id: decision.id },
+      data: { status: "EXECUTED", executedEventId: created.id },
+    });
   });
   return toDecisionView(updated);
 }

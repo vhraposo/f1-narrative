@@ -605,6 +605,44 @@ describe("AI Behavior (Fase 9)", () => {
     await app.close();
   });
 
+  it("execução concorrente de CREATE_EVENT não duplica Event", async () => {
+    const app = buildApp();
+    await app.ready();
+    const user = await createDbUser("event-concurrent");
+    const fixture = await createFixture(user.userId, { withRace: true });
+
+    const evaluated = await evaluate(app, user, fixture.aiCharacterId);
+    const decision = evaluated.json().decision;
+    expect(decision.actionType).toBe("CREATE_EVENT");
+
+    const [first, second] = await Promise.all([
+      execute(app, user, decision.id),
+      execute(app, user, decision.id),
+    ]);
+    const statuses = [first.statusCode, second.statusCode].sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const executed = await prisma.aiDecision.findUniqueOrThrow({
+      where: { id: decision.id },
+    });
+    expect(executed.status).toBe("EXECUTED");
+    expect(executed.executedEventId).not.toBeNull();
+    createdEventIds.push(executed.executedEventId as string);
+
+    const events = await prisma.event.count({
+      where: {
+        payload: { path: ["raceId"], equals: fixture.raceId as string },
+        AND: [
+          { payload: { path: ["origin"], equals: "ai_behavior" } },
+          { payload: { path: ["characterId"], equals: fixture.aiCharacterId } },
+        ],
+      },
+    });
+    expect(events).toBe(1);
+
+    await app.close();
+  });
+
   it("rejeita target de outro Universe e decisão manipulada", async () => {
     const app = buildApp(undefined, generatedProvider());
     await app.ready();
@@ -648,6 +686,16 @@ describe("AI Behavior (Fase 9)", () => {
     expect(invalidExecution.json().decision.policyCode).toBe(
       "TARGET_NOT_IN_UNIVERSE",
     );
+    const leakedEvents = await prisma.event.count({
+      where: {
+        payload: { path: ["raceId"], equals: otherFixture.raceId as string },
+        AND: [
+          { payload: { path: ["origin"], equals: "ai_behavior" } },
+          { payload: { path: ["characterId"], equals: fixture.aiCharacterId } },
+        ],
+      },
+    });
+    expect(leakedEvents).toBe(0);
 
     await app.close();
   });
@@ -680,6 +728,7 @@ describe("AI Behavior (Fase 9)", () => {
     expect(payload.origin).toBe("ai_behavior");
     expect(payload.universeId).toBe(fixture.universeId);
     expect(payload.raceId).toBe(fixture.raceId);
+    expect(payload.decisionId).toBe(decision.id);
 
     const memory = await prisma.memory.findFirst({
       where: { eventId },
