@@ -6,7 +6,8 @@
   (F12); docs/HANDOFF deste ciclo neste commit.
 - Working tree: limpo (após commit deste HANDOFF)
 - **F9 concluída (Benchmark Gate)**; **F10 concluída (análise)**; **F11 concluída (unificação do
-  AI Behavior)**; **F12 concluída (presença/availability efetiva no runtime)**.
+  AI Behavior)**; **F12 concluída (presença/availability efetiva no runtime)**; **F13 concluída
+  como análise (streaming: sem implementação por falta de benefício real)**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -14,8 +15,8 @@
 - Presença (F12): `CharacterAvailability` é a intenção persistida (status + janela `until`); o
   estado efetivo é derivado pelo helper `availability.policy.ts` no relógio do engine (worldDate/
   última mensagem/`WorldState.currentDate`/`schedule.startsAt`). Sem segundo estado/migration.
-- Próximo passo: escolher item do backlog abaixo (nenhum P0/P1 aberto de escrita paralela ou
-  estado obsoleto).
+- Próximo passo: escolher item do backlog abaixo (nenhum P0/P1 aberto de escrita paralela,
+  estado obsoleto ou transporte pendente).
 
 ## F10 — conclusão (detalhes em docs/post-v4-dialogue-engine-f10.md)
 - Análise sem alteração de código (Caso 1/3): a experiência de Conversas já usa o engine
@@ -58,6 +59,20 @@
 - Fora do escopo: presença em tempo real (sessão/websocket), availability visível para terceiros,
   derivação de RACE_WEEKEND via WorldState/Eventos.
 
+## F13 — conclusão (detalhes em docs/post-v4-dialogue-engine-f13.md)
+- `F13 — ANALYSIS COMPLETE — NO IMPLEMENTATION REQUIRED`: nenhum arquivo de código alterado.
+- Motivo: o realizer determinístico produz a utterance completa em memória e
+  `simulateConversationTurn` só retorna após validar/persistir todos os steps; streamar texto
+  exigiria sleeps artificiais (proibidos) ou seria replay do que a mutation já devolve. Sem
+  benefício real de UX; complexidade (SSE + event sink + testes + cliente) desproporcional.
+- `/turn`, `/turn/stream` e `/generate` permanecem legado dormente (provider LLM +
+  `persistGeneratedMessage`); NÃO religar. UI não usa streaming (grep app/components vazio;
+  teste do composer afirma ausência de `/turn`/`/turn/stream`).
+- Design futuro seguro documentado: SSE consumindo o MESMO `simulateConversationTurn`, eventos
+  somente após validator + Command Layer; transporte sem autoridade de escrita; ACL/cooldown/
+  fingerprint reutilizados; desconexão sem estado parcial/rollback.
+- Benchmark F9 reexecutado: PASS (12/12); último checkpoint verde de código é o da F12.
+
 ## Roadmap concluído (commits reais)
 F3: F3.1–F3.5 (HEAD F3.5 `b0f7b8b`); docs `docs/post-v4-dialogue-engine-f3.md`.
 F5: F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
@@ -68,7 +83,8 @@ F8: F8.1 `f58b41e`, F8.2 `8fff7bd`, F8.3 `5fc7470`, F8.4 `ebfca63`, F8.5 `83caa9
 F9: gate `199b098`; doc `7c9b417`.
 F10: análise `c9eee60`.
 F11: F11.1 `d392196`; docs `c190018`.
-F12: F12.1 `3e0ad46`; docs/HANDOFF neste commit.
+F12: F12.1 `3e0ad46`; docs `94ff8f1`.
+F13: análise `post-v4-dialogue-engine-f13.md`; docs/HANDOFF neste commit (sem código).
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -87,6 +103,8 @@ F12: F12.1 `3e0ad46`; docs/HANDOFF neste commit.
   (F12 não alterou web).
 - Banco: TEST (`f1_narrative_test`) com fixtures/cleanup; DEV intocado; nenhuma migration.
 - F11 regression: `ai-behavior` 13/13 (Command Layer/dialogue-realizer/llmUsed=false intactos).
+- F13 (análise, sem código): `pnpm benchmark:f9` → PASS (12/12); suítes completas não
+  reexecutadas porque nenhum arquivo de código foi alterado (checkpoint F12 permanece válido).
 
 ## Flakes observados
 - F12: nenhum flake novo; `pilot-knowledge.provision.test.ts #4` não reproduziu no full.
@@ -95,14 +113,17 @@ F12: F12.1 `3e0ad46`; docs/HANDOFF neste commit.
   vez sob pressão na F11 e passaram isoladas. Nenhum é atribuído a F11/F12.
 
 ## Backlog futuro (priorizado)
-1. Streaming como transporte do realizer determinístico (somente com requisito real de UX).
+1. Streaming como transporte — **decidido na F13: não implementar** enquanto o realizer for
+   determinístico/instantâneo e sem requisito de UX para cadeias ao vivo. Se reaberto: SSE
+   sobre o MESMO `simulateConversationTurn` (design na F13); NÃO religar `/turn/stream` legado.
 2. Presença em tempo real (sessão/websocket/heartbeat) — só existe presença de domínio hoje
    (F12); exige infraestrutura nova e requisito de UX.
 3. Virtualização de mensagens/auto-resize/skeletons; evals de performance/latência.
 4. `CREATE_EVENT` do ai-behavior via pipeline oficial (opcional; hoje writer direto de Event).
 5. Derivação automática de RACE_WEEKEND/status via Schedule/WorldState (F12 deixou manual).
 6. Guarda semântica de secret (se necessária); sincronização do drift schema↔migrations.
-   (P1 da F10 — segundo writer — concluído na F11; presença de domínio concluída na F12.)
+   (P1 da F10 — segundo writer — concluído na F11; presença de domínio na F12; streaming
+   analisado e não implementado na F13.)
 
 ## Achados de infraestrutura (mantidos)
 - Drift schema↔migrations (`Conversation_status_idx`, unique `Season(universeId, year)`, rename
@@ -117,10 +138,11 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md`, `AGENTS.md`, `docs/post-v4-dialogue-engine-f9.md`,
-`docs/post-v4-dialogue-engine-f10.md`, `docs/post-v4-dialogue-engine-f11.md` e
-`docs/post-v4-dialogue-engine-f12.md`. Valide Git (branch, HEAD, working tree). F3–F9
-concluídas, F10 análise, F11 (unificação do AI Behavior) e F12 (presença/availability efetiva)
-concluídas; NÃO repita. Para verificar o engine, rode `pnpm benchmark:f9`. Para trabalho novo,
-escolha um item do backlog priorizado e trate como subfase própria (um commit, testes, HANDOFF).
-Não use amend e não faça push."
+`docs/post-v4-dialogue-engine-f10.md`, `docs/post-v4-dialogue-engine-f11.md`,
+`docs/post-v4-dialogue-engine-f12.md` e `docs/post-v4-dialogue-engine-f13.md`. Valide Git
+(branch, HEAD, working tree). F3–F9 concluídas, F10 análise, F11 (unificação do AI Behavior),
+F12 (presença/availability efetiva) e F13 (streaming: análise-only, não implementar) concluídas;
+NÃO repita. Para verificar o engine, rode `pnpm benchmark:f9`. Para trabalho novo, escolha um
+item do backlog priorizado e trate como subfase própria (um commit, testes, HANDOFF). Não use
+amend e não faça push."
 
