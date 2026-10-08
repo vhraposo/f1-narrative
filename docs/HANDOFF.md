@@ -353,6 +353,11 @@ residuais são condicionados a requisito de produto (paginação/virtualização
    unificação com o Command Layer oficial descartada por mudança semântica do Event.)
 
 ## Achados de infraestrutura (mantidos)
+- DEV estava 3 migrations atrás (`add_conversation_visibility`, `add_event_visibility`,
+  `align_schema_migrations`) → HTTP 500 em `GET/POST /api/conversations` (coluna `visibility`
+  ausente no banco). Corrigido com `npx prisma migrate deploy` (47 migrations, up to date) e
+  validado end-to-end (GET 200 / POST 201). Aplicar migrations pendentes no DEV após pull:
+  `npx prisma migrate deploy` (a partir da raiz).
 - Drift schema↔migrations resolvido na F18 (`20261008210000_align_schema_migrations`; `migrate
   diff` vazio; unique `Season(universeId, year)` aplicada no TEST). DEV intocado.
 - `prisma migrate dev` interativo; migrations via `migrate deploy` em TEST (F18 gerou a migration
