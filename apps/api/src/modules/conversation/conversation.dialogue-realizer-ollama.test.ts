@@ -202,6 +202,7 @@ describe("F22.2 — provider Ollama do Dialogue Realizer (stub, sem rede)", () =
           echoMode: "FORBIDDEN",
           emojiMode: "OFF",
           lengthMode: "SHORT",
+          selfDisclosureMode: "ENCOURAGED",
           nameMode: "KNOWN_ONLY",
           actionClaimMode: "FORBIDDEN",
         },

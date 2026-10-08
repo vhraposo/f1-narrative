@@ -20,12 +20,14 @@ function strategyFor(overrides: {
   emotionTone?: Parameters<typeof deriveDialogueResponseStrategy>[0]["emotionTone"];
   voice?: Partial<typeof VOICE>;
   replyToContent?: string | null;
+  relationshipAffinity?: number | null;
 }) {
   return deriveDialogueResponseStrategy({
     intent: overrides.intent,
     emotionTone: overrides.emotionTone ?? null,
     voice: { ...VOICE, ...overrides.voice },
     replyToContent: overrides.replyToContent ?? null,
+    relationshipAffinity: overrides.relationshipAffinity ?? null,
   });
 }
 
@@ -86,6 +88,19 @@ describe("F22.3 — DialogueResponseStrategy (efêmera e determinística)", () =
     const strategy = strategyFor({ intent: "REACTION" });
     expect(strategy.nameMode).toBe("KNOWN_ONLY");
     expect(strategy.actionClaimMode).toBe("FORBIDDEN");
+  });
+
+  it("selfDisclosureMode: FORBIDDEN em perguntas, ENCOURAGED com relação próxima", () => {
+    expect(strategyFor({ intent: "QUESTION" }).selfDisclosureMode).toBe("FORBIDDEN");
+    expect(strategyFor({ intent: "SUPPORT", relationshipAffinity: 0.9 }).selfDisclosureMode).toBe(
+      "ENCOURAGED",
+    );
+    expect(strategyFor({ intent: "SUPPORT", relationshipAffinity: 0.2 }).selfDisclosureMode).toBe(
+      "OPTIONAL",
+    );
+    expect(strategyFor({ intent: "REACTION", relationshipAffinity: 0.9 }).selfDisclosureMode).toBe(
+      "OPTIONAL",
+    );
   });
 
   it("mesma entrada produz exatamente a mesma estratégia", () => {

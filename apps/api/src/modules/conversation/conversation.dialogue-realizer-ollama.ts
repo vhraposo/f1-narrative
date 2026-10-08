@@ -45,8 +45,13 @@ export function buildOllamaRealizerPrompt(context: DialogueRealizerContext): {
             ? "pode se estender um pouco"
             : "resposta normal",
         strategy.emojiMode === "OFF" ? "sem emoji" : "emoji opcional",
+        strategy.selfDisclosureMode === "FORBIDDEN"
+          ? null
+          : "pode compartilhar algo próprio quando fizer sentido, sem obrigação",
         "não afirme executar ações externas (verificar sistema, previsão, agenda)",
-      ].join("; ")
+      ]
+        .filter((line): line is string => line !== null)
+        .join("; ")
     : null;
   const lines = [
     section("PERSONAGEM", context.speakerName),

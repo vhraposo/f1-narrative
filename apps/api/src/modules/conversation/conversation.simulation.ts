@@ -742,6 +742,7 @@ export async function simulateConversationTurn(
       emotionTone: dialogueContext.emotion?.tone ?? null,
       voice,
       replyToContent: replyTarget?.content ?? null,
+      relationshipAffinity: dialogueContext.relationship.affinity,
     });
     const context = buildDialogueRealizerContext({
       speakerCharacterId: input.candidate.characterId,

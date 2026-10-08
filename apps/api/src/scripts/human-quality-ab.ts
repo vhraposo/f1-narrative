@@ -79,6 +79,7 @@ function makeContext(overrides: Partial<DialogueRealizerContext>): DialogueReali
       emotionTone: overrides.emotion?.tone ?? null,
       voice,
       replyToContent,
+      relationshipAffinity: overrides.relationshipAffinity ?? 0.6,
     });
   const memorySummaries = curateDialogueMemories(overrides.memorySummaries ?? [], {
     recentTexts: (overrides.recentMessages ?? [{ speakerName: "Kimi", content: "bom dia" }]).map(
