@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Bot, CornerUpLeft, UserRoundCog } from "lucide-react";
 
 import { CharacterAvatar } from "@/components/conversations/character-avatar";
@@ -50,7 +51,7 @@ function ReplyPreview({
 
 // Espelho da MessageBubble: a identidade (alinhamento/avatar/nome) vem do
 // senderType REAL, nunca inferida pela aparência ou por controlledBy.
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   message,
   author,
   showHeader = true,
@@ -132,4 +133,4 @@ export function MessageBubble({
       </div>
     </li>
   );
-}
+});

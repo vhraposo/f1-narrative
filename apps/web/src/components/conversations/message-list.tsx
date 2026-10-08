@@ -5,6 +5,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -16,12 +17,7 @@ import {
   useConversationMessages,
   useConversationParticipants,
 } from "@/hooks/use-conversations";
-import {
-  formatChatDay,
-  messageReplyToId,
-  type ConversationParticipant,
-  type Message,
-} from "@/lib/conversations";
+import { formatChatDay, messageReplyToId } from "@/lib/conversations";
 
 type MessageListProps = {
   conversationId: string;
@@ -30,14 +26,6 @@ type MessageListProps = {
 };
 
 const NEAR_BOTTOM_PX = 120;
-
-function findAuthor(
-  participants: ConversationParticipant[],
-  message: Message,
-): ConversationParticipant | null {
-  if (!message.characterId) return null;
-  return participants.find((p) => p.id === message.characterId) ?? null;
-}
 
 function isNearBottom(el: HTMLElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
@@ -120,6 +108,50 @@ export function MessageList({
     requestAnimationFrame(() => scrollToBottom());
   }, [scrollToBottomSignal, scrollToBottom]);
 
+  const participantsById = useMemo(
+    () => new Map(participants.map((participant) => [participant.id, participant])),
+    [participants],
+  );
+
+  const messageById = useMemo(
+    () => new Map(messages.map((message) => [message.id, message])),
+    [messages],
+  );
+
+  const rows = useMemo(
+    () =>
+      messages.map((message, index) => {
+        const previous = messages[index - 1];
+        const showDay =
+          !previous || !sameChatDay(previous.createdAt, message.createdAt);
+        const showHeader =
+          showDay ||
+          !previous ||
+          previous.characterId !== message.characterId ||
+          previous.senderType !== message.senderType;
+        const replyToId = messageReplyToId(message);
+        const replyTarget = replyToId ? messageById.get(replyToId) : undefined;
+        const replyTo: MessageReplyPreview | null = replyTarget
+          ? {
+              authorName:
+                participantsById.get(replyTarget.characterId ?? "")?.name ??
+                "Personagem",
+              content: replyTarget.content,
+            }
+          : null;
+        return {
+          message,
+          author: message.characterId
+            ? (participantsById.get(message.characterId) ?? null)
+            : null,
+          showDay,
+          showHeader,
+          replyTo,
+        };
+      }),
+    [messages, messageById, participantsById],
+  );
+
   if (messagesQuery.isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -160,52 +192,30 @@ export function MessageList({
     );
   }
 
-  const messageById = new Map(messages.map((message) => [message.id, message]));
-
   return (
     <>
       <ul ref={listRef} className="flex flex-col py-3" data-testid="message-list">
-        {messages.map((message, index) => {
-          const previous = messages[index - 1];
-          const showDay =
-            !previous ||
-            !sameChatDay(previous.createdAt, message.createdAt);
-          const showHeader =
-            showDay ||
-            !previous ||
-            previous.characterId !== message.characterId ||
-            previous.senderType !== message.senderType;
-          const replyToId = messageReplyToId(message);
-          const replyTarget = replyToId ? messageById.get(replyToId) : undefined;
-          const replyTo: MessageReplyPreview | null = replyTarget
-            ? {
-                authorName:
-                  findAuthor(participants, replyTarget)?.name ?? "Personagem",
-                content: replyTarget.content,
-              }
-            : null;
-          return (
-            <Fragment key={message.id}>
-              {showDay && (
-                <li
-                  role="separator"
-                  aria-label={`Mensagens de ${formatChatDay(message.createdAt)}`}
-                  className="sticky top-0 z-10 flex justify-center px-4 py-1.5"
-                >
-                  <span className="rounded-full border border-border bg-background/90 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur">
-                    {formatChatDay(message.createdAt)}
-                  </span>
-                </li>
-              )}
-              <MessageBubble
-                message={message}
-                author={findAuthor(participants, message)}
-                showHeader={showHeader}
-                replyTo={replyTo}
-              />
-            </Fragment>
-          );
-        })}
+        {rows.map(({ message, author, showDay, showHeader, replyTo }) => (
+          <Fragment key={message.id}>
+            {showDay && (
+              <li
+                role="separator"
+                aria-label={`Mensagens de ${formatChatDay(message.createdAt)}`}
+                className="sticky top-0 z-10 flex justify-center px-4 py-1.5"
+              >
+                <span className="rounded-full border border-border bg-background/90 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur">
+                  {formatChatDay(message.createdAt)}
+                </span>
+              </li>
+            )}
+            <MessageBubble
+              message={message}
+              author={author}
+              showHeader={showHeader}
+              replyTo={replyTo}
+            />
+          </Fragment>
+        ))}
       </ul>
       {unseenCount > 0 && (
         <div className="pointer-events-none sticky bottom-3 z-20 flex justify-center px-4">
