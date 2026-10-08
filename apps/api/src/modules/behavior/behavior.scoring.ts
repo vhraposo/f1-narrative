@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { CharacterGoalKind } from "@prisma/client";
 
+import { isOpenAvailabilityStatus } from "../availability/availability.policy.js";
 import type {
   BehaviorActionType,
   BehaviorCandidate,
@@ -209,8 +210,8 @@ function availabilityBonus(
   actionType: BehaviorActionType,
 ): number {
   if (actionType === "NO_ACTION") return 0;
-  const status = context.availability?.status;
-  return status === "AVAILABLE" || status === "RACE_WEEKEND"
+  if (!context.availability) return 0;
+  return isOpenAvailabilityStatus(context.availability.status)
     ? BEHAVIOR_SCORE_WEIGHTS.availabilityBonus
     : 0;
 }

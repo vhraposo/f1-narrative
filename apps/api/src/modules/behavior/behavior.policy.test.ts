@@ -234,4 +234,28 @@ describe("behavior policy (deterministic)", () => {
       expect(Array.isArray(candidate.consequencesPreview)).toBe(true);
     }
   });
+
+  it("11) RACE_WEEKEND mantém AVAILABILITY_OPEN e bônus de disponibilidade", () => {
+    const context = withConversation(
+      makeContext({ availability: { status: "RACE_WEEKEND", reason: null, until: null } }),
+      true,
+    );
+    const result = evaluateBehaviorPolicy(context, makeRequest());
+    expect(result.selected.actionType).toBe("RESPOND");
+    const respond = result.candidates.find((candidate) => candidate.actionType === "RESPOND");
+    expect(respond?.failedPreconditions).not.toContain("AVAILABILITY_OPEN");
+    expect(result.selected.scoreBreakdown.availabilityBonus).toBeGreaterThan(0);
+
+    const closed = withConversation(
+      makeContext({ availability: { status: "OFFLINE", reason: null, until: null } }),
+      true,
+    );
+    const closedResult = evaluateBehaviorPolicy(closed, makeRequest());
+    const closedRespond = closedResult.candidates.find(
+      (candidate) => candidate.actionType === "RESPOND",
+    );
+    expect(closedRespond?.failedPreconditions).toContain("AVAILABILITY_OPEN");
+    expect(closedRespond?.scoreBreakdown.availabilityBonus).toBe(0);
+    expect(closedResult.selected.actionType).not.toBe("RESPOND");
+  });
 });

@@ -1,3 +1,4 @@
+import { isOpenAvailabilityStatus } from "../availability/availability.policy.js";
 import {
   actionFingerprint,
   cooldownKey,
@@ -49,12 +50,6 @@ function hasRelationshipWith(context: BehaviorContextView, targetId: string | nu
   return context.relationships.entries.some((entry) => entry.otherCharacterId === targetId);
 }
 
-function isAvailabilityOpen(context: BehaviorContextView): boolean {
-  const status = context.availability?.status;
-  if (!status) return true;
-  return status === "AVAILABLE" || status === "RACE_WEEKEND";
-}
-
 function hasSignificantExperience(context: BehaviorContextView): boolean {
   return context.experience.recent.some(
     (experience) => experience.salience === "HIGH" || experience.salience === "CRITICAL",
@@ -84,7 +79,7 @@ function evaluatePrecondition(
     case "CHARACTER_IS_PARTICIPANT":
       return context.conversation?.isParticipant === true;
     case "AVAILABILITY_OPEN":
-      return isAvailabilityOpen(context);
+      return isOpenAvailabilityStatus(context.availability?.status);
     case "RELATIONSHIP_TARGET_PRESENT":
       return hasRelationshipWith(context, candidate.targetCharacterId);
     case "SIGNIFICANT_EXPERIENCE_PRESENT":

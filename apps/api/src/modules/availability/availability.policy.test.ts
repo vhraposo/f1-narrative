@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isAvailabilityOpen,
+  isOpenAvailabilityStatus,
   resolveEffectiveAvailability,
   resolveEffectiveAvailabilityStatus,
 } from "./availability.policy.js";
@@ -61,6 +62,16 @@ describe("availability.policy (F12 - presença efetiva)", () => {
     expect(isAvailabilityOpen({ status: "RACE_WEEKEND", until: null }, REFERENCE)).toBe(true);
     for (const status of ["BUSY", "TRAINING", "TRAVELING", "SLEEPING", "OFFLINE"] as const) {
       expect(isAvailabilityOpen({ status, until: null }, REFERENCE)).toBe(false);
+    }
+  });
+
+  it("isOpenAvailabilityStatus centraliza a regra (F17)", () => {
+    expect(isOpenAvailabilityStatus(null)).toBe(true);
+    expect(isOpenAvailabilityStatus(undefined)).toBe(true);
+    expect(isOpenAvailabilityStatus("AVAILABLE")).toBe(true);
+    expect(isOpenAvailabilityStatus("RACE_WEEKEND")).toBe(true);
+    for (const status of ["BUSY", "TRAINING", "TRAVELING", "SLEEPING", "OFFLINE"] as const) {
+      expect(isOpenAvailabilityStatus(status)).toBe(false);
     }
   });
 });

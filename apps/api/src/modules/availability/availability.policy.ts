@@ -46,11 +46,18 @@ export function resolveEffectiveAvailabilityStatus(
   return resolveEffectiveAvailability(availability, referenceDate)?.status ?? null;
 }
 
+// F17 — regra canônica de "status aberto" (AVAILABLE/RACE_WEEKEND; sem status =
+// aberto), usada por todos os consumidores para não duplicar o literal.
+export function isOpenAvailabilityStatus(status: string | null | undefined): boolean {
+  if (!status) return true;
+  return status === "AVAILABLE" || status === "RACE_WEEKEND";
+}
+
 export function isAvailabilityOpen(
   availability: AvailabilityWindow | null | undefined,
   referenceDate: Date | null | undefined,
 ): boolean {
-  const status = resolveEffectiveAvailabilityStatus(availability, referenceDate);
-  if (!status) return true;
-  return status === "AVAILABLE" || status === "RACE_WEEKEND";
+  return isOpenAvailabilityStatus(
+    resolveEffectiveAvailabilityStatus(availability, referenceDate),
+  );
 }
