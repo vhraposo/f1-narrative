@@ -226,13 +226,18 @@ function voiceBucket(informality: number): number {
   return 0;
 }
 
+function isLowEnergyTone(context: DialogueRealizerContext): boolean {
+  const tone = context.emotion?.tone;
+  return tone === "SAD" || tone === "TENSE";
+}
+
 function pickPhrase(context: DialogueRealizerContext, policy: IntentRealizationPolicy): string {
   const affinity = context.relationshipAffinity;
   const lowAffinity = affinity !== null && affinity <= 0.3;
   let pool = policy.phrases;
   if (context.intent === "REACTION" && context.replyToContent?.includes("?") && policy.questionPhrases) {
     pool = policy.questionPhrases;
-  } else if (lowAffinity && policy.neutralPhrases) {
+  } else if ((lowAffinity || isLowEnergyTone(context)) && policy.neutralPhrases) {
     pool = policy.neutralPhrases;
   }
   const seed = [
@@ -254,7 +259,7 @@ function applyVoice(text: string, context: DialogueRealizerContext): string {
   const emojiAllowed =
     context.voice.emojiTendency >= 0.6 ||
     (affinity !== null && affinity >= 0.7 && context.voice.emojiTendency >= 0.3);
-  if (!emojiAllowed) return text;
+  if (!emojiAllowed || isLowEnergyTone(context)) return text;
   if (/(?:😂|❤️|😭)/u.test(text)) return text;
   if (context.intent === "SUPPORT" && context.voice.warmth >= 0.6) return `${text} ❤️`;
   if (context.intent === "JOKE" || context.intent === "TEASE" || context.intent === "REACTION") {
