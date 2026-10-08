@@ -12,8 +12,9 @@
   como análise (SEND_MESSAGE: separação transacional intencional; sem correção necessária)**;
   **F16 concluída como análise (RACE_WEEKEND: intenção do dono; fase de weekend já derivada em
   outro domínio; sem correção necessária)**;   **F17 concluída (consolidação da regra de abertura
-  de availability; sem mudança de comportamento)**; **F18 concluída (drift schema↔migrations
-  alinhado; unique `Season(universeId, year)` aplicada no TEST)**.
+  de availability; sem mudança de comportamento)**;   **F18 concluída (drift schema↔migrations
+  alinhado; unique `Season(universeId, year)` aplicada no TEST)**; **F19 concluída como análise
+  (presença em tempo real: single-player, sem consumidor; não implementar)**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -143,6 +144,18 @@
 - DEV intocado; schema sem alteração; API full **212 files / 2961 tests — 100% verde**;
   benchmark F9 PASS antes/depois; web 519/519.
 
+## F19 — conclusão (detalhes em docs/post-v4-dialogue-engine-f19.md)
+- `F19 — ANALYSIS COMPLETE — NO IMPLEMENTATION REQUIRED`: nenhum arquivo de código alterado.
+- Produto é single-player (`Universe.userId @unique`, sem compartilhamento); personagens IA não têm
+  semântica de "online"; a única presença com fonte de verdade é a de domínio (F12). Não há
+  websocket/socket.io; só o heartbeat do SSE legado dormente (`/turn/stream`, F10/F13).
+- Modelo futuro documentado: atividade derivada on-read (`Message/Event/PilotExperience`), exibida
+  só para dados autorizados; transporte só com requisito (SSE como transporte, nunca engine);
+  NÃO persistir presença de IA nem religar `/turn/stream`.
+- Incidente de infra na fase: Docker Desktop parado → benchmark falhou com
+  `PrismaClientInitializationError`; restaurado (Docker Desktop + `f1nw-postgres` healthy) e
+  `F9 BENCHMARK GATE: PASS` (12/12). Sem mascarar.
+
 ## Roadmap concluído (commits reais)
 F3: F3.1–F3.5 (HEAD F3.5 `b0f7b8b`); docs `docs/post-v4-dialogue-engine-f3.md`.
 F5: F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
@@ -159,7 +172,8 @@ F14: F14.1 `826e492`; docs `2a4b6eb`.
 F15: análise `post-v4-dialogue-engine-f15.md`; docs `ab6147a` (sem código).
 F16: análise `post-v4-dialogue-engine-f16.md`; docs `332395c` (sem código).
 F17: F17.1 `038b54c`; docs `763c1ee`.
-F18: F18.1 `a5b60d1`; docs/HANDOFF neste commit.
+F18: F18.1 `a5b60d1`; docs `b992980`.
+F19: análise `post-v4-dialogue-engine-f19.md`; docs/HANDOFF neste commit (sem código).
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -191,6 +205,8 @@ F18: F18.1 `a5b60d1`; docs/HANDOFF neste commit.
 - F18 (db): `migrate diff` vazio após deploy; `migrate status` up to date (47 migrations);
   universe-init 16/16; API full **212 files / 2961 tests — 100% verde**; benchmark F9 PASS
   antes/depois; web `tsc`+519/519 (sem alteração web).
+- F19 (análise, sem código): benchmark F9 PASS (12/12) após restaurar Docker/Postgres; suítes
+  completas não reexecutadas (checkpoint F18 válido).
 
 ## Flakes observados
 - F17: 3 execuções full com flakes históricos (autonomous #13, pilot-knowledge #4; race-weekend/
@@ -206,8 +222,9 @@ F18: F18.1 `a5b60d1`; docs/HANDOFF neste commit.
 1. Streaming como transporte — **decidido na F13: não implementar** enquanto o realizer for
    determinístico/instantâneo e sem requisito de UX para cadeias ao vivo. Se reaberto: SSE
    sobre o MESMO `simulateConversationTurn` (design na F13); NÃO religar `/turn/stream` legado.
-2. Presença em tempo real (sessão/websocket/heartbeat) — só existe presença de domínio hoje
-   (F12); exige infraestrutura nova e requisito de UX.
+2. Presença em tempo real — **decidido na F19: não implementar** (single-player, sem consumidor;
+   IA sem semântica de online). Se reaberto: atividade derivada on-read (sem schema), transporte
+   só com requisito; NUNCA religar `/turn/stream`.
 3. Virtualização de mensagens/auto-resize/skeletons; evals de performance/latência.
 4. Auditoria exata decisão legada ↔ execução oficial (F15 concluiu que a separação é intencional;
    só reabrir se houver requisito de auditoria que justifique registrar correlação no metadata
@@ -224,6 +241,9 @@ F18: F18.1 `a5b60d1`; docs/HANDOFF neste commit.
   diff` vazio; unique `Season(universeId, year)` aplicada no TEST). DEV intocado.
 - `prisma migrate dev` interativo; migrations via `migrate deploy` em TEST (F18 gerou a migration
   a partir de `migrate diff --from-url`).
+- Docker Desktop precisa estar rodando para o TEST (`f1nw-postgres`); se o daemon cair, testes
+  falham com `PrismaClientInitializationError` (incidente da F19, restaurado com
+  `docker compose -f docker/docker-compose.yml up -d`).
 - `prisma generate` pode falhar com EPERM no engine DLL; verificar tipos gerados.
 - Web usa `.eslintrc.json` via `next lint` (ESLint 9 direto não acha config).
 
@@ -233,9 +253,9 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md`, `AGENTS.md` e os docs `docs/post-v4-dialogue-engine-f9.md` a
-`docs/post-v4-dialogue-engine-f18.md`. Valide Git (branch, HEAD, working tree). F3–F9
-concluídas, F10–F18 concluídas (F13/F15/F16 como análise; F11/F12/F14/F17/F18 com código); NÃO
-repita. Para verificar o engine, rode `pnpm benchmark:f9`. Para trabalho novo, escolha um item do
-backlog priorizado e trate como subfase própria (um commit, testes, HANDOFF). Não use amend e não
-faça push."
+`docs/post-v4-dialogue-engine-f19.md`. Valide Git (branch, HEAD, working tree). F3–F9
+concluídas, F10–F19 concluídas (F13/F15/F16/F19 como análise; F11/F12/F14/F17/F18 com código);
+NÃO repita. Garanta Docker Desktop/Postgres ativos. Para verificar o engine, rode
+`pnpm benchmark:f9`. Para trabalho novo, escolha um item do backlog priorizado e trate como
+subfase própria (um commit, testes, HANDOFF). Não use amend e não faça push."
 
