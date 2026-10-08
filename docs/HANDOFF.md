@@ -17,9 +17,9 @@
   (presença em tempo real: single-player, sem consumidor; não implementar)**;   **F20 concluída
   (performance da lista de mensagens: memoização; paginação/virtualização deferidas)**; **F21
   concluída (secret: sem caminho de vazamento; `.gitignore` endurecido para `.env.*`)**;
-  **F22 em andamento (qualidade conversacional) — F22.1–F22.4 concluídas (baseline/tone-aware,
-  LLM realizer experimental, response strategy + guardrails, curadoria de contexto/memória); LLM
-  NÃO promovido (default determinístico); roadmap F22.5–F22.8**.
+  **F22 em andamento (qualidade conversacional) — F22.1–F22.6 concluídas (baseline/tone-aware,
+  LLM realizer experimental, strategy+guardrails, curadoria, persona/relação, anti-repetição);
+  LLM NÃO promovido (default determinístico); restam F22.7–F22.8**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -214,8 +214,15 @@
   `measureDialogueContextBudget` + fronteira de conhecimento no prompt; A/B com curadoria
   aplicada (variância do `llama3.2` domina os agregados — ganho estrutural, sem claim de melhoria
   agregada).
-- Roadmap: F22.5 persona/relationship → F22.6 naturalness/diversity → F22.7 proactive → F22.8
-  avaliação final + promotion gate. Reavaliar promoção do LLM após F22.5/F22.6 com A/B repetido.
+- F22.5 concluída (commit `34218b7`; doc `docs/post-v4-dialogue-engine-f22-5.md`): projeção
+  determinística de relação/estilo (`describeRelationshipAffinity`/`describeVoiceStyle`) usada no
+  prompt; sem eixos inventados; determinístico já adaptava por voz/afinidade. API full 218/3003.
+- F22.6 concluída (commit desta subfase; doc `docs/post-v4-dialogue-engine-f22-6.md`):
+  anti-repetição determinística no `pickPhrase` (desvia de frase idêntica ao histórico recente) +
+  `measureRecentRepetition` (duplicateRate/openingRate). Foco 44/44; API full 3007 (1 flake
+  histórico); F9 PASS.
+- Roadmap: F22.7 proactive → F22.8 avaliação final + promotion gate. Reavaliar promoção do LLM
+  após F22.7/F22.8.
 - Validação F22.1: foco 7/7 + realizer 32/32 + conversation 454/454; API full **213 files /
   2968 tests — 100% verde**; benchmark F9 PASS antes/depois; sem migration.
 
@@ -239,7 +246,8 @@ F18: F18.1 `a5b60d1`; docs `b992980`.
 F19: análise `post-v4-dialogue-engine-f19.md`; docs `0ef21e6` (sem código).
 F20: F20.1 `0f32267`; docs `fd1c8c4`.
 F21: F21.1 `609f31d`; docs `e1c0ce2`.
-F22: F22.1 `f0f705f`; F22.2 `1157708`; F22.3 `cecc6b3`; F22.4 (commit desta subfase).
+F22: F22.1 `f0f705f`; F22.2 `1157708`; F22.3 `cecc6b3`; F22.4 `71ba1f1`; F22.5 `34218b7`;
+F22.6 (commit desta subfase).
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -288,6 +296,10 @@ F22: F22.1 `f0f705f`; F22.2 `1157708`; F22.3 `cecc6b3`; F22.4 (commit desta subf
 - F22.4 (API): foco curation+ollama 17/17; API full 3000 testes com 1 flake histórico
   (`pilot-knowledge #4`, verde isolado 13/13); benchmark F9 PASS; tsc/ESLint verdes; A/B com
   curadoria aplicada (variância do modelo documentada); web não alterada.
+- F22.5 (API): foco persona+ollama 16/16; API full **218 files / 3003 tests — 100% verde**;
+  benchmark F9 PASS; tsc/ESLint verdes; A/B reexecutado; web não alterada.
+- F22.6 (API): foco repetition+realizer+human-quality 44/44; API full 3007 testes com 1 flake
+  histórico; benchmark F9 PASS; tsc/ESLint verdes; A/B reexecutado; web não alterada.
 
 ## Flakes observados
 - F17: 3 execuções full com flakes históricos (autonomous #13, pilot-knowledge #4; race-weekend/
@@ -300,9 +312,8 @@ F22: F22.1 `f0f705f`; F22.2 `1157708`; F22.3 `cecc6b3`; F22.4 (commit desta subf
   vez sob pressão na F11 e passaram isoladas. Nenhum é atribuído a F11/F12.
 
 ## Programa ativo — F22 Human Conversation Quality
-F22.1–F22.4 concluídas. Ordem: F22.5 persona/relationship → F22.6 naturalness/diversity → F22.7
-proactive → F22.8 avaliação final + promotion gate. Detalhes em
-`docs/post-v4-dialogue-engine-f22*.md`.
+F22.1–F22.6 concluídas. Ordem: F22.7 proactive (iniciativa mínima no turno ativo) → F22.8
+avaliação final + promotion gate. Detalhes em `docs/post-v4-dialogue-engine-f22*.md`.
 
 ## Backlog futuro (priorizado)
 1. Streaming como transporte — **decidido na F13: não implementar** enquanto o realizer for
@@ -343,10 +354,10 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md`, `AGENTS.md` e os docs `docs/post-v4-dialogue-engine-f9.md` a
-`docs/post-v4-dialogue-engine-f22-4.md`. Valide Git (branch, HEAD, working tree). F3–F9
-concluídas, F10–F21 concluídas e F22 em andamento (F22.1–F22.4 concluídas; LLM realizer existe
-atrás de `DIALOGUE_REALIZER=llm` mas NÃO foi promovido; próximo passo F22.5 — persona/
-relationship); NÃO repita. Garanta Docker Desktop/Postgres ativos; Ollama é opcional (`npm run
+`docs/post-v4-dialogue-engine-f22-6.md`. Valide Git (branch, HEAD, working tree). F3–F9
+concluídas, F10–F21 concluídas e F22 em andamento (F22.1–F22.6 concluídas; LLM realizer existe
+atrás de `DIALOGUE_REALIZER=llm` mas NÃO foi promovido; próximo passo F22.7 — iniciativa);
+NÃO repita. Garanta Docker Desktop/Postgres ativos; Ollama é opcional (`npm run
 human-quality:ab`). Para verificar o engine, rode `pnpm benchmark:f9`. Não use amend e não faça
 push."
 

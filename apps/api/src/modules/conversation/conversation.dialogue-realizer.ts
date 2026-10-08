@@ -230,6 +230,16 @@ export function isGenericText(text: string): boolean {
   return GENERIC_PATTERNS.some((pattern) => pattern.test(text));
 }
 
+function normalizeForRepeat(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function seededIndex(seed: string, length: number): number {
   const digest = createHash("sha256").update(seed).digest();
   return digest.readUInt32BE(0) % Math.max(1, length);
@@ -268,7 +278,17 @@ function pickPhrase(context: DialogueRealizerContext, policy: IntentRealizationP
     if (withoutQuestions.length > 0) pool = withoutQuestions;
   }
   const index = (seededIndex(seed, pool.length) + voiceBucket(context.voice.informality)) % pool.length;
-  const candidate = pool[index] ?? pool[0] ?? "";
+  let candidate = pool[index] ?? pool[0] ?? "";
+  const recent = new Set(context.recentMessages.map((message) => normalizeForRepeat(message.content)));
+  if (recent.size > 0 && recent.has(normalizeForRepeat(candidate))) {
+    for (let step = 1; step < pool.length; step += 1) {
+      const alternative = pool[(index + step) % pool.length] ?? candidate;
+      if (!recent.has(normalizeForRepeat(alternative))) {
+        candidate = alternative;
+        break;
+      }
+    }
+  }
   if (candidate.length <= policy.maxChars) {
     if (context.strategy?.lengthMode === "SHORT" && candidate.length > 40) {
       return [...pool].sort((a, b) => a.length - b.length)[0] ?? candidate;
