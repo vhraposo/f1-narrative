@@ -13,8 +13,9 @@
   **F16 concluída como análise (RACE_WEEKEND: intenção do dono; fase de weekend já derivada em
   outro domínio; sem correção necessária)**;   **F17 concluída (consolidação da regra de abertura
   de availability; sem mudança de comportamento)**;   **F18 concluída (drift schema↔migrations
-  alinhado; unique `Season(universeId, year)` aplicada no TEST)**; **F19 concluída como análise
-  (presença em tempo real: single-player, sem consumidor; não implementar)**.
+  alinhado; unique `Season(universeId, year)` aplicada no TEST)**;   **F19 concluída como análise
+  (presença em tempo real: single-player, sem consumidor; não implementar)**; **F20 concluída
+  (performance da lista de mensagens: memoização; paginação/virtualização deferidas)**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -156,6 +157,18 @@
   `PrismaClientInitializationError`; restaurado (Docker Desktop + `f1nw-postgres` healthy) e
   `F9 BENCHMARK GATE: PASS` (12/12). Sem mascarar.
 
+## F20 — conclusão (detalhes em docs/post-v4-dialogue-engine-f20.md)
+- Auditoria de performance da UI de conversas: API `GET /messages` sem paginação
+  (`conversation.routes.ts:666-670`) e `MessageList` reconstruindo Map/scans por render com
+  `MessageBubble` sem memo.
+- Correção proporcional (commit `0f32267`): `MessageBubble` com `React.memo`; `MessageList` com
+  `participantsById`/`messageById`/`rows` via `useMemo` antes dos early returns; `findAuthor`
+  removido. Sem dependência nova, sem mudança de contrato/UX, sem comentários novos.
+- Deferido: paginação do histórico e virtualização (exigem requisito de produto/volume real);
+  CSS `content-visibility` descartado por afetar `scrollHeight`.
+- Validação: foco conversations 12/54; web full **70/519** + tsc/lint/build; benchmark F9 PASS
+  antes/depois (API intocada).
+
 ## Roadmap concluído (commits reais)
 F3: F3.1–F3.5 (HEAD F3.5 `b0f7b8b`); docs `docs/post-v4-dialogue-engine-f3.md`.
 F5: F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
@@ -173,7 +186,8 @@ F15: análise `post-v4-dialogue-engine-f15.md`; docs `ab6147a` (sem código).
 F16: análise `post-v4-dialogue-engine-f16.md`; docs `332395c` (sem código).
 F17: F17.1 `038b54c`; docs `763c1ee`.
 F18: F18.1 `a5b60d1`; docs `b992980`.
-F19: análise `post-v4-dialogue-engine-f19.md`; docs/HANDOFF neste commit (sem código).
+F19: análise `post-v4-dialogue-engine-f19.md`; docs `0ef21e6` (sem código).
+F20: F20.1 `0f32267`; docs/HANDOFF neste commit.
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -207,6 +221,8 @@ F19: análise `post-v4-dialogue-engine-f19.md`; docs/HANDOFF neste commit (sem c
   antes/depois; web `tsc`+519/519 (sem alteração web).
 - F19 (análise, sem código): benchmark F9 PASS (12/12) após restaurar Docker/Postgres; suítes
   completas não reexecutadas (checkpoint F18 válido).
+- F20 (web): foco conversations 12 files/54 tests; web full **70 files / 519 tests** + tsc/lint/
+  build; benchmark F9 PASS antes/depois (API intocada).
 
 ## Flakes observados
 - F17: 3 execuções full com flakes históricos (autonomous #13, pilot-knowledge #4; race-weekend/
@@ -225,7 +241,9 @@ F19: análise `post-v4-dialogue-engine-f19.md`; docs/HANDOFF neste commit (sem c
 2. Presença em tempo real — **decidido na F19: não implementar** (single-player, sem consumidor;
    IA sem semântica de online). Se reaberto: atividade derivada on-read (sem schema), transporte
    só com requisito; NUNCA religar `/turn/stream`.
-3. Virtualização de mensagens/auto-resize/skeletons; evals de performance/latência.
+3. Paginação do histórico de mensagens e virtualização — **F20 fez a parte segura (memoização);
+   o restante exige requisito de produto** (janela de histórico/cursor) e evals de latência.
+   API `GET /messages` hoje devolve todo o histórico.
 4. Auditoria exata decisão legada ↔ execução oficial (F15 concluiu que a separação é intencional;
    só reabrir se houver requisito de auditoria que justifique registrar correlação no metadata
    oficial — mudança de contrato do engine a avaliar).
@@ -253,9 +271,9 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md`, `AGENTS.md` e os docs `docs/post-v4-dialogue-engine-f9.md` a
-`docs/post-v4-dialogue-engine-f19.md`. Valide Git (branch, HEAD, working tree). F3–F9
-concluídas, F10–F19 concluídas (F13/F15/F16/F19 como análise; F11/F12/F14/F17/F18 com código);
-NÃO repita. Garanta Docker Desktop/Postgres ativos. Para verificar o engine, rode
+`docs/post-v4-dialogue-engine-f20.md`. Valide Git (branch, HEAD, working tree). F3–F9
+concluídas, F10–F20 concluídas (F13/F15/F16/F19 como análise; F11/F12/F14/F17/F18/F20 com
+código); NÃO repita. Garanta Docker Desktop/Postgres ativos. Para verificar o engine, rode
 `pnpm benchmark:f9`. Para trabalho novo, escolha um item do backlog priorizado e trate como
 subfase própria (um commit, testes, HANDOFF). Não use amend e não faça push."
 
