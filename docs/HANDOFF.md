@@ -14,8 +14,9 @@
   outro domínio; sem correção necessária)**;   **F17 concluída (consolidação da regra de abertura
   de availability; sem mudança de comportamento)**;   **F18 concluída (drift schema↔migrations
   alinhado; unique `Season(universeId, year)` aplicada no TEST)**;   **F19 concluída como análise
-  (presença em tempo real: single-player, sem consumidor; não implementar)**; **F20 concluída
-  (performance da lista de mensagens: memoização; paginação/virtualização deferidas)**.
+  (presença em tempo real: single-player, sem consumidor; não implementar)**;   **F20 concluída
+  (performance da lista de mensagens: memoização; paginação/virtualização deferidas)**; **F21
+  concluída (secret: sem caminho de vazamento; `.gitignore` endurecido para `.env.*`)**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -169,6 +170,16 @@
 - Validação: foco conversations 12/54; web full **70/519** + tsc/lint/build; benchmark F9 PASS
   antes/depois (API intocada).
 
+## F21 — conclusão (detalhes em docs/post-v4-dialogue-engine-f21.md)
+- Auditoria de secrets: nenhum secret entra em contexto/prompt/persistência (env só em
+  config/app/server/providers/auth); logger sem headers/body; erros de domínio sanitizados; repo
+  só tem `.env.example` rastreado e `.env.keys` ausente. Nenhuma guarda semântica de runtime é
+  necessária.
+- Correção pequena (commit `609f31d`): `.gitignore` passa a ignorar `.env.*` com `!.env.example`
+  (antes `.env.production`/`.env.test` ficavam fora do ignore).
+- Verificação: `git check-ignore` confirma variantes ignoradas e exemplo preservado; benchmark F9
+  PASS (mudança não-runtime). Sem código de produção alterado.
+
 ## Roadmap concluído (commits reais)
 F3: F3.1–F3.5 (HEAD F3.5 `b0f7b8b`); docs `docs/post-v4-dialogue-engine-f3.md`.
 F5: F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
@@ -187,7 +198,8 @@ F16: análise `post-v4-dialogue-engine-f16.md`; docs `332395c` (sem código).
 F17: F17.1 `038b54c`; docs `763c1ee`.
 F18: F18.1 `a5b60d1`; docs `b992980`.
 F19: análise `post-v4-dialogue-engine-f19.md`; docs `0ef21e6` (sem código).
-F20: F20.1 `0f32267`; docs/HANDOFF neste commit.
+F20: F20.1 `0f32267`; docs `fd1c8c4`.
+F21: F21.1 `609f31d`; docs/HANDOFF neste commit.
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -223,6 +235,7 @@ F20: F20.1 `0f32267`; docs/HANDOFF neste commit.
   completas não reexecutadas (checkpoint F18 válido).
 - F20 (web): foco conversations 12 files/54 tests; web full **70 files / 519 tests** + tsc/lint/
   build; benchmark F9 PASS antes/depois (API intocada).
+- F21 (repo hygiene): `git check-ignore` ok; benchmark F9 PASS; sem código de produção alterado.
 
 ## Flakes observados
 - F17: 3 execuções full com flakes históricos (autonomous #13, pilot-knowledge #4; race-weekend/
@@ -249,7 +262,9 @@ F20: F20.1 `0f32267`; docs/HANDOFF neste commit.
    oficial — mudança de contrato do engine a avaliar).
 5. `RACE_WEEKEND` auditado na F16 (sem derivação automática: intenção do dono; fase de weekend já
    derivada) e o literal duplicado da regra de abertura consolidado na F17.
-6. Guarda semântica de secret (se necessária). Drift schema↔migrations **encerrado na F18**.
+6. Secret **encerrado na F21** (sem caminho de vazamento; `.gitignore` endurecido). Hardening
+   opcional futuro: `setErrorHandler` global para 500 inesperado. Drift schema↔migrations
+   **encerrado na F18**.
    (P1 da F10 — segundo writer — concluído na F11; presença de domínio na F12; streaming
    analisado/não implementado na F13; CREATE_EVENT investigado e atomicidade corrigida na F14 —
    unificação com o Command Layer oficial descartada por mudança semântica do Event.)
@@ -271,9 +286,10 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md`, `AGENTS.md` e os docs `docs/post-v4-dialogue-engine-f9.md` a
-`docs/post-v4-dialogue-engine-f20.md`. Valide Git (branch, HEAD, working tree). F3–F9
-concluídas, F10–F20 concluídas (F13/F15/F16/F19 como análise; F11/F12/F14/F17/F18/F20 com
-código); NÃO repita. Garanta Docker Desktop/Postgres ativos. Para verificar o engine, rode
-`pnpm benchmark:f9`. Para trabalho novo, escolha um item do backlog priorizado e trate como
-subfase própria (um commit, testes, HANDOFF). Não use amend e não faça push."
+`docs/post-v4-dialogue-engine-f21.md`. Valide Git (branch, HEAD, working tree). F3–F9
+concluídas, F10–F21 concluídas (F13/F15/F16/F19 como análise; F11/F12/F14/F17/F18/F20/F21 com
+código/higiene); NÃO repita. Garanta Docker Desktop/Postgres ativos. Para verificar o engine,
+rode `pnpm benchmark:f9`. Backlog acionável esgotado; itens restantes exigem requisito de produto
+(paginação/virtualização) ou hardening opcional (setErrorHandler). Não use amend e não faça
+push."
 
