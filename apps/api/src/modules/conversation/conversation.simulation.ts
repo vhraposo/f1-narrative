@@ -26,8 +26,11 @@ import {
   buildDialogueRealizerContext,
   createDialogueRealizer,
   DeterministicDialogueRealizer,
+  realizerLanguageMetadata,
   resolveDialogueRealizerKind,
+  type DialogueRealizer,
 } from "./conversation.dialogue-realizer.js";
+import { createOllamaDialogueRealizerProviderFromEnv } from "./conversation.dialogue-realizer-ollama.js";
 import { validateDialogueOutput } from "./conversation.dialogue-output.js";
 import { deriveDialogueEmotion } from "./conversation.dialogue-emotion.js";
 import { deriveDialogueTopic } from "./conversation.dialogue-topic.js";
@@ -623,6 +626,7 @@ export async function simulateConversationTurn(
     readonly provider?: GenerationProvider;
     readonly maxDepth?: number;
     readonly opportunity?: OpportunityEnvelopeSeed;
+    readonly dialogueRealizer?: DialogueRealizer;
   },
 ): Promise<SimulationResult> {
   const plan = await getSimulationPlan(conversationId, {
@@ -643,7 +647,15 @@ export async function simulateConversationTurn(
   if (!initialInput) {
     return { executed: false, stopReason: "CONVERSATION_INACTIVE", depth: 0, steps, selection, plan };
   }
-  const realizer = createDialogueRealizer(resolveDialogueRealizerKind());
+  const realizerKind = resolveDialogueRealizerKind();
+  const realizer =
+    options.dialogueRealizer ??
+    createDialogueRealizer(
+      realizerKind,
+      realizerKind === "llm"
+        ? (createOllamaDialogueRealizerProviderFromEnv() ?? undefined)
+        : undefined,
+    );
   const nameById = new Map(initialInput.participants.map((p) => [p.characterId, p.name]));
   const messageById = new Map<string, { characterId: string | null; content: string; name: string }>();
   for (const message of initialInput.messages) {
@@ -736,6 +748,7 @@ export async function simulateConversationTurn(
       language: "pt-BR",
     });
     const utterance = await realizer.realize(context);
+    const realizerLanguage = realizerLanguageMetadata(realizer.lastTrace);
     const lastPersisted = [...messageById.values()].slice(-1)[0]?.content ?? null;
     const replyToKnown = input.replyToMessageId === null || messageById.has(input.replyToMessageId);
     let outputValidation = validateDialogueOutput({
@@ -780,6 +793,7 @@ export async function simulateConversationTurn(
         ...(options.worldDate ? { worldDate: options.worldDate } : {}),
         forceSpeakerCharacterId: input.candidate.characterId,
         textOverride: fragment.text,
+        ...(realizerLanguage ? { language: realizerLanguage } : {}),
         ...(typeof input.targetCharacterIdOverride === "string"
           ? { targetCharacterId: input.targetCharacterIdOverride }
           : {}),

@@ -63,7 +63,19 @@ export type DialogueRealizerProvider = {
 
 export interface DialogueRealizer {
   readonly kind: "deterministic" | "llm";
+  readonly lastTrace?: RealizerTrace | null;
   realize(context: DialogueRealizerContext): Promise<DialogueUtterance>;
+}
+
+export function realizerLanguageMetadata(
+  trace: RealizerTrace | null | undefined,
+): { provider: string; model: string; fallback: boolean } | null {
+  if (!trace) return null;
+  return {
+    provider: trace.provider,
+    model: trace.model ?? "unknown",
+    fallback: trace.fallback,
+  };
 }
 
 export type RealizerValidation = {

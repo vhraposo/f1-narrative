@@ -64,6 +64,7 @@ export async function runAutonomousConversationTurn(
     readonly provider?: GenerationProvider;
     readonly forceSpeakerCharacterId?: string;
     readonly textOverride?: string;
+    readonly language?: AutonomousTurnLanguage;
     readonly dialogue?: BehaviorDialogueMetadata;
     /**
      * F6.3 — preserva o target da oportunidade quando ainda não há mensagem
@@ -187,9 +188,12 @@ export async function runAutonomousConversationTurn(
     .join(" ")
     .slice(0, 2000);
 
-  let language: AutonomousTurnLanguage = options.textOverride
-    ? { provider: "dialogue-realizer", model: "deterministic-realizer.v1", fallback: false }
-    : { provider: "deterministic", model: "behavior-language.v1", fallback: true };
+  let language: AutonomousTurnLanguage =
+    options.textOverride && options.language
+      ? options.language
+      : options.textOverride
+        ? { provider: "dialogue-realizer", model: "deterministic-realizer.v1", fallback: false }
+        : { provider: "deterministic", model: "behavior-language.v1", fallback: true };
   let text = options.textOverride?.trim() ?? fallbackText(speaker.name);
   if (options.provider && !options.textOverride) {
     try {
