@@ -11,6 +11,8 @@ import {
   type DialogueRealizerContext,
 } from "../modules/conversation/conversation.dialogue-realizer.js";
 import { createOllamaDialogueRealizerProviderFromEnv } from "../modules/conversation/conversation.dialogue-realizer-ollama.js";
+import { deriveDialogueResponseStrategy } from "../modules/conversation/conversation.dialogue-strategy.js";
+import { validateConversationNaturalness } from "../modules/conversation/conversation.dialogue-naturalness.js";
 
 type Scenario = {
   readonly id: string;
@@ -52,12 +54,35 @@ const SCENARIOS: Scenario[] = [
   scenario("length-short", "length", { intent: "REACTION", replyToContent: "kkk", voice: { informality: 0.9, warmth: 0.5, humor: 0.8, emojiTendency: 0.3, verbosity: 0.1 } }),
   scenario("length-long", "length", { intent: "SUPPORT", replyToContent: "preciso desabafar sobre o que aconteceu no fim de semana", maxMessages: 3, voice: { informality: 0.6, warmth: 0.9, humor: 0.3, emojiTendency: 0.2, verbosity: 0.9 } }),
   scenario("persona-charles", "persona", { intent: "SUPPORT", replyToContent: "perdi a corrida", speakerCharacterId: "ai-charles", speakerName: "Charles", relationshipAffinity: 0.7 }),
+  scenario("guardrail-echo", "guardrail", { intent: "REACTION", replyToContent: "eu perdi meu voo porque o aeroporto estava fechado", relationshipAffinity: 0.8 }),
+  scenario("guardrail-assistant", "guardrail", { intent: "SUPPORT", replyToContent: "não sei se consigo terminar isso", emotion: { tone: "TENSE", intensity: 0.7, sourceSignals: ["HIGH_INTENSITY"] }, relationshipAffinity: 0.5 }),
+  scenario("guardrail-action", "guardrail", { intent: "ANSWER", replyToContent: "você acha que chove amanhã?", relationshipAffinity: 0.5 }),
+  scenario("guardrail-emoji", "guardrail", { intent: "REACTION", replyToContent: "lembrei daquele dia", memorySummaries: ["vitória difícil em Interlagos"], emotion: { tone: "AFFECTIVE", intensity: 0.7, sourceSignals: ["CLOSE_RELATIONSHIP"] }, relationshipAffinity: 0.9 }),
+  scenario("guardrail-name", "guardrail", { intent: "REACTION", replyToContent: "oi, tudo bem?", relationshipAffinity: 0.7 }),
 ];
 
 function makeContext(overrides: Partial<DialogueRealizerContext>): DialogueRealizerContext {
+  const voice = overrides.voice ?? {
+    informality: 0.6,
+    warmth: 0.5,
+    humor: 0.5,
+    emojiTendency: 0.4,
+    verbosity: 0.3,
+  };
+  const intent = overrides.intent ?? "REACTION";
+  const replyToContent = overrides.replyToContent ?? "bom dia";
+  const strategy =
+    overrides.strategy ??
+    deriveDialogueResponseStrategy({
+      intent,
+      emotionTone: overrides.emotion?.tone ?? null,
+      voice,
+      replyToContent,
+    });
   return buildDialogueRealizerContext({
     speakerCharacterId: "ai-alicya",
     speakerName: "Alicya",
+    interlocutorName: "Kimi",
     intent: "REACTION",
     replyToMessageId: "ab-1",
     replyToContent: "bom dia",
@@ -66,10 +91,11 @@ function makeContext(overrides: Partial<DialogueRealizerContext>): DialogueReali
     emotionalTone: "NEUTRAL",
     relationshipAffinity: 0.6,
     memorySummaries: [],
-    voice: { informality: 0.6, warmth: 0.5, humor: 0.5, emojiTendency: 0.4, verbosity: 0.3 },
+    voice,
     maxMessages: 1,
     language: "pt-BR",
     ...overrides,
+    strategy,
   });
 }
 
@@ -154,6 +180,9 @@ async function main(): Promise<void> {
     deterministic: OutputMetrics;
     llm: OutputMetrics | null;
     llmTrace: { fallback: boolean; invalidReason: string | null; latencyMs: number } | null;
+    deterministicGuardViolations: string[];
+    llmGuardViolations: string[];
+    llmGuardedText: string | null;
   }> = [];
 
   for (const item of SCENARIOS) {
@@ -172,8 +201,21 @@ async function main(): Promise<void> {
       model: "deterministic-realizer.v1",
     });
 
+    const naturalnessArgs = {
+      replyToContent: context.replyToContent,
+      emotionTone: context.emotion?.tone ?? null,
+      emojiAllowed: context.strategy?.emojiMode !== "OFF",
+      questionMode: context.strategy?.questionMode ?? null,
+    };
+    const detGuardViolations = validateConversationNaturalness({
+      text: detText,
+      ...naturalnessArgs,
+    });
+
     let llmMetrics: OutputMetrics | null = null;
     let llmTrace: { fallback: boolean; invalidReason: string | null; latencyMs: number } | null = null;
+    let llmGuardViolations: string[] = [];
+    let llmGuardedText: string | null = null;
     if (llm) {
       const llmStart = performance.now();
       const llmUtterance = await llm.realize(context);
@@ -194,6 +236,10 @@ async function main(): Promise<void> {
         invalidReason: trace?.invalidReason ?? null,
         latencyMs: llmMs,
       };
+      llmGuardViolations = [
+        ...validateConversationNaturalness({ text: llmText, ...naturalnessArgs }),
+      ];
+      llmGuardedText = llmGuardViolations.length > 0 ? detText : llmText;
     }
 
     rows.push({
@@ -204,6 +250,9 @@ async function main(): Promise<void> {
       deterministic: detMetrics,
       llm: llmMetrics,
       llmTrace,
+      deterministicGuardViolations: [...detGuardViolations],
+      llmGuardViolations,
+      llmGuardedText,
     });
   }
 
@@ -212,6 +261,12 @@ async function main(): Promise<void> {
     .map((row) => row.llm)
     .filter((row): row is OutputMetrics => row !== null);
 
+  const deterministicGuardRate =
+    rows.filter((row) => row.deterministicGuardViolations.length > 0).length / (rows.length || 1);
+  const llmGuardRate =
+    llmRows.length > 0
+      ? rows.filter((row) => row.llm && row.llmGuardViolations.length > 0).length / llmRows.length
+      : null;
   const report = {
     generatedAt: new Date().toISOString(),
     model: llm ? model : null,
@@ -220,6 +275,8 @@ async function main(): Promise<void> {
     aggregate: {
       deterministic: aggregate(deterministicRows),
       llm: llmRows.length > 0 ? aggregate(llmRows) : null,
+      deterministicGuardRate,
+      llmGuardRate,
     },
   };
 
@@ -231,18 +288,20 @@ async function main(): Promise<void> {
     "utf8",
   );
   const markdown = [
-    `# F22.2 Human Quality A/B — ${llm ? `LLM ${model}` : "LLM não executado"}`,
+    `# F22.3 Human Quality A/B — ${llm ? `LLM ${model}` : "LLM não executado"}`,
     "",
-    "| cenário | grupo | deterministic | llm | fallback |",
-    "|---|---|---|---|---|",
+    "| cenário | grupo | deterministic | llm | violações | guardado | fallback |",
+    "|---|---|---|---|---|---|---|",
     ...rows.map((row) =>
-      `| ${row.id} | ${row.group} | ${row.deterministic.text.replace(/\|/g, "/")} | ${(row.llm?.text ?? "-").replace(/\|/g, "/")} | ${row.llmTrace?.fallback ? "sim" : "não"} |`,
+      `| ${row.id} | ${row.group} | ${row.deterministic.text.replace(/\|/g, "/")} | ${(row.llm?.text ?? "-").replace(/\|/g, "/")} | ${row.llmGuardViolations.join(",") || "-"} | ${(row.llmGuardedText ?? "-").replace(/\|/g, "/")} | ${row.llmTrace?.fallback ? "sim" : "não"} |`,
     ),
     "",
     "## Agregados",
     "",
     `- deterministic: ${JSON.stringify(report.aggregate.deterministic)}`,
     `- llm: ${report.aggregate.llm ? JSON.stringify(report.aggregate.llm) : "não executado"}`,
+    `- deterministicGuardRate: ${report.aggregate.deterministicGuardRate}`,
+    `- llmGuardRate: ${report.aggregate.llmGuardRate}`,
   ].join("\n");
   await writeFile(join(outDir, "human-quality-ab.md"), markdown, "utf8");
 

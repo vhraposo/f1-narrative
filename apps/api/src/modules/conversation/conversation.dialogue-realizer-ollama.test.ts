@@ -193,13 +193,29 @@ describe("F22.2 — provider Ollama do Dialogue Realizer (stub, sem rede)", () =
     await expect(provider!.realize(context())).rejects.toBeInstanceOf(OllamaProviderError);
   });
 
-  it("prompt cobre emoção, voz, memória e limite sem despejar JSON interno", () => {
-    const { systemPrompt, userPrompt } = buildOllamaRealizerPrompt(context());
+  it("prompt cobre emoção, voz, memória, interlocutor, estratégia e limite", () => {
+    const { systemPrompt, userPrompt } = buildOllamaRealizerPrompt(
+      context({
+        interlocutorName: "Alicya",
+        strategy: {
+          questionMode: "FORBIDDEN",
+          echoMode: "FORBIDDEN",
+          emojiMode: "OFF",
+          lengthMode: "SHORT",
+          nameMode: "KNOWN_ONLY",
+          actionClaimMode: "FORBIDDEN",
+        },
+      }),
+    );
     expect(userPrompt).toContain("TOM EMOCIONAL");
     expect(userPrompt).toContain("VOZ");
     expect(userPrompt).toContain("MEMÓRIAS DISPONÍVEIS");
     expect(userPrompt).toContain("LIMITE");
+    expect(userPrompt).toContain("INTERLOCUTOR: Alicya");
+    expect(userPrompt).toContain("COMO RESPONDER");
+    expect(userPrompt).toContain("não afirme executar ações externas");
     expect(systemPrompt).toContain("JSON");
+    expect(systemPrompt).toContain("nunca invente nomes");
     expect(userPrompt).not.toContain("{");
   });
 });

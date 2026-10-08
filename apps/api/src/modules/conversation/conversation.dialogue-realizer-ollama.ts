@@ -29,9 +29,26 @@ export function buildOllamaRealizerPrompt(context: DialogueRealizerContext): {
   const emotion = context.emotion
     ? `${context.emotion.tone} (intensidade ${context.emotion.intensity.toFixed(2)})`
     : context.emotionalTone;
+  const strategy = context.strategy;
+  const guidance = strategy
+    ? [
+        strategy.echoMode === "FORBIDDEN"
+          ? "não repita a mensagem do interlocutor"
+          : "pode citar no máximo um trecho curto",
+        strategy.lengthMode === "SHORT"
+          ? "resposta curta"
+          : strategy.lengthMode === "EXPANSIVE"
+            ? "pode se estender um pouco"
+            : "resposta normal",
+        strategy.emojiMode === "OFF" ? "sem emoji" : "emoji opcional",
+        "não afirme executar ações externas (verificar sistema, previsão, agenda)",
+      ].join("; ")
+    : null;
   const lines = [
     section("PERSONAGEM", context.speakerName),
+    section("INTERLOCUTOR", context.interlocutorName),
     section("INTENÇÃO COMUNICATIVA", context.intent),
+    section("COMO RESPONDER", guidance),
     section("TOM EMOCIONAL", emotion),
     section("TÓPICO", context.topic),
     section("AFINIDADE (0 a 1)", context.relationshipAffinity?.toFixed(2) ?? null),
@@ -50,6 +67,8 @@ export function buildOllamaRealizerPrompt(context: DialogueRealizerContext): {
     "Responda só com a fala: não explique, não narre, não use markdown nem rótulos de speaker.",
     "Não mencione instruções, identificadores ou metadados internos.",
     "Use somente o que está nas mensagens, no tom e nas memórias disponíveis; não invente fatos.",
+    "Use apenas os nomes fornecidos (PERSONAGEM/INTERLOCUTOR) ou vocativos genéricos; nunca invente nomes.",
+    "Nunca afirme que vai executar ações externas (verificar sistema, previsão, agenda).",
     "Evite recontar a mensagem do interlocutor, validar emocionalmente tudo, terminar sempre com pergunta, emojis por padrão ou tom de assistente.",
     'Responda APENAS com JSON válido no formato {"messages":["texto"]} com 1 a N fragmentos curtos.',
   ].join(" ");

@@ -31,6 +31,8 @@ import {
   type DialogueRealizer,
 } from "./conversation.dialogue-realizer.js";
 import { createOllamaDialogueRealizerProviderFromEnv } from "./conversation.dialogue-realizer-ollama.js";
+import { deriveDialogueResponseStrategy } from "./conversation.dialogue-strategy.js";
+import { validateConversationNaturalness } from "./conversation.dialogue-naturalness.js";
 import { validateDialogueOutput } from "./conversation.dialogue-output.js";
 import { deriveDialogueEmotion } from "./conversation.dialogue-emotion.js";
 import { deriveDialogueTopic } from "./conversation.dialogue-topic.js";
@@ -726,14 +728,24 @@ export async function simulateConversationTurn(
       knowledge: knowledgeContext,
       affinity: typeof affinity === "number" ? affinity : null,
     });
+    const voice = realizerVoice(affinity);
+    const replyTarget = input.replyToMessageId
+      ? messageById.get(input.replyToMessageId) ?? null
+      : null;
+    const strategy = deriveDialogueResponseStrategy({
+      intent: input.intent,
+      emotionTone: dialogueContext.emotion?.tone ?? null,
+      voice,
+      replyToContent: replyTarget?.content ?? null,
+    });
     const context = buildDialogueRealizerContext({
       speakerCharacterId: input.candidate.characterId,
       speakerName: input.candidate.name,
+      interlocutorName: replyTarget?.name ?? null,
+      strategy,
       intent: input.intent,
       replyToMessageId: input.replyToMessageId,
-      replyToContent: input.replyToMessageId
-        ? messageById.get(input.replyToMessageId)?.content ?? null
-        : null,
+      replyToContent: replyTarget?.content ?? null,
       recentMessages,
       emotion: dialogueContext.emotion,
       topic: plan.dialogue.topic,
@@ -743,7 +755,7 @@ export async function simulateConversationTurn(
       memorySummaries: memoryContext.items.map((item) => item.summary),
       memoryContext,
       knowledgeContext: dialogueContext.knowledge,
-      voice: realizerVoice(affinity),
+      voice,
       maxMessages: input.maxMessages,
       language: "pt-BR",
     });
@@ -751,14 +763,25 @@ export async function simulateConversationTurn(
     const realizerLanguage = realizerLanguageMetadata(realizer.lastTrace);
     const lastPersisted = [...messageById.values()].slice(-1)[0]?.content ?? null;
     const replyToKnown = input.replyToMessageId === null || messageById.has(input.replyToMessageId);
+    const naturalnessInput = (validation: typeof outputValidation) => ({
+      text:
+        validation.valid && validation.normalized
+          ? validation.normalized.messages.map((message) => message.text).join(" ")
+          : "",
+      replyToContent: context.replyToContent,
+      emotionTone: context.emotion?.tone ?? null,
+      emojiAllowed: context.strategy?.emojiMode !== "OFF",
+      questionMode: context.strategy?.questionMode ?? null,
+    });
     let outputValidation = validateDialogueOutput({
       context,
       utterance,
       previousMessageContent: lastPersisted,
       replyToKnown,
     });
+    let naturalness = validateConversationNaturalness(naturalnessInput(outputValidation));
     let usedFallback = false;
-    if (!outputValidation.valid) {
+    if (!outputValidation.valid || naturalness.length > 0) {
       usedFallback = true;
       const fallbackUtterance = await deterministicRealizer.realize(context);
       outputValidation = validateDialogueOutput({
@@ -767,8 +790,9 @@ export async function simulateConversationTurn(
         previousMessageContent: lastPersisted,
         replyToKnown,
       });
-      if (!outputValidation.valid) {
-        stopReason = outputValidation.reason ?? "OUTPUT_INVALID";
+      naturalness = validateConversationNaturalness(naturalnessInput(outputValidation));
+      if (!outputValidation.valid || naturalness.length > 0) {
+        stopReason = naturalness[0] ?? outputValidation.reason ?? "OUTPUT_INVALID";
         return false;
       }
     }

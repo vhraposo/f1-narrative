@@ -13,6 +13,7 @@ import { DialogueEmotionContextSchema } from "./conversation.dialogue-emotion.js
 import { DialogueTopicContextSchema } from "./conversation.dialogue-topic.js";
 import { DialogueMemoryContextSchema } from "./conversation.dialogue-memory.js";
 import { DialogueKnowledgeContextSchema } from "./conversation.dialogue-context.js";
+import { DialogueResponseStrategySchema } from "./conversation.dialogue-strategy.js";
 
 export const RealizerVoiceSchema = z.object({
   informality: z.number().min(0).max(1),
@@ -31,6 +32,8 @@ export const RealizerRecentMessageSchema = z.object({
 export const DialogueRealizerContextSchema = z.object({
   speakerCharacterId: z.string().min(1),
   speakerName: z.string().min(1),
+  interlocutorName: z.string().min(1).nullable().optional().default(null),
+  strategy: DialogueResponseStrategySchema.nullable().optional().default(null),
   intent: DialogueIntentSchema,
   replyToMessageId: z.string().nullable(),
   replyToContent: z.string().nullable(),
@@ -260,9 +263,18 @@ function pickPhrase(context: DialogueRealizerContext, policy: IntentRealizationP
     context.recentMessages[0]?.content ?? "",
     String(context.maxMessages),
   ].join(":");
+  if (context.strategy?.questionMode === "FORBIDDEN") {
+    const withoutQuestions = pool.filter((phrase) => !phrase.trim().endsWith("?"));
+    if (withoutQuestions.length > 0) pool = withoutQuestions;
+  }
   const index = (seededIndex(seed, pool.length) + voiceBucket(context.voice.informality)) % pool.length;
   const candidate = pool[index] ?? pool[0] ?? "";
-  if (candidate.length <= policy.maxChars) return candidate;
+  if (candidate.length <= policy.maxChars) {
+    if (context.strategy?.lengthMode === "SHORT" && candidate.length > 40) {
+      return [...pool].sort((a, b) => a.length - b.length)[0] ?? candidate;
+    }
+    return candidate;
+  }
   return [...pool].sort((a, b) => a.length - b.length)[0] ?? candidate;
 }
 
@@ -271,7 +283,9 @@ function applyVoice(text: string, context: DialogueRealizerContext): string {
   const emojiAllowed =
     context.voice.emojiTendency >= 0.6 ||
     (affinity !== null && affinity >= 0.7 && context.voice.emojiTendency >= 0.3);
-  if (!emojiAllowed || isLowEnergyTone(context)) return text;
+  if (!emojiAllowed || isLowEnergyTone(context) || context.strategy?.emojiMode === "OFF") {
+    return text;
+  }
   if (/(?:😂|❤️|😭)/u.test(text)) return text;
   if (context.intent === "SUPPORT" && context.voice.warmth >= 0.6) return `${text} ❤️`;
   if (context.intent === "JOKE" || context.intent === "TEASE" || context.intent === "REACTION") {
