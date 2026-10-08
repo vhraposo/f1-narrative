@@ -17,8 +17,9 @@
   (presença em tempo real: single-player, sem consumidor; não implementar)**;   **F20 concluída
   (performance da lista de mensagens: memoização; paginação/virtualização deferidas)**; **F21
   concluída (secret: sem caminho de vazamento; `.gitignore` endurecido para `.env.*`)**;
-  **F22 em andamento (qualidade conversacional) — F22.1 concluída (baseline determinístico +
-  realizer tone-aware); roadmap F22.2–F22.8 registrado**.
+  **F22 em andamento (qualidade conversacional) — F22.1 (baseline + realizer tone-aware) e F22.2
+  (LLM realizer controlado atrás de flag + A/B real) concluídas; LLM NÃO promovido (default
+  determinístico); roadmap F22.3–F22.8 registrado**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -191,9 +192,17 @@
 - Auditoria registrada: `LlmDialogueRealizer` existe (provider/schema/trace/fallback) mas **não
   está ligado** (simulation chama `createDialogueRealizer(kind)` sem provider); `topic`/`memory`/
   `knowledge` ainda não influenciam a realização; F5/F12 intactos.
-- Roadmap: F22.2 LLM realizer wiring (provider existente, flag, fallback, eval A/B) → F22.3
-  dialogue acts/strategy → F22.4 context/memory → F22.5 persona/relationship → F22.6
-  naturalness/diversity → F22.7 proactive → F22.8 avaliação humana (golden conversations).
+- F22.2 concluída (commit `1157708`; doc `docs/post-v4-dialogue-engine-f22-2.md`): LLM realizer
+  ligado atrás de `DIALOGUE_REALIZER=llm` via endpoint Ollama existente (`conversation.
+  dialogue-realizer-ollama.ts`), contrato estreitado (engine decide speaker/intent/replyTo; LLM só
+  wording), fallback+`RealizerTrace` propagado para `contextJson.language`, LLM fora de transação.
+  A/B real (25 cenários, `llama3.2`): 0 fallbacks, ~1,07s, mais contexto/variedade, mas eco do
+  interlocutor (8%), tom de assistente, nome alucinado, degeneração de emoji e JOKE fraco →
+  **LLM NÃO promovido**; determinístico segue default. Lacuna: `validateDialogueOutput` não barra
+  eco/emoji degenerado (registrado para F22.3/hardening).
+- Roadmap: F22.3 dialogue acts/strategy (+hardening do validator) → F22.4 context/memory →
+  F22.5 persona/relationship → F22.6 naturalness/diversity → F22.7 proactive → F22.8 avaliação
+  humana expandida. Reavaliar promoção do LLM após F22.3–F22.5 com A/B repetido.
 - Validação F22.1: foco 7/7 + realizer 32/32 + conversation 454/454; API full **213 files /
   2968 tests — 100% verde**; benchmark F9 PASS antes/depois; sem migration.
 
@@ -217,7 +226,7 @@ F18: F18.1 `a5b60d1`; docs `b992980`.
 F19: análise `post-v4-dialogue-engine-f19.md`; docs `0ef21e6` (sem código).
 F20: F20.1 `0f32267`; docs `fd1c8c4`.
 F21: F21.1 `609f31d`; docs `e1c0ce2`.
-F22: F22.1 `f0f705f`; docs/HANDOFF neste commit (programa em andamento).
+F22: F22.1 `f0f705f`; F22.2 `1157708`; docs/HANDOFF neste commit (programa em andamento).
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -257,6 +266,9 @@ F22: F22.1 `f0f705f`; docs/HANDOFF neste commit (programa em andamento).
 - F22.1 (API): foco `human-quality` 7/7 + `dialogue-realizer` 32/32 + folder conversation
   454/454; API full **213 files / 2968 tests — 100% verde**; benchmark F9 PASS antes/depois;
   tsc/ESLint verdes; web não alterada.
+- F22.2 (API): foco realizer+adapter+baseline 53/53; API full **214 files / 2981 tests — 100%
+  verde**; benchmark F9 PASS antes/depois; tsc/ESLint verdes; A/B real com Ollama
+  (`npm run human-quality:ab`, 25 cenários) executado; web não alterada.
 
 ## Flakes observados
 - F17: 3 execuções full com flakes históricos (autonomous #13, pilot-knowledge #4; race-weekend/
@@ -269,10 +281,10 @@ F22: F22.1 `f0f705f`; docs/HANDOFF neste commit (programa em andamento).
   vez sob pressão na F11 e passaram isoladas. Nenhum é atribuído a F11/F12.
 
 ## Programa ativo — F22 Human Conversation Quality
-Ordem: F22.2 LLM realizer wiring (provider existente, flag, fallback, eval A/B) → F22.3 dialogue
-acts/strategy → F22.4 context/memory → F22.5 persona/relationship → F22.6 naturalness/diversity
-→ F22.7 proactive → F22.8 avaliação humana (golden conversations). Detalhes em
-`docs/post-v4-dialogue-engine-f22.md`.
+F22.1 e F22.2 concluídas. Ordem: F22.3 dialogue acts/strategy (+hardening do validator para
+eco/emoji/JSON-like) → F22.4 context/memory → F22.5 persona/relationship → F22.6
+naturalness/diversity → F22.7 proactive → F22.8 avaliação humana expandida. Detalhes em
+`docs/post-v4-dialogue-engine-f22.md` e `docs/post-v4-dialogue-engine-f22-2.md`.
 
 ## Backlog futuro (priorizado)
 1. Streaming como transporte — **decidido na F13: não implementar** enquanto o realizer for
@@ -313,9 +325,10 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md`, `AGENTS.md` e os docs `docs/post-v4-dialogue-engine-f9.md` a
-`docs/post-v4-dialogue-engine-f22.md`. Valide Git (branch, HEAD, working tree). F3–F9
-concluídas, F10–F21 concluídas e F22 em andamento (F22.1 concluída; próximo passo F22.2 — LLM
-realizer wiring com provider existente, flag, fallback e eval A/B); NÃO repita. Garanta Docker
-Desktop/Postgres ativos. Para verificar o engine, rode `pnpm benchmark:f9`. Não use amend e não
-faça push."
+`docs/post-v4-dialogue-engine-f22-2.md`. Valide Git (branch, HEAD, working tree). F3–F9
+concluídas, F10–F21 concluídas e F22 em andamento (F22.1/F22.2 concluídas; LLM realizer existe
+atrás de `DIALOGUE_REALIZER=llm` mas NÃO foi promovido; próximo passo F22.3 — dialogue
+acts/strategy + hardening do validator); NÃO repita. Garanta Docker Desktop/Postgres ativos;
+Ollama é opcional (A/B usa `npm run human-quality:ab`). Para verificar o engine, rode
+`pnpm benchmark:f9`. Não use amend e não faça push."
 
