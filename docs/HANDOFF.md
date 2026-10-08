@@ -9,7 +9,9 @@
   AI Behavior)**; **F12 concluída (presença/availability efetiva no runtime)**; **F13 concluída
   como análise (streaming: sem implementação por falta de benefício real)**; **F14 concluída
   (CREATE_EVENT: writer único já existia; correção pequena de atomicidade)**; **F15 concluída
-  como análise (SEND_MESSAGE: separação transacional intencional; sem correção necessária)**.
+  como análise (SEND_MESSAGE: separação transacional intencional; sem correção necessária)**;
+  **F16 concluída como análise (RACE_WEEKEND: intenção do dono; fase de weekend já derivada em
+  outro domínio; sem correção necessária)**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -103,6 +105,20 @@
   persistido); correlação exigiria mudança de contrato do engine — não justificada agora.
 - Benchmark F9 reexecutado: PASS (12/12); último checkpoint de código é o da F14.
 
+## F16 — conclusão (detalhes em docs/post-v4-dialogue-engine-f16.md)
+- `F16 — ANALYSIS COMPLETE — NO IMPLEMENTATION REQUIRED`: nenhum arquivo de código alterado.
+- `RACE_WEEKEND` é um valor de **disponibilidade** (intenção do dono em `CharacterAvailability`;
+  só a rota PATCH o escreve) e é tratado como aberto pela regra canônica da F12
+  (`availability.policy.isAvailabilityOpen`). A **fase de weekend** é outro domínio, já derivada
+  de `Race.status` + `WorldState.currentRaceId/currentSession` + `RaceSessionResult` pelo módulo
+  `race-weekend`/`world-progression` (locks, ordem de sessões, FINISHED limpa `currentSession`).
+- Não há duplicação de derivação nem inconsistência. Auto-derivar `RACE_WEEKEND` exigiria segundo
+  writer de availability (sobrescrevendo intenção) ou override em leitura — descartado.
+- Premissa do backlog ("derivação automática via WorldState/Schedule") era incorreta; item
+  encerrado. Fica só cleanup cosmético opcional (reuso do open-rule em `behavior.policy`/
+  `behavior.scoring`).
+- Benchmark F9 reexecutado: PASS (12/12); último checkpoint de código é o da F14.
+
 ## Roadmap concluído (commits reais)
 F3: F3.1–F3.5 (HEAD F3.5 `b0f7b8b`); docs `docs/post-v4-dialogue-engine-f3.md`.
 F5: F5.1 `89358c6`, F5.2 `541d0f7`, F5.3 `91d319e`, F5.4 `4c6ac82`.
@@ -116,7 +132,8 @@ F11: F11.1 `d392196`; docs `c190018`.
 F12: F12.1 `3e0ad46`; docs `94ff8f1`.
 F13: análise `post-v4-dialogue-engine-f13.md`; docs `392bdff` (sem código).
 F14: F14.1 `826e492`; docs `2a4b6eb`.
-F15: análise `post-v4-dialogue-engine-f15.md`; docs/HANDOFF neste commit (sem código).
+F15: análise `post-v4-dialogue-engine-f15.md`; docs `ab6147a` (sem código).
+F16: análise `post-v4-dialogue-engine-f16.md`; docs/HANDOFF neste commit (sem código).
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -141,6 +158,7 @@ F15: análise `post-v4-dialogue-engine-f15.md`; docs/HANDOFF neste commit (sem c
   verdes; web 70/519 + tsc/lint/build; `pnpm benchmark:f9` PASS antes e depois.
 - F15 (análise, sem código): `pnpm benchmark:f9` → PASS (12/12); suítes completas não
   reexecutadas porque nenhum arquivo de código foi alterado (checkpoint F14 permanece válido).
+- F16 (análise, sem código): `pnpm benchmark:f9` → PASS (12/12); idem (checkpoint F14 válido).
 
 ## Flakes observados
 - F14: uma execução do foco (`ai-behavior+behavior+events`) falhou 1 teste sob pressão; rerun
@@ -160,7 +178,9 @@ F15: análise `post-v4-dialogue-engine-f15.md`; docs/HANDOFF neste commit (sem c
 4. Auditoria exata decisão legada ↔ execução oficial (F15 concluiu que a separação é intencional;
    só reabrir se houver requisito de auditoria que justifique registrar correlação no metadata
    oficial — mudança de contrato do engine a avaliar).
-5. Derivação automática de RACE_WEEKEND/status via Schedule/WorldState (F12 deixou manual).
+5. (Opcional, cosmético) Reusar `availability.policy.isAvailabilityOpen` em `behavior.policy`/
+   `behavior.scoring` para eliminar o literal duplicado da regra de abertura. `RACE_WEEKEND`
+   auditado na F16: sem derivação automática (intenção do dono; fase de weekend já derivada).
 6. Guarda semântica de secret (se necessária); sincronização do drift schema↔migrations.
    (P1 da F10 — segundo writer — concluído na F11; presença de domínio na F12; streaming
    analisado/não implementado na F13; CREATE_EVENT investigado e atomicidade corrigida na F14 —
@@ -179,10 +199,9 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md`, `AGENTS.md` e os docs `docs/post-v4-dialogue-engine-f9.md` a
-`docs/post-v4-dialogue-engine-f15.md`. Valide Git (branch, HEAD, working tree). F3–F9
-concluídas, F10 análise, F11 (AI Behavior), F12 (presença), F13 (streaming: não implementar),
-F14 (CREATE_EVENT: writer único + atomicidade) e F15 (SEND_MESSAGE: separação intencional)
-concluídas; NÃO repita. Para verificar o engine, rode `pnpm benchmark:f9`. Para trabalho novo,
-escolha um item do backlog priorizado e trate como subfase própria (um commit, testes, HANDOFF).
-Não use amend e não faça push."
+`docs/post-v4-dialogue-engine-f16.md`. Valide Git (branch, HEAD, working tree). F3–F9
+concluídas, F10–F16 concluídas (F13/F15/F16 como análise; F11/F12/F14 com código); NÃO repita.
+Para verificar o engine, rode `pnpm benchmark:f9`. Para trabalho novo, escolha um item do backlog
+priorizado e trate como subfase própria (um commit, testes, HANDOFF). Não use amend e não faça
+push."
 
