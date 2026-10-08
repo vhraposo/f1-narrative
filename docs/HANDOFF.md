@@ -19,7 +19,8 @@
   concluída (secret: sem caminho de vazamento; `.gitignore` endurecido para `.env.*`)**;
   **F22 — COMPLETE (qualidade conversacional, F22.1–F22.8). LLM — EXPERIMENTAL;
   DETERMINISTIC — DEFAULT (promotion gate: NÃO promovido; multi-turno com question overuse/
-  incoerência no `llama3.2`)**.
+  incoerência no `llama3.2`)**. Fix pós-F22: prioridade de endereçamento explícito na seleção
+  de speaker de grupo (abaixo).
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -256,6 +257,20 @@ F20: F20.1 `0f32267`; docs `fd1c8c4`.
 F21: F21.1 `609f31d`; docs `e1c0ce2`.
 F22: F22.1 `f0f705f`; F22.2 `1157708`; F22.3 `cecc6b3`; F22.4 `71ba1f1`; F22.5 `34218b7`;
 F22.6 `44061d1`; F22.7 `99143cb`; F22.8 (commit desta subfase).
+
+## Fix pós-F22 — Speaker priority (conversa de grupo)
+- Problema: cadeia artificial (cada piloto respondia o anterior), menção explícita ignorada
+  ("Kimi" não batia por ser nome do meio) e avalanche de reações.
+- Correção em `conversation.response-engine.ts`: matching de qualquer token do nome (nome
+  completo/primeiro/último/meio), distinção `DIRECT_MENTION` (vocativo/pergunta direta/nome no
+  fim) vs `SUBJECT_MENTION` (assunto), `REPLY_TARGET` (reply a mensagem de IA), seleção
+  restrita aos alvos diretos quando existem, gating de reações por motivo contextual
+  (`TOPIC_ENGAGEMENT`/`HIGH_AFFINITY`/menção) e cap social (1 sem sinal contextual).
+- `conversation.simulation.ts`: `replyToMessageId` lido do `contextJson.dialogue` e propagado;
+  intent de reação agora considera menção do escolhido.
+- Testes: `conversation.speaker-selection.test.ts` (9); conversation 503/503; API full 3017
+  verdes; F9 PASS. QA end-to-end (TEST): "mds o que Kimi?" → só Kimi e encerra; "Max, ..." → só
+  Max; "bom dia" → 1 resposta. Database: unchanged; Migrations: none.
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`

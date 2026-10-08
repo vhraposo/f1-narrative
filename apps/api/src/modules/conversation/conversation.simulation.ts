@@ -151,6 +151,7 @@ type PlanInput = {
     characterId: string | null;
     content: string;
     createdAt: Date;
+    replyToMessageId: string | null;
   }>;
   readonly affinity: Record<string, number>;
   readonly budgetRemaining: number;
@@ -184,7 +185,14 @@ async function loadPlanInput(
       messages: {
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
         take: limits.recentMessageWindow,
-        select: { id: true, senderType: true, characterId: true, content: true, createdAt: true },
+        select: {
+          id: true,
+          senderType: true,
+          characterId: true,
+          content: true,
+          createdAt: true,
+          contextJson: true,
+        },
       },
     },
   });
@@ -230,6 +238,7 @@ async function loadPlanInput(
       characterId: message.characterId,
       content: message.content,
       createdAt: message.createdAt,
+      replyToMessageId: readReplyToMessageId(message.contextJson),
     })),
     affinity,
     budgetRemaining: Math.max(0, limits.maxAiTurnsPerRound - aiTurnsThisRound),
@@ -610,6 +619,14 @@ export async function getSimulationPlan(
   return assembleSimulationPlan({ energy, window, candidateSet, dialogue });
 }
 
+function readReplyToMessageId(contextJson: unknown): string | null {
+  if (contextJson === null || typeof contextJson !== "object") return null;
+  const dialogue = (contextJson as { dialogue?: unknown }).dialogue;
+  if (dialogue === null || typeof dialogue !== "object") return null;
+  const replyTo = (dialogue as { replyToMessageId?: unknown }).replyToMessageId;
+  return typeof replyTo === "string" ? replyTo : null;
+}
+
 function realizerVoice(affinity: number | undefined) {
   const value = affinity ?? 0.5;
   return {
@@ -940,9 +957,13 @@ export async function simulateConversationTurn(
       stopReason = "NO_OPPORTUNITY";
       break;
     }
+    const mentioned =
+      chosen.reasons.includes("DIRECT_MENTION") ||
+      chosen.reasons.includes("SUBJECT_MENTION") ||
+      chosen.reasons.includes("REPLY_TARGET");
     const intent = deriveDialogueIntent({
       content: lastMessage.content,
-      mentioned: false,
+      mentioned,
       energy: plan.energy,
     });
     const ok = await realizeAndPersist({
