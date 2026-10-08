@@ -228,36 +228,26 @@ describe("UniverseInit bootstrap — temporada do universo a partir de ExternalS
     expect(await readWorldSeason(fixture.ids.universeId)).toBe(fixture.ids.seasonId);
   });
 
-  it("múltiplas temporadas do mesmo ano → conflito sem nenhuma escrita", async () => {
+  it("múltiplas temporadas do mesmo ano são impedidas pelo banco (unique)", async () => {
     const fixture = await seedUniverseInitFixture(2065);
     extraCleanups.push(() => fixture.cleanup());
-    const worldBefore = await readWorldSeason(fixture.ids.universeId);
-    await captureWorldRowPresence(fixture.ids.universeId);
-
-    const secondSeason = await prisma.season.create({
-      data: {
-        universeId: fixture.ids.universeId,
-        year: 2065,
-        name: "2065B",
-        status: "PRE_SEASON",
-      },
-    });
-    seasonIds.push(secondSeason.id);
 
     await expect(
-      universeInitService.bootstrapSeason(
-        actorFor(fixture.ids.userId),
-        fixture.ids.extSeasonId,
-      ),
-    ).rejects.toMatchObject({ code: "MULTIPLE_SEASONS_SAME_YEAR" });
+      prisma.season.create({
+        data: {
+          universeId: fixture.ids.universeId,
+          year: 2065,
+          name: "2065B",
+          status: "PRE_SEASON",
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
 
     expect(
-      await prisma.externalBindingSeason.count({
-        where: { externalSeasonId: fixture.ids.extSeasonId },
+      await prisma.season.count({
+        where: { universeId: fixture.ids.universeId, year: 2065 },
       }),
-    ).toBe(0);
-    expect(await prisma.season.count({ where: { year: 2065 } })).toBe(2);
-    expect(await readWorldSeason(fixture.ids.universeId)).toBe(worldBefore);
+    ).toBe(1);
   });
 
   it("binding sugerido → conflito sem escrita", async () => {
