@@ -8,6 +8,10 @@ import type {
   DialogueRealizerContext,
   DialogueRealizerProvider,
 } from "./conversation.dialogue-realizer.js";
+import {
+  describeRelationshipAffinity,
+  describeVoiceStyle,
+} from "./conversation.dialogue-persona.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_FRAGMENT_CHARS = 400;
@@ -51,7 +55,13 @@ export function buildOllamaRealizerPrompt(context: DialogueRealizerContext): {
     section("COMO RESPONDER", guidance),
     section("TOM EMOCIONAL", emotion),
     section("TÓPICO", context.topic),
-    section("AFINIDADE (0 a 1)", context.relationshipAffinity?.toFixed(2) ?? null),
+    section(
+      "RELAÇÃO",
+      context.relationshipAffinity !== null
+        ? `${describeRelationshipAffinity(context.relationshipAffinity)} (afinidade ${context.relationshipAffinity.toFixed(2)})`
+        : null,
+    ),
+    section("ESTILO", describeVoiceStyle(voice)),
     section(
       "VOZ",
       `informalidade ${voice.informality.toFixed(2)}, calor ${voice.warmth.toFixed(2)}, humor ${voice.humor.toFixed(2)}, emoji ${voice.emojiTendency.toFixed(2)}, verbosidade ${voice.verbosity.toFixed(2)}`,

@@ -212,6 +212,8 @@ describe("F22.2 — provider Ollama do Dialogue Realizer (stub, sem rede)", () =
     expect(userPrompt).toContain("MEMÓRIAS DISPONÍVEIS");
     expect(userPrompt).toContain("LIMITE");
     expect(userPrompt).toContain("INTERLOCUTOR: Alicya");
+    expect(userPrompt).toContain("RELAÇÃO: próxima");
+    expect(userPrompt).toContain("ESTILO:");
     expect(userPrompt).toContain("COMO RESPONDER");
     expect(userPrompt).toContain("não afirme executar ações externas");
     expect(systemPrompt).toContain("JSON");
