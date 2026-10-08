@@ -17,9 +17,9 @@
   (presença em tempo real: single-player, sem consumidor; não implementar)**;   **F20 concluída
   (performance da lista de mensagens: memoização; paginação/virtualização deferidas)**; **F21
   concluída (secret: sem caminho de vazamento; `.gitignore` endurecido para `.env.*`)**;
-  **F22 em andamento (qualidade conversacional) — F22.1–F22.6 concluídas (baseline/tone-aware,
-  LLM realizer experimental, strategy+guardrails, curadoria, persona/relação, anti-repetição);
-  LLM NÃO promovido (default determinístico); restam F22.7–F22.8**.
+  **F22 — COMPLETE (qualidade conversacional, F22.1–F22.8). LLM — EXPERIMENTAL;
+  DETERMINISTIC — DEFAULT (promotion gate: NÃO promovido; multi-turno com question overuse/
+  incoerência no `llama3.2`)**.
 - Caminho real da UI validado: Conversations usa `createMessage` + `simulate-turn/plan` +
   `simulate-turn`; o `SEND_MESSAGE` do AI Behavior usa `simulateConversationTurn` com seed; o
   segundo writer (`assembleGenerationBundle`/`persistGeneratedMessage`) foi removido do AI
@@ -224,7 +224,13 @@
 - F22.7 concluída (commit desta subfase; doc `docs/post-v4-dialogue-engine-f22-7.md`):
   `selfDisclosureMode` na estratégia (FORBIDDEN/OPTIONAL/ENCOURAGED) + orientação de
   compartilhamento no prompt; sem planner/scheduler novo; turno ativo apenas.
-- Roadmap: F22.8 avaliação final + promotion gate.
+- F22.8 concluída (commit desta subfase; docs `post-v4-dialogue-engine-f22-8.md` e
+  `evaluations/f22-human-review.md`): multi-turno real (4×5 turnos) via
+  `npm run human-quality:multiturn`; determinístico 0 violações/0 perguntas/0 dup; LLM question
+  overuse (até 80%) e incoerência → **promotion gate: LLM NÃO promovido**. F9 PASS; API full 3008
+  (flake histórico `autonomous #13`, verde isolado 13/13); tsc/ESLint verdes; web não alterada.
+- Programa F22 encerrado. Roadmap residual: apenas itens condicionados a requisito de produto
+  (paginação/virtualização, presença em tempo real, `setErrorHandler`).
 - Validação F22.1: foco 7/7 + realizer 32/32 + conversation 454/454; API full **213 files /
   2968 tests — 100% verde**; benchmark F9 PASS antes/depois; sem migration.
 
@@ -249,7 +255,7 @@ F19: análise `post-v4-dialogue-engine-f19.md`; docs `0ef21e6` (sem código).
 F20: F20.1 `0f32267`; docs `fd1c8c4`.
 F21: F21.1 `609f31d`; docs `e1c0ce2`.
 F22: F22.1 `f0f705f`; F22.2 `1157708`; F22.3 `cecc6b3`; F22.4 `71ba1f1`; F22.5 `34218b7`;
-F22.6 `44061d1`; F22.7 (commit desta subfase).
+F22.6 `44061d1`; F22.7 `99143cb`; F22.8 (commit desta subfase).
 
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
@@ -304,6 +310,9 @@ F22.6 `44061d1`; F22.7 (commit desta subfase).
   histórico; benchmark F9 PASS; tsc/ESLint verdes; A/B reexecutado; web não alterada.
 - F22.7 (API): foco strategy/ollama/naturalness 29/29; API full 3008 testes com 1 flake histórico;
   benchmark F9 PASS; tsc/ESLint verdes; A/B reexecutado; web não alterada.
+- F22.8 (API/scripts): multi-turn real (4 sequências × 5 turnos) executado; determinístico 0
+  violações/0 perguntas/0 dup; LLM question overuse até 80% + incoerência; F9 PASS; API full 3008
+  com flake histórico verde isolado (13/13); tsc/ESLint verdes; web não alterada.
 
 ## Flakes observados
 - F17: 3 execuções full com flakes históricos (autonomous #13, pilot-knowledge #4; race-weekend/
@@ -315,9 +324,11 @@ F22.6 `44061d1`; F22.7 (commit desta subfase).
   desde F6); `world-progression`/`biography.lifecycle`/`conversation.autonomous #13` falharam uma
   vez sob pressão na F11 e passaram isoladas. Nenhum é atribuído a F11/F12.
 
-## Programa ativo — F22 Human Conversation Quality
-F22.1–F22.7 concluídas. Próxima (e última planejada): F22.8 — avaliação final multi-turno +
-promotion gate. Detalhes em `docs/post-v4-dialogue-engine-f22*.md`.
+## Programa F22 — ENCERRADO
+F22.1–F22.8 concluídas. LLM — EXPERIMENTAL (`DIALOGUE_REALIZER=llm`); DETERMINISTIC — DEFAULT.
+Relatórios em `docs/post-v4-dialogue-engine-f22*.md`; revisão em `docs/evaluations/`. Itens
+residuais são condicionados a requisito de produto (paginação/virtualização, presença,
+`setErrorHandler`).
 
 ## Backlog futuro (priorizado)
 1. Streaming como transporte — **decidido na F13: não implementar** enquanto o realizer for
@@ -358,10 +369,9 @@ atualizar este HANDOFF ao fim de cada subfase; código real prevalece sobre o ha
 
 ## Prompt de retomada
 "Leia `docs/HANDOFF.md`, `AGENTS.md` e os docs `docs/post-v4-dialogue-engine-f9.md` a
-`docs/post-v4-dialogue-engine-f22-7.md`. Valide Git (branch, HEAD, working tree). F3–F9
-concluídas, F10–F21 concluídas e F22 em andamento (F22.1–F22.7 concluídas; LLM realizer existe
-atrás de `DIALOGUE_REALIZER=llm` mas NÃO foi promovido; próximo passo F22.8 — avaliação final +
-promotion gate); NÃO repita. Garanta Docker Desktop/Postgres ativos; Ollama é opcional (`npm run
-human-quality:ab`). Para verificar o engine, rode `pnpm benchmark:f9`. Não use amend e não faça
-push."
+`docs/post-v4-dialogue-engine-f22-8.md`. Valide Git (branch, HEAD, working tree). F3–F22
+concluídas (F22 — COMPLETE; LLM EXPERIMENTAL, DETERMINISTIC DEFAULT); NÃO repita. Garanta Docker
+Desktop/Postgres ativos; Ollama é opcional (`npm run human-quality:ab` e
+`human-quality:multiturn`). Para verificar o engine, rode `pnpm benchmark:f9`. Para trabalho novo,
+escolha um item condicional do backlog ou abra fase própria. Não use amend e não faça push."
 
