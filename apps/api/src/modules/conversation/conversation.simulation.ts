@@ -33,6 +33,7 @@ import {
 import { createOllamaDialogueRealizerProviderFromEnv } from "./conversation.dialogue-realizer-ollama.js";
 import { deriveDialogueResponseStrategy } from "./conversation.dialogue-strategy.js";
 import { validateConversationNaturalness } from "./conversation.dialogue-naturalness.js";
+import { curateDialogueMemories } from "./conversation.dialogue-context-curation.js";
 import { validateDialogueOutput } from "./conversation.dialogue-output.js";
 import { deriveDialogueEmotion } from "./conversation.dialogue-emotion.js";
 import { deriveDialogueTopic } from "./conversation.dialogue-topic.js";
@@ -732,6 +733,10 @@ export async function simulateConversationTurn(
     const replyTarget = input.replyToMessageId
       ? messageById.get(input.replyToMessageId) ?? null
       : null;
+    const curatedMemories = curateDialogueMemories(
+      memoryContext.items.map((item) => item.summary),
+      { recentTexts: recentMessages.map((message) => message.content), limit: 3 },
+    );
     const strategy = deriveDialogueResponseStrategy({
       intent: input.intent,
       emotionTone: dialogueContext.emotion?.tone ?? null,
@@ -752,7 +757,7 @@ export async function simulateConversationTurn(
       topicContext: dialogueContext.topic,
       emotionalTone: plan.dialogue.emotionalTone,
       relationshipAffinity: dialogueContext.relationship.affinity,
-      memorySummaries: memoryContext.items.map((item) => item.summary),
+      memorySummaries: curatedMemories,
       memoryContext,
       knowledgeContext: dialogueContext.knowledge,
       voice,

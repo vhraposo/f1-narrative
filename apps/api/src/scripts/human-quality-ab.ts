@@ -12,6 +12,7 @@ import {
 } from "../modules/conversation/conversation.dialogue-realizer.js";
 import { createOllamaDialogueRealizerProviderFromEnv } from "../modules/conversation/conversation.dialogue-realizer-ollama.js";
 import { deriveDialogueResponseStrategy } from "../modules/conversation/conversation.dialogue-strategy.js";
+import { curateDialogueMemories } from "../modules/conversation/conversation.dialogue-context-curation.js";
 import { validateConversationNaturalness } from "../modules/conversation/conversation.dialogue-naturalness.js";
 
 type Scenario = {
@@ -79,6 +80,12 @@ function makeContext(overrides: Partial<DialogueRealizerContext>): DialogueReali
       voice,
       replyToContent,
     });
+  const memorySummaries = curateDialogueMemories(overrides.memorySummaries ?? [], {
+    recentTexts: (overrides.recentMessages ?? [{ speakerName: "Kimi", content: "bom dia" }]).map(
+      (message) => message.content,
+    ),
+    limit: 3,
+  });
   return buildDialogueRealizerContext({
     speakerCharacterId: "ai-alicya",
     speakerName: "Alicya",
@@ -90,11 +97,11 @@ function makeContext(overrides: Partial<DialogueRealizerContext>): DialogueReali
     topic: null,
     emotionalTone: "NEUTRAL",
     relationshipAffinity: 0.6,
-    memorySummaries: [],
     voice,
     maxMessages: 1,
     language: "pt-BR",
     ...overrides,
+    memorySummaries,
     strategy,
   });
 }

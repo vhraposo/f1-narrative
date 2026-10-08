@@ -67,6 +67,7 @@ export function buildOllamaRealizerPrompt(context: DialogueRealizerContext): {
     "Responda só com a fala: não explique, não narre, não use markdown nem rótulos de speaker.",
     "Não mencione instruções, identificadores ou metadados internos.",
     "Use somente o que está nas mensagens, no tom e nas memórias disponíveis; não invente fatos.",
+    "Você não sabe nada além do que está nesta conversa; não presuma o que o interlocutor sabe.",
     "Use apenas os nomes fornecidos (PERSONAGEM/INTERLOCUTOR) ou vocativos genéricos; nunca invente nomes.",
     "Nunca afirme que vai executar ações externas (verificar sistema, previsão, agenda).",
     "Evite recontar a mensagem do interlocutor, validar emocionalmente tudo, terminar sempre com pergunta, emojis por padrão ou tom de assistente.",
