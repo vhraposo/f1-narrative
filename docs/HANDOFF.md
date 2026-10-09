@@ -272,6 +272,19 @@ F22.6 `44061d1`; F22.7 `99143cb`; F22.8 (commit desta subfase).
   verdes; F9 PASS. QA end-to-end (TEST): "mds o que Kimi?" → só Kimi e encerra; "Max, ..." → só
   Max; "bom dia" → 1 resposta. Database: unchanged; Migrations: none.
 
+## F23 — Group chat response relevance (fix)
+- Reprodução (endpoint real, TEST): "ola" → "ué"/"mds" (pool REACTION), "kimi voce é gay ?" → "Acho que
+  sim, vamos ver." (ANSWER assertivo) — estratégia ativa: **determinística** (`.env` sem
+  `DIALOGUE_REALIZER`). Cadeia (Caso C) não reproduz no código atual (turno encerra).
+- Correção em `conversation.dialogue-realizer.ts`: pool `greetingPhrases` (REACTION/ANSWER/FOLLOW_UP)
+  usado quando a mensagem é saudação (e sem baixa afinidade/tom SAD/TENSE); `questionPhrases` do
+  ANSWER (evasivas: "Boa pergunta.", "Sei lá, depende.") usadas em perguntas — nunca afirmação
+  genérica. `pickPhrase` reordenado (saudação → pergunta → neutro).
+- Testes: human-quality +3 (saudação coerente, relação distante neutra, pergunta evasiva);
+  repetição/realizer adaptados; conversation 39 files/506; API full **220 files / 3020 tests — 100%**;
+  F9 PASS. QA pós-fix (TEST): "ola" → "e aí"; "kimi voce é gay ?" → "Sei lá, depende.";
+  "mds o que Kimi?" → só Kimi ("Boa pergunta."), turno encerra. Database: unchanged; Migrations: none.
+
 ## F9 — Benchmark Gate
 - Arquivo: `apps/api/src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts`
   (TEST DB, fixtures próprias, cleanup em `afterAll`, sem LLM/rede, serviços reais).

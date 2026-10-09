@@ -301,7 +301,12 @@ describe("F3.2 — DeterministicDialogueRealizer", () => {
 
   it("nenhuma frase da política é genérica ou corporativa", () => {
     for (const policy of Object.values(INTENT_REALIZATION_POLICY)) {
-      for (const phrase of [...policy.phrases, ...(policy.neutralPhrases ?? []), ...(policy.questionPhrases ?? [])]) {
+      for (const phrase of [
+        ...policy.phrases,
+        ...(policy.neutralPhrases ?? []),
+        ...(policy.questionPhrases ?? []),
+        ...(policy.greetingPhrases ?? []),
+      ]) {
         expect(isGenericText(phrase)).toBe(false);
       }
     }

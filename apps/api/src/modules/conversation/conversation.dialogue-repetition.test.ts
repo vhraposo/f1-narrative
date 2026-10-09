@@ -15,7 +15,7 @@ function context(overrides: Partial<DialogueRealizerContext> = {}): DialogueReal
     interlocutorName: "Alicya",
     intent: "REACTION",
     replyToMessageId: "m-1",
-    replyToContent: "oi",
+    replyToContent: "falamos depois",
     recentMessages: [{ speakerName: "Alicya", content: "bom dia" }],
     topic: null,
     emotionalTone: "NEUTRAL",

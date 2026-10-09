@@ -31,8 +31,8 @@ function context(overrides: Partial<DialogueRealizerContext> = {}): DialogueReal
     speakerName: "Alicya",
     intent: "REACTION",
     replyToMessageId: "m-1",
-    replyToContent: "bom dia",
-    recentMessages: [{ speakerName: "Kimi", content: "bom dia" }],
+    replyToContent: "falamos depois",
+    recentMessages: [{ speakerName: "Kimi", content: "falamos depois" }],
     topic: null,
     emotionalTone: "NEUTRAL",
     relationshipAffinity: 0.6,
@@ -133,5 +133,22 @@ describe("F22 baseline — qualidade conversacional determinística", () => {
     const first = await textFor("SUPPORT", { maxMessages: 2 });
     const second = await textFor("SUPPORT", { maxMessages: 2 });
     expect(first).toBe(second);
+  });
+
+  it("saudação recebe resposta socialmente coerente (não 'ué'/'mds')", async () => {
+    const text = await textFor("REACTION", { replyToContent: "ola" });
+    expect(INTENT_REALIZATION_POLICY.REACTION.greetingPhrases ?? []).toContain(text);
+    expect(["ué", "mds", "kkkk"]).not.toContain(text);
+  });
+
+  it("saudação de relação distante permanece neutra", async () => {
+    const text = await textFor("REACTION", { replyToContent: "oi", relationshipAffinity: 0.1 });
+    expect(INTENT_REALIZATION_POLICY.REACTION.neutralPhrases ?? []).toContain(text);
+  });
+
+  it("pergunta direta não recebe afirmação genérica", async () => {
+    const text = await textFor("ANSWER", { replyToContent: "kimi voce é gay ?" });
+    expect(INTENT_REALIZATION_POLICY.ANSWER.questionPhrases ?? []).toContain(text);
+    expect(INTENT_REALIZATION_POLICY.ANSWER.phrases).not.toContain(text);
   });
 });

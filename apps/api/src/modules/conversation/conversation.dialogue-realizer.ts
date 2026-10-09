@@ -119,6 +119,7 @@ type IntentRealizationPolicy = {
   readonly phrases: readonly string[];
   readonly neutralPhrases?: readonly string[];
   readonly questionPhrases?: readonly string[];
+  readonly greetingPhrases?: readonly string[];
 };
 
 export const INTENT_REALIZATION_POLICY: Record<DialogueIntent, IntentRealizationPolicy> = {
@@ -133,6 +134,8 @@ export const INTENT_REALIZATION_POLICY: Record<DialogueIntent, IntentRealization
       "Talvez, não dá pra cravar.",
     ],
     neutralPhrases: ["Acho que sim.", "Pode ser.", "Vamos ver.", "Provavelmente."],
+    questionPhrases: ["Boa pergunta.", "Pode ser.", "Sei lá, depende.", "Difícil dizer."],
+    greetingPhrases: ["oi", "bom dia", "e aí", "olá", "opa"],
   },
   QUESTION: {
     maxChars: 60,
@@ -145,6 +148,7 @@ export const INTENT_REALIZATION_POLICY: Record<DialogueIntent, IntentRealization
     phrases: ["kkkk", "pior que sim", "nem fala", "ué", "sério isso?", "mds"],
     neutralPhrases: ["entendi", "ok", "certo", "tá"],
     questionPhrases: ["sei lá", "boa pergunta", "depende", "difícil dizer"],
+    greetingPhrases: ["oi", "bom dia", "e aí", "olá", "opa"],
   },
   JOKE: {
     maxChars: 60,
@@ -188,6 +192,7 @@ export const INTENT_REALIZATION_POLICY: Record<DialogueIntent, IntentRealization
     maxChars: 60,
     fragmentsAllowed: false,
     phrases: ["Mas e depois?", "E aí, o que rolou?", "Como assim?", "E você, o que acha?"],
+    greetingPhrases: ["oi, bom dia", "bom dia", "oi", "e aí", "olá"],
   },
   TOPIC_CHANGE: {
     maxChars: 70,
@@ -259,8 +264,13 @@ function isLowEnergyTone(context: DialogueRealizerContext): boolean {
 function pickPhrase(context: DialogueRealizerContext, policy: IntentRealizationPolicy): string {
   const affinity = context.relationshipAffinity;
   const lowAffinity = affinity !== null && affinity <= 0.3;
+  const reply = context.replyToContent ?? "";
+  const isGreeting = /^\s*(bom dia|boa tarde|boa noite|oi|ol[aá]|e a[íi]|eai|opa)\b/i.test(reply);
+  const hasQuestion = reply.includes("?");
   let pool = policy.phrases;
-  if (context.intent === "REACTION" && context.replyToContent?.includes("?") && policy.questionPhrases) {
+  if (isGreeting && !lowAffinity && !isLowEnergyTone(context) && policy.greetingPhrases) {
+    pool = policy.greetingPhrases;
+  } else if (hasQuestion && policy.questionPhrases) {
     pool = policy.questionPhrases;
   } else if ((lowAffinity || isLowEnergyTone(context)) && policy.neutralPhrases) {
     pool = policy.neutralPhrases;
