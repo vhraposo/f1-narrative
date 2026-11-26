@@ -1,8 +1,5 @@
 import { prisma } from "../../infrastructure/database/prisma.js";
-import type {
-  JolpicaClient,
-  JolpicaRaceRaw,
-} from "./jolpica.client.js";
+import type { JolpicaClient } from "./jolpica.client.js";
 import {
   createExternalDataProvider,
   type ExternalDataProvider,
@@ -16,9 +13,6 @@ import {
   normalizeSeason,
   normalizeStandings,
   normalizeTeams,
-  type NormalizedWithSource,
-  type NormalizedDriver,
-  type NormalizedResult,
 } from "./jolpica.normalizer.js";
 import {
   mergePersistResults,
@@ -271,34 +265,13 @@ export class JolpicaSyncService {
   async syncResults(year: number): Promise<JolpicaSyncReport> {
     const started = Date.now();
     const counts = await this.runScoped("RESULTS", year, async () => {
-      const races = await this.client.getSeasonRaces(year);
-      const rounds = uniqueSortedRounds(races);
-      const resultItems: NormalizedWithSource<NormalizedResult>[] = [];
-      const driverItems = new Map<
-        string,
-        NormalizedWithSource<NormalizedDriver>
-      >();
-      for (const round of rounds) {
-        const payload = await this.client.getRaceResults(year, round);
-        const normalized = normalizeRaceResults(payload, year);
-        resultItems.push(...normalized.results);
-        for (const driver of normalized.drivers) {
-          driverItems.set(driver.data.externalId, driver);
-        }
-        if (this.requestDelayMs > 0) {
-          await this.sleep(this.requestDelayMs);
-        }
-      }
+      const races = await this.client.getSeasonResults(year, this.requestDelayMs);
+      const normalized = normalizeRaceResults(races, year);
       const now = new Date();
       return prisma.$transaction(async (tx) =>
         mergePersistResults([
-          await persistDrivers(
-            tx,
-            JOLPICA_SOURCE,
-            [...driverItems.values()],
-            now,
-          ),
-          await persistResults(tx, JOLPICA_SOURCE, resultItems, now),
+          await persistDrivers(tx, JOLPICA_SOURCE, normalized.drivers, now),
+          await persistResults(tx, JOLPICA_SOURCE, normalized.results, now),
         ]),
       );
     });
@@ -353,16 +326,4 @@ export class JolpicaSyncService {
     };
   }
 
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-}
-
-function uniqueSortedRounds(races: JolpicaRaceRaw[]): number[] {
-  const rounds: number[] = [];
-  for (const race of races) {
-    const round = Number.parseInt(String(race.round), 10);
-    if (Number.isInteger(round)) rounds.push(round);
-  }
-  return [...new Set(rounds)].sort((a, b) => a - b);
 }

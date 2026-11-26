@@ -59,6 +59,58 @@ export default function F1WorldDataPage() {
   const resultsQuery = useExternalResults(year);
   const standingsQuery = useExternalStandings(year);
 
+  const latestResults = useMemo(() => {
+    const results = resultsQuery.data ?? [];
+    if (results.length === 0) return [];
+    const latestRound = Math.max(
+      ...results.map((result) => result.externalRace.round),
+    );
+    return results.filter(
+      (result) => result.externalRace.round === latestRound,
+    );
+  }, [resultsQuery.data]);
+
+  const latestRace = useMemo(() => {
+    const round = latestResults[0]?.externalRace.round;
+    if (round == null) return null;
+    return (
+      (racesQuery.data ?? []).find((race) => race.round === round) ?? null
+    );
+  }, [latestResults, racesQuery.data]);
+
+  const latestRaceLabel = useMemo(() => {
+    const round = latestResults[0]?.externalRace.round;
+    if (round == null) return null;
+    const name = latestRace?.grandPrix ?? latestRace?.name ?? "Corrida";
+    return `${name} · rodada ${round}`;
+  }, [latestResults, latestRace]);
+
+  const latestRaceDriverSeasons = useMemo(() => {
+    const seasonEntries = driverSeasonsQuery.data ?? [];
+    if (latestResults.length === 0) return seasonEntries;
+    const byExternalId = new Map(
+      seasonEntries.map((entry) => [entry.externalDriver.externalId, entry]),
+    );
+    const entries: typeof seasonEntries = [];
+    for (const result of latestResults) {
+      const existing = byExternalId.get(result.externalDriver.externalId);
+      if (existing) {
+        entries.push(existing);
+        continue;
+      }
+      entries.push({
+        id: `latest-${result.id}`,
+        seasonYear: result.externalRace.seasonYear,
+        externalDriver: result.externalDriver,
+        teamExternalId: null,
+        teamNameSnapshot: null,
+        number: null,
+        role: null,
+      });
+    }
+    return entries;
+  }, [driverSeasonsQuery.data, latestResults]);
+
   const teamsByExternalId = useMemo(() => {
     const map: Record<string, ExternalTeam> = {};
     for (const team of teamsQuery.data ?? []) {
@@ -312,22 +364,34 @@ export default function F1WorldDataPage() {
             />
 
             <ExternalDrivers
-              driverSeasons={driverSeasonsQuery.data ?? []}
+              driverSeasons={latestRaceDriverSeasons}
               driversByExternalId={driversByExternalId}
-              isLoading={driverSeasonsQuery.isLoading}
-              isError={driverSeasonsQuery.isError}
-              refetching={driverSeasonsQuery.isRefetching}
-              onRetry={() => void driverSeasonsQuery.refetch()}
+              contextLabel={latestRaceLabel}
+              isLoading={driverSeasonsQuery.isLoading || resultsQuery.isLoading}
+              isError={driverSeasonsQuery.isError || resultsQuery.isError}
+              refetching={
+                driverSeasonsQuery.isRefetching || resultsQuery.isRefetching
+              }
+              onRetry={() => {
+                void driverSeasonsQuery.refetch();
+                void resultsQuery.refetch();
+              }}
             />
 
             <ExternalTeams
               year={year}
-              driverSeasons={driverSeasonsQuery.data ?? []}
+              driverSeasons={latestRaceDriverSeasons}
               teamsByExternalId={teamsByExternalId}
-              isLoading={driverSeasonsQuery.isLoading}
-              isError={driverSeasonsQuery.isError}
-              refetching={driverSeasonsQuery.isRefetching}
-              onRetry={() => void driverSeasonsQuery.refetch()}
+              contextLabel={latestRaceLabel}
+              isLoading={driverSeasonsQuery.isLoading || resultsQuery.isLoading}
+              isError={driverSeasonsQuery.isError || resultsQuery.isError}
+              refetching={
+                driverSeasonsQuery.isRefetching || resultsQuery.isRefetching
+              }
+              onRetry={() => {
+                void driverSeasonsQuery.refetch();
+                void resultsQuery.refetch();
+              }}
             />
 
             <ExternalCalendar

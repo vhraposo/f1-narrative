@@ -83,6 +83,14 @@ function mapRefreshFailure(error: unknown): {
         error: "Recurso não encontrado na fonte externa",
       };
     }
+    if (error.code === "HTTP" && error.statusCode === 403) {
+      return {
+        statusCode: 502,
+        code: "SOURCE_FORBIDDEN",
+        error:
+          "A fonte externa recusou a consulta (HTTP 403); verifique bloqueio da fonte ou tente novamente mais tarde",
+      };
+    }
     if (error.code === "TIMEOUT") {
       return {
         statusCode: 504,
@@ -179,6 +187,17 @@ export const jolpicaSyncRoutes: FastifyPluginAsync<JolpicaSyncRoutesOptions> =
           recent: recent.map(toRunView),
         });
       },
+    );
+
+    fastify.get("/api/external-sync/refresh", async (_request, reply) =>
+      reply
+        .header("Allow", "POST")
+        .code(405)
+        .send({
+          code: "METHOD_NOT_ALLOWED",
+          error:
+            "Esta rota aceita apenas POST com { seasonYear }; o erro de limite (429) vem da fonte externa, não desta rota",
+        }),
     );
 
     fastify.post(

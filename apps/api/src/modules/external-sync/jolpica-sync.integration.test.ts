@@ -211,7 +211,19 @@ class JolpicaFixtureServer {
       );
     }
     if (filename === "results.json") {
-      const round = Number(parts[parts.length - 2]);
+      const rawRound = parts[parts.length - 2];
+      if (rawRound === String(this.year)) {
+        const races = this.rounds.map((entry) => ({
+          ...entry.race,
+          Results: entry.results,
+        }));
+        return this.json(
+          body({
+            RaceTable: { season: String(this.year), Races: races },
+          }),
+        );
+      }
+      const round = Number(rawRound);
       const entry = this.rounds.find((r) => r.round === round);
       const races = entry ? [{ ...entry.race, Results: entry.results }] : [];
       return this.json(

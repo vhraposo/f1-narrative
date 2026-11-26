@@ -16,6 +16,7 @@ type ExternalTeamsProps = {
   year: number;
   driverSeasons: ExternalDriverSeason[];
   teamsByExternalId: Record<string, ExternalTeam>;
+  contextLabel?: string | null;
   isLoading: boolean;
   isError: boolean;
   refetching: boolean;
@@ -34,6 +35,7 @@ export function ExternalTeams({
   year,
   driverSeasons,
   teamsByExternalId,
+  contextLabel,
   isLoading,
   isError,
   refetching,
@@ -68,6 +70,11 @@ export function ExternalTeams({
         title="Equipes"
         action={<ExternalSourceBadge />}
       />
+      {contextLabel ? (
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Última corrida · {contextLabel}
+        </p>
+      ) : null}
       {isLoading && <ExternalSectionLoading />}
       {isError && (
         <ExternalSectionError
@@ -79,7 +86,7 @@ export function ExternalTeams({
       {!isLoading && !isError && teams.length === 0 && (
         <ExternalSectionEmpty
           title={`Não há equipes da fonte para ${year}.`}
-          description="As equipes são derivadas dos pilotos da temporada (ExternalDriverSeason) informados na fonte."
+          description="As equipes são derivadas dos pilotos que correram na fonte."
         />
       )}
       {!isLoading && !isError && teams.length > 0 && (
@@ -106,8 +113,8 @@ export function ExternalTeams({
                   ID externo: {team.externalId}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {team.driverCount} piloto{team.driverCount === 1 ? "" : "s"} na
-                  temporada
+                  {team.driverCount} piloto{team.driverCount === 1 ? "" : "s"}{" "}
+                  {contextLabel ? "na última corrida" : "na temporada"}
                 </p>
               </CardContent>
             </Card>

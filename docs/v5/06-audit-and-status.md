@@ -67,21 +67,50 @@ A V5 **não parte do zero**. Já existem, em produção/testes:
 - **Os JSONs `data/v5/*.json` precisam ser versionados junto do código** para o teste de dataset
   real passar em CI.
 
+## 3.2 V5.2–V5.4 implementadas como domínio puro (sem persistência ainda)
+### V5.2 — `modules/racing/driver-development.ts`
+- 10 atributos (`qualifyingPace`, `racePace`, `consistency`, `tireManagement`, `racecraft`,
+  `starts`, `wetWeather`, `adaptability`, `composure`, `technicalFeedback`), potencial por
+  atributo, idade/experiência, forma, moral, confiança e fadiga.
+- `effectiveAttributes` (fadiga penaliza físicos; confiança penaliza compostura), treino com
+  custo crescente, retorno decrescente por headroom, teto de potencial, fator de idade e
+  programas padrão; IA escolhe o maior headroom; `advanceAge`/`recover`.
+- `simulateDevelopmentSeason` limita ganho total (teste: ≤45 em 24 sessões) e nunca ultrapassa
+  potencial. **7 testes.**
+
+### V5.3 — `modules/racing/team-development.ts`
+- 8 dimensões (`aero`, `power`, `chassis`, `tyres`, `reliability`, `pitCrew`, `development`,
+  `strategy`), potencial, upgrades com `availableFrom`, confiança, custo e histórico.
+- Rejeita duplicado/sem orçamento/sem headroom; ganho decrescente; `teamStrength` ponderado.
+  **6 testes.**
+
+### V5.4 — `modules/racing/race-probability.ts`
+- Força = 58% piloto (efetivo por fadiga/confiança, seco/chuva, rua, dificuldade de
+  ultrapassagem) + 42% equipe (pesos por tipo de pista) + bônus de casa pequeno.
+- Grade por quali simulada (ritmo de quali + carro + ruído semeado); corrida por Gumbel/Monte
+  Carlo com bônus de grade proporcional à dificuldade de ultrapassagem, DNF por confiabilidade/
+  risco da pista/chuva e clima amostrado da climatologia real.
+- Saída: win/pódio/pontos/top10/DNF/posição esperada/distribuição/força, grade, probabilidade de
+  chuva; RNG determinístico (mulberry32 + hash). **8 testes** (normalização, determinismo,
+  sensibilidade a força/chuva/casa/DNF/grade).
+- Usa `TrackProfile` real, mas **ainda não há rota/API/UI nem backtest walk-forward**; isso é
+  pré-requisito de aceite da V5.4 completa (calibração).
+
 ## 4. Fases restantes (não implementadas nesta execução)
-- **V5.2** — migrar `DriverAttribute` para os 10 atributos + potencial/forma/fadiga/moral;
-  seed pelo universo (Jolpica/resultados) com faixa de incerteza; treino por calendário, custo
-  crescente, IA de treino; testes de não-inflação em temporada.
-- **V5.3** — migrar `TeamPerformance` para 8 dimensões; seed por construtores/forma/DNF/pit;
-  upgrades datados com fonte/confiança; testes por dimensão.
-- **V5.4** — motor de previsão (Plackett–Luce/ROL + Monte Carlo) sobre perfis reais; backtest
-  walk-forward com log loss/Brier/ECE vs baseline grid; feature flag.
-- **V5.5** — simulação oficial por voltas (pneus, pit, SC/VSC, ultrapassagem) com RNG semeado;
-  persistência via Command Layer (`RaceResult`/`RaceSessionResult`/pontos/timeline/WorldState).
-- **V5.6** — carreira: treino por calendário, feats, moral/confiança, memórias/reações autônomas.
+- **V5.2+ (persistência)** — migração TEST estendendo `DriverAttribute`/`TeamPerformance`,
+  adaptação de `qualifying`/`race-simulation`/`evolution`, seed via Jolpica/universo, rotas/UI.
+- **V5.4+ (calibração)** — backtest walk-forward com log loss/Brier/ECE vs baseline de grade;
+  feature flag `race_probability_v5`; ajustar pesos só com evidência.
+- **V5.5** — motor oficial por voltas **(não criar paralelo ao `race-simulation` existente)**:
+  extrair/estender o serviço atual com pneus, pit, SC/VSC, ultrapassagem, RNG semeado e
+  persistência única via Command Layer (`RaceResult`/`RaceSessionResult`/pontos/timeline/WorldState).
+- **V5.6** — carreira: ligar treino/upgrades ao calendário e ao banco (feature flag), feats,
+  moral/confiança, memórias/reações autônomas.
 - **V5.7** — UI (atributos/treino/equipe/previsão/corrida/histórico) + validação de temporada.
 
 ## 5. Por que parar aqui
-A V5.1 entrega a fundação de dados reais e validada. As fases seguintes exigem migrações e
-refactors dos módulos de simulação/evolução existentes (não greenfield) e validação estatística;
-executá-las sem esse cuidado violaria a regra de não declarar concluído sem evidência. O próximo
-checkpoint recomendado é **V5.2** (atributos/treino) com migração TEST e testes de inflação.
+V5.1–V5.4 estão em checkpoint verde (25 testes novos, tsc, F9). As fases seguintes exigem
+migrações e integração com os módulos existentes (não greenfield) e validação estatística. Criar
+um simulador paralelo ou UI sem integração violaria a arquitetura. Próximo passo exato:
+**V5.2 de persistência** (migração TEST + adaptação dos consumidores), depois calibração V5.4,
+depois V5.5 sobre o simulador existente.

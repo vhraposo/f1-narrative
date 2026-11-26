@@ -212,6 +212,7 @@ export function buildApp(
           baseUrl: env.JOLPICA_BASE_URL,
           timeoutMs: env.JOLPICA_TIMEOUT_MS,
           maxRetries: env.JOLPICA_MAX_RETRIES,
+          minIntervalMs: env.JOLPICA_REQUEST_DELAY_MS,
         }),
       }),
     requestDelayMs: env.JOLPICA_REQUEST_DELAY_MS,

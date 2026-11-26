@@ -34,6 +34,7 @@ import {
 type ExternalDriversProps = {
   driverSeasons: ExternalDriverSeason[];
   driversByExternalId: Record<string, ExternalDriver>;
+  contextLabel?: string | null;
   isLoading: boolean;
   isError: boolean;
   refetching: boolean;
@@ -186,6 +187,7 @@ function DriverDetailDialog({
 export function ExternalDrivers({
   driverSeasons,
   driversByExternalId,
+  contextLabel,
   isLoading,
   isError,
   refetching,
@@ -218,6 +220,11 @@ export function ExternalDrivers({
         title="Pilotos"
         action={<ExternalSourceBadge />}
       />
+      {contextLabel ? (
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Última corrida · {contextLabel}
+        </p>
+      ) : null}
       {isLoading && <ExternalSectionLoading />}
       {isError && (
         <ExternalSectionError

@@ -18,7 +18,7 @@ const BASE_URL = "https://mock.invalid/f1/";
 const YEAR = 2046;
 const ID_PREFIX = "sync2046";
 
-type FailMode = "none" | "http404" | "http500" | "rate429" | "malformed" | "timeout";
+type FailMode = "none" | "http403" | "http404" | "http500" | "rate429" | "malformed" | "timeout";
 
 class RefreshFixtureServer {
   raceName = "Australian Grand Prix";
@@ -94,6 +94,9 @@ class RefreshFixtureServer {
       if (this.failMode === "http500") {
         return new Response("boom", { status: 500 });
       }
+      if (this.failMode === "http403") {
+        return new Response("forbidden", { status: 403 });
+      }
       if (this.failMode === "rate429") {
         return new Response("slow down", { status: 429 });
       }
@@ -138,7 +141,8 @@ class RefreshFixtureServer {
       );
     }
     if (filename === "results.json") {
-      const round = Number(parts[parts.length - 2]);
+      const maybeRound = Number(parts[parts.length - 2]);
+      const round = Number.isInteger(maybeRound) && maybeRound > 0 && maybeRound < 100 ? maybeRound : 1;
       return this.json(
         body({
           RaceTable: {
@@ -473,6 +477,26 @@ describe("External data refresh (Fase 6)", () => {
       where: { source: JOLPICA_SOURCE, seasonYear: YEAR, status: "RUNNING" },
     });
     expect(stillRunning).toBe(0);
+  });
+
+  it("mapeia 403 da fonte sem vazar o corpo e orienta o bloqueio", async () => {
+    server.failMode = "http403";
+    server.failOn = "constructors";
+
+    const response = await refresh(admin.cookie);
+    expect(response.statusCode).toBe(502);
+    expect(response.json().code).toBe("SOURCE_FORBIDDEN");
+    expect(response.json().error).toContain("403");
+    expect(response.body).not.toContain("forbidden");
+  });
+
+  it("responde 405 explicando POST quando a rota é chamada por GET", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/external-sync/refresh",
+    });
+    expect(response.statusCode).toBe(405);
+    expect(response.json().code).toBe("METHOD_NOT_ALLOWED");
   });
 
   it("mapeia rate limit (429) com erro semântico", async () => {

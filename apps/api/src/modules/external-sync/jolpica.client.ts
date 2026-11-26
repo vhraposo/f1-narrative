@@ -161,6 +161,39 @@ export class JolpicaClient {
     const table = readTable(body, "RaceTable");
     return asArray(table.Races) as JolpicaRaceWithResultsRaw[];
   }
+
+  async getSeasonResults(
+    year: number,
+    pageDelayMs = 0,
+  ): Promise<JolpicaRaceWithResultsRaw[]> {
+    const limit = 100;
+    const pause = Math.max(250, pageDelayMs);
+    const collected: JolpicaRaceWithResultsRaw[] = [];
+    for (let offset = 0; offset < 5000; offset += limit) {
+      const body = await this.transport.getJson(
+        `${year}/results.json?limit=${limit}&offset=${offset}`,
+      );
+      const table = readTable(body, "RaceTable");
+      const races = asArray(table.Races) as JolpicaRaceWithResultsRaw[];
+      if (races.length === 0) break;
+      collected.push(...races);
+      const total = readTotal(body);
+      if (total !== null && offset + limit >= total) break;
+      await sleep(pause);
+    }
+    return collected;
+  }
+}
+
+function readTotal(body: unknown): number | null {
+  const root = asRecord(body);
+  const mrData = root ? asRecord(root.MRData) : null;
+  const total = Number.parseInt(String(mrData?.total ?? ""), 10);
+  return Number.isInteger(total) ? total : null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function asArray(value: unknown): unknown[] {

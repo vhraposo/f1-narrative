@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { JolpicaError, JolpicaTransport } from "./jolpica.transport.js";
+import {
+  DEFAULT_JOLPICA_USER_AGENT,
+  JolpicaError,
+  JolpicaTransport,
+} from "./jolpica.transport.js";
 
 const BASE = "https://mock.invalid/f1/";
 
@@ -16,6 +20,32 @@ describe("JolpicaTransport", () => {
     const transport = new JolpicaTransport({ baseUrl: BASE, fetchImpl });
     const body = await transport.getJson("1975.json");
     expect(body).toEqual({ ok: true, value: 42 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("envia User-Agent identificável e Accept JSON", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ ok: true }));
+    const transport = new JolpicaTransport({ baseUrl: BASE, fetchImpl });
+    await transport.getJson("1975.json");
+    const calls = fetchImpl.mock.calls as unknown as Array<Parameters<typeof fetch>>;
+    const headers = new Headers(calls[0]?.[1]?.headers);
+    expect(headers.get("User-Agent")).toBe(DEFAULT_JOLPICA_USER_AGENT);
+    expect(headers.get("Accept")).toBe("application/json");
+  });
+
+  it("não refaz 403 (bloqueio da fonte) e preserva o status", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse("forbidden", 403));
+    const transport = new JolpicaTransport({
+      baseUrl: BASE,
+      timeoutMs: 1000,
+      maxRetries: 2,
+      fetchImpl,
+    });
+    await expect(transport.getJson("2026/constructors.json")).rejects.toMatchObject({
+      name: "JolpicaError",
+      code: "HTTP",
+      statusCode: 403,
+    });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
@@ -48,6 +78,27 @@ describe("JolpicaTransport", () => {
       code: "HTTP",
       statusCode: 500,
     });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("respeita Retry-After em 429 e tenta novamente", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("slow down", {
+          status: 429,
+          headers: { "Retry-After": "0" },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ retried: true }));
+    const transport = new JolpicaTransport({
+      baseUrl: BASE,
+      timeoutMs: 1000,
+      maxRetries: 1,
+      fetchImpl,
+    });
+    const body = await transport.getJson("2026/results.json");
+    expect(body).toEqual({ retried: true });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 

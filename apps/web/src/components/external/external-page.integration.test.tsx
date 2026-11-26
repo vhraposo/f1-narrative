@@ -593,39 +593,34 @@ describe("F1 World Data - External World Data", () => {
     expect(within(grid).queryByText(/Lugar|Seat/i)).toBeNull();
   });
 
-  it("pilotos da temporada aparecem como cards com identidade real", async () => {
+  it("pilotos da última corrida aparecem como cards com identidade real", async () => {
     renderWithClient(<F1WorldDataPage />);
 
     const drivers = await screen.findByRole("region", { name: "Pilotos externos" });
     await within(drivers).findByText("Max Verstappen");
+    expect(within(drivers).getByText(/Bahrain Grand Prix/)).toBeDefined();
     expect(within(drivers).getByText("Dutch")).toBeDefined();
     expect(within(drivers).getByText("#3")).toBeDefined();
     expect(within(drivers).getByText("Red Bull")).toBeDefined();
     expect(within(drivers).getByText("ID: max-verstappen")).toBeDefined();
-    expect(within(drivers).getByText("Lando Norris")).toBeDefined();
-    expect(within(drivers).getByText("#1")).toBeDefined();
     expect(within(drivers).getByText("Oscar Piastri")).toBeDefined();
     expect(within(drivers).getByText("#81")).toBeDefined();
-    expect(within(drivers).getByText("Lewis Hamilton")).toBeDefined();
-    expect(within(drivers).getByText("#44")).toBeDefined();
-    expect(within(drivers).getByText("Charles Leclerc")).toBeDefined();
-    expect(within(drivers).getByText("#16")).toBeDefined();
-    expect(within(drivers).getByText("Reserva")).toBeDefined();
+    expect(within(drivers).queryByText("Lando Norris")).toBeNull();
     expect(within(drivers).queryByText("Fernando Alonso")).toBeNull();
   });
 
-  it("equipes da temporada derivam das equipes da fonte", async () => {
+  it("equipes da última corrida derivam dos pilotos que correram", async () => {
     renderWithClient(<F1WorldDataPage />);
 
     const teams = await screen.findByRole("region", { name: "Equipes externas" });
     expect(await within(teams).findByText("McLaren")).toBeDefined();
+    expect(within(teams).getByText(/Bahrain Grand Prix/)).toBeDefined();
     expect(within(teams).getByText("MCL")).toBeDefined();
     expect(within(teams).getByText(/ID externo: mclaren/)).toBeDefined();
-    expect(within(teams).getByText("3 pilotos na temporada")).toBeDefined();
+    expect(within(teams).getAllByText("1 piloto na última corrida").length).toBeGreaterThanOrEqual(2);
     expect(within(teams).getByText("Red Bull")).toBeDefined();
     expect(within(teams).getByText("RBR")).toBeDefined();
-    expect(within(teams).getByText("Ferrari")).toBeDefined();
-    expect(within(teams).getByText("FER")).toBeDefined();
+    expect(within(teams).queryByText("Ferrari")).toBeNull();
   });
 
   it("calendário da fonte lista corridas com circuito e data", async () => {
@@ -710,10 +705,10 @@ describe("F1 World Data - External World Data", () => {
     renderWithClient(<F1WorldDataPage />);
 
     const drivers = await screen.findByRole("region", { name: "Pilotos externos" });
-    await within(drivers).findByText("Lando Norris");
+    await within(drivers).findByText("Max Verstappen");
     await user.click(
       within(drivers).getByRole("button", {
-        name: "Ver detalhes de Lando Norris",
+        name: "Ver detalhes de Max Verstappen",
       }),
     );
 

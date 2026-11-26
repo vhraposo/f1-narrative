@@ -36,8 +36,10 @@ probabilidades e distribuição de posições; a corrida continua pertencendo ao
 
 ## Status
 - **V5.1 COMPLETE** — perfis de pista + climatologia reais, proveniência, validação e testes.
-  Ver [`06-audit-and-status.md`](06-audit-and-status.md).
-- **V5.2–V5.7 PENDING** — ver roadmap revisado em `05-roadmap.md`.
+- **V5.2–V5.4 COMPLETE (domínio puro)** — 10 atributos/treino/fadiga/IA; equipe em 8 dimensões
+  com upgrades; motor de probabilidades determinístico com clima/DNF/grade. 25 testes verdes.
+- **PENDENTE** — persistência/migrações, rotas/UI, backtest de calibração, V5.5 (sobre o simulador
+  existente), V5.6 e V5.7. Detalhes e próximos passos em [`06-audit-and-status.md`](06-audit-and-status.md).
 
 ## Decisões já fechadas
 - Modelo de força: **Plackett–Luce / ordem de estatísticas (Thurstone) + Monte Carlo** para
