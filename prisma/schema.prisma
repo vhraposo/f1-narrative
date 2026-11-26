@@ -58,6 +58,13 @@ enum RaceSession {
   RACE
 }
 
+enum ConversationStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
 enum ConversationType {
   GROUP
   DM
@@ -220,6 +227,12 @@ model Universe {
   status    UniverseStatus @default(PENDING)
   lastError String?
 
+  autonomyMode   UniverseAutonomyMode   @default(OFF)
+  autonomyStatus UniverseAutonomyStatus @default(PAUSED)
+  lastSimulationAt DateTime?
+  nextSimulationAt DateTime?
+  simulationVersion String?
+
   seasons     Season[]
   teams       Team[]
   characters  Character[]
@@ -234,6 +247,8 @@ model Universe {
   bindingRaces         ExternalBindingRace[]
   bindingCircuits      ExternalBindingCircuit[]
   aiDecisions          AiDecision[]
+  characterGoals       CharacterGoal[]
+  simulationTicks      SimulationTick[]
   bindingDriverSeasons ExternalBindingDriverSeason[]
   bindingResults       ExternalBindingResult[]
   bindingStandings     ExternalBindingStanding[]
@@ -339,6 +354,7 @@ model Character {
   memoryMemberships        MemoryCharacter[]
   eventMemberships         EventCharacter[]
   aiDecisions              AiDecision[]
+  goals                    CharacterGoal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1079,11 +1095,22 @@ model ExternalBindingStanding {
 // Chat
 // ---------------------------------------------------------------
 
+/// Visibilidade de uma Conversation. PRIVATE = somente participantes
+/// listados (comportamento atual). UNIVERSE está reservado para grupos
+/// abertos do mesmo Universe; enquanto não implementado o acesso permanece
+/// fail-closed (somente participantes).
+enum ConversationVisibility {
+  PRIVATE
+  UNIVERSE
+}
+
 /// Grupo ou conversa direta composta por Characters.
 model Conversation {
-  id    String           @id @default(uuid()) @db.Uuid
-  title String?
-  type  ConversationType @default(GROUP)
+  id         String                 @id @default(uuid()) @db.Uuid
+  title      String?
+  type       ConversationType       @default(GROUP)
+  status     ConversationStatus     @default(ACTIVE)
+  visibility ConversationVisibility @default(PRIVATE)
 
   participants ConversationParticipant[]
   messages     Message[]
@@ -1200,6 +1227,8 @@ model Relationship {
   // Dimensões multidimensionais (amizade, confiança, respeito, rivalidade, ...)
   dimensions Json @default("{}")
 
+  changes RelationshipChange[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1214,11 +1243,17 @@ model Relationship {
 /// Acontecimento do universo. Tipos bem definidos; o payload JSON carrega
 /// dados específicos do tipo. Pode envolver múltiplos Characters e gerar
 /// memórias e notícias.
+enum EventVisibility {
+  PUBLIC
+  RESTRICTED
+}
+
 model Event {
   id          String          @id @default(uuid()) @db.Uuid
   type        EventType
   importance  EventImportance @default(MEDIUM)
   source      CanonSource     @default(GENERATED_EVENT)
+  visibility  EventVisibility @default(PUBLIC)
   title       String
   description String?
   worldDate   DateTime?
@@ -1593,8 +1628,11 @@ enum AiDecisionStatus {
 
 enum AiActionType {
   NO_ACTION
+  RESPOND
   SEND_MESSAGE
   CREATE_EVENT
+  CREATE_MEMORY
+  UPDATE_RELATIONSHIP
 }
 
 /// Auditoria de decisão comportamental de um Character AI (Universe-scoped).
@@ -2278,4 +2316,136 @@ model PersonaTraitEvolution {
   @@index([personaId, traitKey])
   @@index([personaId, status])
   @@index([sourceExperienceId])
+}
+
+enum CharacterGoalKind {
+  WIN_RACE
+  WIN_CHAMPIONSHIP
+  OUTPERFORM_TEAMMATE
+  RECOVER_AFTER_SETBACK
+  PROTECT_RELATIONSHIP
+  CONFRONT_RIVAL
+  SUPPORT_FRIEND
+  MAINTAIN_POSITION
+  BUILD_REPUTATION
+  RESTORE_CONFIDENCE
+  USER_DEFINED_GOAL
+}
+
+enum CharacterGoalStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum CharacterGoalSource {
+  SYSTEM
+  MANUAL
+  DERIVED
+}
+
+model CharacterGoal {
+  id          String    @id @default(uuid()) @db.Uuid
+  universeId  String    @db.Uuid
+  universe    Universe  @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  characterId String    @db.Uuid
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  kind      CharacterGoalKind
+  priority  Int                @default(50)
+  status    CharacterGoalStatus @default(ACTIVE)
+  source    CharacterGoalSource @default(SYSTEM)
+  ruleCode  String?
+  fingerprint String?
+
+  targetCharacterId String? @db.Uuid
+  targetRaceId      String? @db.Uuid
+  seasonId          String? @db.Uuid
+
+  validFrom DateTime?
+  validTo   DateTime?
+  progress  Json?
+  metadata  Json?
+
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universeId, fingerprint])
+  @@index([universeId, characterId, status])
+  @@index([characterId, status])
+  @@index([universeId, kind, status])
+  @@index([validTo])
+}
+
+model RelationshipChange {
+  id             String       @id @default(uuid()) @db.Uuid
+  relationshipId String       @db.Uuid
+  relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  characterAId String @db.Uuid
+  characterBId String @db.Uuid
+
+  dimension      String
+  previousValue  Int
+  delta          Int
+  resultingValue Int
+
+  ruleCode   String
+  sourceType String
+  sourceId   String?
+  worldDate  DateTime?
+  fingerprint String @unique
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([relationshipId, createdAt])
+  @@index([characterAId, characterBId, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+enum SimulationTickStatus {
+  RUNNING
+  COMPLETED
+  DRY_RUN
+  FAILED
+}
+
+model SimulationTick {
+  id        String    @id @default(uuid()) @db.Uuid
+  universeId String   @db.Uuid
+  universe  Universe  @relation(fields: [universeId], references: [id], onDelete: Cascade)
+
+  startWorldDate    DateTime
+  endWorldDate      DateTime
+  simulationVersion String
+  status            SimulationTickStatus @default(RUNNING)
+  dryRun            Boolean              @default(false)
+  fingerprint       String               @unique
+  summary           Json?
+  error             String?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([universeId, startWorldDate])
+  @@index([universeId, status])
+}
+
+enum UniverseAutonomyMode {
+  OFF
+  OBSERVER
+  GUIDED
+  FULL
+}
+
+enum UniverseAutonomyStatus {
+  ACTIVE
+  PAUSED
+  STOPPED
 }

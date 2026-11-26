@@ -29,6 +29,7 @@ import memoryRoutes from "./modules/memory/memory.routes.js";
 import conversationRoutes from "./modules/conversation/conversation.routes.js";
 import conversationTurnRoutes from "./modules/conversation/conversation-turn.routes.js";
 import conversationTurnStreamRoutes from "./modules/conversation/conversation-turn-stream.routes.js";
+import conversationAutonomousRoutes from "./modules/conversation/conversation-autonomous.routes.js";
 import contextRoutes from "./modules/context/context.routes.js";
 import conversationRagRoutes from "./modules/context/conversation-rag.routes.js";
 import conversationRagMaterializeRoutes, {
@@ -64,6 +65,10 @@ import { profileRoutes } from "./modules/profile/profile.routes.js";
 import { mediaRoutes } from "./modules/media/media.routes.js";
 import newsRoutes from "./modules/news/news.routes.js";
 import aiBehaviorRoutes from "./modules/ai-behavior/ai-behavior.routes.js";
+import behaviorRoutes from "./modules/behavior/behavior.routes.js";
+import worldSimulationRoutes from "./modules/world-simulation/world-simulation.routes.js";
+import autonomyRoutes from "./modules/autonomy/autonomy.routes.js";
+import observabilityRoutes from "./modules/observability/observability.routes.js";
 import evolutionRoutes from "./modules/evolution/evolution.routes.js";
 import raceWeekendRoutes from "./modules/race-weekend/race-weekend.routes.js";
 import type { StorageProvider } from "./infrastructure/storage/storage-provider.js";
@@ -146,6 +151,10 @@ export function buildApp(
   void app.register(authRoutes);
   void app.register(charactersRoutes);
   void app.register(personaRoutes);
+  void app.register(behaviorRoutes);
+  void app.register(worldSimulationRoutes);
+  void app.register(autonomyRoutes);
+  void app.register(observabilityRoutes);
   void app.register(characterHeadshotMaterializationRoutes);
   void app.register(driversRoutes);
   void app.register(teamsRoutes);
@@ -156,9 +165,7 @@ export function buildApp(
   void app.register(profileRoutes, { storageProvider });
   void app.register(mediaRoutes, { storageProvider });
   void app.register(newsRoutes);
-  void app.register(aiBehaviorRoutes, {
-    provider: generationProvider ?? nullProvider,
-  });
+  void app.register(aiBehaviorRoutes);
   void app.register(evolutionRoutes);
   void app.register(raceWeekendRoutes);
   void app.register(teamPerformanceRoutes);
@@ -183,6 +190,9 @@ export function buildApp(
   void app.register(conversationTurnStreamRoutes, {
     provider: generationProvider ?? nullProvider,
     ragProvider: ragProvider ?? defaultRagProvider(),
+  });
+  void app.register(conversationAutonomousRoutes, {
+    provider: generationProvider ?? nullProvider,
   });
   void app.register(contextRoutes);
   void app.register(conversationRagRoutes);

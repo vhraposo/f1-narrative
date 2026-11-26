@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, CalendarDays, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Lock, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -57,6 +57,15 @@ export function EventCard({ event, isDeleting, onDelete }: EventCardProps) {
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
               {EVENT_IMPORTANCE_LABELS[event.importance]}
             </span>
+            {event.visibility === "RESTRICTED" && (
+              <span
+                title="Evento restrito — visível apenas à audiência"
+                className="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              >
+                <Lock className="h-3 w-3" aria-hidden="true" />
+                Restrito
+              </span>
+            )}
             <ArrowUpRight
               className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-brand"
               aria-hidden="true"

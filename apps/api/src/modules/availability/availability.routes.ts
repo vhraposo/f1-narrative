@@ -110,27 +110,29 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // until < since -> 400 VALIDATION_ERROR. A regra usa o `since` real do
-      // registro (default 'now()'); se ainda não existe, o default assume
-      // agora, então qualquer `until` no passado viola a regra.
+      // F12 — `until` pertence à janela do status: mudar o status inicia uma
+      // nova janela (since = agora; until = informado ou null). atualizar
+      // apenas reason/until preserva os demais campos. until < since continua
+      // 400 VALIDATION_ERROR usando o `since` real da janela.
+      const existing = await prisma.characterAvailability.findUnique({
+        where: { characterId: character.id },
+        select: { status: true, since: true },
+      });
+      const statusChanged =
+        parsed.data.status !== undefined && parsed.data.status !== existing?.status;
+      const since = statusChanged ? new Date() : existing?.since ?? new Date();
       const until = parsed.data.until ?? null;
-      if (until !== null) {
-        const existing = await prisma.characterAvailability.findUnique({
-          where: { characterId: character.id },
-          select: { since: true },
+      if (until !== null && new Date(until).getTime() < since.getTime()) {
+        return reply.code(400).send({
+          error: "A data final não pode ser anterior ao início da disponibilidade",
+          code: "VALIDATION_ERROR",
         });
-        const since = existing?.since ?? new Date();
-        if (new Date(until).getTime() < since.getTime()) {
-          return reply.code(400).send({
-            error: "A data final não pode ser anterior ao início da disponibilidade",
-            code: "VALIDATION_ERROR",
-          });
-        }
       }
 
       const availability = await prisma.characterAvailability.upsert({
         where: { characterId: character.id },
         update: {
+          ...(statusChanged ? { since } : {}),
           ...(parsed.data.status !== undefined
             ? { status: parsed.data.status }
             : {}),
@@ -139,7 +141,9 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify) => {
             : {}),
           ...(parsed.data.until !== undefined
             ? { until: until === null ? null : new Date(until) }
-            : {}),
+            : statusChanged
+              ? { until: null }
+              : {}),
         },
         create: {
           characterId: character.id,

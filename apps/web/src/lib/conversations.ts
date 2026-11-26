@@ -4,7 +4,16 @@ import { ApiError, API_BASE, get, patch, post, remove } from "./api";
 
 export type ConversationType = "GROUP" | "DM";
 
+export type ConversationVisibility = "PRIVATE" | "UNIVERSE";
+
 export type MessageSenderType = "USER_CHARACTER" | "AI_CHARACTER" | "SYSTEM";
+
+export type MessageDialogueContext = {
+  intent?: string;
+  replyToMessageId?: string | null;
+  fragmentIndex?: number;
+  topicTag?: string | null;
+};
 
 export type MessageContextJson = {
   family: string;
@@ -15,6 +24,7 @@ export type MessageContextJson = {
   assembledAt: string;
   activeSpeaker: { characterId: string | null; senderType: MessageSenderType };
   participantCharacterIds: string[];
+  dialogue?: MessageDialogueContext;
   temporal: {
     worldDate: string | null;
     currentSeasonId: string | null;
@@ -58,6 +68,7 @@ export type Conversation = {
   id: string;
   title: string | null;
   type: ConversationType;
+  visibility?: ConversationVisibility;
   createdAt: string;
   updatedAt: string;
   participants: ConversationParticipant[];
@@ -533,4 +544,112 @@ export function formatListTime(iso: string): string {
     month: "2-digit",
     year: "2-digit",
   });
+}
+
+export function formatChatDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  if (sameDay(date, now)) return "Hoje";
+  const daysDiff = Math.round(
+    (startOfDay(now) - startOfDay(date)) / 86_400_000,
+  );
+  if (daysDiff === 1) return "Ontem";
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
+export function messageReplyToId(message: Message): string | null {
+  const context = message.contextJson;
+  if (!context || typeof context !== "object") return null;
+  const dialogue = context.dialogue;
+  if (!dialogue || typeof dialogue !== "object") return null;
+  const replyTo = dialogue.replyToMessageId;
+  return typeof replyTo === "string" && replyTo.length > 0 ? replyTo : null;
+}
+export type AutonomousTurnInput = {
+  worldDate?: string;
+};
+
+export type AutonomousTurnResponse = {
+  turn:
+    | {
+        executed: false;
+        reasonCode: string;
+        plan: unknown;
+        decisionId: string | null;
+      }
+    | {
+        executed: true;
+        reasonCode: "EXECUTED";
+        plan: unknown;
+        decisionId: string;
+        messageId: string;
+        speakerCharacterId: string;
+        language: { provider: string; model: string; fallback: boolean };
+      };
+};
+
+export function runAutonomousTurn(
+  conversationId: string,
+  input: AutonomousTurnInput = {},
+): Promise<AutonomousTurnResponse> {
+  return post<AutonomousTurnResponse>(
+    `/api/conversations/${conversationId}/autonomous-turn`,
+    input,
+  );
+}
+export type SimulationStep = {
+  depth: number;
+  characterId: string;
+  name: string;
+  messageId: string;
+  language: { provider: string; model: string; fallback: boolean };
+};
+
+export type SimulationResponse = {
+  simulation: {
+    executed: boolean;
+    stopReason: string;
+    depth: number;
+    steps: SimulationStep[];
+    selection: unknown[];
+  };
+};
+
+export function simulateConversationTurn(
+  conversationId: string,
+  input: AutonomousTurnInput = {},
+): Promise<SimulationResponse> {
+  return post<SimulationResponse>(
+    `/api/conversations/${conversationId}/simulate-turn`,
+    input,
+  );
+}
+export type SimulationPlanResponse = {
+  plan: {
+    energy: { energy: number; intensity: number; level: string; reasons: string[] };
+    window: { maxInitialResponders: number; maxReactions: number; maxChainDepth: number };
+    planned: Array<{
+      characterId: string;
+      name: string;
+      score: number;
+      opportunity: number;
+      reasons: string[];
+    }>;
+    stopReason: string;
+  };
+};
+
+export function planSimulationTurn(
+  conversationId: string,
+  input: AutonomousTurnInput = {},
+): Promise<SimulationPlanResponse> {
+  return post<SimulationPlanResponse>(
+    `/api/conversations/${conversationId}/simulate-turn/plan`,
+    input,
+  );
 }

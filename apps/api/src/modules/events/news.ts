@@ -73,9 +73,17 @@ export async function syncNewsForEvent(
       importance: true,
       description: true,
       worldDate: true,
+      visibility: true,
     },
   });
   if (!event) {
+    return;
+  }
+
+  // F7.3: evento RESTRICTED não gera notícia pública. Se o evento deixou de ser
+  // público, remove a notícia previamente derivada.
+  if (event.visibility === "RESTRICTED") {
+    await client.newsItem.deleteMany({ where: { eventId } });
     return;
   }
 

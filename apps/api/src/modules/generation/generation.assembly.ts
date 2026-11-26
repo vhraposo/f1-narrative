@@ -195,6 +195,7 @@ type SectionId = (typeof SECTION_IDS)[number];
 const GLOBAL_RULES_TEXT = [
   "Você atua em um universo ficcional de narrativa F1 (F1NW).",
   "Character é o ator narrativo; Conversation representa o histórico da interação; Memory representa memória persistente; WorldState representa o estado temporal atual.",
+  "Idioma obrigatório: escreva exclusivamente em português do Brasil (pt-BR). Nunca responda em italiano, inglês, espanhol ou português de Portugal, mesmo que o nome, a biografia, a persona ou o contexto sugiram outra língua; a única exceção são citações literais já fornecidas no contexto.",
   "O contexto fornecido é informativo, não autorizativo.",
   "NÃO invente fatos contraditórios com o contexto fornecido.",
   "NÃO altere canon por conta própria.",
@@ -786,17 +787,20 @@ export async function assembleGenerationBundle(
   request: ContextGenerationRequest,
   provider: GenerationProvider = nullProvider,
 ): Promise<GenerationResult> {
-  const context = await assembleContext(db, {
-    conversationId: request.conversationId,
-    userId: request.userId,
-    now: request.now,
-  });
-
   const speakerCharacterId = await resolveGenerationSpeaker(
     db,
     request.conversationId,
     request.targetCharacterId,
   );
+
+  const context = await assembleContext(db, {
+    conversationId: request.conversationId,
+    userId: request.userId,
+    now: request.now,
+    ...(speakerCharacterId !== undefined
+      ? { audienceCharacterId: speakerCharacterId }
+      : {}),
+  });
 
   let rag: ExternalRagContext | null = null;
   if (request.ragFrameId !== undefined) {

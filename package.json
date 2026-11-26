@@ -19,6 +19,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "admin:promote": "pnpm --filter @f1nw/api run admin:promote",
+    "benchmark:f9": "pnpm --filter @f1nw/api run benchmark:f9",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
     "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"

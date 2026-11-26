@@ -704,27 +704,29 @@ describe("Conversation - Message sender (USER_CHARACTER / AI_CHARACTER / SYSTEM)
     expect(res.statusCode).toBe(403);
   });
 
-  it("USER_CHARACTER como character de OUTRO usuário -> 403 (sem bypass)", async () => {
+  it("character de OUTRO usuário não entra na conversa e não há bypass (F7.1)", async () => {
     const outsider = await createUser(`conv-msg-o-${Date.now()}@f1nw.test`, "MsgOut");
     const otherOwned = await createCharacter(outsider, {
       name: "Charles",
       nationality: "MC",
       birthDate: "1997-10-16",
     });
-    // outsider precisa ser participante para acessar a conv; adicionamos seu char.
-    await app.inject({
+    // F7.1: personagem de outro Universe/usuário não pode ser adicionado.
+    const add = await app.inject({
       method: "POST",
       url: `/api/conversations/${convId}/participants`,
       headers: { cookie: owner.cookie },
       payload: { characterId: otherOwned.id },
     });
-    // Mas tenta enviar como charA (do owner) -> 403.
+    expect(add.statusCode).toBe(404);
+
+    // Sem participação, o outsider não acessa a conversa (404, sem vazar).
     const res = await postMessage(outsider, convId, {
       senderType: "USER_CHARACTER",
       characterId: charA.id,
       content: "Fingindo ser Alicya",
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
   });
 
   it("AI_CHARACTER com characterId AI participante -> 201", async () => {

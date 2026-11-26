@@ -123,9 +123,41 @@ describe("curated grid evidence (dataset)", () => {
       expect(categories.has("JUNIOR_CAREER")).toBe(true);
       expect(categories.has("ORIGIN")).toBe(true);
       expect(categories.has("PUBLIC_PERSONALITY")).toBe(true);
-      expect(categories.has("INTERESTS")).toBe(true);
+      expect(categories.has("INTERESTS") || categories.has("PROJECTS")).toBe(true);
       expect((bundle?.claims.length ?? 0) >= 25).toBe(true);
+      const personalityWithContext = (bundle?.claims ?? []).filter(
+        (claim) =>
+          claim.category === "PUBLIC_PERSONALITY" &&
+          (claim.context === "ON_TRACK" || claim.context === "OFF_TRACK"),
+      );
+      expect(personalityWithContext.length).toBeGreaterThanOrEqual(1);
     }
+  });
+
+  it("6) semântica do dataset: INTERESTS/PROJECTS nunca têm contexto de trait", () => {
+    const dataset = getCuratedEvidenceDataset();
+    expect(dataset).not.toBeNull();
+    if (!dataset) return;
+    const failures: string[] = [];
+    for (const [driverId, bundle] of dataset.drivers) {
+      for (const claim of bundle.claims) {
+        if (
+          (claim.category === "INTERESTS" || claim.category === "PROJECTS") &&
+          claim.context !== null
+        ) {
+          failures.push(`${driverId}:${claim.key} tem contexto indevido`);
+        }
+        if (
+          claim.category === "PUBLIC_PERSONALITY" &&
+          claim.context !== null &&
+          claim.context !== "ON_TRACK" &&
+          claim.context !== "OFF_TRACK"
+        ) {
+          failures.push(`${driverId}:${claim.key} contexto inválido`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
   });
 });
 

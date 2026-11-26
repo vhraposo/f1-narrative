@@ -13,8 +13,10 @@ export type PersonaTraitContext = "ON_TRACK" | "OFF_TRACK";
 export type PersonaEnrichmentResult = {
   readonly characterId: string;
   readonly evidenceCreated: number;
+  readonly evidenceRemoved: number;
   readonly traitsCreated: number;
   readonly traitsUpdated: number;
+  readonly traitsRemoved: number;
   readonly manualPreserved: number;
   readonly traitsByContext: { readonly onTrack: number; readonly offTrack: number };
 };
@@ -27,19 +29,17 @@ type TraitMapping = {
 const TRAIT_KEYS = new Set<string>(PERSONA_TRAIT_KEYS);
 
 export function mapCuratedClaimToTrait(claim: BiographyClaim): TraitMapping | null {
-  if (claim.category === "INTERESTS" || claim.category === "PROJECTS") {
-    return { key: "interests", context: "OFF_TRACK" };
-  }
   if (claim.category !== "PUBLIC_PERSONALITY") return null;
+  if (claim.context !== "ON_TRACK" && claim.context !== "OFF_TRACK") return null;
   const upper = claim.key.toUpperCase();
   let key = "behavioralTendencies";
   if (/COMPETITI/.test(upper)) key = "competitiveness";
-  else if (/CONFIDENCE/.test(upper)) key = "confidence";
-  else if (/HUMOR/.test(upper)) key = "humor";
+  else if (/CONFIDENCE|SELF_RATING/.test(upper)) key = "confidence";
+  else if (/HUMOR|SELF_DEPRECATION/.test(upper)) key = "humor";
   else if (/COMMUNICATION|SPEECH/.test(upper)) key = "communicationStyle";
-  else if (/EMOTION|MENTAL|PRESSURE/.test(upper)) key = "emotionalExpression";
+  else if (/EMOTION|MENTAL|PRESSURE|CALM/.test(upper)) key = "emotionalExpression";
   if (!TRAIT_KEYS.has(key)) return null;
-  return { key, context: "ON_TRACK" };
+  return { key, context: claim.context };
 }
 
 function mapEvidenceType(sourceType: string): PersonaEvidenceType {
@@ -62,9 +62,13 @@ function clamp(value: string, max: number): string {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1).trimEnd()}…`;
 }
 
+function confidenceFor(authority: string): number {
+  return authority === "PRIMARY_OFFICIAL" ? 0.85 : 0.6;
+}
+
 type SelectedClaim = { readonly claim: BiographyClaim; readonly mapping: TraitMapping };
 
-function selectCuratedTraitClaims(evidence: CharacterBiographyEvidence): SelectedClaim[] {
+function selectPersonalityTraitClaims(evidence: CharacterBiographyEvidence): SelectedClaim[] {
   const curated = evidence.claimSet.claims.filter(
     (claim) => claim.status === "APPROVED" && claim.sourceRef !== null,
   );
@@ -74,10 +78,7 @@ function selectCuratedTraitClaims(evidence: CharacterBiographyEvidence): Selecte
     if (!mapping) continue;
     const slot = `${mapping.context}:${mapping.key}`;
     const current = best.get(slot);
-    if (
-      !current ||
-      authorityRank(claim.authority) > authorityRank(current.claim.authority)
-    ) {
+    if (!current || authorityRank(claim.authority) > authorityRank(current.claim.authority)) {
       best.set(slot, { claim, mapping });
     }
   }
@@ -90,8 +91,7 @@ export async function enrichCharacterPersonaFromEvidence(
 ): Promise<PersonaEnrichmentResult | null> {
   const evidence = await loadBiographyEvidenceForCharacter(characterId, now);
   if (!evidence) return null;
-  const selected = selectCuratedTraitClaims(evidence);
-  if (selected.length === 0) return null;
+  const selected = selectPersonalityTraitClaims(evidence);
 
   const persona = await prisma.characterPersona.upsert({
     where: { characterId },
@@ -100,13 +100,64 @@ export async function enrichCharacterPersonaFromEvidence(
     select: { id: true },
   });
 
+  const desiredSlots = new Set(
+    selected.map(({ mapping }) => `${mapping.context}:${mapping.key}`),
+  );
+
+  let traitsRemoved = 0;
+  let manualPreserved = 0;
+  const existingTraits = await prisma.personaTrait.findMany({
+    where: { personaId: persona.id },
+    select: { id: true, key: true, context: true, sourceKind: true },
+  });
+  for (const trait of existingTraits) {
+    const slot = `${trait.context}:${trait.key}`;
+    if (desiredSlots.has(slot)) continue;
+    if (trait.sourceKind === "MANUAL") {
+      manualPreserved += 1;
+      continue;
+    }
+    await prisma.personaTrait.delete({ where: { id: trait.id } });
+    traitsRemoved += 1;
+  }
+
   let evidenceCreated = 0;
   let traitsCreated = 0;
   let traitsUpdated = 0;
-  let manualPreserved = 0;
 
   for (const { claim, mapping } of selected) {
     const source = claim.sourceRef;
+    const excerpt = clamp(claim.display, 500);
+    const existingEvidence = await prisma.personaEvidence.findFirst({
+      where: {
+        personaId: persona.id,
+        traitKey: mapping.key,
+        excerpt,
+        status: "APPROVED",
+      },
+      select: { id: true },
+    });
+    let evidenceId = existingEvidence?.id ?? null;
+    if (!evidenceId) {
+      const row = await prisma.personaEvidence.create({
+        data: {
+          personaId: persona.id,
+          traitKey: mapping.key,
+          proposedValue: clamp(claim.value, 200),
+          sourceType: mapEvidenceType(source?.sourceType ?? "OTHER_APPROVED"),
+          title: clamp(source?.title ?? "Evidência pública curada", 200),
+          url: source?.url ?? null,
+          excerpt,
+          confidence: confidenceFor(claim.authority),
+          status: "APPROVED",
+          reviewedAt: now,
+        },
+        select: { id: true },
+      });
+      evidenceId = row.id;
+      evidenceCreated += 1;
+    }
+
     const existingTrait = await prisma.personaTrait.findUnique({
       where: {
         personaId_key_context: {
@@ -117,49 +168,17 @@ export async function enrichCharacterPersonaFromEvidence(
       },
       select: { id: true, sourceKind: true },
     });
-
     if (existingTrait?.sourceKind === "MANUAL") {
       manualPreserved += 1;
       continue;
     }
-
-    const existingEvidence = await prisma.personaEvidence.findFirst({
-      where: {
-        personaId: persona.id,
-        traitKey: mapping.key,
-        excerpt: clamp(claim.display, 500),
-        status: "APPROVED",
-      },
-      select: { id: true },
-    });
-    let evidenceId = existingEvidence?.id ?? null;
-    if (!evidenceId) {
-      const evidenceRow = await prisma.personaEvidence.create({
-        data: {
-          personaId: persona.id,
-          traitKey: mapping.key,
-          proposedValue: clamp(claim.value, 200),
-          sourceType: mapEvidenceType(source?.sourceType ?? "OTHER_APPROVED"),
-          title: clamp(source?.title ?? "Evidência pública curada", 200),
-          url: source?.url ?? null,
-          excerpt: clamp(claim.display, 500),
-          confidence: claim.authority === "PRIMARY_OFFICIAL" ? 0.85 : 0.6,
-          status: "APPROVED",
-          reviewedAt: now,
-        },
-        select: { id: true },
-      });
-      evidenceId = evidenceRow.id;
-      evidenceCreated += 1;
-    }
-
     const value = clamp(claim.display, 200);
     if (existingTrait) {
       await prisma.personaTrait.update({
         where: { id: existingTrait.id },
         data: {
           value,
-          confidence: claim.authority === "PRIMARY_OFFICIAL" ? 0.85 : 0.6,
+          confidence: confidenceFor(claim.authority),
           sourceKind: "EVIDENCE",
           evidenceId,
         },
@@ -171,7 +190,7 @@ export async function enrichCharacterPersonaFromEvidence(
           personaId: persona.id,
           key: mapping.key,
           value,
-          confidence: claim.authority === "PRIMARY_OFFICIAL" ? 0.85 : 0.6,
+          confidence: confidenceFor(claim.authority),
           sourceKind: "EVIDENCE",
           context: mapping.context,
           evidenceId,
@@ -179,6 +198,26 @@ export async function enrichCharacterPersonaFromEvidence(
       });
       traitsCreated += 1;
     }
+  }
+
+  const desiredByExcerpt = new Map<string, Set<string>>();
+  for (const { claim, mapping } of selected) {
+    const excerpt = clamp(claim.display, 500);
+    const keys = desiredByExcerpt.get(excerpt) ?? new Set<string>();
+    keys.add(mapping.key);
+    desiredByExcerpt.set(excerpt, keys);
+  }
+  let evidenceRemoved = 0;
+  const autoEvidence = await prisma.personaEvidence.findMany({
+    where: { personaId: persona.id, createdById: null },
+    select: { id: true, traitKey: true, excerpt: true, _count: { select: { authoritativeTraits: true } } },
+  });
+  for (const candidate of autoEvidence) {
+    if (candidate._count.authoritativeTraits > 0) continue;
+    const desiredKeys = desiredByExcerpt.get(candidate.excerpt);
+    if (desiredKeys?.has(candidate.traitKey)) continue;
+    await prisma.personaEvidence.delete({ where: { id: candidate.id } });
+    evidenceRemoved += 1;
   }
 
   const traits = await prisma.personaTrait.findMany({
@@ -189,8 +228,10 @@ export async function enrichCharacterPersonaFromEvidence(
   return {
     characterId,
     evidenceCreated,
+    evidenceRemoved,
     traitsCreated,
     traitsUpdated,
+    traitsRemoved,
     manualPreserved,
     traitsByContext: {
       onTrack: traits.filter((trait) => trait.context === "ON_TRACK").length,

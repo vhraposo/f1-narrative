@@ -22,6 +22,7 @@ export const eventSourceSchema = z.enum([
   "GENERATED_EVENT",
   "EXTERNAL_INFORMATION",
 ]);
+export const eventVisibilitySchema = z.enum(["PUBLIC", "RESTRICTED"]);
 
 // payload é um objeto JSON livre, análogo a dimensions em Relationships.
 // Não inventamos aqui uma estrutura narrativa rígida: o Prisma armazena como
@@ -49,6 +50,7 @@ export const createEventSchema = z
       .transform((value) => (value ? value : null)),
     importance: eventImportanceSchema.optional(),
     source: eventSourceSchema.optional(),
+    visibility: eventVisibilitySchema.optional(),
     worldDate: z.string().datetime({ offset: true }).optional().nullable(),
     payload: payloadSchema.optional().nullable(),
   })

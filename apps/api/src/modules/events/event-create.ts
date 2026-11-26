@@ -1,4 +1,4 @@
-import { Prisma, type CanonSource, type EventImportance, type EventType } from "@prisma/client";
+import { Prisma, type CanonSource, type EventImportance, type EventType, type EventVisibility } from "@prisma/client";
 
 import { applyEventEvolution } from "./event-evolution.js";
 import { syncNewsForEvent } from "./news.js";
@@ -9,6 +9,7 @@ export type CreateEventData = {
   description?: string | null;
   importance?: EventImportance;
   source?: CanonSource;
+  visibility?: EventVisibility;
   worldDate?: Date | string | null;
   payload?: Prisma.InputJsonValue | null | undefined;
   createdById?: string | null;
@@ -26,6 +27,7 @@ export async function createEventWithDerivations(
       description: data.description ?? null,
       ...(data.importance !== undefined ? { importance: data.importance } : {}),
       ...(data.source !== undefined ? { source: data.source } : {}),
+      ...(data.visibility !== undefined ? { visibility: data.visibility } : {}),
       worldDate: data.worldDate ?? null,
       payload:
         data.payload === undefined || data.payload === null

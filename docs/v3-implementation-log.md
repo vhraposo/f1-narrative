@@ -1106,3 +1106,12 @@ Ver `docs/v3-decisions.md` (D-009 a D-013).
 - **DEV:** 46 runs RICH_DETERMINISTIC (23/23 pilotos, 7-8 paragrafos, Public Profile AVAILABLE), 62 traits ON_TRACK/40 OFF_TRACK; leitura pura READY em ~54 ms; backup 1narrative_dev_pre_v3244.dump; zero migrations.
 - **QA:** API 2544/2544 (172 arquivos) x2; Web 505/505 (65 arquivos) x2; typecheck/lint/build 0; TEST 0 residuos de fixture.
 - **Docs:** 3.24.4-universal-driver-lore.md, 3.24.4-public-profile.md, 3.24.4-grid-coverage.md, D-100..D-103.
+
+### V3.24.5 - Personality Semantics & Evidence Separation
+- **Correcao semantica:** INTERESTS/PROJECTS deixam de gerar PersonaTrait; somente PUBLIC_PERSONALITY com context explicito gera trait EVIDENCE (ON_TRACK/OFF_TRACK), propagado via JSON curado -> biography.evidence -> BiographyClaim.context (sem migration).
+- **Enrichment/reconcile deterministico:** selecao por slot context:key com autoridade, remocao de traits EVIDENCE fora do desejado (MANUAL preservado) e remocao de PersonaEvidence auto-gerada orfa; idempotente (run2 cria 0/remove 0).
+- **DEV:** 102 traits -> 62 (44 ON_TRACK, 18 OFF_TRACK), 0 interests, 0 orfaos, 62 evidencias; bios 23/23 RICH (46/46 runs), Public Profile AVAILABLE com interests/projects preservados; leitura ~30-46 ms; backup 1narrative_dev_pre_v3245.dump.
+- **Correcao de lifecycle:** run com mode NOT_REQUESTED passa a classificar pelo metadata persistido (perfis compartilhados entre universes).
+- **Testes:** enrichment 9/9 (mapeamento, cleanup, manual, idempotencia, cross-universe), grid-content 6/6 (dataset sem context em interests/projects), lifecycle 7/7 (perfil compartilhado).
+- **QA:** API 2551/2551 (172 arquivos) x2; Web 505/505 (65 arquivos) x2; typecheck/lint/build 0; TEST 0 residuos; DEV protection intacto (286 resultados/23 standings/2 timeline/46 entries).
+- **Docs:** 3.24.5-personality-semantics.md, D-104.

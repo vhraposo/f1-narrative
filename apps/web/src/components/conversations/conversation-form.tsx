@@ -168,7 +168,38 @@ export function ConversationForm({
               )}
 
               <div className="space-y-2">
-                <Label>Participantes</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Participantes</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {participantIds.length} selecionado
+                    {participantIds.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                {participantIds.length > 0 && (
+                  <ul className="flex flex-wrap gap-2">
+                    {participantIds.map((id) => {
+                      const character = (characters ?? []).find((item) => item.id === id);
+                      return (
+                        <li key={id}>
+                          <button
+                            type="button"
+                            onClick={() => toggleCharacter(id)}
+                            aria-label={`Remover ${character?.name ?? "participante"}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-sm text-foreground transition-colors hover:bg-brand/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {character?.name ?? id}
+                            {character?.controlledBy === "AI" && (
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-brand">
+                                IA
+                              </span>
+                            )}
+                            <span aria-hidden="true">×</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
                 {charactersQuery.isLoading ? (
                   <p className="text-sm text-muted-foreground">
                     Carregando personagens...
