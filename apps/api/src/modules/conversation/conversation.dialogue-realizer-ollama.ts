@@ -150,6 +150,7 @@ export function createOllamaDialogueRealizerProviderFromEnv(
                 { role: "user", content: userPrompt },
               ],
               stream: false,
+              reasoning_effort: "none",
               response_format: { type: "json_object" },
             }),
             signal: controller.signal,

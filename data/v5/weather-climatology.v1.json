@@ -1,0 +1,2084 @@
+{
+  "schemaVersion": "v5.weather-climatology.v1",
+  "generatedAt": "2026-11-26T12:10:39.537Z",
+  "sources": [
+    {
+      "name": "Open-Meteo Historical Weather API",
+      "url": "https://open-meteo.com/en/docs/historical-weather-api",
+      "license": "CC BY 4.0",
+      "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+    }
+  ],
+  "circuits": [
+    {
+      "circuitId": "austin",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.27,
+          "avgTempC": 10.5,
+          "avgWindKmh": 21.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.293,
+          "avgTempC": 12.6,
+          "avgWindKmh": 23.1,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.334,
+          "avgTempC": 17.7,
+          "avgWindKmh": 23.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.376,
+          "avgTempC": 20.6,
+          "avgWindKmh": 24.2,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.487,
+          "avgTempC": 24.3,
+          "avgWindKmh": 22.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.391,
+          "avgTempC": 27.7,
+          "avgWindKmh": 20.2,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.261,
+          "avgTempC": 29.5,
+          "avgWindKmh": 20.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.302,
+          "avgTempC": 29.9,
+          "avgWindKmh": 19.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.297,
+          "avgTempC": 27.1,
+          "avgWindKmh": 17.6,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.252,
+          "avgTempC": 22.5,
+          "avgWindKmh": 19.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.312,
+          "avgTempC": 16.5,
+          "avgWindKmh": 20.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.276,
+          "avgTempC": 13.1,
+          "avgWindKmh": 20.6,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "baku",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.161,
+          "avgTempC": 5.1,
+          "avgWindKmh": 26.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.145,
+          "avgTempC": 5.3,
+          "avgWindKmh": 27.3,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.205,
+          "avgTempC": 8.1,
+          "avgWindKmh": 27.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.142,
+          "avgTempC": 12.9,
+          "avgWindKmh": 26.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.173,
+          "avgTempC": 18.5,
+          "avgWindKmh": 26.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.067,
+          "avgTempC": 24.5,
+          "avgWindKmh": 25.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.038,
+          "avgTempC": 27.1,
+          "avgWindKmh": 26.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.056,
+          "avgTempC": 27.2,
+          "avgWindKmh": 23.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.13,
+          "avgTempC": 22.6,
+          "avgWindKmh": 24.5,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.211,
+          "avgTempC": 16.9,
+          "avgWindKmh": 25.2,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.233,
+          "avgTempC": 11.5,
+          "avgWindKmh": 25.5,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.235,
+          "avgTempC": 7.5,
+          "avgWindKmh": 24.8,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "catalunya",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.138,
+          "avgTempC": 8,
+          "avgWindKmh": 16,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.241,
+          "avgTempC": 9.6,
+          "avgWindKmh": 15,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.302,
+          "avgTempC": 11.2,
+          "avgWindKmh": 17.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.291,
+          "avgTempC": 13.6,
+          "avgWindKmh": 17,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.323,
+          "avgTempC": 17.3,
+          "avgWindKmh": 16.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.224,
+          "avgTempC": 22.3,
+          "avgWindKmh": 15.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.199,
+          "avgTempC": 25,
+          "avgWindKmh": 16.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.255,
+          "avgTempC": 24.6,
+          "avgWindKmh": 15.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.418,
+          "avgTempC": 20.6,
+          "avgWindKmh": 14.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.361,
+          "avgTempC": 17.1,
+          "avgWindKmh": 14.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.282,
+          "avgTempC": 12.1,
+          "avgWindKmh": 14.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.155,
+          "avgTempC": 9.3,
+          "avgWindKmh": 14,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "hungaroring",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.194,
+          "avgTempC": 0.5,
+          "avgWindKmh": 16.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.251,
+          "avgTempC": 3.2,
+          "avgWindKmh": 17.6,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.226,
+          "avgTempC": 6.6,
+          "avgWindKmh": 17.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.294,
+          "avgTempC": 11.5,
+          "avgWindKmh": 18.3,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.381,
+          "avgTempC": 15.9,
+          "avgWindKmh": 16.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.355,
+          "avgTempC": 21.4,
+          "avgWindKmh": 15.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.276,
+          "avgTempC": 23.1,
+          "avgWindKmh": 16.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.226,
+          "avgTempC": 22.9,
+          "avgWindKmh": 14.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.264,
+          "avgTempC": 17.7,
+          "avgWindKmh": 15.3,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.238,
+          "avgTempC": 11.6,
+          "avgWindKmh": 15.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.3,
+          "avgTempC": 5.9,
+          "avgWindKmh": 15.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.238,
+          "avgTempC": 1.9,
+          "avgWindKmh": 15.2,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "interlagos",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.774,
+          "avgTempC": 22.3,
+          "avgWindKmh": 19.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.682,
+          "avgTempC": 22.1,
+          "avgWindKmh": 19.9,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.61,
+          "avgTempC": 21.6,
+          "avgWindKmh": 18.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.373,
+          "avgTempC": 19.6,
+          "avgWindKmh": 19.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.267,
+          "avgTempC": 17.6,
+          "avgWindKmh": 18.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.255,
+          "avgTempC": 16.3,
+          "avgWindKmh": 17.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.123,
+          "avgTempC": 15.8,
+          "avgWindKmh": 18,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.226,
+          "avgTempC": 16.5,
+          "avgWindKmh": 18.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.288,
+          "avgTempC": 18.6,
+          "avgWindKmh": 20.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.493,
+          "avgTempC": 19.4,
+          "avgWindKmh": 21.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.567,
+          "avgTempC": 19.7,
+          "avgWindKmh": 21.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.666,
+          "avgTempC": 21.5,
+          "avgWindKmh": 20.3,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "las-vegas",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.123,
+          "avgTempC": 9,
+          "avgWindKmh": 15.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.093,
+          "avgTempC": 11.6,
+          "avgWindKmh": 19.7,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.12,
+          "avgTempC": 15.5,
+          "avgWindKmh": 22,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.045,
+          "avgTempC": 20.9,
+          "avgWindKmh": 23.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.047,
+          "avgTempC": 25.1,
+          "avgWindKmh": 24,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.015,
+          "avgTempC": 32.2,
+          "avgWindKmh": 23.4,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.059,
+          "avgTempC": 34.7,
+          "avgWindKmh": 22,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.062,
+          "avgTempC": 33.3,
+          "avgWindKmh": 21.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.039,
+          "avgTempC": 28.9,
+          "avgWindKmh": 19.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.047,
+          "avgTempC": 21.7,
+          "avgWindKmh": 17.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.055,
+          "avgTempC": 14,
+          "avgWindKmh": 15.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.082,
+          "avgTempC": 9.1,
+          "avgWindKmh": 13.7,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "lusail",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.073,
+          "avgTempC": 17.7,
+          "avgWindKmh": 22.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.08,
+          "avgTempC": 18.7,
+          "avgWindKmh": 24.6,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.085,
+          "avgTempC": 22.1,
+          "avgWindKmh": 25.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.03,
+          "avgTempC": 26.9,
+          "avgWindKmh": 25.3,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.006,
+          "avgTempC": 32.1,
+          "avgWindKmh": 26.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0,
+          "avgTempC": 34.9,
+          "avgWindKmh": 28.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.012,
+          "avgTempC": 35.9,
+          "avgWindKmh": 25.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0,
+          "avgTempC": 35.7,
+          "avgWindKmh": 23.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.003,
+          "avgTempC": 33.4,
+          "avgWindKmh": 22.4,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.012,
+          "avgTempC": 29.8,
+          "avgWindKmh": 21.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.052,
+          "avgTempC": 24.9,
+          "avgWindKmh": 20.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.047,
+          "avgTempC": 20,
+          "avgWindKmh": 20.6,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "madring",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.22,
+          "avgTempC": 5.2,
+          "avgWindKmh": 14.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.19,
+          "avgTempC": 7.4,
+          "avgWindKmh": 15.4,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.34,
+          "avgTempC": 9.8,
+          "avgWindKmh": 17.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.33,
+          "avgTempC": 13,
+          "avgWindKmh": 16.4,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.199,
+          "avgTempC": 17.7,
+          "avgWindKmh": 16.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.152,
+          "avgTempC": 23.3,
+          "avgWindKmh": 16.6,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.035,
+          "avgTempC": 27.5,
+          "avgWindKmh": 17.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.038,
+          "avgTempC": 26.8,
+          "avgWindKmh": 16.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.167,
+          "avgTempC": 20.7,
+          "avgWindKmh": 14.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.267,
+          "avgTempC": 15.9,
+          "avgWindKmh": 14.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.279,
+          "avgTempC": 9.7,
+          "avgWindKmh": 14.4,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.211,
+          "avgTempC": 6.8,
+          "avgWindKmh": 12.9,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "marina-bay",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.739,
+          "avgTempC": 26.3,
+          "avgWindKmh": 19.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.605,
+          "avgTempC": 26.7,
+          "avgWindKmh": 21.2,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.76,
+          "avgTempC": 27.3,
+          "avgWindKmh": 17.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.876,
+          "avgTempC": 27.5,
+          "avgWindKmh": 13.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.889,
+          "avgTempC": 28,
+          "avgWindKmh": 14.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.812,
+          "avgTempC": 27.8,
+          "avgWindKmh": 15.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.707,
+          "avgTempC": 27.8,
+          "avgWindKmh": 17.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.777,
+          "avgTempC": 27.5,
+          "avgWindKmh": 17.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.745,
+          "avgTempC": 27.5,
+          "avgWindKmh": 16.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.801,
+          "avgTempC": 27.4,
+          "avgWindKmh": 15.2,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.918,
+          "avgTempC": 26.8,
+          "avgWindKmh": 14.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.886,
+          "avgTempC": 26.5,
+          "avgWindKmh": 17,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "melbourne",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.273,
+          "avgTempC": 20.5,
+          "avgWindKmh": 23.2,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.209,
+          "avgTempC": 19.8,
+          "avgWindKmh": 23.1,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.246,
+          "avgTempC": 18.6,
+          "avgWindKmh": 21.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.315,
+          "avgTempC": 15.5,
+          "avgWindKmh": 19.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.326,
+          "avgTempC": 12.4,
+          "avgWindKmh": 20.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.367,
+          "avgTempC": 10,
+          "avgWindKmh": 19.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.431,
+          "avgTempC": 9.7,
+          "avgWindKmh": 22.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.408,
+          "avgTempC": 10.4,
+          "avgWindKmh": 22.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.409,
+          "avgTempC": 12.3,
+          "avgWindKmh": 23.2,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.39,
+          "avgTempC": 14.5,
+          "avgWindKmh": 23.2,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.373,
+          "avgTempC": 16.4,
+          "avgWindKmh": 22.6,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.287,
+          "avgTempC": 18.5,
+          "avgWindKmh": 23.2,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "mexico-city",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.07,
+          "avgTempC": 14.4,
+          "avgWindKmh": 15.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.087,
+          "avgTempC": 16.3,
+          "avgWindKmh": 17.6,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.123,
+          "avgTempC": 18.3,
+          "avgWindKmh": 19.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.179,
+          "avgTempC": 19.8,
+          "avgWindKmh": 20.3,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.284,
+          "avgTempC": 20.3,
+          "avgWindKmh": 18.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.612,
+          "avgTempC": 18.8,
+          "avgWindKmh": 15.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.795,
+          "avgTempC": 17.5,
+          "avgWindKmh": 13.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.801,
+          "avgTempC": 17.5,
+          "avgWindKmh": 13.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.77,
+          "avgTempC": 17.2,
+          "avgWindKmh": 13.2,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.463,
+          "avgTempC": 16.6,
+          "avgWindKmh": 15.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.145,
+          "avgTempC": 16,
+          "avgWindKmh": 14.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.053,
+          "avgTempC": 14.7,
+          "avgWindKmh": 14,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "miami",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.29,
+          "avgTempC": 19.5,
+          "avgWindKmh": 19,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.354,
+          "avgTempC": 21.3,
+          "avgWindKmh": 19.1,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.299,
+          "avgTempC": 22.5,
+          "avgWindKmh": 19.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.355,
+          "avgTempC": 24.2,
+          "avgWindKmh": 19.6,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.522,
+          "avgTempC": 25.7,
+          "avgWindKmh": 18.2,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.797,
+          "avgTempC": 26.7,
+          "avgWindKmh": 15,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.783,
+          "avgTempC": 27.6,
+          "avgWindKmh": 14.2,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.839,
+          "avgTempC": 27.6,
+          "avgWindKmh": 14.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.806,
+          "avgTempC": 26.7,
+          "avgWindKmh": 14.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.613,
+          "avgTempC": 25.3,
+          "avgWindKmh": 17.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.385,
+          "avgTempC": 23.1,
+          "avgWindKmh": 17.3,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.358,
+          "avgTempC": 21.2,
+          "avgWindKmh": 17.4,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "monaco",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.196,
+          "avgTempC": 8.8,
+          "avgWindKmh": 13,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.244,
+          "avgTempC": 9.8,
+          "avgWindKmh": 13.3,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.229,
+          "avgTempC": 11.5,
+          "avgWindKmh": 15.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.264,
+          "avgTempC": 14.3,
+          "avgWindKmh": 14.5,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.273,
+          "avgTempC": 17.9,
+          "avgWindKmh": 13.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.236,
+          "avgTempC": 22.8,
+          "avgWindKmh": 13.2,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.109,
+          "avgTempC": 25.6,
+          "avgWindKmh": 12.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.152,
+          "avgTempC": 25.6,
+          "avgWindKmh": 12.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.236,
+          "avgTempC": 21.6,
+          "avgWindKmh": 13.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.273,
+          "avgTempC": 17.6,
+          "avgWindKmh": 13.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.285,
+          "avgTempC": 12.8,
+          "avgWindKmh": 13.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.232,
+          "avgTempC": 9.9,
+          "avgWindKmh": 12.1,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "montreal",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.097,
+          "avgTempC": -8.3,
+          "avgWindKmh": 19.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.151,
+          "avgTempC": -7.5,
+          "avgWindKmh": 21.3,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.243,
+          "avgTempC": -1.5,
+          "avgWindKmh": 21.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.367,
+          "avgTempC": 5.8,
+          "avgWindKmh": 21.5,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.355,
+          "avgTempC": 14,
+          "avgWindKmh": 19.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.421,
+          "avgTempC": 19.2,
+          "avgWindKmh": 19.5,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.413,
+          "avgTempC": 22.3,
+          "avgWindKmh": 17.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.399,
+          "avgTempC": 21.2,
+          "avgWindKmh": 16.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.282,
+          "avgTempC": 17.3,
+          "avgWindKmh": 16.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.352,
+          "avgTempC": 10.5,
+          "avgWindKmh": 19.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.336,
+          "avgTempC": 2.6,
+          "avgWindKmh": 20,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.202,
+          "avgTempC": -3.8,
+          "avgWindKmh": 19.7,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "monza",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.217,
+          "avgTempC": 3.2,
+          "avgWindKmh": 11.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.286,
+          "avgTempC": 5.9,
+          "avgWindKmh": 12.5,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.296,
+          "avgTempC": 9,
+          "avgWindKmh": 13.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.333,
+          "avgTempC": 13,
+          "avgWindKmh": 13.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.566,
+          "avgTempC": 16.8,
+          "avgWindKmh": 13.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.427,
+          "avgTempC": 22.2,
+          "avgWindKmh": 13,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.399,
+          "avgTempC": 24.4,
+          "avgWindKmh": 13,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.405,
+          "avgTempC": 23.9,
+          "avgWindKmh": 12.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.388,
+          "avgTempC": 19,
+          "avgWindKmh": 11.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.37,
+          "avgTempC": 14.2,
+          "avgWindKmh": 11.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.361,
+          "avgTempC": 8.2,
+          "avgWindKmh": 11.4,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.226,
+          "avgTempC": 4.2,
+          "avgWindKmh": 10.5,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "sepang",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.736,
+          "avgTempC": 25.8,
+          "avgWindKmh": 11,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.614,
+          "avgTempC": 26.4,
+          "avgWindKmh": 12.4,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.809,
+          "avgTempC": 26.7,
+          "avgWindKmh": 11.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.915,
+          "avgTempC": 26.7,
+          "avgWindKmh": 11.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.88,
+          "avgTempC": 26.9,
+          "avgWindKmh": 11.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.706,
+          "avgTempC": 26.8,
+          "avgWindKmh": 11.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.677,
+          "avgTempC": 26.8,
+          "avgWindKmh": 12.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.774,
+          "avgTempC": 26.6,
+          "avgWindKmh": 12.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.809,
+          "avgTempC": 26.4,
+          "avgWindKmh": 12,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.806,
+          "avgTempC": 26.4,
+          "avgWindKmh": 12,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.958,
+          "avgTempC": 25.9,
+          "avgWindKmh": 10.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.889,
+          "avgTempC": 25.8,
+          "avgWindKmh": 10.8,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "shanghai",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.243,
+          "avgTempC": 5.2,
+          "avgWindKmh": 16.2,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.289,
+          "avgTempC": 6.3,
+          "avgWindKmh": 16.8,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.346,
+          "avgTempC": 11.1,
+          "avgWindKmh": 17.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.321,
+          "avgTempC": 16.1,
+          "avgWindKmh": 18,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.387,
+          "avgTempC": 20.7,
+          "avgWindKmh": 17.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.57,
+          "avgTempC": 24.3,
+          "avgWindKmh": 16.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.545,
+          "avgTempC": 28.3,
+          "avgWindKmh": 17.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.484,
+          "avgTempC": 28.7,
+          "avgWindKmh": 16.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.442,
+          "avgTempC": 24.6,
+          "avgWindKmh": 15.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.264,
+          "avgTempC": 19.1,
+          "avgWindKmh": 16.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.297,
+          "avgTempC": 13.7,
+          "avgWindKmh": 16.3,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.191,
+          "avgTempC": 7,
+          "avgWindKmh": 15.7,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "silverstone",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.352,
+          "avgTempC": 4,
+          "avgWindKmh": 24,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.344,
+          "avgTempC": 5.1,
+          "avgWindKmh": 26,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.381,
+          "avgTempC": 6.4,
+          "avgWindKmh": 24.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.33,
+          "avgTempC": 8.5,
+          "avgWindKmh": 20.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.358,
+          "avgTempC": 12.1,
+          "avgWindKmh": 20.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.348,
+          "avgTempC": 15.5,
+          "avgWindKmh": 20.5,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.402,
+          "avgTempC": 17.4,
+          "avgWindKmh": 20.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.349,
+          "avgTempC": 17,
+          "avgWindKmh": 20.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.37,
+          "avgTempC": 14.4,
+          "avgWindKmh": 21.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.358,
+          "avgTempC": 11.1,
+          "avgWindKmh": 22.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.4,
+          "avgTempC": 7.3,
+          "avgWindKmh": 23.6,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.425,
+          "avgTempC": 6.1,
+          "avgWindKmh": 24.6,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "spa-francorchamps",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.472,
+          "avgTempC": 1.3,
+          "avgWindKmh": 23.5,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.473,
+          "avgTempC": 2.7,
+          "avgWindKmh": 23.9,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.44,
+          "avgTempC": 5,
+          "avgWindKmh": 21.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.385,
+          "avgTempC": 8.1,
+          "avgWindKmh": 19.6,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.446,
+          "avgTempC": 12.1,
+          "avgWindKmh": 18.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.461,
+          "avgTempC": 16.4,
+          "avgWindKmh": 17.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.49,
+          "avgTempC": 17.3,
+          "avgWindKmh": 18.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.469,
+          "avgTempC": 17.6,
+          "avgWindKmh": 17.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.427,
+          "avgTempC": 14,
+          "avgWindKmh": 18.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.493,
+          "avgTempC": 10.3,
+          "avgWindKmh": 20.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.524,
+          "avgTempC": 5.6,
+          "avgWindKmh": 21.6,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.519,
+          "avgTempC": 3.5,
+          "avgWindKmh": 22.7,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "spielberg",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.194,
+          "avgTempC": -0.3,
+          "avgWindKmh": 9.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.225,
+          "avgTempC": 1.5,
+          "avgWindKmh": 9.7,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.293,
+          "avgTempC": 4.3,
+          "avgWindKmh": 10.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.37,
+          "avgTempC": 8.2,
+          "avgWindKmh": 12,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.554,
+          "avgTempC": 12.3,
+          "avgWindKmh": 10.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.506,
+          "avgTempC": 17.7,
+          "avgWindKmh": 10.5,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.519,
+          "avgTempC": 19,
+          "avgWindKmh": 9.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.434,
+          "avgTempC": 18.7,
+          "avgWindKmh": 9,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.397,
+          "avgTempC": 14.1,
+          "avgWindKmh": 9.1,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.32,
+          "avgTempC": 9.7,
+          "avgWindKmh": 9.1,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.267,
+          "avgTempC": 4.3,
+          "avgWindKmh": 8,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.243,
+          "avgTempC": 0.9,
+          "avgWindKmh": 7.5,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "suzuka",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.179,
+          "avgTempC": 5,
+          "avgWindKmh": 22.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.209,
+          "avgTempC": 5.6,
+          "avgWindKmh": 22,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.343,
+          "avgTempC": 9.3,
+          "avgWindKmh": 21.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.376,
+          "avgTempC": 14,
+          "avgWindKmh": 20.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.384,
+          "avgTempC": 18.3,
+          "avgWindKmh": 18.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.494,
+          "avgTempC": 22,
+          "avgWindKmh": 17.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.563,
+          "avgTempC": 26.3,
+          "avgWindKmh": 16.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.51,
+          "avgTempC": 27.6,
+          "avgWindKmh": 17.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.576,
+          "avgTempC": 24.3,
+          "avgWindKmh": 17.5,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.416,
+          "avgTempC": 18.3,
+          "avgWindKmh": 17.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.261,
+          "avgTempC": 12.8,
+          "avgWindKmh": 18,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.211,
+          "avgTempC": 7.5,
+          "avgWindKmh": 20.2,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "yas-marina",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.053,
+          "avgTempC": 19.7,
+          "avgWindKmh": 21.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.042,
+          "avgTempC": 20.8,
+          "avgWindKmh": 23.6,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.056,
+          "avgTempC": 23.7,
+          "avgWindKmh": 24.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.018,
+          "avgTempC": 27.7,
+          "avgWindKmh": 24.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.003,
+          "avgTempC": 31.6,
+          "avgWindKmh": 24.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0,
+          "avgTempC": 34,
+          "avgWindKmh": 24.9,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.009,
+          "avgTempC": 35.9,
+          "avgWindKmh": 24.4,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.006,
+          "avgTempC": 35.9,
+          "avgWindKmh": 23.9,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0,
+          "avgTempC": 33.6,
+          "avgWindKmh": 23.2,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.006,
+          "avgTempC": 30.3,
+          "avgWindKmh": 21.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.018,
+          "avgTempC": 26,
+          "avgWindKmh": 20.8,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.038,
+          "avgTempC": 21.9,
+          "avgWindKmh": 19.9,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    },
+    {
+      "circuitId": "zandvoort",
+      "months": [
+        {
+          "month": 1,
+          "rainDayProbability": 0.496,
+          "avgTempC": 5.2,
+          "avgWindKmh": 31.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 2,
+          "rainDayProbability": 0.421,
+          "avgTempC": 5.3,
+          "avgWindKmh": 30.8,
+          "sampleDays": 311
+        },
+        {
+          "month": 3,
+          "rainDayProbability": 0.399,
+          "avgTempC": 6.7,
+          "avgWindKmh": 27.8,
+          "sampleDays": 341
+        },
+        {
+          "month": 4,
+          "rainDayProbability": 0.355,
+          "avgTempC": 9.2,
+          "avgWindKmh": 25.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 5,
+          "rainDayProbability": 0.323,
+          "avgTempC": 12.9,
+          "avgWindKmh": 25.3,
+          "sampleDays": 341
+        },
+        {
+          "month": 6,
+          "rainDayProbability": 0.373,
+          "avgTempC": 16.5,
+          "avgWindKmh": 25,
+          "sampleDays": 330
+        },
+        {
+          "month": 7,
+          "rainDayProbability": 0.449,
+          "avgTempC": 18,
+          "avgWindKmh": 25.7,
+          "sampleDays": 341
+        },
+        {
+          "month": 8,
+          "rainDayProbability": 0.457,
+          "avgTempC": 18.6,
+          "avgWindKmh": 25,
+          "sampleDays": 341
+        },
+        {
+          "month": 9,
+          "rainDayProbability": 0.424,
+          "avgTempC": 16.3,
+          "avgWindKmh": 25.4,
+          "sampleDays": 330
+        },
+        {
+          "month": 10,
+          "rainDayProbability": 0.507,
+          "avgTempC": 12.9,
+          "avgWindKmh": 28.6,
+          "sampleDays": 341
+        },
+        {
+          "month": 11,
+          "rainDayProbability": 0.579,
+          "avgTempC": 8.8,
+          "avgWindKmh": 29.7,
+          "sampleDays": 330
+        },
+        {
+          "month": 12,
+          "rainDayProbability": 0.487,
+          "avgTempC": 6.7,
+          "avgWindKmh": 30.9,
+          "sampleDays": 341
+        }
+      ],
+      "source": "open-meteo"
+    }
+  ]
+}

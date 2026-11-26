@@ -12,6 +12,7 @@
     "benchmark:f9": "vitest run --disableConsoleIntercept src/modules/conversation/conversation.dialogue-f9-benchmark.test.ts",
     "human-quality:ab": "tsx src/scripts/human-quality-ab.ts",
     "human-quality:multiturn": "tsx src/scripts/human-quality-multiturn.ts",
+    "v5:build-data": "tsx src/scripts/build-v5-data.ts",
     "admin:promote": "tsx src/scripts/admin-promote.ts",
     "test": "vitest run"
   },

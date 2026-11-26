@@ -156,7 +156,7 @@ async function runSequence(
 }
 
 async function main(): Promise<void> {
-  const model = process.env.OLLAMA_MODEL ?? "llama3.2";
+  const model = process.env.OLLAMA_MODEL ?? "qwen3.5:9b";
   const provider = createOllamaDialogueRealizerProviderFromEnv({ model, timeoutMs: 60_000 });
   const deterministic = new DeterministicDialogueRealizer();
   const llm = provider ? new LlmDialogueRealizer(provider) : null;

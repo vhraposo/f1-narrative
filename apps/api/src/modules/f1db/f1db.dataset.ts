@@ -70,6 +70,8 @@ export type F1dbResult = {
   gridPositionNumber: number | null;
   fastestLap: boolean;
   reasonRetired: string | null;
+  positionsGained: number | null;
+  pitStops: number | null;
 };
 
 export type F1dbChampion = {
@@ -241,6 +243,8 @@ export function loadF1dbDataset(): F1dbDataset | null {
       gridPositionNumber: toNumber(row.gridPositionNumber),
       fastestLap: toBoolean(row.fastestLap),
       reasonRetired: row.reasonRetired?.length ? row.reasonRetired : null,
+      positionsGained: toNumber(row.positionsGained),
+      pitStops: toNumber(row.pitStops),
     };
     const list = resultsByDriverId.get(result.driverId) ?? [];
     list.push(result);

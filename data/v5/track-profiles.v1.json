@@ -1,0 +1,3311 @@
+{
+  "schemaVersion": "v5.track-profiles.v1",
+  "generatedAt": "2026-11-26T12:10:39.537Z",
+  "sourceVersion": "v2026.15.1",
+  "targetYear": 2026,
+  "circuits": [
+    {
+      "circuitId": "melbourne",
+      "name": "Melbourne",
+      "officialName": "Formula 1 Qatar Airways Australian Grand Prix 2026",
+      "country": "australia",
+      "city": "Melbourne",
+      "type": "STREET",
+      "direction": "CLOCKWISE",
+      "latitude": -37.849722,
+      "longitude": 144.968333,
+      "lengthKm": 5.278,
+      "laps": 58,
+      "turns": 14,
+      "layoutId": "melbourne-2",
+      "eventMonth": 3,
+      "firstRaceYear": 1996,
+      "racesHeld": 29,
+      "derived": {
+        "dnfRate": 0.253,
+        "avgPositionsGained": 1.41,
+        "pitStopsPerRace": 2.59,
+        "overtakingDifficulty": 2,
+        "sampleStarts": 79,
+        "confidence": 0.73
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.246,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.273,
+            "avgTempC": 20.5,
+            "avgWindKmh": 23.2,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.209,
+            "avgTempC": 19.8,
+            "avgWindKmh": 23.1,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.246,
+            "avgTempC": 18.6,
+            "avgWindKmh": 21.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.315,
+            "avgTempC": 15.5,
+            "avgWindKmh": 19.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.326,
+            "avgTempC": 12.4,
+            "avgWindKmh": 20.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.367,
+            "avgTempC": 10,
+            "avgWindKmh": 19.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.431,
+            "avgTempC": 9.7,
+            "avgWindKmh": 22.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.408,
+            "avgTempC": 10.4,
+            "avgWindKmh": 22.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.409,
+            "avgTempC": 12.3,
+            "avgWindKmh": 23.2,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.39,
+            "avgTempC": 14.5,
+            "avgWindKmh": 23.2,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.373,
+            "avgTempC": 16.4,
+            "avgWindKmh": 22.6,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.287,
+            "avgTempC": 18.5,
+            "avgWindKmh": 23.2,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.81
+    },
+    {
+      "circuitId": "shanghai",
+      "name": "Shanghai",
+      "officialName": "Formula 1 Heineken Chinese Grand Prix 2026",
+      "country": "china",
+      "city": "Shanghai",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 31.338889,
+      "longitude": 121.219722,
+      "lengthKm": 5.451,
+      "laps": 56,
+      "turns": 16,
+      "layoutId": "shanghai-1",
+      "eventMonth": 3,
+      "firstRaceYear": 2004,
+      "racesHeld": 19,
+      "derived": {
+        "dnfRate": 0.134,
+        "avgPositionsGained": 0.78,
+        "pitStopsPerRace": 2.21,
+        "overtakingDifficulty": 7,
+        "sampleStarts": 164,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.346,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.243,
+            "avgTempC": 5.2,
+            "avgWindKmh": 16.2,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.289,
+            "avgTempC": 6.3,
+            "avgWindKmh": 16.8,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.346,
+            "avgTempC": 11.1,
+            "avgWindKmh": 17.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.321,
+            "avgTempC": 16.1,
+            "avgWindKmh": 18,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.387,
+            "avgTempC": 20.7,
+            "avgWindKmh": 17.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.57,
+            "avgTempC": 24.3,
+            "avgWindKmh": 16.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.545,
+            "avgTempC": 28.3,
+            "avgWindKmh": 17.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.484,
+            "avgTempC": 28.7,
+            "avgWindKmh": 16.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.442,
+            "avgTempC": 24.6,
+            "avgWindKmh": 15.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.264,
+            "avgTempC": 19.1,
+            "avgWindKmh": 16.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.297,
+            "avgTempC": 13.7,
+            "avgWindKmh": 16.3,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.191,
+            "avgTempC": 7,
+            "avgWindKmh": 15.7,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "suzuka",
+      "name": "Suzuka",
+      "officialName": "Formula 1 Aramco Japanese Grand Prix 2026",
+      "country": "japan",
+      "city": "Suzuka",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 34.843056,
+      "longitude": 136.540556,
+      "lengthKm": 5.807,
+      "laps": 53,
+      "turns": 18,
+      "layoutId": "suzuka-2",
+      "eventMonth": 3,
+      "firstRaceYear": 1987,
+      "racesHeld": 36,
+      "derived": {
+        "dnfRate": 0.123,
+        "avgPositionsGained": 0.69,
+        "pitStopsPerRace": 1.95,
+        "overtakingDifficulty": 8,
+        "sampleStarts": 204,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.343,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.179,
+            "avgTempC": 5,
+            "avgWindKmh": 22.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.209,
+            "avgTempC": 5.6,
+            "avgWindKmh": 22,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.343,
+            "avgTempC": 9.3,
+            "avgWindKmh": 21.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.376,
+            "avgTempC": 14,
+            "avgWindKmh": 20.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.384,
+            "avgTempC": 18.3,
+            "avgWindKmh": 18.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.494,
+            "avgTempC": 22,
+            "avgWindKmh": 17.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.563,
+            "avgTempC": 26.3,
+            "avgWindKmh": 16.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.51,
+            "avgTempC": 27.6,
+            "avgWindKmh": 17.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.576,
+            "avgTempC": 24.3,
+            "avgWindKmh": 17.5,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.416,
+            "avgTempC": 18.3,
+            "avgWindKmh": 17.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.261,
+            "avgTempC": 12.8,
+            "avgWindKmh": 18,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.211,
+            "avgTempC": 7.5,
+            "avgWindKmh": 20.2,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "miami",
+      "name": "Miami",
+      "officialName": "Formula 1 Crypto.com Miami Grand Prix 2026",
+      "country": "united-states-of-america",
+      "city": "Miami Gardens",
+      "type": "STREET",
+      "direction": "ANTI_CLOCKWISE",
+      "latitude": 25.958056,
+      "longitude": -80.238889,
+      "lengthKm": 5.412,
+      "laps": 57,
+      "turns": 19,
+      "layoutId": "miami-1",
+      "eventMonth": 5,
+      "firstRaceYear": 2022,
+      "racesHeld": 5,
+      "derived": {
+        "dnfRate": 0.125,
+        "avgPositionsGained": 0.55,
+        "pitStopsPerRace": 1.14,
+        "overtakingDifficulty": 8,
+        "sampleStarts": 80,
+        "confidence": 0.73
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.522,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.29,
+            "avgTempC": 19.5,
+            "avgWindKmh": 19,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.354,
+            "avgTempC": 21.3,
+            "avgWindKmh": 19.1,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.299,
+            "avgTempC": 22.5,
+            "avgWindKmh": 19.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.355,
+            "avgTempC": 24.2,
+            "avgWindKmh": 19.6,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.522,
+            "avgTempC": 25.7,
+            "avgWindKmh": 18.2,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.797,
+            "avgTempC": 26.7,
+            "avgWindKmh": 15,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.783,
+            "avgTempC": 27.6,
+            "avgWindKmh": 14.2,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.839,
+            "avgTempC": 27.6,
+            "avgWindKmh": 14.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.806,
+            "avgTempC": 26.7,
+            "avgWindKmh": 14.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.613,
+            "avgTempC": 25.3,
+            "avgWindKmh": 17.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.385,
+            "avgTempC": 23.1,
+            "avgWindKmh": 17.3,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.358,
+            "avgTempC": 21.2,
+            "avgWindKmh": 17.4,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.81
+    },
+    {
+      "circuitId": "montreal",
+      "name": "Gilles Villeneuve",
+      "officialName": "Formula 1 Lenovo Grand Prix du Canada 2026",
+      "country": "canada",
+      "city": "Montreal",
+      "type": "STREET",
+      "direction": "CLOCKWISE",
+      "latitude": 45.500578,
+      "longitude": -73.522461,
+      "lengthKm": 4.361,
+      "laps": 68,
+      "turns": 14,
+      "layoutId": "montreal-6",
+      "eventMonth": 5,
+      "firstRaceYear": 1978,
+      "racesHeld": 45,
+      "derived": {
+        "dnfRate": 0.196,
+        "avgPositionsGained": 1.04,
+        "pitStopsPerRace": 1.45,
+        "overtakingDifficulty": 4,
+        "sampleStarts": 204,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.355,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.097,
+            "avgTempC": -8.3,
+            "avgWindKmh": 19.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.151,
+            "avgTempC": -7.5,
+            "avgWindKmh": 21.3,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.243,
+            "avgTempC": -1.5,
+            "avgWindKmh": 21.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.367,
+            "avgTempC": 5.8,
+            "avgWindKmh": 21.5,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.355,
+            "avgTempC": 14,
+            "avgWindKmh": 19.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.421,
+            "avgTempC": 19.2,
+            "avgWindKmh": 19.5,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.413,
+            "avgTempC": 22.3,
+            "avgWindKmh": 17.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.399,
+            "avgTempC": 21.2,
+            "avgWindKmh": 16.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.282,
+            "avgTempC": 17.3,
+            "avgWindKmh": 16.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.352,
+            "avgTempC": 10.5,
+            "avgWindKmh": 19.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.336,
+            "avgTempC": 2.6,
+            "avgWindKmh": 20,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.202,
+            "avgTempC": -3.8,
+            "avgWindKmh": 19.7,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "monaco",
+      "name": "Monaco",
+      "officialName": "Formula 1 Louis Vuitton Grand Prix de Monaco 2026",
+      "country": "monaco",
+      "city": "Monte Carlo",
+      "type": "STREET",
+      "direction": "CLOCKWISE",
+      "latitude": 43.734722,
+      "longitude": 7.420556,
+      "lengthKm": 3.337,
+      "laps": 78,
+      "turns": 19,
+      "layoutId": "monaco-6",
+      "eventMonth": 6,
+      "firstRaceYear": 1950,
+      "racesHeld": 72,
+      "derived": {
+        "dnfRate": 0.188,
+        "avgPositionsGained": 1.02,
+        "pitStopsPerRace": 1.57,
+        "overtakingDifficulty": 6,
+        "sampleStarts": 224,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.236,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.196,
+            "avgTempC": 8.8,
+            "avgWindKmh": 13,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.244,
+            "avgTempC": 9.8,
+            "avgWindKmh": 13.3,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.229,
+            "avgTempC": 11.5,
+            "avgWindKmh": 15.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.264,
+            "avgTempC": 14.3,
+            "avgWindKmh": 14.5,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.273,
+            "avgTempC": 17.9,
+            "avgWindKmh": 13.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.236,
+            "avgTempC": 22.8,
+            "avgWindKmh": 13.2,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.109,
+            "avgTempC": 25.6,
+            "avgWindKmh": 12.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.152,
+            "avgTempC": 25.6,
+            "avgWindKmh": 12.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.236,
+            "avgTempC": 21.6,
+            "avgWindKmh": 13.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.273,
+            "avgTempC": 17.6,
+            "avgWindKmh": 13.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.285,
+            "avgTempC": 12.8,
+            "avgWindKmh": 13.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.232,
+            "avgTempC": 9.9,
+            "avgWindKmh": 12.1,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "catalunya",
+      "name": "Catalunya",
+      "officialName": "Formula 1 MSC Cruises Gran Premio de Barcelona-Catalunya 2026",
+      "country": "spain",
+      "city": "Montmeló",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 41.57,
+      "longitude": 2.261111,
+      "lengthKm": 4.657,
+      "laps": 66,
+      "turns": 14,
+      "layoutId": "catalunya-6",
+      "eventMonth": 6,
+      "firstRaceYear": 1991,
+      "racesHeld": 36,
+      "derived": {
+        "dnfRate": 0.05,
+        "avgPositionsGained": 0.08,
+        "pitStopsPerRace": 2.32,
+        "overtakingDifficulty": 10,
+        "sampleStarts": 60,
+        "confidence": 0.65
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.224,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.138,
+            "avgTempC": 8,
+            "avgWindKmh": 16,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.241,
+            "avgTempC": 9.6,
+            "avgWindKmh": 15,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.302,
+            "avgTempC": 11.2,
+            "avgWindKmh": 17.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.291,
+            "avgTempC": 13.6,
+            "avgWindKmh": 17,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.323,
+            "avgTempC": 17.3,
+            "avgWindKmh": 16.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.224,
+            "avgTempC": 22.3,
+            "avgWindKmh": 15.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.199,
+            "avgTempC": 25,
+            "avgWindKmh": 16.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.255,
+            "avgTempC": 24.6,
+            "avgWindKmh": 15.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.418,
+            "avgTempC": 20.6,
+            "avgWindKmh": 14.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.361,
+            "avgTempC": 17.1,
+            "avgWindKmh": 14.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.282,
+            "avgTempC": 12.1,
+            "avgWindKmh": 14.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.155,
+            "avgTempC": 9.3,
+            "avgWindKmh": 14,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.78
+    },
+    {
+      "circuitId": "spielberg",
+      "name": "Red Bull Ring",
+      "officialName": "Formula 1 Lenovo Austrian Grand Prix 2026",
+      "country": "austria",
+      "city": "Spielberg",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 47.219722,
+      "longitude": 14.764722,
+      "lengthKm": 4.326,
+      "laps": 71,
+      "turns": 10,
+      "layoutId": "spielberg-3",
+      "eventMonth": 6,
+      "firstRaceYear": 1970,
+      "racesHeld": 40,
+      "derived": {
+        "dnfRate": 0.173,
+        "avgPositionsGained": 1.11,
+        "pitStopsPerRace": 1.75,
+        "overtakingDifficulty": 4,
+        "sampleStarts": 284,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.506,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.194,
+            "avgTempC": -0.3,
+            "avgWindKmh": 9.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.225,
+            "avgTempC": 1.5,
+            "avgWindKmh": 9.7,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.293,
+            "avgTempC": 4.3,
+            "avgWindKmh": 10.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.37,
+            "avgTempC": 8.2,
+            "avgWindKmh": 12,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.554,
+            "avgTempC": 12.3,
+            "avgWindKmh": 10.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.506,
+            "avgTempC": 17.7,
+            "avgWindKmh": 10.5,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.519,
+            "avgTempC": 19,
+            "avgWindKmh": 9.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.434,
+            "avgTempC": 18.7,
+            "avgWindKmh": 9,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.397,
+            "avgTempC": 14.1,
+            "avgWindKmh": 9.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.32,
+            "avgTempC": 9.7,
+            "avgWindKmh": 9.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.267,
+            "avgTempC": 4.3,
+            "avgWindKmh": 8,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.243,
+            "avgTempC": 0.9,
+            "avgWindKmh": 7.5,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "silverstone",
+      "name": "Silverstone",
+      "officialName": "Formula 1 Pirelli British Grand Prix 2026",
+      "country": "united-kingdom",
+      "city": "Silverstone",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 52.078611,
+      "longitude": -1.016944,
+      "lengthKm": 5.891,
+      "laps": 52,
+      "turns": 18,
+      "layoutId": "silverstone-8",
+      "eventMonth": 7,
+      "firstRaceYear": 1950,
+      "racesHeld": 61,
+      "derived": {
+        "dnfRate": 0.201,
+        "avgPositionsGained": 1.02,
+        "pitStopsPerRace": 1.67,
+        "overtakingDifficulty": 6,
+        "sampleStarts": 264,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.402,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.352,
+            "avgTempC": 4,
+            "avgWindKmh": 24,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.344,
+            "avgTempC": 5.1,
+            "avgWindKmh": 26,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.381,
+            "avgTempC": 6.4,
+            "avgWindKmh": 24.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.33,
+            "avgTempC": 8.5,
+            "avgWindKmh": 20.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.358,
+            "avgTempC": 12.1,
+            "avgWindKmh": 20.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.348,
+            "avgTempC": 15.5,
+            "avgWindKmh": 20.5,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.402,
+            "avgTempC": 17.4,
+            "avgWindKmh": 20.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.349,
+            "avgTempC": 17,
+            "avgWindKmh": 20.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.37,
+            "avgTempC": 14.4,
+            "avgWindKmh": 21.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.358,
+            "avgTempC": 11.1,
+            "avgWindKmh": 22.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.4,
+            "avgTempC": 7.3,
+            "avgWindKmh": 23.6,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.425,
+            "avgTempC": 6.1,
+            "avgWindKmh": 24.6,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "spa-francorchamps",
+      "name": "Spa-Francorchamps",
+      "officialName": "Formula 1 Moët & Chandon Belgian Grand Prix 2026",
+      "country": "belgium",
+      "city": "Spa",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 50.437222,
+      "longitude": 5.971389,
+      "lengthKm": 7.004,
+      "laps": 44,
+      "turns": 19,
+      "layoutId": "spa-francorchamps-4",
+      "eventMonth": 7,
+      "firstRaceYear": 1950,
+      "racesHeld": 59,
+      "derived": {
+        "dnfRate": 0.152,
+        "avgPositionsGained": 1.21,
+        "pitStopsPerRace": 1.74,
+        "overtakingDifficulty": 2,
+        "sampleStarts": 244,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.49,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.472,
+            "avgTempC": 1.3,
+            "avgWindKmh": 23.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.473,
+            "avgTempC": 2.7,
+            "avgWindKmh": 23.9,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.44,
+            "avgTempC": 5,
+            "avgWindKmh": 21.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.385,
+            "avgTempC": 8.1,
+            "avgWindKmh": 19.6,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.446,
+            "avgTempC": 12.1,
+            "avgWindKmh": 18.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.461,
+            "avgTempC": 16.4,
+            "avgWindKmh": 17.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.49,
+            "avgTempC": 17.3,
+            "avgWindKmh": 18.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.469,
+            "avgTempC": 17.6,
+            "avgWindKmh": 17.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.427,
+            "avgTempC": 14,
+            "avgWindKmh": 18.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.493,
+            "avgTempC": 10.3,
+            "avgWindKmh": 20.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.524,
+            "avgTempC": 5.6,
+            "avgWindKmh": 21.6,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.519,
+            "avgTempC": 3.5,
+            "avgWindKmh": 22.7,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "hungaroring",
+      "name": "Hungaroring",
+      "officialName": "Formula 1 AWS Hungarian Grand Prix 2026",
+      "country": "hungary",
+      "city": "Budapest",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 47.582222,
+      "longitude": 19.251111,
+      "lengthKm": 4.381,
+      "laps": 70,
+      "turns": 14,
+      "layoutId": "hungaroring-3",
+      "eventMonth": 7,
+      "firstRaceYear": 1986,
+      "racesHeld": 41,
+      "derived": {
+        "dnfRate": 0.139,
+        "avgPositionsGained": 0.84,
+        "pitStopsPerRace": 2.02,
+        "overtakingDifficulty": 7,
+        "sampleStarts": 244,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.276,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.194,
+            "avgTempC": 0.5,
+            "avgWindKmh": 16.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.251,
+            "avgTempC": 3.2,
+            "avgWindKmh": 17.6,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.226,
+            "avgTempC": 6.6,
+            "avgWindKmh": 17.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.294,
+            "avgTempC": 11.5,
+            "avgWindKmh": 18.3,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.381,
+            "avgTempC": 15.9,
+            "avgWindKmh": 16.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.355,
+            "avgTempC": 21.4,
+            "avgWindKmh": 15.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.276,
+            "avgTempC": 23.1,
+            "avgWindKmh": 16.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.226,
+            "avgTempC": 22.9,
+            "avgWindKmh": 14.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.264,
+            "avgTempC": 17.7,
+            "avgWindKmh": 15.3,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.238,
+            "avgTempC": 11.6,
+            "avgWindKmh": 15.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.3,
+            "avgTempC": 5.9,
+            "avgWindKmh": 15.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.238,
+            "avgTempC": 1.9,
+            "avgWindKmh": 15.2,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "zandvoort",
+      "name": "Zandvoort",
+      "officialName": "Formula 1 Heineken Dutch Grand Prix 2026",
+      "country": "netherlands",
+      "city": "Zandvoort",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 52.388819,
+      "longitude": 4.540922,
+      "lengthKm": 4.259,
+      "laps": 72,
+      "turns": 14,
+      "layoutId": "zandvoort-5",
+      "eventMonth": 8,
+      "firstRaceYear": 1952,
+      "racesHeld": 36,
+      "derived": {
+        "dnfRate": 0.11,
+        "avgPositionsGained": 0.41,
+        "pitStopsPerRace": 2.68,
+        "overtakingDifficulty": 9,
+        "sampleStarts": 100,
+        "confidence": 0.82
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.457,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.496,
+            "avgTempC": 5.2,
+            "avgWindKmh": 31.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.421,
+            "avgTempC": 5.3,
+            "avgWindKmh": 30.8,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.399,
+            "avgTempC": 6.7,
+            "avgWindKmh": 27.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.355,
+            "avgTempC": 9.2,
+            "avgWindKmh": 25.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.323,
+            "avgTempC": 12.9,
+            "avgWindKmh": 25.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.373,
+            "avgTempC": 16.5,
+            "avgWindKmh": 25,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.449,
+            "avgTempC": 18,
+            "avgWindKmh": 25.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.457,
+            "avgTempC": 18.6,
+            "avgWindKmh": 25,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.424,
+            "avgTempC": 16.3,
+            "avgWindKmh": 25.4,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.507,
+            "avgTempC": 12.9,
+            "avgWindKmh": 28.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.579,
+            "avgTempC": 8.8,
+            "avgWindKmh": 29.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.487,
+            "avgTempC": 6.7,
+            "avgWindKmh": 30.9,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.84
+    },
+    {
+      "circuitId": "monza",
+      "name": "Monza",
+      "officialName": "Formula 1 Pirelli Gran Premio d'Italia 2026",
+      "country": "italy",
+      "city": "Monza",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 45.620556,
+      "longitude": 9.289444,
+      "lengthKm": 5.793,
+      "laps": 53,
+      "turns": 11,
+      "layoutId": "monza-7",
+      "eventMonth": 9,
+      "firstRaceYear": 1950,
+      "racesHeld": 76,
+      "derived": {
+        "dnfRate": 0.16,
+        "avgPositionsGained": 1.04,
+        "pitStopsPerRace": 1.3,
+        "overtakingDifficulty": 4,
+        "sampleStarts": 244,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.388,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.217,
+            "avgTempC": 3.2,
+            "avgWindKmh": 11.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.286,
+            "avgTempC": 5.9,
+            "avgWindKmh": 12.5,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.296,
+            "avgTempC": 9,
+            "avgWindKmh": 13.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.333,
+            "avgTempC": 13,
+            "avgWindKmh": 13.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.566,
+            "avgTempC": 16.8,
+            "avgWindKmh": 13.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.427,
+            "avgTempC": 22.2,
+            "avgWindKmh": 13,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.399,
+            "avgTempC": 24.4,
+            "avgWindKmh": 13,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.405,
+            "avgTempC": 23.9,
+            "avgWindKmh": 12.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.388,
+            "avgTempC": 19,
+            "avgWindKmh": 11.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.37,
+            "avgTempC": 14.2,
+            "avgWindKmh": 11.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.361,
+            "avgTempC": 8.2,
+            "avgWindKmh": 11.4,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.226,
+            "avgTempC": 4.2,
+            "avgWindKmh": 10.5,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "madring",
+      "name": "Madring",
+      "officialName": "Formula 1 TAG Heuer Gran Premio de España 2026",
+      "country": "spain",
+      "city": "Madrid",
+      "type": "STREET",
+      "direction": "CLOCKWISE",
+      "latitude": 40.465278,
+      "longitude": -3.615278,
+      "lengthKm": 5.416,
+      "laps": 57,
+      "turns": 22,
+      "layoutId": "madring-1",
+      "eventMonth": 9,
+      "firstRaceYear": 2026,
+      "racesHeld": 1,
+      "derived": {
+        "dnfRate": null,
+        "avgPositionsGained": null,
+        "pitStopsPerRace": null,
+        "overtakingDifficulty": null,
+        "sampleStarts": 0,
+        "confidence": 0.2
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.167,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.22,
+            "avgTempC": 5.2,
+            "avgWindKmh": 14.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.19,
+            "avgTempC": 7.4,
+            "avgWindKmh": 15.4,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.34,
+            "avgTempC": 9.8,
+            "avgWindKmh": 17.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.33,
+            "avgTempC": 13,
+            "avgWindKmh": 16.4,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.199,
+            "avgTempC": 17.7,
+            "avgWindKmh": 16.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.152,
+            "avgTempC": 23.3,
+            "avgWindKmh": 16.6,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.035,
+            "avgTempC": 27.5,
+            "avgWindKmh": 17.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.038,
+            "avgTempC": 26.8,
+            "avgWindKmh": 16.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.167,
+            "avgTempC": 20.7,
+            "avgWindKmh": 14.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.267,
+            "avgTempC": 15.9,
+            "avgWindKmh": 14.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.279,
+            "avgTempC": 9.7,
+            "avgWindKmh": 14.4,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.211,
+            "avgTempC": 6.8,
+            "avgWindKmh": 12.9,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.62
+    },
+    {
+      "circuitId": "baku",
+      "name": "Baku",
+      "officialName": "Formula 1 Qatar Airways Azerbaijan Grand Prix 2026",
+      "country": "azerbaijan",
+      "city": "Baku",
+      "type": "STREET",
+      "direction": "ANTI_CLOCKWISE",
+      "latitude": 40.3725,
+      "longitude": 49.853333,
+      "lengthKm": 6.003,
+      "laps": 51,
+      "turns": 20,
+      "layoutId": "baku-1",
+      "eventMonth": 9,
+      "firstRaceYear": 2016,
+      "racesHeld": 10,
+      "derived": {
+        "dnfRate": 0.209,
+        "avgPositionsGained": 1.17,
+        "pitStopsPerRace": 1.7,
+        "overtakingDifficulty": 3,
+        "sampleStarts": 182,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.13,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.161,
+            "avgTempC": 5.1,
+            "avgWindKmh": 26.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.145,
+            "avgTempC": 5.3,
+            "avgWindKmh": 27.3,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.205,
+            "avgTempC": 8.1,
+            "avgWindKmh": 27.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.142,
+            "avgTempC": 12.9,
+            "avgWindKmh": 26.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.173,
+            "avgTempC": 18.5,
+            "avgWindKmh": 26.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.067,
+            "avgTempC": 24.5,
+            "avgWindKmh": 25.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.038,
+            "avgTempC": 27.1,
+            "avgWindKmh": 26.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.056,
+            "avgTempC": 27.2,
+            "avgWindKmh": 23.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.13,
+            "avgTempC": 22.6,
+            "avgWindKmh": 24.5,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.211,
+            "avgTempC": 16.9,
+            "avgWindKmh": 25.2,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.233,
+            "avgTempC": 11.5,
+            "avgWindKmh": 25.5,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.235,
+            "avgTempC": 7.5,
+            "avgWindKmh": 24.8,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "sepang",
+      "name": "Sepang",
+      "officialName": "Formula 1 Gulf Air Bahrain Grand Prix in Malaysia 2026",
+      "country": "malaysia",
+      "city": "Sepang",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 2.760556,
+      "longitude": 101.7375,
+      "lengthKm": 5.543,
+      "laps": 56,
+      "turns": 15,
+      "layoutId": "sepang-1",
+      "eventMonth": 10,
+      "firstRaceYear": 1999,
+      "racesHeld": 20,
+      "derived": {
+        "dnfRate": 0.238,
+        "avgPositionsGained": 2.06,
+        "pitStopsPerRace": 2.01,
+        "overtakingDifficulty": 1,
+        "sampleStarts": 84,
+        "confidence": 0.75
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.806,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.736,
+            "avgTempC": 25.8,
+            "avgWindKmh": 11,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.614,
+            "avgTempC": 26.4,
+            "avgWindKmh": 12.4,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.809,
+            "avgTempC": 26.7,
+            "avgWindKmh": 11.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.915,
+            "avgTempC": 26.7,
+            "avgWindKmh": 11.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.88,
+            "avgTempC": 26.9,
+            "avgWindKmh": 11.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.706,
+            "avgTempC": 26.8,
+            "avgWindKmh": 11.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.677,
+            "avgTempC": 26.8,
+            "avgWindKmh": 12.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.774,
+            "avgTempC": 26.6,
+            "avgWindKmh": 12.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.809,
+            "avgTempC": 26.4,
+            "avgWindKmh": 12,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.806,
+            "avgTempC": 26.4,
+            "avgWindKmh": 12,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.958,
+            "avgTempC": 25.9,
+            "avgWindKmh": 10.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.889,
+            "avgTempC": 25.8,
+            "avgWindKmh": 10.8,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.81
+    },
+    {
+      "circuitId": "marina-bay",
+      "name": "Marina Bay",
+      "officialName": "Formula 1 Singapore Airlines Singapore Grand Prix 2026",
+      "country": "singapore",
+      "city": "Singapore",
+      "type": "STREET",
+      "direction": "ANTI_CLOCKWISE",
+      "latitude": 1.291531,
+      "longitude": 103.86385,
+      "lengthKm": 4.927,
+      "laps": 62,
+      "turns": 19,
+      "layoutId": "marina-bay-4",
+      "eventMonth": 10,
+      "firstRaceYear": 2008,
+      "racesHeld": 17,
+      "derived": {
+        "dnfRate": 0.117,
+        "avgPositionsGained": 0.21,
+        "pitStopsPerRace": 1.18,
+        "overtakingDifficulty": 10,
+        "sampleStarts": 60,
+        "confidence": 0.65
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.801,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.739,
+            "avgTempC": 26.3,
+            "avgWindKmh": 19.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.605,
+            "avgTempC": 26.7,
+            "avgWindKmh": 21.2,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.76,
+            "avgTempC": 27.3,
+            "avgWindKmh": 17.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.876,
+            "avgTempC": 27.5,
+            "avgWindKmh": 13.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.889,
+            "avgTempC": 28,
+            "avgWindKmh": 14.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.812,
+            "avgTempC": 27.8,
+            "avgWindKmh": 15.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.707,
+            "avgTempC": 27.8,
+            "avgWindKmh": 17.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.777,
+            "avgTempC": 27.5,
+            "avgWindKmh": 17.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.745,
+            "avgTempC": 27.5,
+            "avgWindKmh": 16.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.801,
+            "avgTempC": 27.4,
+            "avgWindKmh": 15.2,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.918,
+            "avgTempC": 26.8,
+            "avgWindKmh": 14.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.886,
+            "avgTempC": 26.5,
+            "avgWindKmh": 17,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.78
+    },
+    {
+      "circuitId": "austin",
+      "name": "Americas",
+      "officialName": "Formula 1 MSC Cruises United States Grand Prix 2026",
+      "country": "united-states-of-america",
+      "city": "Austin",
+      "type": "RACE",
+      "direction": "ANTI_CLOCKWISE",
+      "latitude": 30.132778,
+      "longitude": -97.641111,
+      "lengthKm": 5.513,
+      "laps": 56,
+      "turns": 20,
+      "layoutId": "austin-1",
+      "eventMonth": 10,
+      "firstRaceYear": 2012,
+      "racesHeld": 14,
+      "derived": {
+        "dnfRate": 0.191,
+        "avgPositionsGained": 1.55,
+        "pitStopsPerRace": 1.66,
+        "overtakingDifficulty": 1,
+        "sampleStarts": 220,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.252,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.27,
+            "avgTempC": 10.5,
+            "avgWindKmh": 21.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.293,
+            "avgTempC": 12.6,
+            "avgWindKmh": 23.1,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.334,
+            "avgTempC": 17.7,
+            "avgWindKmh": 23.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.376,
+            "avgTempC": 20.6,
+            "avgWindKmh": 24.2,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.487,
+            "avgTempC": 24.3,
+            "avgWindKmh": 22.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.391,
+            "avgTempC": 27.7,
+            "avgWindKmh": 20.2,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.261,
+            "avgTempC": 29.5,
+            "avgWindKmh": 20.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.302,
+            "avgTempC": 29.9,
+            "avgWindKmh": 19.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.297,
+            "avgTempC": 27.1,
+            "avgWindKmh": 17.6,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.252,
+            "avgTempC": 22.5,
+            "avgWindKmh": 19.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.312,
+            "avgTempC": 16.5,
+            "avgWindKmh": 20.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.276,
+            "avgTempC": 13.1,
+            "avgWindKmh": 20.6,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "mexico-city",
+      "name": "Hermanos Rodríguez",
+      "officialName": "Formula 1 Gran Premio de la Ciudad de México 2026",
+      "country": "mexico",
+      "city": "Mexico City",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 19.404197,
+      "longitude": -99.088747,
+      "lengthKm": 4.304,
+      "laps": 71,
+      "turns": 17,
+      "layoutId": "mexico-city-3",
+      "eventMonth": 11,
+      "firstRaceYear": 1963,
+      "racesHeld": 26,
+      "derived": {
+        "dnfRate": 0.158,
+        "avgPositionsGained": 1.04,
+        "pitStopsPerRace": 1.38,
+        "overtakingDifficulty": 4,
+        "sampleStarts": 202,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.145,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.07,
+            "avgTempC": 14.4,
+            "avgWindKmh": 15.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.087,
+            "avgTempC": 16.3,
+            "avgWindKmh": 17.6,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.123,
+            "avgTempC": 18.3,
+            "avgWindKmh": 19.5,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.179,
+            "avgTempC": 19.8,
+            "avgWindKmh": 20.3,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.284,
+            "avgTempC": 20.3,
+            "avgWindKmh": 18.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.612,
+            "avgTempC": 18.8,
+            "avgWindKmh": 15.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.795,
+            "avgTempC": 17.5,
+            "avgWindKmh": 13.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.801,
+            "avgTempC": 17.5,
+            "avgWindKmh": 13.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.77,
+            "avgTempC": 17.2,
+            "avgWindKmh": 13.2,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.463,
+            "avgTempC": 16.6,
+            "avgWindKmh": 15.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.145,
+            "avgTempC": 16,
+            "avgWindKmh": 14.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.053,
+            "avgTempC": 14.7,
+            "avgWindKmh": 14,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "interlagos",
+      "name": "José Carlos Pace",
+      "officialName": "Formula 1 MSC Cruises Grande Prêmio de São Paulo 2026",
+      "country": "brazil",
+      "city": "São Paulo",
+      "type": "RACE",
+      "direction": "ANTI_CLOCKWISE",
+      "latitude": -23.701111,
+      "longitude": -46.697222,
+      "lengthKm": 4.309,
+      "laps": 71,
+      "turns": 15,
+      "layoutId": "interlagos-2",
+      "eventMonth": 11,
+      "firstRaceYear": 1973,
+      "racesHeld": 43,
+      "derived": {
+        "dnfRate": 0.177,
+        "avgPositionsGained": 1.12,
+        "pitStopsPerRace": 2.56,
+        "overtakingDifficulty": 3,
+        "sampleStarts": 220,
+        "confidence": 0.9
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.567,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.774,
+            "avgTempC": 22.3,
+            "avgWindKmh": 19.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.682,
+            "avgTempC": 22.1,
+            "avgWindKmh": 19.9,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.61,
+            "avgTempC": 21.6,
+            "avgWindKmh": 18.7,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.373,
+            "avgTempC": 19.6,
+            "avgWindKmh": 19.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.267,
+            "avgTempC": 17.6,
+            "avgWindKmh": 18.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.255,
+            "avgTempC": 16.3,
+            "avgWindKmh": 17.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.123,
+            "avgTempC": 15.8,
+            "avgWindKmh": 18,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.226,
+            "avgTempC": 16.5,
+            "avgWindKmh": 18.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.288,
+            "avgTempC": 18.6,
+            "avgWindKmh": 20.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.493,
+            "avgTempC": 19.4,
+            "avgWindKmh": 21.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.567,
+            "avgTempC": 19.7,
+            "avgWindKmh": 21.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.666,
+            "avgTempC": 21.5,
+            "avgWindKmh": 20.3,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.87
+    },
+    {
+      "circuitId": "las-vegas",
+      "name": "Las Vegas",
+      "officialName": "Formula 1 Heineken Las Vegas Grand Prix 2026",
+      "country": "united-states-of-america",
+      "city": "Las Vegas",
+      "type": "STREET",
+      "direction": "ANTI_CLOCKWISE",
+      "latitude": 36.175,
+      "longitude": -115.136389,
+      "lengthKm": 6.201,
+      "laps": 50,
+      "turns": 17,
+      "layoutId": "las-vegas-1",
+      "eventMonth": 11,
+      "firstRaceYear": 2023,
+      "racesHeld": 4,
+      "derived": {
+        "dnfRate": 0.167,
+        "avgPositionsGained": 0.96,
+        "pitStopsPerRace": 1.55,
+        "overtakingDifficulty": 6,
+        "sampleStarts": 60,
+        "confidence": 0.65
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.055,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.123,
+            "avgTempC": 9,
+            "avgWindKmh": 15.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.093,
+            "avgTempC": 11.6,
+            "avgWindKmh": 19.7,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.12,
+            "avgTempC": 15.5,
+            "avgWindKmh": 22,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.045,
+            "avgTempC": 20.9,
+            "avgWindKmh": 23.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.047,
+            "avgTempC": 25.1,
+            "avgWindKmh": 24,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0.015,
+            "avgTempC": 32.2,
+            "avgWindKmh": 23.4,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.059,
+            "avgTempC": 34.7,
+            "avgWindKmh": 22,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.062,
+            "avgTempC": 33.3,
+            "avgWindKmh": 21.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.039,
+            "avgTempC": 28.9,
+            "avgWindKmh": 19.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.047,
+            "avgTempC": 21.7,
+            "avgWindKmh": 17.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.055,
+            "avgTempC": 14,
+            "avgWindKmh": 15.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.082,
+            "avgTempC": 9.1,
+            "avgWindKmh": 13.7,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.78
+    },
+    {
+      "circuitId": "lusail",
+      "name": "Lusail",
+      "officialName": "Formula 1 Qatar Airways Qatar Grand Prix 2026",
+      "country": "qatar",
+      "city": "Lusail",
+      "type": "RACE",
+      "direction": "CLOCKWISE",
+      "latitude": 25.49,
+      "longitude": 51.454167,
+      "lengthKm": 5.419,
+      "laps": 57,
+      "turns": 16,
+      "layoutId": "lusail-1",
+      "eventMonth": 11,
+      "firstRaceYear": 2021,
+      "racesHeld": 5,
+      "derived": {
+        "dnfRate": 0.175,
+        "avgPositionsGained": 0.88,
+        "pitStopsPerRace": 2.31,
+        "overtakingDifficulty": 7,
+        "sampleStarts": 80,
+        "confidence": 0.73
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.052,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.073,
+            "avgTempC": 17.7,
+            "avgWindKmh": 22.6,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.08,
+            "avgTempC": 18.7,
+            "avgWindKmh": 24.6,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.085,
+            "avgTempC": 22.1,
+            "avgWindKmh": 25.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.03,
+            "avgTempC": 26.9,
+            "avgWindKmh": 25.3,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.006,
+            "avgTempC": 32.1,
+            "avgWindKmh": 26.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0,
+            "avgTempC": 34.9,
+            "avgWindKmh": 28.1,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.012,
+            "avgTempC": 35.9,
+            "avgWindKmh": 25.3,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0,
+            "avgTempC": 35.7,
+            "avgWindKmh": 23.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0.003,
+            "avgTempC": 33.4,
+            "avgWindKmh": 22.4,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.012,
+            "avgTempC": 29.8,
+            "avgWindKmh": 21.1,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.052,
+            "avgTempC": 24.9,
+            "avgWindKmh": 20.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.047,
+            "avgTempC": 20,
+            "avgWindKmh": 20.6,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.81
+    },
+    {
+      "circuitId": "yas-marina",
+      "name": "Yas Marina",
+      "officialName": "Formula 1 Etihad Airways Abu Dhabi Grand Prix 2026",
+      "country": "united-arab-emirates",
+      "city": "Abu Dhabi",
+      "type": "RACE",
+      "direction": "ANTI_CLOCKWISE",
+      "latitude": 24.467222,
+      "longitude": 54.603056,
+      "lengthKm": 5.281,
+      "laps": 58,
+      "turns": 16,
+      "layoutId": "yas-marina-2",
+      "eventMonth": 12,
+      "firstRaceYear": 2009,
+      "racesHeld": 18,
+      "derived": {
+        "dnfRate": 0.14,
+        "avgPositionsGained": 0.36,
+        "pitStopsPerRace": 1.52,
+        "overtakingDifficulty": 9,
+        "sampleStarts": 100,
+        "confidence": 0.82
+      },
+      "weather": {
+        "eventMonthRainProbability": 0.038,
+        "months": [
+          {
+            "month": 1,
+            "rainDayProbability": 0.053,
+            "avgTempC": 19.7,
+            "avgWindKmh": 21.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 2,
+            "rainDayProbability": 0.042,
+            "avgTempC": 20.8,
+            "avgWindKmh": 23.6,
+            "sampleDays": 311
+          },
+          {
+            "month": 3,
+            "rainDayProbability": 0.056,
+            "avgTempC": 23.7,
+            "avgWindKmh": 24.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 4,
+            "rainDayProbability": 0.018,
+            "avgTempC": 27.7,
+            "avgWindKmh": 24.7,
+            "sampleDays": 330
+          },
+          {
+            "month": 5,
+            "rainDayProbability": 0.003,
+            "avgTempC": 31.6,
+            "avgWindKmh": 24.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 6,
+            "rainDayProbability": 0,
+            "avgTempC": 34,
+            "avgWindKmh": 24.9,
+            "sampleDays": 330
+          },
+          {
+            "month": 7,
+            "rainDayProbability": 0.009,
+            "avgTempC": 35.9,
+            "avgWindKmh": 24.4,
+            "sampleDays": 341
+          },
+          {
+            "month": 8,
+            "rainDayProbability": 0.006,
+            "avgTempC": 35.9,
+            "avgWindKmh": 23.9,
+            "sampleDays": 341
+          },
+          {
+            "month": 9,
+            "rainDayProbability": 0,
+            "avgTempC": 33.6,
+            "avgWindKmh": 23.2,
+            "sampleDays": 330
+          },
+          {
+            "month": 10,
+            "rainDayProbability": 0.006,
+            "avgTempC": 30.3,
+            "avgWindKmh": 21.8,
+            "sampleDays": 341
+          },
+          {
+            "month": 11,
+            "rainDayProbability": 0.018,
+            "avgTempC": 26,
+            "avgWindKmh": 20.8,
+            "sampleDays": 330
+          },
+          {
+            "month": 12,
+            "rainDayProbability": 0.038,
+            "avgTempC": 21.9,
+            "avgWindKmh": 19.9,
+            "sampleDays": 341
+          }
+        ]
+      },
+      "unavailable": [
+        "powerDemand",
+        "downforceDemand",
+        "brakingDemand",
+        "tractionDemand",
+        "tyreStress",
+        "abrasion",
+        "trackEvolution",
+        "grip",
+        "pitLossSeconds",
+        "safetyCarRate",
+        "sprintWeekend"
+      ],
+      "sources": [
+        {
+          "name": "F1DB",
+          "url": "https://github.com/f1db/f1db",
+          "license": "CC BY 4.0",
+          "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+        },
+        {
+          "name": "Open-Meteo Historical Weather API",
+          "url": "https://open-meteo.com/en/docs/historical-weather-api",
+          "license": "CC BY 4.0",
+          "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+        }
+      ],
+      "confidence": 0.84
+    }
+  ],
+  "sources": [
+    {
+      "name": "F1DB",
+      "url": "https://github.com/f1db/f1db",
+      "license": "CC BY 4.0",
+      "note": "circuitos, calendário, grids, posições e abandono (snapshot local)"
+    },
+    {
+      "name": "Open-Meteo Historical Weather API",
+      "url": "https://open-meteo.com/en/docs/historical-weather-api",
+      "license": "CC BY 4.0",
+      "note": "climatologia ERA5/ERA5-Land por coordenada do circuito (2015-2025)"
+    }
+  ]
+}

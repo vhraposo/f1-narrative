@@ -142,6 +142,7 @@ describe("F22.2 — provider Ollama do Dialogue Realizer (stub, sem rede)", () =
     expect(body).toContain("Kimi");
     expect(body).toContain("REACTION");
     expect(body).toContain("json_object");
+    expect(body).toContain('"reasoning_effort":"none"');
   });
 
   it("LlmDialogueRealizer cai no determinístico quando o adapter falha", async () => {

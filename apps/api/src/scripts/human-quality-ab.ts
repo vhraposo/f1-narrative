@@ -172,7 +172,7 @@ function aggregate(rows: OutputMetrics[]) {
 }
 
 async function main(): Promise<void> {
-  const model = process.env.OLLAMA_MODEL ?? "llama3.2:latest";
+  const model = process.env.OLLAMA_MODEL ?? "qwen3.5:9b";
   const provider = createOllamaDialogueRealizerProviderFromEnv({
     model,
     timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS) || 60_000,
